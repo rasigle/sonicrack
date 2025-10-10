@@ -1,0 +1,14 @@
+[project]
+name = "synthplay"
+version = "0.1.0"
+description = "Just a playground for creating sounds with Python"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.10.7",
+    "numpy>=2.2.6",
+    "pyaudio",
+    "pynput>=1.8.1",
+    "pyqt6",
+    "scipy",
+    "sounddevice>=0.5.2",
+]

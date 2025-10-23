@@ -2,8 +2,19 @@ import sys
 import numpy as np
 from scipy import signal
 from PyQt6.QtWidgets import (
-    QApplication, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QComboBox, QDoubleSpinBox, QWidget, QScrollArea, QFrame, QGroupBox, QCheckBox
+    QApplication,
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QComboBox,
+    QDoubleSpinBox,
+    QWidget,
+    QScrollArea,
+    QFrame,
+    QGroupBox,
+    QCheckBox,
 )
 from PyQt6.QtCore import QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -118,8 +129,7 @@ class SignalGroup(QGroupBox):
 
     def add_waveform(self):
         widget = WaveformWidget(
-            remove_callback=self.remove_waveform,
-            update_callback=self.update_callback
+            remove_callback=self.remove_waveform, update_callback=self.update_callback
         )
         self.waveforms.append(widget)
         self.waveform_layout.addWidget(widget)
@@ -140,7 +150,9 @@ class SignalGroup(QGroupBox):
             elif p["waveform"] == "square":
                 wave = signal.square(2 * np.pi * p["freq"] * t + p["phase"])
             elif p["waveform"] == "triangle":
-                wave = signal.sawtooth(2 * np.pi * p["freq"] * t + p["phase"], width=0.5)
+                wave = signal.sawtooth(
+                    2 * np.pi * p["freq"] * t + p["phase"], width=0.5
+                )
             elif p["waveform"] == "saw":
                 wave = signal.sawtooth(2 * np.pi * p["freq"] * t + p["phase"])
             y += p["amp"] * wave
@@ -211,7 +223,6 @@ class CompositeSignalWidget(QFrame):
         return self.operation.currentText()
 
 
-
 # --- Main Window ---
 class TimeFreqDialog(QDialog):
     def __init__(self):
@@ -276,7 +287,7 @@ class TimeFreqDialog(QDialog):
         widget = CompositeSignalWidget(
             get_group_names=self.get_group_names,
             remove_callback=self.remove_composite_signal,
-            update_callback=self.update_plots
+            update_callback=self.update_plots,
         )
         self.composites.append(widget)
         self.composite_container.addWidget(widget)
@@ -288,7 +299,9 @@ class TimeFreqDialog(QDialog):
         self.update_plots()
 
     def add_group(self):
-        group = SignalGroup(remove_callback=self.remove_group, update_callback=self.update_plots)
+        group = SignalGroup(
+            remove_callback=self.remove_group, update_callback=self.update_plots
+        )
         self.groups.append(group)
         self.group_container.addWidget(group)
         self.update_plots()
@@ -321,7 +334,9 @@ class TimeFreqDialog(QDialog):
             # Time-domain
             if show_time:
                 style = "-" if show_fft else ":"  # dashed if hidden in FFT
-                self.time_canvas.axes.plot(t, y, label=f"Signal {i+1}", color=color, linestyle=style)
+                self.time_canvas.axes.plot(
+                    t, y, label=f"Signal {i+1}", color=color, linestyle=style
+                )
             else:
                 # Dimmed version if hidden in time
                 self.time_canvas.axes.plot(t, y, color="grey", linestyle=":", alpha=0.3)
@@ -358,14 +373,20 @@ class TimeFreqDialog(QDialog):
 
             if show_time:
                 style = "--" if show_fft else ":"
-                self.time_canvas.axes.plot(t, combo, color=color, linestyle=style, label=label)
+                self.time_canvas.axes.plot(
+                    t, combo, color=color, linestyle=style, label=label
+                )
             else:
-                self.time_canvas.axes.plot(t, combo, color="grey", linestyle=":", alpha=0.3)
+                self.time_canvas.axes.plot(
+                    t, combo, color="grey", linestyle=":", alpha=0.3
+                )
 
             if show_fft:
                 freqs = np.fft.rfftfreq(len(t), d=t[1] - t[0])
                 Y = np.abs(np.fft.rfft(combo))
-                self.freq_canvas.axes.plot(freqs, Y, color=color, linestyle=style, label=label)
+                self.freq_canvas.axes.plot(
+                    freqs, Y, color=color, linestyle=style, label=label
+                )
 
         # Axes titles, legends, and redraw
         self.time_canvas.axes.set_title("Time Domain Signals")

@@ -5,18 +5,29 @@ import threading
 import numpy as np
 import sounddevice as sd
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import (
-    QApplication
-)
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QComboBox,
-    QDial, QPushButton, QGroupBox, QCheckBox, QFileDialog, QWidget
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QGridLayout,
+    QLabel,
+    QComboBox,
+    QDial,
+    QPushButton,
+    QGroupBox,
+    QCheckBox,
+    QFileDialog,
+    QWidget,
 )
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+from src.engine.envelopes import generate_adsr_envelope
+
 
 # --- Helper functions ----------------------------------------------------------
+
 
 def generate_waveform(waveform_type, t, freq):
     if waveform_type == "Sine":
@@ -30,27 +41,12 @@ def generate_waveform(waveform_type, t, freq):
     return np.zeros_like(t)
 
 
-def generate_adsr_envelope(t, attack, decay, sustain, release, total_time):
-    env = np.zeros_like(t)
-    attack_end = attack
-    decay_end = attack + decay
-    release_start = total_time - release
-    for i, ti in enumerate(t):
-        if ti < attack_end:
-            env[i] = ti / attack_end if attack_end > 0 else 1
-        elif ti < decay_end:
-            env[i] = 1 - (ti - attack_end) / max(decay, 1e-9) * (1 - sustain)
-        elif ti < release_start:
-            env[i] = sustain
-        else:
-            env[i] = sustain * (1 - (ti - release_start) / max(release, 1e-9))
-    return env
-
-
 # --- Knob widget ---------------------------------------------------------------
+
 
 class Knob(QWidget):
     """Small rotary knob with a label and value display."""
+
     def __init__(self, name, minv, maxv, step, default, callback):
         super().__init__()
         layout = QVBoxLayout(self)
@@ -95,6 +91,7 @@ class Knob(QWidget):
 
 
 # --- Main Synth Dialog ---------------------------------------------------------
+
 
 class ADSRDialog(QDialog):
     def __init__(self, parent=None):
@@ -150,8 +147,12 @@ class ADSRDialog(QDialog):
         # --- LFO knobs ---
         self.lfo_enable = QCheckBox("Enable LFO")
         self.lfo_enable.stateChanged.connect(self.update_plot)
-        self.lfo_freq_knob = Knob("LFO Freq", 0.1, 20, 0.1, 2, lambda _: self.update_plot())
-        self.lfo_depth_knob = Knob("LFO Depth", 0.0, 1.0, 0.01, 0.3, lambda _: self.update_plot())
+        self.lfo_freq_knob = Knob(
+            "LFO Freq", 0.1, 20, 0.1, 2, lambda _: self.update_plot()
+        )
+        self.lfo_depth_knob = Knob(
+            "LFO Depth", 0.0, 1.0, 0.01, 0.3, lambda _: self.update_plot()
+        )
         self.lfo_target_box = QComboBox()
         self.lfo_target_box.addItems(["Amplitude", "Frequency"])
         self.lfo_target_box.currentIndexChanged.connect(self.update_plot)
@@ -159,8 +160,12 @@ class ADSRDialog(QDialog):
         # --- VCO knobs ---
         self.vco_enable = QCheckBox("Enable VCO")
         self.vco_enable.stateChanged.connect(self.update_plot)
-        self.vco_freq_knob = Knob("VCO Freq", 0.1, 1000, 1, 100, lambda _: self.update_plot())
-        self.vco_depth_knob = Knob("VCO Depth", 0.0, 100.0, 1.0, 20, lambda _: self.update_plot())
+        self.vco_freq_knob = Knob(
+            "VCO Freq", 0.1, 1000, 1, 100, lambda _: self.update_plot()
+        )
+        self.vco_depth_knob = Knob(
+            "VCO Depth", 0.0, 100.0, 1.0, 20, lambda _: self.update_plot()
+        )
         self.vco_wave_box = QComboBox()
         self.vco_wave_box.addItems(["Sine", "Triangle", "Sawtooth", "Square"])
         self.vco_wave_box.currentIndexChanged.connect(self.update_plot)
@@ -181,10 +186,16 @@ class ADSRDialog(QDialog):
 
         # --- Layout organization ---
         knob_row1 = [
-            self.attack_knob, self.decay_knob, self.sustain_knob, self.release_knob,
-            self.freq_knob, self.amp_knob,
-            self.lfo_freq_knob, self.lfo_depth_knob,
-            self.vco_freq_knob, self.vco_depth_knob
+            self.attack_knob,
+            self.decay_knob,
+            self.sustain_knob,
+            self.release_knob,
+            self.freq_knob,
+            self.amp_knob,
+            self.lfo_freq_knob,
+            self.lfo_depth_knob,
+            self.vco_freq_knob,
+            self.vco_depth_knob,
         ]
         for i, knob in enumerate(knob_row1):
             ctrl_layout.addWidget(knob, 1, i)
@@ -214,7 +225,11 @@ class ADSRDialog(QDialog):
         freq = self.freq_knob.value()
         amp = self.amp_knob.value()
 
-        waves = [generate_waveform(cb.text(), t, freq) for cb in self.waveform_checks if cb.isChecked()]
+        waves = [
+            generate_waveform(cb.text(), t, freq)
+            for cb in self.waveform_checks
+            if cb.isChecked()
+        ]
         base_wave = np.mean(waves, axis=0) if waves else np.zeros_like(t)
 
         # LFO
@@ -228,14 +243,20 @@ class ADSRDialog(QDialog):
 
         # VCO
         if self.vco_enable.isChecked():
-            mod = generate_waveform(self.vco_wave_box.currentText(), t, self.vco_freq_knob.value())
+            mod = generate_waveform(
+                self.vco_wave_box.currentText(), t, self.vco_freq_knob.value()
+            )
             vco = np.sin(2 * np.pi * (freq + mod * self.vco_depth_knob.value()) * t)
         else:
             vco = np.sin(2 * np.pi * freq * t)
 
         adsr = generate_adsr_envelope(
-            t, self.attack_knob.value(), self.decay_knob.value(),
-            self.sustain_knob.value(), self.release_knob.value(), self.duration
+            t,
+            self.attack_knob.value(),
+            self.decay_knob.value(),
+            self.sustain_knob.value(),
+            self.release_knob.value(),
+            self.duration,
         )
         signal = (base_wave + 0.5 * vco) * adsr * amp * amp_mod
         return signal, base_wave * amp, adsr * amp, t
@@ -246,8 +267,12 @@ class ADSRDialog(QDialog):
 
         # Time domain
         self.time_ax.clear()
-        self.time_ax.plot(t, base_wave, color="grey", linestyle="--", alpha=0.5, label="Original Wave")
-        self.time_ax.plot(t, adsr_env, color="orange", linestyle=":", alpha=0.7, label="ADSR Envelope")
+        self.time_ax.plot(
+            t, base_wave, color="grey", linestyle="--", alpha=0.5, label="Original Wave"
+        )
+        self.time_ax.plot(
+            t, adsr_env, color="orange", linestyle=":", alpha=0.7, label="ADSR Envelope"
+        )
         self.time_ax.plot(t, signal, color="tab:blue", label="Final Signal")
         self.time_ax.set_title("Time Domain (ADSR, LFO, VCO)")
         self.time_ax.set_xlabel("Time [s]")
@@ -315,13 +340,17 @@ class ADSRDialog(QDialog):
             "vco_wave": self.vco_wave_box.currentText(),
             "waveforms": [cb.text() for cb in self.waveform_checks if cb.isChecked()],
         }
-        path, _ = QFileDialog.getSaveFileName(self, "Save Preset", "", "ADSR Preset (*.json)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Preset", "", "ADSR Preset (*.json)"
+        )
         if path:
             with open(path, "w") as f:
                 json.dump(data, f, indent=2)
 
     def load_preset(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Load Preset", "", "ADSR Preset (*.json)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Preset", "", "ADSR Preset (*.json)"
+        )
         if not path:
             return
         with open(path) as f:
@@ -343,6 +372,7 @@ class ADSRDialog(QDialog):
         self.vco_depth_knob.setValue(data.get("vco_depth", 20))
         self.vco_wave_box.setCurrentText(data.get("vco_wave", "Sine"))
         self.update_plot()
+
 
 # --- Run App ---
 if __name__ == "__main__":

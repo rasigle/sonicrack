@@ -4,7 +4,8 @@ import numpy as np
 import pyaudio
 from pynput import keyboard
 
-from src.generator import generate_waveform, WaveForm, envelope
+from src.engine.generators import generate_waveform, WaveForm
+from src.engine.envelopes import envelope
 
 # 🎧 Audio settings
 fs = 44100
@@ -13,19 +14,19 @@ SAMPLE_SIZE = 1024
 
 # 🎵 Keyboard → Frequency mapping (one octave + sharps)
 KEY_FREQUENCIES = {
-    'a': 261.63,  # C4
-    'w': 277.18,  # C#4
-    's': 293.66,  # D4
-    'e': 311.13,  # D#4
-    'd': 329.63,  # E4
-    'f': 349.23,  # F4
-    't': 369.99,  # F#4
-    'g': 392.00,  # G4
-    'y': 415.30,  # G#4
-    'h': 440.00,  # A4
-    'u': 466.16,  # A#4
-    'j': 493.88,  # B4
-    'k': 523.25,  # C5
+    "a": 261.63,  # C4
+    "w": 277.18,  # C#4
+    "s": 293.66,  # D4
+    "e": 311.13,  # D#4
+    "d": 329.63,  # E4
+    "f": 349.23,  # F4
+    "t": 369.99,  # F#4
+    "g": 392.00,  # G4
+    "y": 415.30,  # G#4
+    "h": 440.00,  # A4
+    "u": 466.16,  # A#4
+    "j": 493.88,  # B4
+    "k": 523.25,  # C5
 }
 
 
@@ -43,36 +44,37 @@ def audio_thread():
     """Audio generation loop."""
     global running
     p = pyaudio.PyAudio()
-    stream = p.open(format=pyaudio.paFloat32,
-                    channels=1,
-                    rate=fs,
-                    output=True,
-                    frames_per_buffer=SAMPLE_SIZE)
+    stream = p.open(
+        format=pyaudio.paFloat32,
+        channels=1,
+        rate=fs,
+        output=True,
+        frames_per_buffer=SAMPLE_SIZE,
+    )
 
     while running:
         samples = np.zeros(SAMPLE_SIZE, dtype=np.float32)
         dt = 1.0 / fs
 
         for key, note in list(active_notes.items()):
-            freq = note['freq']
-            phase = note['phase']
-            t0 = note['time']
-            released = note['released']
-            release_start = note.get('release_start', None)
+            freq = note["freq"]
+            phase = note["phase"]
+            t0 = note["time"]
+            released = note["released"]
+            release_start = note.get("release_start", None)
 
             # Envelope + waveform
             t_vals = np.arange(SAMPLE_SIZE) * dt
-            amps = np.array([
-                envelope(t0 + t, released, release_start or 0)
-                for t in t_vals
-            ])
+            amps = np.array(
+                [envelope(t0 + t, released, release_start or 0) for t in t_vals]
+            )
             wave = generate_waveform(waveform_type, freq, phase, SAMPLE_SIZE, fs)
             samples += wave * amps
 
             # Update note state
-            note['time'] += SAMPLE_SIZE * dt
-            note['phase'] += SAMPLE_SIZE
-            if released and envelope(note['time'], True, release_start) <= 0:
+            note["time"] += SAMPLE_SIZE * dt
+            note["phase"] += SAMPLE_SIZE
+            if released and envelope(note["time"], True, release_start) <= 0:
                 del active_notes[key]
 
         # Normalize
@@ -80,7 +82,7 @@ def audio_thread():
             samples /= len(active_notes)
         stream.write(
             (volume * samples).astype(np.float32).tobytes(),
-            exception_on_underflow=False
+            exception_on_underflow=False,
         )
 
     stream.stop_stream()
@@ -90,13 +92,14 @@ def audio_thread():
 
 # ---------- KEYBOARD HANDLERS ----------
 
+
 def on_press(key):
     global waveform_type
     try:
         k = key.char.lower()
 
         # Switch waveforms
-        if k in ['1', '2', '3', '4']:
+        if k in ["1", "2", "3", "4"]:
             waveform_type = WAVEFORMS[int(k) - 1]
             print(f"🎛️ Waveform: {waveform_type}")
             return
@@ -104,10 +107,10 @@ def on_press(key):
         # Play notes
         if k in KEY_FREQUENCIES and k not in active_notes:
             active_notes[k] = {
-                'freq': KEY_FREQUENCIES[k],
-                'phase': 0,
-                'time': 0,
-                'released': False
+                "freq": KEY_FREQUENCIES[k],
+                "phase": 0,
+                "time": 0,
+                "released": False,
             }
             print(f"🎵 Pressed: {k}")
     except AttributeError:
@@ -117,9 +120,9 @@ def on_press(key):
 def on_release(key):
     try:
         k = key.char.lower()
-        if k in active_notes and not active_notes[k]['released']:
-            active_notes[k]['released'] = True
-            active_notes[k]['release_start'] = active_notes[k]['time']
+        if k in active_notes and not active_notes[k]["released"]:
+            active_notes[k]["released"] = True
+            active_notes[k]["release_start"] = active_notes[k]["time"]
             print(f"Released: {k}")
     except AttributeError:
         pass

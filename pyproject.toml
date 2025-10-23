@@ -5,10 +5,21 @@ description = "Just a playground for creating sounds with Python"
 requires-python = ">=3.10"
 dependencies = [
     "matplotlib>=3.10.7",
+    "notebook>=7.4.7",
     "numpy>=2.2.6",
     "pyaudio",
     "pynput>=1.8.1",
     "pyqt6",
+    "pyqtgraph>=0.13.7",
     "scipy",
     "sounddevice>=0.5.2",
+]
+
+
+[dependency-groups]
+"dev" = [
+    "black>=24.3.5",
+    "flake8>=7.0.1",
+    "pytest>=7.4.2",
+    "pytest-cov>=4.1.0",
 ]

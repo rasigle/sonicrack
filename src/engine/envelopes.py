@@ -1,6 +1,8 @@
 import numpy as np
 import itertools
 
+from engine.generators import DEFAULT_SAMPLE_RATE
+
 
 class ADSREnvelope:
     """
@@ -12,11 +14,11 @@ class ADSREnvelope:
 
     def __init__(
         self,
-        attack_duration=0.05,
-        decay_duration=0.2,
-        sustain_level=0.7,
-        release_duration=0.3,
-        sample_rate=44_100,
+        attack_duration: float = 0.05,
+        decay_duration: float = 0.2,
+        sustain_level: float = 0.7,
+        release_duration: float = 0.3,
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
     ):
         """
         attack_duration : time taken to reach from 0 to 1 in s.
@@ -31,6 +33,8 @@ class ADSREnvelope:
         self.sustain_level = sustain_level
         self.release_duration = release_duration
         self._sample_rate = sample_rate
+
+        self.stepper = None
 
     def _get_ads_stepper(self):
         steppers = []
@@ -49,13 +53,13 @@ class ADSREnvelope:
                 )
             )
         while True:
-            l = len(steppers)
-            if l > 0:
+            stepper_len = len(steppers)
+            if stepper_len > 0:
                 val = next(steppers[0])
-                if l == 2 and val > 1:
+                if stepper_len == 2 and val > 1:
                     steppers.pop(0)
                     val = next(steppers[0])
-                elif l == 1 and val < self.sustain_level:
+                elif stepper_len == 1 and val < self.sustain_level:
                     steppers.pop(0)
                     val = self.sustain_level
             else:

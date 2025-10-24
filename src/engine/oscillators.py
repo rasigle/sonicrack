@@ -151,15 +151,15 @@ class Oscillator(ABC):
 
     @staticmethod
     def squish_val(val, min_val=0, max_val=1):
-        """Map a value in \[-1, 1\] to a range \[min_val, max_val\].
+        """Map a value in [-1, 1] to a range [min_val, max_val].
 
         Args:
-            val (float): Value expected roughly in \[-1, 1\].
+            val (float): Value expected roughly in [-1, 1].
             min_val (float, optional): Minimum of target range. Defaults to 0.
             max_val (float, optional): Maximum of target range. Defaults to 1.
 
         Returns:
-            float: Rescaled value in \[min_val, max_val\].
+            float: Rescaled value in [min_val, max_val].
         """
         return (((val + 1) / 2) * (max_val - min_val)) + min_val
 
@@ -194,17 +194,22 @@ class Oscillator(ABC):
         self._initialize_osc()
         return self
 
-    def get_samples(self, n: int = DEFAULT_SAMPLE_RATE):
+    def get_samples(self, n: int = DEFAULT_SAMPLE_RATE, it: bool = False):
         """Return the next *n* samples from this generator.
 
         Args:
-            n (int, optional): Number of samples to produce. Defaults to
-                `DEFAULT_SAMPLE_RATE`.
+            n: Number of samples to produce. Defaults to `DEFAULT_SAMPLE_RATE`.
+            it: If True, return an iterator instead of a list.
 
         Returns:
             list[float]: List of `n` consecutive samples produced by calling
             `next(self)` repeatedly.
+
+        Note:
+            If `it` is True, the method returns an iterator instead of a list.
         """
+        if it:
+            iter(self)
         return [next(self) for _ in range(n)]
 
 
@@ -250,7 +255,7 @@ class TriangleOscillator(SawtoothOscillator):
     """Triangle wave generator derived from sawtooth logic.
 
     The triangle waveform is computed by taking the absolute of a centered
-    sawtooth and scaling it to \[-1, 1\] before amplitude scaling.
+    sawtooth and scaling it to [-1, 1] before amplitude scaling.
     """
 
     def __next__(self):
@@ -319,12 +324,12 @@ class SquareOscillator(SineOscillator):
         """Construct a square oscillator.
 
         Args:
-            freq (float, optional): Frequency in Hz.
-            amp (float, optional): Amplitude multiplier.
-            phase (float, optional): Phase in degrees.
-            sample_rate (int, optional): Sample rate in samples/sec.
-            wave_range (tuple, optional): Output raw range before amplitude scaling.
-            threshold (float, optional): Threshold used on sine reference to decide polarity.
+            freq: Frequency in Hz.
+            amp: Amplitude multiplier.
+            phase: Phase in degrees.
+            sample_rate: Sample rate in samples/sec.
+            wave_range: Output raw range before amplitude scaling.
+            threshold: Threshold used on sine reference to decide polarity.
         """
         super().__init__(freq, amp, phase, sample_rate, wave_range)
         self.threshold = threshold

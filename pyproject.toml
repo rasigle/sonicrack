@@ -1,9 +1,14 @@
 [project]
 name = "synthplay"
-version = "0.1.0"
+authors = [
+    {name = "Rainer Sigle", email = "rainer.sigle@live.de"}
+]
 description = "Just a playground for creating sounds with Python"
+
+version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
+    "librosa>=0.11.0",
     "matplotlib>=3.10.7",
     "notebook>=7.4.7",
     "numpy>=2.2.6",
@@ -18,7 +23,7 @@ dependencies = [
 
 [dependency-groups]
 "dev" = [
-    "black>=24.3.5",
+    "black[jupyter]",
     "flake8>=7.0.1",
     "pytest>=7.4.2",
     "pytest-cov>=4.1.0",

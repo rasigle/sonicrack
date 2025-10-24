@@ -1,20 +1,23 @@
+from engine.modulator import Modulator
+from engine.oscillator import Oscillator
+
+
 class ModulatedOscillator:
     """
     Creates a modulated oscillator by using a plain oscillator along with modulators,
     the `[parameter]_mod` functions of the signature (float, float) -> float are used
     to decide the method of modulation.
 
-    Has `.trigger_release()` implemented to trigger the release stage of any of the
-    modulators. Similarly has `.ended` to indicate the end of signal generator of the
+    Has `.trigger_release()` implemented to trigger the release stage of the
+    modulators. Similarly, has `.ended` to indicate the end of signal generator of the
     modulators if the generation is meant to be finite.
 
     The ModulatedOscillator internal values are set by calling __init__ and then
     __next__ to generate the sequence of values.
     """
 
-    def __init__(
-        self, oscillator, *modulators, amp_mod=None, freq_mod=None, phase_mod=None
-    ):
+    def __init__(self, oscillator, *modulators, amp_mod=None,
+                 freq_mod=None, phase_mod=None):
         """
         oscillator : Instance of `Oscillator`, a component that generates a
             periodic signal of a given frequency.
@@ -27,16 +30,26 @@ class ModulatedOscillator:
 
         amp_mod : Any function that takes in the initial oscillator amplitude
             value and the modulator value and returns the modified value.
-            If set the first modualtor is used for the values.
+            If set the first modulator is used for the values.
 
         freq_mod : Any function that takes in the initial oscillator frequency
             value and the modulator value and returns the modified value.
-            If set the second modualtor of the last modulator is used for the values.
+            If set the second modulator of the last modulator is used for the values.
 
         phase_mod : Any function that takes in the initial oscillator phase
             value and the modulator value and returns the modified value.
-            If set the third modualtor of the last modulator is used for the values.
+            If set the third modulator of the last modulator is used for the values.
         """
+        if not isinstance(oscillator, Oscillator):
+            raise TypeError(
+                f"Oscillator should be an instance of Oscillator. "
+                f"Given: {type(oscillator)}"
+            )
+        if not all([isinstance(m, Modulator) for m in modulators]):
+            raise TypeError(
+                f"All given modulators should be instances of Modulator. "
+                f"Given: {[type(mod) for mod in modulators]}"
+            )
         self.oscillator = oscillator
         self.modulators = modulators
 
@@ -76,6 +89,7 @@ class ModulatedOscillator:
         for modulator in self.modulators:
             if hasattr(modulator, tr):
                 modulator.trigger_release()
+
         if hasattr(self.oscillator, tr):
             self.oscillator.trigger_release()
 

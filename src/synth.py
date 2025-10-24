@@ -5,7 +5,7 @@ import pyaudio
 from pynput import keyboard
 
 from src.engine.generators import generate_waveform, WaveForm
-from src.engine.envelopes import envelope
+from envelopes import envelope
 
 # 🎧 Audio settings
 fs = 44100

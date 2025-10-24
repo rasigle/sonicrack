@@ -1,10 +1,16 @@
-import numpy as np
 import itertools
+from abc import ABC
 
-from engine.generators import DEFAULT_SAMPLE_RATE
+from constants import DEFAULT_SAMPLE_RATE
 
 
-class ADSREnvelope:
+class Modulator(ABC):
+
+    def __init__(self):
+        pass
+
+
+class ADSREnvelope(Modulator):
     """
     A simple ADSR envelope with the four stages attack, decay, release and sustain.
 
@@ -12,14 +18,10 @@ class ADSREnvelope:
     similarly has `.ended`, a flag to indicate the end of the release stage.
     """
 
-    def __init__(
-        self,
-        attack_duration: float = 0.05,
-        decay_duration: float = 0.2,
-        sustain_level: float = 0.7,
-        release_duration: float = 0.3,
-        sample_rate: float = DEFAULT_SAMPLE_RATE,
-    ):
+    def __init__(self, attack_duration: float = 0.05,
+                 decay_duration: float = 0.2, sustain_level: float = 0.7,
+                 release_duration: float = 0.3,
+                 sample_rate: float = DEFAULT_SAMPLE_RATE):
         """
         attack_duration : time taken to reach from 0 to 1 in s.
         decay_duration : time taken to reach from 1 to `sustain_level` in s.
@@ -28,6 +30,7 @@ class ADSREnvelope:
         release_duration : time taken to reach 0 from current value in s.
         sample_rate : the sample rate at which the notes are to be consumed.
         """
+        super().__init__()
         self.attack_duration = attack_duration
         self.decay_duration = decay_duration
         self.sustain_level = sustain_level
@@ -44,6 +47,7 @@ class ADSREnvelope:
                     start=0, step=1 / (self.attack_duration * self._sample_rate)
                 )
             )
+
         if self.decay_duration > 0:
             steppers.append(
                 itertools.count(
@@ -52,6 +56,7 @@ class ADSREnvelope:
                     / (self.decay_duration * self._sample_rate),
                 )
             )
+
         while True:
             stepper_len = len(steppers)
             if stepper_len > 0:
@@ -94,43 +99,7 @@ class ADSREnvelope:
     def trigger_release(self):
         self.stepper = self._get_r_stepper()
 
-
-def envelope(t, released, release_start):
-    """Compute ADSR amplitude at time t."""
-
-    # 🎚️ ADSR envelope settings
-    ATTACK = 0.05
-    DECAY = 0.1
-    SUSTAIN_LEVEL = 0.4
-    RELEASE = 0.3
-
-    if not released:
-        if t < ATTACK:
-            return t / ATTACK
-        elif t < ATTACK + DECAY:
-            return 1 - (1 - SUSTAIN_LEVEL) * ((t - ATTACK) / DECAY)
-        else:
-            return SUSTAIN_LEVEL
-    else:
-        rel_t = t - release_start
-        if rel_t < RELEASE:
-            return SUSTAIN_LEVEL * (1 - rel_t / RELEASE)
-        else:
-            return 0.0
-
-
-def generate_adsr_envelope(t, attack, decay, sustain, release, total_time):
-    env = np.zeros_like(t)
-    attack_end = attack
-    decay_end = attack + decay
-    release_start = total_time - release
-    for i, ti in enumerate(t):
-        if ti < attack_end:
-            env[i] = ti / attack_end if attack_end > 0 else 1
-        elif ti < decay_end:
-            env[i] = 1 - (ti - attack_end) / max(decay, 1e-9) * (1 - sustain)
-        elif ti < release_start:
-            env[i] = sustain
-        else:
-            env[i] = sustain * (1 - (ti - release_start) / max(release, 1e-9))
-    return env
+    def __str__(self):
+        return (f"ADSREnvelope(attack={self.attack_duration}, "
+                f"decay={self.decay_duration}, sustain={self.sustain_level}, "
+                f"release={self.release_duration})")

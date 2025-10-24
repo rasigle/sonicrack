@@ -77,7 +77,6 @@ class SmoothSequencer:
 
             remain = self.samples_in_step - self.samples_generated
             n = min(frames - idx, remain)
-            t = np.arange(n)
 
             # frequency ramp near end of note
             if remain < self.freq_ramp_samps:

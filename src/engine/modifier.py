@@ -4,20 +4,30 @@ instances can be used as functions to alter the output
 of any kind of generator. Generally used in a Chain
 component.
 """
-
+from abc import abstractmethod, ABC
 from collections.abc import Iterable
 
 
-class Panner:
+class Modifier(ABC):
+    """
+    Base class for all modifiers.
+    """
+
+    @abstractmethod
+    def __call__(self, val):
+        pass
+
+class Panner(Modifier):
     """
     Will convert a mono input into stereo.
     """
 
-    def __init__(self, r=0.5):
+    def __init__(self, r: float = 0.5):
         """
-        r : is the right pan value, 0 means 100% left
-            panned and 1 means 100% right panned, 0.5
-            is center panned.
+
+        Args:
+            r : is the right pan value, 0 means 100% left panned and 1 means 100% right
+                panned, 0.5 is center panned.
         """
         self.r = r
 
@@ -29,15 +39,15 @@ class Panner:
 
 class ModulatedPanner(Panner):
     """
-    Same as the Panner but takes in a modulator
-    to set the internal `r` value.
+    Same as the Panner but takes in a modulator to set the internal `r` value.
     """
 
     def __init__(self, modulator):
         """
-        modulator : any kind of generator that returns a
-            value within the range of [-1, 1] this is used
-            to set the `r` value that has a range of [0, 1]
+
+        Args:
+            modulator : any kind of generator that returns a value within the range
+                of [-1, 1] this is used to set the `r` value that has a range of [0, 1].
         """
         super().__init__(r=0)
         self.modulator = modulator
@@ -51,13 +61,11 @@ class ModulatedPanner(Panner):
         return self.r
 
 
-class Volume:
-    """
-    Scales the input values by `amp`, can be used
-    to increase or decrease the amplitude.
+class Volume(Modifier):
+    """Scales the input values by `amp`, can be used to increase or decrease the amplitude.
     """
 
-    def __init__(self, amp=1.0):
+    def __init__(self, amp: float = 1.0):
         """
         amp : sets the amplitude multiplier for the
             input signal (1 : no change, 0 : no output).
@@ -74,16 +82,15 @@ class Volume:
 
 
 class ModulatedVolume(Volume):
-    """
-    Same as the volume component but the internal `amp` is set by a modulator.
+    """Same as the volume component but the internal `amp` is set by a modulator.
     """
 
     def __init__(self, modulator):
         """
-        modulator : any kind of generator that returns a
-            value within the range of [0, max_amp] this is used
-            to set the `amp` value directly. If max_amp is > 1
-            then the amplitude of the input will increase.
+        Args:
+            modulator: Any kind of generator that returns a value within the range
+                of [0, max_amp] this is used to set the `amp` value directly.
+                If max_amp is > 1 then the amplitude of the input will increase.
         """
         super().__init__(0.0)
         self.modulator = modulator
@@ -108,7 +115,7 @@ class ModulatedVolume(Volume):
         return ended
 
 
-class Clipper:
+class Clipper(Modifier):
     """
     Component that clips the input signal to the given wave range.
     """

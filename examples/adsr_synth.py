@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from src.engine.envelopes import generate_adsr_envelope
+from envelopes import generate_adsr_envelope
 
 
 # --- Helper functions ----------------------------------------------------------

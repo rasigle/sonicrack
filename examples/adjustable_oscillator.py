@@ -42,32 +42,29 @@ class WaveformViewer(QtWidgets.QMainWindow):
         ctrl_l.addWidget(QtWidgets.QLabel("Wave:"))
         ctrl_l.addWidget(self.wave_combo)
 
-        self.freq_spin = QtWidgets.QDoubleSpinBox()
-        self.freq_spin.setRange(0.1, 20000.0)
-        self.freq_spin.setDecimals(2)
-        self.freq_spin.setValue(440.0)
-        self.freq_spin.setSingleStep(1.0)
+        self.freq_spin = QtWidgets.QDial()
+        self.freq_spin.setRange(10, 2000)
+        self.freq_spin.setValue(10)
+        self.freq_spin.setSingleStep(1)
         ctrl_l.addWidget(QtWidgets.QLabel("Freq (Hz):"))
         ctrl_l.addWidget(self.freq_spin)
 
-        self.amp_spin = QtWidgets.QDoubleSpinBox()
-        self.amp_spin.setRange(0.0, 10.0)
-        self.amp_spin.setDecimals(3)
-        self.amp_spin.setValue(1.0)
-        self.amp_spin.setSingleStep(0.1)
+        self.amp_spin = QtWidgets.QDial()
+        self.amp_spin.setRange(0, 100)
+        self.amp_spin.setValue(100)
+        self.amp_spin.setSingleStep(1)
         ctrl_l.addWidget(QtWidgets.QLabel("Amp:"))
         ctrl_l.addWidget(self.amp_spin)
 
-        self.phase_spin = QtWidgets.QDoubleSpinBox()
-        self.phase_spin.setRange(0.0, 360.0)
-        self.phase_spin.setDecimals(1)
-        self.phase_spin.setValue(0.0)
+        self.phase_spin = QtWidgets.QDial()
+        self.phase_spin.setRange(0, 360)
+        self.phase_spin.setValue(0)
         ctrl_l.addWidget(QtWidgets.QLabel("Phase (°):"))
         ctrl_l.addWidget(self.phase_spin)
 
         self.sr_spin = QtWidgets.QSpinBox()
         self.sr_spin.setRange(100, 192000)
-        self.sr_spin.setValue(44100)
+        self.sr_spin.setValue(1024)
         ctrl_l.addWidget(QtWidgets.QLabel("Sample Rate:"))
         ctrl_l.addWidget(self.sr_spin)
 
@@ -112,7 +109,7 @@ class WaveformViewer(QtWidgets.QMainWindow):
     def _create_initial_osc(self):
         cls = CLASS_MAP[self.wave_combo.currentText()]
         freq = float(self.freq_spin.value())
-        amp = float(self.amp_spin.value())
+        amp = float(self.amp_spin.value() / 100)
         phase = float(self.phase_spin.value())
         sr = int(self.sr_spin.value())
 
@@ -129,7 +126,7 @@ class WaveformViewer(QtWidgets.QMainWindow):
     def _change_waveform(self, _):
         cls = CLASS_MAP[self.wave_combo.currentText()]
         freq = float(self.freq_spin.value())
-        amp = float(self.amp_spin.value())
+        amp = float(self.amp_spin.value() / 100)
         phase = float(self.phase_spin.value())
         sr = int(self.sr_spin.value())
         try:
@@ -146,7 +143,7 @@ class WaveformViewer(QtWidgets.QMainWindow):
         if self._osc is None:
             return
         freq = float(self.freq_spin.value())
-        amp = float(self.amp_spin.value())
+        amp = float(self.amp_spin.value() / 100)
         phase = float(self.phase_spin.value())
         sr = int(self.sr_spin.value())
 
@@ -162,10 +159,10 @@ class WaveformViewer(QtWidgets.QMainWindow):
         pts = int(self.points_spin.value())
         sr = max(1, int(self.sr_spin.value()))
         self._x = np.linspace(0, pts / sr, pts, endpoint=False)
-        amp = float(self.amp_spin.value())
+        amp = float(self.amp_spin.value() / 100)
         self.plot.setYRange(-max(1.0, amp) * 1.1, max(1.0, amp) * 1.1)
 
-    def _get_samples_no_advance(self, pts: int) -> np.ndarray:
+    def _get_samples_no_advance(self, pts: int):
         """Return a non-advancing snapshot of `pts` samples."""
         if self._osc is None:
             return np.zeros(int(pts), dtype=float)
@@ -178,8 +175,8 @@ class WaveformViewer(QtWidgets.QMainWindow):
         pts = int(self.points_spin.value())
         # Always use non-advancing snapshot
         y = self._get_samples_no_advance(pts)
-        print(len(y))
-        # recompute x if points or sr changed
+
+        # # recompute x if points or sr changed
         if self._x is None or len(self._x) != len(y):
             self._update_x()
 

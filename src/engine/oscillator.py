@@ -23,33 +23,30 @@ from constants import DEFAULT_SAMPLE_RATE
 class Oscillator(ABC):
     """Base class for all signal generators.
 
-    The oscillator is initialized with fixed initial values but exposes
-    properties to modify the running parameters without reconstructing the
-    instance.
+    The oscillator is initialized with fixed initial values but exposes properties to
+    modify the running parameters without reconstructing the instance.
 
     Args:
-        freq (float): Initial frequency in Hz.
-        amp (float, optional): Initial amplitude. Defaults to 1.
-        phase (float, optional): Initial phase in degrees. Defaults to 0.0.
-        sample_rate (int, optional): Samples per second. Defaults to
-            `DEFAULT_SAMPLE_RATE`.
-        wave_range (tuple, optional): Tuple specifying value range
-            (min, max) of raw waveform before amplitude scaling. Defaults to
-            (-1, 1).
+        freq: Initial frequency in Hz.
+        amp: Initial amplitude. Defaults to 1.
+        phase: Initial phase in degrees. Defaults to 0.0.
+        sample_rate: Samples per second. Defaults to `DEFAULT_SAMPLE_RATE`.
+        wave_range: Tuple specifying value range (min, max) of raw waveform before
+            amplitude scaling. Defaults to (-1, 1).
 
     Attributes:
-        sample_rate (int): Samples per second (public alias).
-        _i (float): internal time/index state.
-        _step (float): internal step for phase progression (implementation-specific).
+        sample_rate: Samples per second (public alias).
+        _i: internal time/index state.
+        _step: internal step for phase progression (implementation-specific).
     """
 
     def __init__(
         self,
-        freq: float,
+        freq: float = 440,
         amp: float = 1,
         phase: float = 0.0,
         sample_rate: int = DEFAULT_SAMPLE_RATE,
-        wave_range=(-1, 1),
+        wave_range: tuple[float, float] = (-1, 1),
     ):
         self.sample_rate = sample_rate  # Samples per second
 
@@ -216,9 +213,9 @@ class Oscillator(ABC):
 class SawtoothOscillator(Oscillator):
     """Sawtooth wave generator.
 
-    The sawtooth oscillates in the range specified by `wave_range` and is
-    scaled by `amp`. Phase is interpreted in degrees and converted to an
-    offset within the oscillator period.
+    The sawtooth oscillates in the range specified by `wave_range` and is scaled by
+    `amp`. Phase is interpreted in degrees and converted to an offset within the
+    oscillator period.
 
     The implementation uses an internal period (`_period`) computed from
     `sample_rate / freq`.
@@ -231,7 +228,7 @@ class SawtoothOscillator(Oscillator):
 
     def _post_phase_set(self):
         """Convert phase (degrees) to an index offset into the period."""
-        self._p = ((self._p + 90) / 360) * self._period
+        self._p = (self._p / 360) * self._period
 
     def _initialize_osc(self):
         """Reset internal sample index."""
@@ -243,7 +240,7 @@ class SawtoothOscillator(Oscillator):
         Returns:
             float: Next sawtooth sample scaled by amplitude.
         """
-        div = (self._i + self._p) / self._period
+        div = (self._i + self._p) / self._period if self._period != 0 else 0
         val = 2 * (div - np.floor(0.5 + div))
         self._i = self._i + 1
         if self._wave_range != (-1, 1):
@@ -264,7 +261,7 @@ class TriangleOscillator(SawtoothOscillator):
         Returns:
             float: Next triangle sample scaled by amplitude.
         """
-        div = (self._i + self._p) / self._period
+        div = (self._i + self._p) / self._period if self._period != 0 else 0
         val = 2 * (div - np.floor(0.5 + div))
         val = (abs(val) - 0.5) * 2
         self._i = self._i + 1

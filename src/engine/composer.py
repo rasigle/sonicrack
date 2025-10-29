@@ -1,7 +1,6 @@
-"""Components that help in composing combinations of generators and modifiers
-to generate waves of different kinds.
-"""
-from abc import ABC
+"""Composers combine oscillators and modifiers to generate waves of different kinds."""
+
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from constants import DEFAULT_SAMPLE_RATE
@@ -12,13 +11,22 @@ from engine.oscillator import Oscillator
 
 class Composer(ABC):
 
-    pass
+    @abstractmethod
+    def __next__(self):
+        pass
 
+    @abstractmethod
+    def __iter__(self):
+        pass
+
+    def get_samples(self, n: int = DEFAULT_SAMPLE_RATE, it: bool = False):
+        """Return the next n samples from this composer component."""
+        osc = iter(self) if it else self
+        return [next(osc) for _ in range(n)]
 
 
 class Chain(Composer):
-    """
-    A component that allows for chaining a single generator with multiple modifiers
+    """A component that allows for chaining a single generator with multiple modifiers
     after it.
 
     For sequential composition of waves.
@@ -33,10 +41,10 @@ class Chain(Composer):
             modifiers: Any function that takes in a value modifies it and returns
                 another value. Example: instances of Panner.
         """
-        if not isinstance(oscillator, Oscillator | ModulatedOscillator):
+        if not (hasattr(oscillator, "__iter__") and hasattr(oscillator, "__next__")):
             raise TypeError(
-                f"The given generator should be an instance of Generator. "
-                f"Given: {type(oscillator)}"
+                f"The given oscillator must implement the iterator protocol "
+                f"(`__iter__` and `__next__`). Given: {type(oscillator)}"
             )
         if not all([isinstance(m, Modifier) for m in modifiers]):
             raise TypeError(
@@ -45,6 +53,8 @@ class Chain(Composer):
             )
         self.oscillator: Oscillator | ModulatedOscillator = oscillator
         self.modifiers = modifiers
+
+        iter(self)
 
     def __getattr__(self, attr):
         if hasattr(self.oscillator, attr):
@@ -85,10 +95,6 @@ class Chain(Composer):
         for modifier in self.modifiers:
             val = modifier(val)
         return val
-
-    def get_samples(self, n: int = DEFAULT_SAMPLE_RATE):
-        """Return the next n samples from this generator."""
-        return [next(self) for _ in range(n)]
 
 
 class WaveAdder(Composer):
@@ -135,10 +141,6 @@ class WaveAdder(Composer):
         vals = [self._mod_channels(next(gen)) for gen in self.generators]
         if self.stereo:
             l, r = zip(*vals)
-            return (sum(l) / len(l), sum(r) / len(r))
+            return sum(l) / len(l), sum(r) / len(r)
 
         return sum(vals) / len(vals)
-
-    def get_samples(self, n: int = DEFAULT_SAMPLE_RATE):
-        """Return the next n samples from this generator."""
-        return [next(self) for _ in range(n)]

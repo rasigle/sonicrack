@@ -8,10 +8,3 @@ echo Upgrading all specified dependencies
 uv sync --native-tls --upgrade
 echo - done
 echo.
-
-if exist "%venv_folder%\Lib\site-packages\*.pth" (
-    echo Removing pth-files in venv-directory
-    del %venv_folder%\Lib\site-packages\*.pth
-    echo - done
-    echo.
-)

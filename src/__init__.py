@@ -1,4 +1,4 @@
-from engine import generators
+from engine import oscillator
 
 
-__all__ = ["generators"]
+__all__ = ["oscillator"]

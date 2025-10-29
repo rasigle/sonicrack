@@ -344,3 +344,44 @@ class SquareOscillator(SineOscillator):
         else:
             val = self._wave_range[1]
         return val * self._a
+
+
+def synth(
+        freq: float = 440,
+        dur: float = 1.0,
+        amp: float = 1.0,
+        sr: float | int = DEFAULT_SAMPLE_RATE,
+        stype: str = "sine"
+) -> np.ndarray:
+    """Synthesizes a waveform of given type.
+
+    Args:
+        freq (float): Frequency of the waveform in Hz.
+        dur (float): Duration of the waveform in seconds.
+        amp (float): Amplitude of the waveform.
+        sr (float): Sample rate in samples per second.
+        stype (str): Type of waveform ('sine', 'square', 'sawtooth', 'triangle').
+    """
+
+    n_samples = int(dur * sr)
+
+    stype= stype.lower()
+    if stype == "sin":
+        stype = "sine"
+    if stype == "sawtooth":
+        stype = "saw"
+    if stype == "triangle":
+        stype = "tri"
+
+    synth_map = {
+        "sine": SineOscillator,
+        "square": SquareOscillator,
+        "saw": SawtoothOscillator,
+        "tri": TriangleOscillator,
+    }
+    try:
+        osc = synth_map[stype](freq=freq, amp=amp, sample_rate=sr)
+    except KeyError:
+        raise ValueError(f"Unsupported waveform type: {stype}")
+
+    return np.array(osc.get_samples(n_samples))

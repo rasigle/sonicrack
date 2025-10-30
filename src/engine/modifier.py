@@ -8,8 +8,7 @@ from collections.abc import Iterable
 
 
 class Modifier(ABC):
-    """Base class for all modifiers.
-    """
+    """Base class for all modifiers."""
 
     @abstractmethod
     def __call__(self, val):
@@ -17,8 +16,7 @@ class Modifier(ABC):
 
 
 class Panner(Modifier):
-    """Will convert a mono input into stereo.
-    """
+    """Will convert a mono input into stereo."""
 
     def __init__(self, r: float = 0.5):
         """
@@ -36,8 +34,7 @@ class Panner(Modifier):
 
 
 class ModulatedPanner(Panner):
-    """Same as the Panner but takes in a modulator to set the internal `r` value.
-    """
+    """Same as the Panner but takes in a modulator to set the internal `r` value."""
 
     def __init__(self, modulator):
         """
@@ -70,7 +67,6 @@ class Volume(Modifier):
         self.amp = amp
 
     def __call__(self, val):
-        _val = None
         if isinstance(val, Iterable):
             return tuple(v * self.amp for v in val)
 
@@ -124,9 +120,9 @@ class Frequency(Modifier):
         self.freq = freq
 
     def __call__(self, val):
-        _val = None
         if isinstance(val, Iterable):
             return tuple(v * self.freq for v in val)
+
         if isinstance(val, (int, float)):
             return val * self.freq
         raise TypeError("Input value must be an int, float, or Iterable.")

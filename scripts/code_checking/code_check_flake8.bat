@@ -3,7 +3,7 @@
 
 :: Checks for uv, synchronizes and activates the virtual environment
 cd "%~dp0..\environment"
-call .\uv_sync_dev.bat
+call .\uv_sync_all.bat
 
 echo Running flake8 code checking
 uv run flake8 .\src .\scripts

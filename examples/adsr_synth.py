@@ -23,25 +23,12 @@ from PyQt6.QtWidgets import (
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+from engine.oscillator import synth, SineOscillator
 from envelopes import generate_adsr_envelope
 
 
-# --- Helper functions ----------------------------------------------------------
-
-
-def generate_waveform(waveform_type, t, freq):
-    if waveform_type == "Sine":
-        return np.sin(2 * np.pi * freq * t)
-    elif waveform_type == "Square":
-        return np.sign(np.sin(2 * np.pi * freq * t))
-    elif waveform_type == "Triangle":
-        return 2 * np.abs(2 * (t * freq - np.floor(t * freq + 0.5))) - 1
-    elif waveform_type == "Sawtooth":
-        return 2 * (t * freq - np.floor(t * freq + 0.5))
-    return np.zeros_like(t)
-
-
-# --- Knob widget ---------------------------------------------------------------
+def generate_waveform(waveform_type, dur, sr, freq):
+    return synth(freq, dur, 1.0, sr=sr, stype=waveform_type)
 
 
 class Knob(QWidget):
@@ -141,7 +128,7 @@ class ADSRDialog(QDialog):
         self.release_knob = Knob("R", 0.0, 1.0, 0.01, 0.3, lambda _: self.update_plot())
 
         # --- Main knobs ---
-        self.freq_knob = Knob("Freq", 20, 2000, 5, 440, lambda _: self.update_plot())
+        self.freq_knob = Knob("Freq", 5, 2000, 5, 20, lambda _: self.update_plot())
         self.amp_knob = Knob("Amp", 0.1, 2.0, 0.05, 1.0, lambda _: self.update_plot())
 
         # --- LFO knobs ---
@@ -226,7 +213,7 @@ class ADSRDialog(QDialog):
         amp = self.amp_knob.value()
 
         waves = [
-            generate_waveform(cb.text(), t, freq)
+            generate_waveform(cb.text(), self.duration, self.fs, freq)
             for cb in self.waveform_checks
             if cb.isChecked()
         ]
@@ -235,7 +222,8 @@ class ADSRDialog(QDialog):
         # LFO
         amp_mod = np.ones_like(t)
         if self.lfo_enable.isChecked():
-            lfo = np.sin(2 * np.pi * self.lfo_freq_knob.value() * t)
+            lfo_osc = SineOscillator(freq=self.lfo_freq_knob.value())
+            lfo = np.asarray(lfo_osc.get_samples(int(self.fs * self.duration)))
             if self.lfo_target_box.currentText() == "Amplitude":
                 amp_mod = 1 + lfo * self.lfo_depth_knob.value()
             else:
@@ -244,7 +232,10 @@ class ADSRDialog(QDialog):
         # VCO
         if self.vco_enable.isChecked():
             mod = generate_waveform(
-                self.vco_wave_box.currentText(), t, self.vco_freq_knob.value()
+                self.vco_wave_box.currentText(),
+                self.duration,
+                self.fs,
+                self.vco_freq_knob.value(),
             )
             vco = np.sin(2 * np.pi * (freq + mod * self.vco_depth_knob.value()) * t)
         else:
@@ -376,6 +367,16 @@ class ADSRDialog(QDialog):
 
 # --- Run App ---
 if __name__ == "__main__":
+
+    sys._excepthook = sys.excepthook
+
+    def exception_hook(exctype, value, traceback):
+        print(exctype, value, traceback)
+        sys._excepthook(exctype, value, traceback)
+        sys.exit(1)
+
+    sys.excepthook = exception_hook
+
     app = QApplication(sys.argv)
     dlg = ADSRDialog()
     dlg.show()

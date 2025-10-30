@@ -44,15 +44,17 @@ def pink_noise(length, amplitude=1.0, seed=None):
     array[0, :] = np.random.uniform(-1, 1, length)
 
     for i in range(1, num_rows):
-        step = 2 ** i
+        step = 2**i
         for j in range(0, length, step):
-            array[i, j:j + step] = np.random.uniform(-1, 1)
+            array[i, j : j + step] = np.random.uniform(-1, 1)
 
     pink = np.sum(array, axis=0) / num_rows
     return amplitude * pink
 
 
-def brownian_noise(dur: float, amplitude=1.0, sr: float = DEFAULT_SAMPLE_RATE, seed=None):
+def brownian_noise(
+    dur: float, amplitude=1.0, sr: float = DEFAULT_SAMPLE_RATE, seed=None
+):
     """Generate Brownian noise (red noise).
 
     Args:

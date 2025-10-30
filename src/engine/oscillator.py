@@ -347,11 +347,11 @@ class SquareOscillator(SineOscillator):
 
 
 def synth(
-        freq: float = 440,
-        dur: float = 1.0,
-        amp: float = 1.0,
-        sr: float | int = DEFAULT_SAMPLE_RATE,
-        stype: str = "sine"
+    freq: float = 440,
+    dur: float = 1.0,
+    amp: float = 1.0,
+    sr: float | int = DEFAULT_SAMPLE_RATE,
+    stype: str = "sine",
 ) -> np.ndarray:
     """Synthesizes a waveform of given type.
 
@@ -365,7 +365,7 @@ def synth(
 
     n_samples = int(dur * sr)
 
-    stype= stype.lower()
+    stype = stype.lower()
     if stype == "sin":
         stype = "sine"
     if stype == "sawtooth":

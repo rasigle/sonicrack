@@ -3,7 +3,7 @@
 
 :: Checks for uv, synchronizes and activates the virtual environment
 cd "%~dp0..\environment"
-call .\uv_sync_dev.bat
+call .\uv_sync_all.bat
 
 :: Ruff analyze
 echo Running ruff code checking

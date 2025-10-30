@@ -2,7 +2,7 @@ import numpy as np
 from scipy.signal import filtfilt
 
 
-def butter(order, cutoff, fs, btype='low'):
+def butter(order, cutoff, fs, btype="low"):
     """
     Design Butterworth IIR filter coefficients.
 
@@ -23,8 +23,10 @@ def butter(order, cutoff, fs, btype='low'):
         wn = cutoff / nyq
 
     from scipy.signal import butter
+
     b, a = butter(order, wn, btype=btype, analog=False)
     return b, a
+
 
 def apply_filter(b, a, x):
     """Apply zero-phase filter (filtfilt) to signal x.

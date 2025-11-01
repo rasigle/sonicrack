@@ -3,7 +3,7 @@
 import itertools
 from abc import ABC
 
-from constants import DEFAULT_SAMPLE_RATE
+from src.constants import DEFAULT_SAMPLE_RATE
 
 
 class Modulator(ABC):

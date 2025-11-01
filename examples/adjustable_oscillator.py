@@ -2,7 +2,7 @@ import sys
 import numpy as np
 from PyQt6 import QtWidgets, QtCore
 import pyqtgraph as pg
-from src.engine.oscillator import (
+from engine import (
     SineOscillator,
     SawtoothOscillator,
     SquareOscillator,

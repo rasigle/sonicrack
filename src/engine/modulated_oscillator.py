@@ -1,5 +1,5 @@
-from constants import DEFAULT_SAMPLE_RATE
-from engine.oscillator import Oscillator
+from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.oscillator import Oscillator
 
 
 class ModulatedOscillator:

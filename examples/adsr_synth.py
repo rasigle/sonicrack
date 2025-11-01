@@ -4,26 +4,12 @@ import threading
 
 import numpy as np
 import sounddevice as sd
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QGridLayout,
-    QLabel,
-    QComboBox,
-    QDial,
-    QPushButton,
-    QGroupBox,
-    QCheckBox,
-    QFileDialog,
-    QWidget,
-)
+from PyQt6 import QtWidgets, QtCore
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from engine.oscillator import synth, SineOscillator
+from engine import synth, SineOscillator
 from envelopes import generate_adsr_envelope
 
 
@@ -31,16 +17,16 @@ def generate_waveform(waveform_type, dur, sr, freq):
     return synth(freq, dur, 1.0, sr=sr, stype=waveform_type)
 
 
-class Knob(QWidget):
+class Knob(QtWidgets.QWidget):
     """Small rotary knob with a label and value display."""
 
     def __init__(self, name, minv, maxv, step, default, callback):
         super().__init__()
-        layout = QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(2, 2, 2, 2)
-        layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
 
-        self.dial = QDial()
+        self.dial = QtWidgets.QDial()
         self.dial.setFixedSize(60, 60)
         self.dial.setMinimum(int(minv / step))
         self.dial.setMaximum(int(maxv / step))
@@ -51,10 +37,10 @@ class Knob(QWidget):
         self.maxv = maxv
         self.callback = callback
 
-        self.label_name = QLabel(name)
-        self.label_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label_val = QLabel(f"{default:.2f}")
-        self.label_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label_name = QtWidgets.QLabel(name)
+        self.label_name.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.label_val = QtWidgets.QLabel(f"{default:.2f}")
+        self.label_val.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.label_val.setStyleSheet("color: #888; font-size: 10px;")
 
         layout.addWidget(self.label_name)
@@ -78,12 +64,10 @@ class Knob(QWidget):
 
 
 # --- Main Synth Dialog ---------------------------------------------------------
-
-
-class ADSRDialog(QDialog):
+class ADSRDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("🎛 ADSR Synthesizer – Compact Knob Edition")
+        self.setWindowTitle("🎛 ADSR Synthesizer")
         self.resize(1400, 850)
 
         self.fs = 44100
@@ -92,10 +76,10 @@ class ADSRDialog(QDialog):
         self.loop_thread = None
         self.stop_flag = threading.Event()
 
-        main_layout = QVBoxLayout(self)
+        main_layout = QtWidgets.QVBoxLayout(self)
 
         # === PLOTS ===
-        plot_layout = QHBoxLayout()
+        plot_layout = QtWidgets.QHBoxLayout()
         self.time_fig = Figure()
         self.time_canvas = FigureCanvas(self.time_fig)
         self.time_ax = self.time_fig.add_subplot(111)
@@ -108,14 +92,14 @@ class ADSRDialog(QDialog):
         main_layout.addLayout(plot_layout, stretch=5)
 
         # === CONTROL PANEL ===
-        ctrl_box = QGroupBox("Synth Controls")
-        ctrl_layout = QGridLayout(ctrl_box)
+        ctrl_box = QtWidgets.QGroupBox("Synth Controls")
+        ctrl_layout = QtWidgets.QGridLayout(ctrl_box)
         ctrl_layout.setSpacing(10)
 
         # --- Waveform selection ---
         self.waveform_checks = []
         for i, w in enumerate(["Sine", "Square", "Triangle", "Sawtooth"]):
-            cb = QCheckBox(w)
+            cb = QtWidgets.QCheckBox(w)
             cb.setChecked(w == "Sine")
             cb.stateChanged.connect(self.update_plot)
             self.waveform_checks.append(cb)
@@ -132,7 +116,7 @@ class ADSRDialog(QDialog):
         self.amp_knob = Knob("Amp", 0.1, 2.0, 0.05, 1.0, lambda _: self.update_plot())
 
         # --- LFO knobs ---
-        self.lfo_enable = QCheckBox("Enable LFO")
+        self.lfo_enable = QtWidgets.QCheckBox("Enable LFO")
         self.lfo_enable.stateChanged.connect(self.update_plot)
         self.lfo_freq_knob = Knob(
             "LFO Freq", 0.1, 20, 0.1, 2, lambda _: self.update_plot()
@@ -140,12 +124,12 @@ class ADSRDialog(QDialog):
         self.lfo_depth_knob = Knob(
             "LFO Depth", 0.0, 1.0, 0.01, 0.3, lambda _: self.update_plot()
         )
-        self.lfo_target_box = QComboBox()
+        self.lfo_target_box = QtWidgets.QComboBox()
         self.lfo_target_box.addItems(["Amplitude", "Frequency"])
         self.lfo_target_box.currentIndexChanged.connect(self.update_plot)
 
         # --- VCO knobs ---
-        self.vco_enable = QCheckBox("Enable VCO")
+        self.vco_enable = QtWidgets.QCheckBox("Enable VCO")
         self.vco_enable.stateChanged.connect(self.update_plot)
         self.vco_freq_knob = Knob(
             "VCO Freq", 0.1, 1000, 1, 100, lambda _: self.update_plot()
@@ -153,18 +137,18 @@ class ADSRDialog(QDialog):
         self.vco_depth_knob = Knob(
             "VCO Depth", 0.0, 100.0, 1.0, 20, lambda _: self.update_plot()
         )
-        self.vco_wave_box = QComboBox()
+        self.vco_wave_box = QtWidgets.QComboBox()
         self.vco_wave_box.addItems(["Sine", "Triangle", "Sawtooth", "Square"])
         self.vco_wave_box.currentIndexChanged.connect(self.update_plot)
 
         # --- Playback controls ---
-        self.loop_toggle = QCheckBox("Loop Playback")
+        self.loop_toggle = QtWidgets.QCheckBox("Loop Playback")
         self.loop_toggle.stateChanged.connect(self.toggle_loop)
-        self.play_btn = QPushButton("▶ Play Once")
-        self.stop_btn = QPushButton("⏹ Stop")
-        self.save_btn = QPushButton("💾 Save Preset")
-        self.load_btn = QPushButton("📂 Load Preset")
-        self.close_btn = QPushButton("❌ Close")
+        self.play_btn = QtWidgets.QPushButton("▶ Play Once")
+        self.stop_btn = QtWidgets.QPushButton("⏹ Stop")
+        self.save_btn = QtWidgets.QPushButton("💾 Save Preset")
+        self.load_btn = QtWidgets.QPushButton("📂 Load Preset")
+        self.close_btn = QtWidgets.QPushButton("❌ Close")
         self.play_btn.clicked.connect(self.play_once)
         self.stop_btn.clicked.connect(self.stop_loop)
         self.save_btn.clicked.connect(self.save_preset)
@@ -189,10 +173,10 @@ class ADSRDialog(QDialog):
 
         # Row 2: toggles + combo boxes
         ctrl_layout.addWidget(self.lfo_enable, 2, 0)
-        ctrl_layout.addWidget(QLabel("LFO Target:"), 2, 1)
+        ctrl_layout.addWidget(QtWidgets.QLabel("LFO Target:"), 2, 1)
         ctrl_layout.addWidget(self.lfo_target_box, 2, 2)
         ctrl_layout.addWidget(self.vco_enable, 2, 3)
-        ctrl_layout.addWidget(QLabel("VCO Wave:"), 2, 4)
+        ctrl_layout.addWidget(QtWidgets.QLabel("VCO Wave:"), 2, 4)
         ctrl_layout.addWidget(self.vco_wave_box, 2, 5)
         ctrl_layout.addWidget(self.loop_toggle, 2, 7)
 
@@ -331,7 +315,7 @@ class ADSRDialog(QDialog):
             "vco_wave": self.vco_wave_box.currentText(),
             "waveforms": [cb.text() for cb in self.waveform_checks if cb.isChecked()],
         }
-        path, _ = QFileDialog.getSaveFileName(
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, "Save Preset", "", "ADSR Preset (*.json)"
         )
         if path:
@@ -339,7 +323,7 @@ class ADSRDialog(QDialog):
                 json.dump(data, f, indent=2)
 
     def load_preset(self):
-        path, _ = QFileDialog.getOpenFileName(
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Load Preset", "", "ADSR Preset (*.json)"
         )
         if not path:
@@ -365,9 +349,7 @@ class ADSRDialog(QDialog):
         self.update_plot()
 
 
-# --- Run App ---
-if __name__ == "__main__":
-
+def _debug_hook():
     sys._excepthook = sys.excepthook
 
     def exception_hook(exctype, value, traceback):
@@ -377,7 +359,14 @@ if __name__ == "__main__":
 
     sys.excepthook = exception_hook
 
-    app = QApplication(sys.argv)
+
+def main():
+    _debug_hook()
+    app = QtWidgets.QApplication(sys.argv)
     dlg = ADSRDialog()
     dlg.show()
     sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()

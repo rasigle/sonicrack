@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from constants import DEFAULT_SAMPLE_RATE
+from src.constants import DEFAULT_SAMPLE_RATE
 
 
 def white_noise(dur: float, amplitude=1.0, sr: float = DEFAULT_SAMPLE_RATE, seed=None):

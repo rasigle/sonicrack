@@ -3,10 +3,10 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from constants import DEFAULT_SAMPLE_RATE
-from engine.modifier import Modifier
-from engine.modulated_oscillator import ModulatedOscillator
-from engine.oscillator import Oscillator
+from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.modifier import Modifier
+from src.engine.modulated_oscillator import ModulatedOscillator
+from src.engine.oscillator import Oscillator
 
 
 class Composer(ABC):

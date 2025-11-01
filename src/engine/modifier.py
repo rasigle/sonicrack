@@ -25,12 +25,12 @@ class Panner(Modifier):
             r : is the right pan value, 0 means 100% left panned and 1 means 100% right
                 panned, 0.5 is center panned.
         """
-        self.r = r
+        self.right = r
 
     def __call__(self, val):
-        r = self.r * 2
-        l = 2 - r
-        return l * val, r * val
+        right = self.right * 2
+        left = 2 - right
+        return left * val, right * val
 
 
 class ModulatedPanner(Panner):
@@ -113,9 +113,11 @@ class Frequency(Modifier):
     amplitude."""
 
     def __init__(self, freq: float = 1.0):
-        """
-        amp : sets the amplitude multiplier for the
-            input signal (1 : no change, 0 : no output).
+        """Initializes the Frequency modifier.
+
+        Args:
+            freq : sets the amplitude multiplier for the
+                input signal (1 : no change, 0 : no output).
         """
         self.freq = freq
 

@@ -1,3 +1,37 @@
+"""Constants used throughout the audio engine.
+
+This module defines global constants for sample rates, buffer sizes,
+and other audio-related values.
+"""
+
+# Sample rate constants
+DEFAULT_SAMPLE_RATE = 44100  # CD quality
+SAMPLE_RATE_48K = 48000  # Professional audio
+SAMPLE_RATE_96K = 96000  # High-resolution audio
+SAMPLE_RATE_192K = 192000  # Ultra high-resolution
+
+# Buffer size constants (in samples)
+DEFAULT_BUFFER_SIZE = 512
+BUFFER_SIZE_256 = 256  # Low latency
+BUFFER_SIZE_1024 = 1024  # Higher latency, lower CPU
+BUFFER_SIZE_2048 = 2048  # Maximum stability
+
+# Bit depth
+DEFAULT_BIT_DEPTH = 16
+BIT_DEPTH_24 = 24
+BIT_DEPTH_32 = 32
+
+# Derived constants
+NYQUIST_FREQUENCY = DEFAULT_SAMPLE_RATE / 2  # Maximum frequency we can represent
+
+# Musical constants
+A4_FREQUENCY = 440.0  # Concert pitch
+SEMITONE_RATIO = 2 ** (1 / 12)  # Ratio between adjacent semitones
+
+# Audio range
+MIN_AMPLITUDE = -1.0
+MAX_AMPLITUDE = 1.0
+
 # 🎵 Note mapping (keyboard keys → frequencies)
 KEY_FREQUENCIES = {
     "a": 261.63,  # C4
@@ -14,4 +48,3 @@ KEY_FREQUENCIES = {
     "j": 493.88,  # B4
     "k": 523.25,  # C5
 }
-DEFAULT_SAMPLE_RATE: int = 44100

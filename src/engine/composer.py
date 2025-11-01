@@ -1,4 +1,37 @@
-"""Composers combine oscillators and modifiers to generate waves of different kinds."""
+"""Signal routing and composition for audio synthesis.
+
+This module provides components for combining multiple audio generators and
+effects into complex synthesis patches. Composers enable both serial (Chain)
+and parallel (WaveAdder) signal routing patterns.
+
+Classes:
+    Composer: Abstract base class for all composers.
+    Chain: Serial signal chain for applying multiple modifiers sequentially.
+    WaveAdder: Parallel mixer for combining multiple signal generators.
+
+Example:
+    >>> from engine import SineOscillator, Volume, Panner
+    >>>
+    >>> # Serial processing with Chain
+    >>> osc = SineOscillator(440)
+    >>> chain = Chain(osc, Volume(0.5), Panner(0.7))
+    >>> samples = chain.get_samples(1000)
+    >>>
+    >>> # Parallel mixing with WaveAdder
+    >>> osc1 = SineOscillator(440)
+    >>> osc2 = SineOscillator(880)
+    >>> adder = WaveAdder(osc1, osc2)
+    >>> mixed = adder.get_samples(1000)
+
+Signal Flow:
+    - Chain: oscillator → modifier1 → modifier2 → ... → output
+    - WaveAdder: (osc1 + osc2 + ... + oscN) / N → output
+
+Note:
+    Composers support both mono and stereo signal routing, with automatic
+    handling of stereo/mono conversion where needed. They also propagate
+    trigger_release() and ended properties to all child components.
+"""
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence

@@ -1,6 +1,31 @@
-"""
-Components that have __call__ implemented and whose instances can be used as functions
-to alter the output of any kind of generator. Generally used in a Chain component.
+"""Signal modifiers for audio processing.
+
+This module provides components that modify audio signals through callable objects.
+Modifiers can be chained together using the Chain composer to create complex
+signal processing pipelines.
+
+Classes:
+    Modifier: Abstract base class for all modifiers.
+    Panner: Converts mono signals to stereo with configurable pan position.
+    ModulatedPanner: Panner with modulated pan position.
+    Volume: Scales signal amplitude.
+    ModulatedVolume: Volume with modulated amplitude.
+    Frequency: Scales frequency-related values.
+    ModulatedFrequency: Frequency modifier with modulation.
+    Clipper: Clips signals to specified range.
+
+Example:
+    >>> from engine import SineOscillator, Chain
+    >>>
+    >>> osc = SineOscillator(440)
+    >>> volume = Volume(0.5)
+    >>> panner = Panner(0.7)  # Pan right
+    >>> chain = Chain(osc, volume, panner)
+    >>> samples = chain.get_samples(1000)
+
+Note:
+    Modifiers are designed to be used with the Chain composer but can also
+    be used standalone by calling them directly with signal values.
 """
 
 from abc import abstractmethod, ABC

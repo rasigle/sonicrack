@@ -1,4 +1,51 @@
-"""Module for generating noise."""
+"""Noise generators for audio synthesis and sound design.
+
+This module provides various types of noise generators commonly used in
+synthesizers and sound design. Each noise type has distinct spectral
+characteristics suitable for different applications.
+
+Functions:
+    white_noise: Generate white noise (equal energy across all frequencies).
+    pink_noise: Generate pink noise (1/f spectrum, perceptually balanced).
+    brownian_noise: Generate Brownian/brown noise (1/f² spectrum).
+    blue_noise: Generate blue noise (increasing energy with frequency).
+    perlin_noise: Generate smooth, organic Perlin noise.
+
+Example:
+    >>> from src.constants import DEFAULT_SAMPLE_RATE
+    >>>
+    >>> # Generate 1 second of white noise
+    >>> noise = white_noise(dur=1.0, amplitude=0.5, sr=DEFAULT_SAMPLE_RATE)
+    >>>
+    >>> # Generate pink noise for ambient sound
+    >>> ambient = pink_noise(dur=2.0, amplitude=0.3)
+    >>>
+    >>> # Generate Perlin noise for smooth modulation
+    >>> modulation = perlin_noise(
+    ...     dur=5.0,
+    ...     frequency=2.0,
+    ...     amplitude=1.0,
+    ...     octaves=3
+    ... )
+
+Noise Types:
+    - White: Flat spectrum, harsh sound, useful for percussion
+    - Pink: 1/f spectrum, perceptually balanced, natural sound
+    - Brown: 1/f² spectrum, deep rumble, sub-bass content
+    - Blue: Increasing with frequency, bright, airy sound
+    - Perlin: Smooth, organic variation, excellent for modulation
+
+Applications:
+    - Percussion synthesis (white/pink noise)
+    - Ambient soundscapes (pink/brown noise)
+    - Wind/air sounds (blue noise)
+    - LFO/modulation sources (Perlin noise)
+    - Dithering and testing (white noise)
+
+Note:
+    All noise generators return NumPy arrays. Use the seed parameter
+    for reproducible results in testing and composition.
+"""
 
 import numpy as np
 

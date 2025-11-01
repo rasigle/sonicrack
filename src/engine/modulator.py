@@ -1,4 +1,45 @@
-"""Modulators shape the amplitude or frequency of audio signals over time."""
+"""Envelope generators and modulators for audio synthesis.
+
+This module provides components that generate time-varying control signals
+used to modulate audio parameters such as amplitude, frequency, and filters.
+The primary implementation is the ADSR (Attack-Decay-Sustain-Release) envelope,
+a fundamental building block in subtractive synthesis.
+
+Classes:
+    Modulator: Abstract base class for all modulators.
+    ADSREnvelope: Classic ADSR envelope generator with configurable phases.
+
+Functions:
+    getadsr: Convenience function to generate complete ADSR envelope arrays.
+
+Example:
+    >>> # Create an ADSR envelope
+    >>> env = ADSREnvelope(
+    ...     attack_duration=0.1,
+    ...     decay_duration=0.2,
+    ...     sustain_level=0.7,
+    ...     release_duration=0.3
+    ... )
+    >>>
+    >>> # Generate envelope values
+    >>> samples = env.get_samples(1000)
+    >>>
+    >>> # Trigger release phase
+    >>> env.trigger_release()
+    >>> release_samples = env.get_samples(500)
+    >>>
+    >>> # Check if envelope has completed
+    >>> if env.ended:
+    ...     print("Envelope finished")
+
+Typical Use:
+    ADSR envelopes are commonly used with ModulatedOscillator to create
+    expressive synthesis voices with natural attack and decay characteristics.
+
+Note:
+    Modulators maintain internal state and should be reset (via iteration)
+    when reusing for multiple notes or synthesis events.
+"""
 
 import itertools
 from abc import ABC

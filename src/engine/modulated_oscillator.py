@@ -1,3 +1,48 @@
+"""Modulated oscillators for expressive synthesis.
+
+This module provides the ModulatedOscillator class, which combines basic
+oscillators with modulators (like ADSR envelopes) to create time-varying
+synthesis. This is a fundamental technique in subtractive synthesis for
+creating natural-sounding, expressive audio.
+
+Classes:
+    ModulatedOscillator: Combines an oscillator with modulators for dynamic synthesis.
+
+Example:
+    >>> from engine import SineOscillator, ADSREnvelope
+    >>>
+    >>> # Create oscillator and envelope
+    >>> osc = SineOscillator(freq=440, amp=1.0)
+    >>> env = ADSREnvelope(
+    ...     attack_duration=0.1,
+    ...     decay_duration=0.2,
+    ...     sustain_level=0.7,
+    ...     release_duration=0.3
+    ... )
+    >>>
+    >>> # Combine them with amplitude modulation
+    >>> mod_osc = ModulatedOscillator(
+    ...     osc,
+    ...     env,
+    ...     amp_mod=lambda base_amp, env_val: base_amp * env_val
+    ... )
+    >>>
+    >>> # Generate modulated audio
+    >>> samples = mod_osc.get_samples(1000)
+    >>>
+    >>> # Trigger note release
+    >>> mod_osc.trigger_release()
+
+Modulation Types:
+    - amp_mod: Modulate oscillator amplitude (common for ADSR envelopes)
+    - freq_mod: Modulate oscillator frequency (vibrato, FM synthesis)
+    - phase_mod: Modulate oscillator phase (phase modulation synthesis)
+
+Note:
+    ModulatedOscillator maintains the ended state of its modulators,
+    making it suitable for voice management in polyphonic synthesizers.
+"""
+
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE

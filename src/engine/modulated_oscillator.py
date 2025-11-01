@@ -1,3 +1,5 @@
+import numpy as np
+
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.oscillator import Oscillator
 
@@ -110,20 +112,79 @@ class ModulatedOscillator:
         self._modulate(mod_vals)
         return next(self.oscillator)
 
-    def get_samples(self, n: int = DEFAULT_SAMPLE_RATE, it: bool = False):
-        """Return the next *n* samples from this generator.
+    def get_samples_iterator(
+        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False
+    ) -> np.ndarray:
+        """Generate n samples using Python iterator (slower but flexible).
 
         Args:
             n: Number of samples to produce. Defaults to `DEFAULT_SAMPLE_RATE`.
-            it: If True, return an iterator instead of a list.
+            reset: If True, reset the modulated oscillator to initial state.
 
         Returns:
             list[float]: List of `n` consecutive samples produced by calling
             `next(self)` repeatedly.
+        """
+        if reset:
+            iter(self)
+        return np.array([next(self) for _ in range(n)])
+
+    def get_samples_vectorized(self, n: int) -> np.ndarray:
+        """Generate n samples using iterator and convert to NumPy array.
+
+        For modulated oscillators, vectorization depends on both the oscillator
+        and modulators. This method uses the iterator and converts to array.
+
+        Args:
+            n: Number of samples to produce.
+
+        Returns:
+            np.ndarray: Array of `n` consecutive samples.
 
         Note:
-            If `it` is True, the method returns an iterator instead of a list.
+            For best performance, ensure the underlying oscillator uses
+            vectorized generation internally.
         """
-        if it:
-            iter(self)
-        return [next(self) for _ in range(n)]
+        samples = [next(self) for _ in range(n)]
+        return np.array(samples, dtype=np.float32)
+
+    def get_samples(
+        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+    ) -> np.ndarray:
+        """Generate n samples using the specified method.
+
+        Args:
+            n: Number of samples to produce. Defaults to `DEFAULT_SAMPLE_RATE`.
+            reset: If True, reset the modulated oscillator to initial state.
+            mode: Generation mode. Options:
+                - "auto": Automatically choose best method (vectorized for n >= 512)
+                - "iterator": Use Python iterator (returns list)
+                - "vectorized": Convert to NumPy array (returns ndarray)
+
+        Returns:
+            np.ndarray or list[float]: Generated samples. Type depends on mode.
+
+        Raises:
+            ValueError: If mode is not one of "auto", "iterator", or "vectorized".
+
+        Examples:
+            >>> osc = SineOscillator(440)
+            >>> env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
+            >>> mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
+            >>> samples1 = mod_osc.get_samples(1000)  # Auto mode
+            >>> samples2 = mod_osc.get_samples(100, mode="iterator", reset=True)
+        """
+        if mode not in ("auto", "iterator", "vectorized"):
+            raise ValueError(
+                f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
+            )
+
+        if mode == "auto":
+            mode = "vectorized" if n >= 512 else "iterator"
+
+        if mode == "iterator":
+            return self.get_samples_iterator(n, reset=reset)
+        else:  # mode == "vectorized"
+            if reset:
+                iter(self)
+            return self.get_samples_vectorized(n)

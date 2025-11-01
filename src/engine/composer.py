@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
+import numpy as np
+
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.modifier import Modifier
 from src.engine.modulated_oscillator import ModulatedOscillator
@@ -19,10 +21,80 @@ class Composer(ABC):
     def __iter__(self):
         pass
 
-    def get_samples(self, n: int = DEFAULT_SAMPLE_RATE, it: bool = False):
-        """Return the next n samples from this composer component."""
-        osc = iter(self) if it else self
-        return [next(osc) for _ in range(n)]
+    def get_samples_iterator(
+        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False
+    ) -> np.ndarray:
+        """Generate n samples using Python iterator.
+
+        Args:
+            n: Number of samples to produce. Defaults to `DEFAULT_SAMPLE_RATE`.
+            reset: If True, reset the composer to initial state before generating.
+
+        Returns:
+            list: List of `n` consecutive samples produced by calling `next(self)`.
+        """
+        osc = iter(self) if reset else self
+        return np.array([next(osc) for _ in range(n)])
+
+    def get_samples_vectorized(self, n: int) -> np.ndarray:
+        """Generate n samples using iterator and convert to NumPy array.
+
+        For composers, true vectorization depends on the underlying oscillators.
+        This method generates samples via iterator and converts to array.
+
+        Args:
+            n: Number of samples to produce.
+
+        Returns:
+            np.ndarray: Array of `n` consecutive samples.
+
+        Note:
+            To get true vectorized performance, ensure underlying oscillators
+            use their vectorized methods.
+        """
+        samples = [next(self) for _ in range(n)]
+        return np.array(samples, dtype=np.float32)
+
+    def get_samples(
+        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+    ) -> np.ndarray:
+        """Generate n samples using the specified method.
+
+        Args:
+            n: Number of samples to produce. Defaults to `DEFAULT_SAMPLE_RATE`.
+            reset: If True, reset the composer to initial state before generating.
+            mode: Generation mode. Options:
+                - "auto": Automatically choose the best method (vectorized for n >= 512)
+                - "iterator": Use Python iterator (returns list)
+                - "vectorized": Convert to NumPy array (returns ndarray)
+
+        Returns:
+            np.ndarray or list: Generated samples. Type depends on mode.
+
+        Raises:
+            ValueError: If mode is not one of "auto", "iterator", or "vectorized".
+
+        Examples:
+            >>> from engine import SineOscillator, Volume
+            >>>
+            >>> chain = Chain(SineOscillator(), Volume(0.5))
+            >>> samples1 = chain.get_samples(1000)  # Auto mode
+            >>> samples2 = chain.get_samples(100, mode="iterator", reset=True)
+        """
+        if mode not in ("auto", "iterator", "vectorized"):
+            raise ValueError(
+                f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
+            )
+
+        if mode == "auto":
+            mode = "vectorized" if n >= 512 else "iterator"
+
+        if mode == "iterator":
+            return self.get_samples_iterator(n, reset=reset)
+        else:  # mode == "vectorized"
+            if reset:
+                iter(self)
+            return self.get_samples_vectorized(n)
 
 
 class Chain(Composer):

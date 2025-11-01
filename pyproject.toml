@@ -31,11 +31,20 @@ examples = [
 
 
 "dev" = [
+    # Linter
     "black[jupyter]",
     "flake8>=7.0.1",
     "pytest>=7.4.2",
     "pytest-cov>=4.1.0",
+
+    # Testing
+    "pytest",
+    "pytest-html",
+    "pytest-mock",
+    "coverage",
+    "pytest-cov",
 ]
+
 
 
 [tool.ruff]

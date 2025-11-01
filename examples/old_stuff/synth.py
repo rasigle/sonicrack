@@ -5,7 +5,6 @@ import pyaudio
 from pynput import keyboard
 
 from src.engine.generators import generate_waveform, WaveForm
-from envelopes import envelope
 
 # 🎧 Audio settings
 fs = 44100
@@ -28,6 +27,30 @@ KEY_FREQUENCIES = {
     "j": 493.88,  # B4
     "k": 523.25,  # C5
 }
+
+
+def envelope(t, released, release_start):
+    """Compute ADSR amplitude at time t."""
+
+    # 🎚️ ADSR envelope settings
+    ATTACK = 0.05
+    DECAY = 0.1
+    SUSTAIN_LEVEL = 0.4
+    RELEASE = 0.3
+
+    if not released:
+        if t < ATTACK:
+            return t / ATTACK
+        elif t < ATTACK + DECAY:
+            return 1 - (1 - SUSTAIN_LEVEL) * ((t - ATTACK) / DECAY)
+        else:
+            return SUSTAIN_LEVEL
+    else:
+        rel_t = t - release_start
+        if rel_t < RELEASE:
+            return SUSTAIN_LEVEL * (1 - rel_t / RELEASE)
+        else:
+            return 0.0
 
 
 # 🎛️ Waveform selection

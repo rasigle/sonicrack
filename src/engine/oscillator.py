@@ -191,7 +191,9 @@ class Oscillator(ABC):
         self._initialize_osc()
         return self
 
-    def get_samples_iterator(self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False) -> np.ndarray:
+    def get_samples_iterator(
+        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False
+    ) -> np.ndarray:
         """Generate n samples using Python iterator (slower but flexible).
 
         Args:
@@ -229,7 +231,9 @@ class Oscillator(ABC):
         """
         pass
 
-    def get_samples(self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"):
+    def get_samples(
+        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+    ) -> np.ndarray:
         """Generate n samples using the specified method.
 
         Args:
@@ -254,7 +258,9 @@ class Oscillator(ABC):
             >>> samples3 = osc.get_samples(44100, mode="vectorized")  # Force vectorized
         """
         if mode not in ("auto", "iterator", "vectorized"):
-            raise ValueError(f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'.")
+            raise ValueError(
+                f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
+            )
 
         if mode == "auto":
             # Auto-select based on buffer size
@@ -324,7 +330,9 @@ class SawtoothOscillator(Oscillator):
 
         # Apply wave range if needed
         if self._wave_range != (-1, 1):
-            val = (((val + 1) / 2) * (self._wave_range[1] - self._wave_range[0])) + self._wave_range[0]
+            val = (
+                ((val + 1) / 2) * (self._wave_range[1] - self._wave_range[0])
+            ) + self._wave_range[0]
 
         # Scale by amplitude
         samples = val * self._a
@@ -375,7 +383,9 @@ class TriangleOscillator(SawtoothOscillator):
 
         # Apply wave range if needed
         if self._wave_range != (-1, 1):
-            val = (((val + 1) / 2) * (self._wave_range[1] - self._wave_range[0])) + self._wave_range[0]
+            val = (
+                ((val + 1) / 2) * (self._wave_range[1] - self._wave_range[0])
+            ) + self._wave_range[0]
 
         # Scale by amplitude
         samples = val * self._a
@@ -431,7 +441,9 @@ class SineOscillator(Oscillator):
 
         # Apply wave range if needed
         if self._wave_range != (-1, 1):
-            val = (((val + 1) / 2) * (self._wave_range[1] - self._wave_range[0])) + self._wave_range[0]
+            val = (
+                ((val + 1) / 2) * (self._wave_range[1] - self._wave_range[0])
+            ) + self._wave_range[0]
 
         # Scale by amplitude
         samples = val * self._a
@@ -496,7 +508,9 @@ class SquareOscillator(SineOscillator):
 
         # Compute sine values and threshold
         sine_vals = np.sin(phases + self._p)
-        val = np.where(sine_vals < self.threshold, self._wave_range[0], self._wave_range[1])
+        val = np.where(
+            sine_vals < self.threshold, self._wave_range[0], self._wave_range[1]
+        )
 
         # Scale by amplitude
         samples = val * self._a

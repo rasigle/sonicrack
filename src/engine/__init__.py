@@ -79,7 +79,6 @@ __all__ = [
     "SawtoothOscillator",
     "TriangleOscillator",
     "synth",
-
     # Modulators
     "Modulator",
     "ADSREnvelope",

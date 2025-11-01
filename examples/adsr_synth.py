@@ -10,7 +10,23 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 from engine import synth, SineOscillator
-from envelopes import generate_adsr_envelope
+
+
+def generate_adsr_envelope(t, attack, decay, sustain, release, total_time):
+    env = np.zeros_like(t)
+    attack_end = attack
+    decay_end = attack + decay
+    release_start = total_time - release
+    for i, ti in enumerate(t):
+        if ti < attack_end:
+            env[i] = ti / attack_end if attack_end > 0 else 1
+        elif ti < decay_end:
+            env[i] = 1 - (ti - attack_end) / max(decay, 1e-9) * (1 - sustain)
+        elif ti < release_start:
+            env[i] = sustain
+        else:
+            env[i] = sustain * (1 - (ti - release_start) / max(release, 1e-9))
+    return env
 
 
 def generate_waveform(waveform_type, dur, sr, freq):

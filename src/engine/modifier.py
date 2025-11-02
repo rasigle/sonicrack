@@ -32,6 +32,8 @@ from abc import abstractmethod, ABC
 from collections.abc import Iterable
 from typing import Union, Tuple, Any
 
+import numpy as np
+
 from src.utils.logging_config import get_engine_logger
 
 logger = get_engine_logger("modifier")
@@ -166,11 +168,12 @@ class Volume(Modifier):
         if isinstance(val, Iterable):
             return tuple(v * self.amp for v in val)
 
-        if isinstance(val, (int, float)):
+        # Accept int, float, and numpy number types
+        if isinstance(val, (int, float, np.number)):
             return val * self.amp
 
         logger.error(f"Invalid input type for Volume: {type(val)}")
-        raise TypeError("Input value must be an int, float, or Iterable.")
+        raise TypeError("Input value must be an int, float, numpy number, or Iterable.")
 
 
 class ModulatedVolume(Volume):

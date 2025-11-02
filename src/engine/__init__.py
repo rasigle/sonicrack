@@ -84,33 +84,17 @@ Version: 0.1.0
 License: See LICENSE file
 """
 
-# Oscillators
-from src.engine.oscillator import (
-    Oscillator,
-    SineOscillator,
-    SquareOscillator,
-    SawtoothOscillator,
-    TriangleOscillator,
-    synth,
-)
-
-# Modulators
-from src.engine.modulator import (
-    Modulator,
-    ADSREnvelope,
-    getadsr,
-)
-
-# Modulated Oscillator
-from src.engine.modulated_oscillator import ModulatedOscillator
-
 # Composers
 from src.engine.composer import (
     Composer,
     Chain,
     WaveAdder,
 )
-
+# Filters
+from src.engine.filter import (
+    butter,
+    apply_filter,
+)
 # Modifiers
 from src.engine.modifier import (
     Modifier,
@@ -122,13 +106,14 @@ from src.engine.modifier import (
     ModulatedFrequency,
     Clipper,
 )
-
-# Filters
-from src.engine.filter import (
-    butter,
-    apply_filter,
+# Modulated Oscillator
+from src.engine.modulated_oscillator import ModulatedOscillator
+# Modulators
+from src.engine.modulator import (
+    Modulator,
+    ADSREnvelope,
+    getadsr,
 )
-
 # Noise generators
 from src.engine.noise import (
     white_noise,
@@ -140,6 +125,15 @@ from src.engine.noise import (
     grey_noise,
     sample_hold_noise,
 )
+# Oscillators
+from src.engine.oscillator import (
+    Oscillator,
+    SineOscillator,
+    SquareOscillator,
+    SawtoothOscillator,
+    TriangleOscillator,
+    synth,
+)
 
 __all__ = [
     # Oscillators
@@ -149,16 +143,20 @@ __all__ = [
     "SawtoothOscillator",
     "TriangleOscillator",
     "synth",
+
     # Modulators
     "Modulator",
     "ADSREnvelope",
     "getadsr",
+
     # Modulated Oscillator
     "ModulatedOscillator",
+
     # Composers
     "Composer",
     "Chain",
     "WaveAdder",
+
     # Modifiers
     "Modifier",
     "Panner",
@@ -168,9 +166,11 @@ __all__ = [
     "Frequency",
     "ModulatedFrequency",
     "Clipper",
+
     # Filters
     "butter",
     "apply_filter",
+
     # Noise
     "white_noise",
     "pink_noise",

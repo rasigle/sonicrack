@@ -1,0 +1,359 @@
+"""Unit tests for PatchBuilder
+
+Tests cover:
+- Fluent API patch building
+- Integration with existing components
+"""
+
+import unittest
+
+import numpy as np
+
+from src.builder import PatchBuilder
+from src.engine.oscillator import SineOscillator
+
+
+class TestPatchBuilder(unittest.TestCase):
+    """Tests for PatchBuilder fluent API."""
+
+    def test_simple_sine_wave(self):
+        """Test building a simple sine wave patch."""
+        patch = PatchBuilder().sine(440).build()
+
+        # Should be a SineOscillator
+        self.assertIsInstance(patch, SineOscillator)
+
+        # Should generate samples
+        samples = patch.get_samples(1000)
+        self.assertEqual(len(samples), 1000)
+        self.assertTrue(np.all(np.abs(samples) <= 1.0))
+
+    def test_oscillator_types(self):
+        """Test building patches with different oscillator types."""
+        # Sine
+        sine_patch = PatchBuilder().sine(440).build()
+        sine_samples = sine_patch.get_samples(100)
+        self.assertEqual(len(sine_samples), 100)
+
+        # Square
+        square_patch = PatchBuilder().square(440).build()
+        square_samples = square_patch.get_samples(100)
+        self.assertEqual(len(square_samples), 100)
+
+        # Triangle
+        triangle_patch = PatchBuilder().triangle(440).build()
+        triangle_samples = triangle_patch.get_samples(100)
+        self.assertEqual(len(triangle_samples), 100)
+
+        # Sawtooth
+        sawtooth_patch = PatchBuilder().sawtooth(440).build()
+        sawtooth_samples = sawtooth_patch.get_samples(100)
+        self.assertEqual(len(sawtooth_samples), 100)
+
+    def test_with_volume(self):
+        """Test adding volume control."""
+        patch = PatchBuilder().sine(440).volume(0.5).build()
+
+        # Generate samples
+        samples = patch.get_samples(1000)
+        self.assertEqual(len(samples), 1000)
+
+        # Volume should reduce amplitude
+        max_amp = np.max(np.abs(samples))
+        self.assertLess(max_amp, 0.6)  # Should be around 0.5
+
+    def test_with_pan(self):
+        """Test adding stereo panning."""
+        patch = PatchBuilder().sine(440).pan(1.0).build()
+
+        # Generate samples
+        samples = patch.get_samples(100)
+
+        # Should be stereo (tuple of left, right for each sample)
+        # Chain with Panner returns stereo tuples
+        self.assertEqual(len(samples), 100)
+
+    def test_with_clip(self):
+        """Test adding clipping."""
+        patch = PatchBuilder().sine(440, amplitude=2.0).clip(-0.5, 0.5).build()
+
+        # Generate samples
+        samples = patch.get_samples(1000)
+
+        # All samples should be within clip range
+        self.assertTrue(np.all(samples >= -0.5))
+        self.assertTrue(np.all(samples <= 0.5))
+
+    def test_with_adsr(self):
+        """Test adding ADSR envelope."""
+        patch = PatchBuilder().sine(440).adsr(0.1, 0.2, 0.7, 0.3).build()
+
+        # Generate samples
+        samples = patch.get_samples(44100)  # 1 second
+
+        # Should have envelope shape
+        # Attack phase should ramp up
+        attack_samples = samples[:int(0.1 * 44100)]
+        self.assertTrue(np.mean(np.abs(attack_samples[:100])) < np.mean(np.abs(attack_samples[-100:])))
+
+    def test_method_chaining(self):
+        """Test fluent API method chaining."""
+        patch = (PatchBuilder()
+                .sine(440, amplitude=0.8)
+                .adsr(0.1, 0.2, 0.7, 0.3)
+                .volume(0.5)
+                .pan(0.0)
+                .clip(-0.9, 0.9)
+                .build())
+
+        # Should successfully build
+        samples = patch.get_samples(1000)
+        self.assertEqual(len(samples), 1000)
+
+    def test_multiple_oscillators(self):
+        """Test mixing multiple oscillators."""
+        patch = (PatchBuilder()
+                .add_oscillator(PatchBuilder().sine(220).build())
+                .add_oscillator(PatchBuilder().sine(440).build())
+                .add_oscillator(PatchBuilder().sine(880).build())
+                .build())
+
+        # Should create a WaveAdder
+        samples = patch.get_samples(1000)
+        self.assertEqual(len(samples), 1000)
+
+    def test_build_without_source_raises_error(self):
+        """Test that building without oscillator raises error."""
+        with self.assertRaises(ValueError):
+            PatchBuilder().volume(0.5).build()
+
+    def test_get_config(self):
+        """Test getting configuration dictionary."""
+        builder = (PatchBuilder()
+                  .sine(440, amplitude=0.8)
+                  .adsr(0.1, 0.2, 0.7, 0.3)
+                  .volume(0.5))
+
+        config = builder.get_config()
+
+        # Should have version and components
+        self.assertIn("version", config)
+        self.assertIn("components", config)
+        self.assertEqual(len(config["components"]), 3)  # sine, adsr, volume
+
+
+class TestPatchBuilderIntegration(unittest.TestCase):
+    """Integration tests with existing components."""
+
+    def test_output_consistency_with_manual_creation(self):
+        """Test that builder output matches manually created patch."""
+        # Create patch manually
+        from src.engine import SineOscillator, Chain, Volume
+        manual_osc = SineOscillator(440, amp=0.8)
+        manual_patch = Chain(manual_osc, Volume(0.5))
+
+        # Create same patch with builder
+        builder_patch = (PatchBuilder()
+                        .sine(440, amplitude=0.8)
+                        .volume(0.5)
+                        .build())
+
+        # Both should generate similar samples
+        manual_samples = manual_patch.get_samples(1000, reset=True)
+        builder_samples = builder_patch.get_samples(1000, reset=True)
+
+        # Should be very similar (allow for small differences)
+        correlation = np.corrcoef(manual_samples, builder_samples)[0, 1]
+        self.assertGreater(correlation, 0.99)
+
+    def test_sample_rate_configuration(self):
+        """Test setting custom sample rate."""
+        custom_sr = 48000
+        patch = (PatchBuilder()
+                .set_sample_rate(custom_sr)
+                .sine(440)
+                .build())
+
+        # Should use custom sample rate
+        self.assertEqual(patch._sample_rate, custom_sr)
+
+
+class TestPatchBuilderConvenience(unittest.TestCase):
+    """Tests for convenience methods (describe, summary, modify, etc.)."""
+
+    def test_name_and_description(self):
+        """Test setting and getting patch name and description."""
+        # Test with constructor
+        patch1 = PatchBuilder("My Synth", "A cool synthesizer")
+        self.assertEqual(patch1.get_name(), "My Synth")
+        self.assertEqual(patch1.get_description(), "A cool synthesizer")
+
+        # Test with setter methods
+        patch2 = (PatchBuilder()
+                 .set_name("Lead Synth")
+                 .set_description("Bright lead sound")
+                 .sine(440))
+        self.assertEqual(patch2.get_name(), "Lead Synth")
+        self.assertEqual(patch2.get_description(), "Bright lead sound")
+
+        # Test default values
+        patch3 = PatchBuilder()
+        self.assertEqual(patch3.get_name(), "Untitled Patch")
+        self.assertEqual(patch3.get_description(), "")
+
+    def test_get_source(self):
+        """Test accessing source oscillator."""
+        from src.engine.oscillator import SineOscillator
+
+        patch = PatchBuilder().sine(440)
+        source = patch.get_source()
+
+        self.assertIsInstance(source, SineOscillator)
+        self.assertEqual(source.freq, 440)
+
+    def test_get_modifiers(self):
+        """Test accessing modifiers list."""
+        from src.engine.modifier import Volume, Panner
+
+        patch = PatchBuilder().sine(440).volume(0.5).pan(0.3)
+        modifiers = patch.get_modifiers()
+
+        self.assertEqual(len(modifiers), 2)
+        self.assertIsInstance(modifiers[0], Volume)
+        self.assertIsInstance(modifiers[1], Panner)
+
+    def test_get_modulators(self):
+        """Test accessing modulators dictionary."""
+        patch = PatchBuilder().sine(440).adsr(0.1, 0.2, 0.7, 0.3)
+        modulators = patch.get_modulators()
+
+        self.assertIn('amplitude_mod', modulators)
+
+    def test_get_components(self):
+        """Test accessing all components."""
+        patch = (PatchBuilder("Test Patch")
+                .sine(440)
+                .adsr(0.1, 0.2, 0.7, 0.3)
+                .volume(0.5))
+
+        components = patch.get_components()
+
+        self.assertIn('source', components)
+        self.assertIn('modifiers', components)
+        self.assertIn('modulators', components)
+        self.assertIn('name', components)
+        self.assertIn('description', components)
+        self.assertIn('sample_rate', components)
+
+        self.assertEqual(components['name'], "Test Patch")
+        self.assertEqual(len(components['modifiers']), 1)
+
+    def test_describe(self):
+        """Test patch description."""
+        builder = (PatchBuilder("My Lead")
+                  .set_description("Bright lead sound")
+                  .sine(440, amplitude=0.8)
+                  .adsr(0.1, 0.2, 0.7, 0.3)
+                  .volume(0.5)
+                  .pan(0.3))
+
+        description = builder.describe()
+
+        # Should contain name and description
+        self.assertIn("My Lead", description)
+        self.assertIn("Bright lead sound", description)
+        # Should contain component descriptions
+        self.assertIn("Sine Oscillator", description)
+        self.assertIn("440", description)
+        self.assertIn("ADSR Envelope", description)
+        self.assertIn("Volume", description)
+        self.assertIn("Panner", description)
+
+    def test_summary(self):
+        """Test patch summary statistics."""
+        builder = (PatchBuilder("Test")
+                  .sine(440)
+                  .adsr(0.1, 0.2, 0.7, 0.3)
+                  .volume(0.5)
+                  .pan(0.3))
+
+        summary = builder.summary()
+
+        # Check summary structure
+        self.assertEqual(summary["name"], "Test")
+        self.assertEqual(summary["oscillators"], 1)
+        self.assertEqual(summary["modulators"], 1)
+        self.assertEqual(summary["effects"], 2)  # volume + pan
+        self.assertEqual(summary["components"], 4)
+
+    def test_clone(self):
+        """Test patch cloning."""
+        original = PatchBuilder().sine(440).volume(0.5)
+        clone = original.clone()
+
+        # Clone should have same config
+        self.assertEqual(clone.get_config(), original.get_config())
+
+        # But modifying clone shouldn't affect original
+        clone.volume(0.7)
+        orig_volume = None
+        clone_volume = None
+
+        for comp in original.get_config()["components"]:
+            if comp["type"] == "volume":
+                orig_volume = comp["amplitude"]
+
+        for comp in clone.get_config()["components"]:
+            if comp["type"] == "volume":
+                clone_volume = comp["amplitude"]
+
+        # Original should still have 0.5, clone should have 0.7
+        self.assertEqual(orig_volume, 0.5)
+
+    def test_modify_frequency(self):
+        """Test modifying patch frequency."""
+        patch = PatchBuilder().sine(440)
+
+        # Modify frequency
+        patch.modify_frequency(880)
+
+        # Check config was updated
+        config = patch.get_config()
+        osc_config = config["components"][0]
+        self.assertEqual(osc_config["frequency"], 880)
+
+    def test_modify_amplitude(self):
+        """Test modifying patch amplitude."""
+        patch = PatchBuilder().sine(440, amplitude=1.0)
+
+        # Modify amplitude
+        patch.modify_amplitude(0.5)
+
+        # Check config was updated
+        config = patch.get_config()
+        osc_config = config["components"][0]
+        self.assertEqual(osc_config["amplitude"], 0.5)
+
+    def test_clear_effects(self):
+        """Test clearing effects from patch."""
+        builder = (PatchBuilder()
+                  .sine(440)
+                  .volume(0.5)
+                  .pan(0.3)
+                  .clip(-0.9, 0.9))
+
+        # Clear effects
+        builder.clear_effects()
+
+        # Should only have oscillator left
+        config = builder.get_config()
+        component_types = [c["type"] for c in config["components"]]
+        self.assertIn("sine_oscillator", component_types)
+        self.assertNotIn("volume", component_types)
+        self.assertNotIn("panner", component_types)
+        self.assertNotIn("clipper", component_types)
+
+
+if __name__ == "__main__":
+    unittest.main()
+

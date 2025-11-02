@@ -42,12 +42,14 @@ class TestPresetSaveLoad(unittest.TestCase):
             filepath = Path(tmpdir) / "complex_preset.json"
 
             # Create complex patch
-            builder = (PatchBuilder()
-                      .sine(440, amplitude=0.8, phase=45)
-                      .adsr(0.1, 0.2, 0.7, 0.3)
-                      .volume(0.6)
-                      .panner(-0.5)
-                      .clipper(-0.8, 0.8))
+            builder = (
+                PatchBuilder()
+                .sine(440, amplitude=0.8, phase=45)
+                .adsr(0.1, 0.2, 0.7, 0.3)
+                .volume(0.6)
+                .panner(-0.5)
+                .clipper(-0.8, 0.8)
+            )
 
             builder.save_preset(filepath)
 
@@ -80,7 +82,7 @@ class TestPresetSaveLoad(unittest.TestCase):
             builder.save_preset(filepath)
 
             # Read JSON directly
-            with open(filepath, 'r') as f:
+            with open(filepath, "r") as f:
                 data = json.load(f)
 
             # Check structure
@@ -226,14 +228,14 @@ class TestPresetLibrary(unittest.TestCase):
             metadata = {
                 "author": "Test Author",
                 "description": "Test preset",
-                "tags": ["synth", "lead"]
+                "tags": ["synth", "lead"],
             }
 
             library.save(builder, "preset_with_meta", metadata=metadata)
 
             # Load and check metadata
             preset_file = Path(tmpdir) / "preset_with_meta.json"
-            with open(preset_file, 'r') as f:
+            with open(preset_file, "r") as f:
                 data = json.load(f)
 
             self.assertIn("metadata", data)

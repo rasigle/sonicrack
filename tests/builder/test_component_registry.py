@@ -16,7 +16,7 @@ from src.builder.component_registry import (
     ComponentDescriptor,
     ComponentCategory,
     registry,
-    register_component
+    register_component,
 )
 
 
@@ -30,7 +30,7 @@ class TestComponentDescriptor(unittest.TestCase):
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
             config_params=["param1", "param2"],
-            description="Test component"
+            description="Test component",
         )
 
         self.assertEqual(descriptor.name, "test_component")
@@ -45,7 +45,7 @@ class TestComponentDescriptor(unittest.TestCase):
             name="sine_oscillator",
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
-            config_params=[]
+            config_params=[],
         )
         self.assertEqual(descriptor1.method_name, "sine")
 
@@ -54,7 +54,7 @@ class TestComponentDescriptor(unittest.TestCase):
             name="custom",
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
-            config_params=[]
+            config_params=[],
         )
         self.assertEqual(descriptor2.method_name, "custom")
 
@@ -64,7 +64,7 @@ class TestComponentDescriptor(unittest.TestCase):
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
             config_params=[],
-            method_name="my_test"
+            method_name="my_test",
         )
         self.assertEqual(descriptor3.method_name, "my_test")
 
@@ -75,7 +75,7 @@ class TestComponentDescriptor(unittest.TestCase):
             name="test",
             category=ComponentCategory.OSCILLATOR,
             factory=mock_factory,
-            config_params=[]
+            config_params=[],
         )
 
         instance = descriptor.create_instance(440, amplitude=0.5)
@@ -89,7 +89,7 @@ class TestComponentDescriptor(unittest.TestCase):
             name="test_component",
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
-            config_params=["frequency", "amplitude"]
+            config_params=["frequency", "amplitude"],
         )
 
         config = descriptor.to_config(440, amplitude=0.8)
@@ -104,7 +104,7 @@ class TestComponentDescriptor(unittest.TestCase):
             name="test",
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
-            config_params=["frequency", "amplitude", "phase"]
+            config_params=["frequency", "amplitude", "phase"],
         )
 
         config = descriptor.to_config(frequency=440, amplitude=0.5, phase=90)
@@ -128,7 +128,7 @@ class TestComponentRegistry(unittest.TestCase):
             name="test_osc",
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
-            config_params=["frequency"]
+            config_params=["frequency"],
         )
 
         self.test_registry.register(descriptor)
@@ -142,13 +142,13 @@ class TestComponentRegistry(unittest.TestCase):
             name="test",
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
-            config_params=[]
+            config_params=[],
         )
         descriptor2 = ComponentDescriptor(
             name="test",
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
-            config_params=[]
+            config_params=[],
         )
 
         self.test_registry.register(descriptor1)
@@ -169,13 +169,13 @@ class TestComponentRegistry(unittest.TestCase):
             name="test1",
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
-            config_params=[]
+            config_params=[],
         )
         descriptor2 = ComponentDescriptor(
             name="test2",
             category=ComponentCategory.MODIFIER,
             factory=Mock,
-            config_params=[]
+            config_params=[],
         )
 
         self.test_registry.register(descriptor1)
@@ -193,13 +193,13 @@ class TestComponentRegistry(unittest.TestCase):
             name="osc",
             category=ComponentCategory.OSCILLATOR,
             factory=Mock,
-            config_params=[]
+            config_params=[],
         )
         mod_descriptor = ComponentDescriptor(
             name="mod",
             category=ComponentCategory.MODIFIER,
             factory=Mock,
-            config_params=[]
+            config_params=[],
         )
 
         self.test_registry.register(osc_descriptor)
@@ -212,7 +212,6 @@ class TestComponentRegistry(unittest.TestCase):
         self.assertEqual(oscillators[0].name, "osc")
         self.assertEqual(len(modifiers), 1)
         self.assertEqual(modifiers[0].name, "mod")
-
 
 
 class TestGlobalRegistry(unittest.TestCase):
@@ -277,6 +276,5 @@ class TestComponentCategories(unittest.TestCase):
         self.assertIn(ComponentCategory.COMPOSER, categories)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
-

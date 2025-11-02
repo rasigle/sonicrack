@@ -38,10 +38,12 @@ def example_1_basic_save_load():
 
     # Create a simple sine wave patch
     print("\n1. Creating a simple sine wave patch...")
-    patch = (PatchBuilder("Pure Sine")
-            .set_description("Simple 440Hz sine wave")
-            .sine(440, amplitude=0.8)
-            .volume(0.6))
+    patch = (
+        PatchBuilder("Pure Sine")
+        .set_description("Simple 440Hz sine wave")
+        .sine(440, amplitude=0.8)
+        .volume(0.6)
+    )
 
     print(patch.describe())
 
@@ -70,46 +72,54 @@ def example_2_library_management():
 
     # Initialize library
     library = PresetLibrary("demo_presets")
-    print(f"\n1. Initialized preset library at: demo_presets/")
+    print("\n1. Initialized preset library at: demo_presets/")
 
     # Create and save multiple presets in different categories
     print("\n2. Creating and saving categorized presets...")
 
     # Bass sounds
-    bass_patch = (PatchBuilder("Deep Bass")
-                 .set_description("Sub bass for electronic music")
-                 .sine(55, amplitude=0.9)  # A1
-                 .adsr(0.01, 0.1, 0.8, 0.2)
-                 .volume(0.7))
+    bass_patch = (
+        PatchBuilder("Deep Bass")
+        .set_description("Sub bass for electronic music")
+        .sine(55, amplitude=0.9)  # A1
+        .adsr(0.01, 0.1, 0.8, 0.2)
+        .volume(0.7)
+    )
     library.save(bass_patch, category="bass")
     print("   ✓ Saved: Deep Bass (bass category)")
 
     # Lead sounds
-    lead_patch = (PatchBuilder("Bright Lead")
-                 .set_description("Cutting lead sound")
-                 .sawtooth(880, amplitude=0.8)  # A5
-                 .adsr(0.05, 0.2, 0.6, 0.3)
-                 .volume(0.6)
-                 .clip(-0.8, 0.8))
+    lead_patch = (
+        PatchBuilder("Bright Lead")
+        .set_description("Cutting lead sound")
+        .sawtooth(880, amplitude=0.8)  # A5
+        .adsr(0.05, 0.2, 0.6, 0.3)
+        .volume(0.6)
+        .clip(-0.8, 0.8)
+    )
     library.save(lead_patch, category="leads")
     print("   ✓ Saved: Bright Lead (leads category)")
 
     # Pad sounds
-    pad_patch = (PatchBuilder("Warm Pad")
-                .set_description("Atmospheric pad with slow attack")
-                .sine(220, amplitude=0.6)  # A3
-                .adsr(2.0, 1.5, 0.7, 3.0)
-                .volume(0.4)
-                .pan(0.0))
+    pad_patch = (
+        PatchBuilder("Warm Pad")
+        .set_description("Atmospheric pad with slow attack")
+        .sine(220, amplitude=0.6)  # A3
+        .adsr(2.0, 1.5, 0.7, 3.0)
+        .volume(0.4)
+        .pan(0.0)
+    )
     library.save(pad_patch, category="pads")
     print("   ✓ Saved: Warm Pad (pads category)")
 
     # FX sounds
-    fx_patch = (PatchBuilder("Sweep FX")
-               .set_description("Rising sweep effect")
-               .square(100, amplitude=0.7)
-               .volume(0.5)
-               .pan(-0.3))
+    fx_patch = (
+        PatchBuilder("Sweep FX")
+        .set_description("Rising sweep effect")
+        .square(100, amplitude=0.7)
+        .volume(0.5)
+        .pan(-0.3)
+    )
     library.save(fx_patch, category="fx")
     print("   ✓ Saved: Sweep FX (fx category)")
 
@@ -198,13 +208,15 @@ def example_5_patch_inspection():
 
     # Create a complex patch
     print("\n1. Creating a complex multi-component patch...")
-    patch = (PatchBuilder("Complex Synth")
-            .set_description("Multi-stage synthesis example")
-            .sawtooth(440, amplitude=0.7)
-            .adsr(0.1, 0.3, 0.6, 0.5)
-            .volume(0.6)
-            .pan(0.2)
-            .clip(-0.7, 0.7))
+    patch = (
+        PatchBuilder("Complex Synth")
+        .set_description("Multi-stage synthesis example")
+        .sawtooth(440, amplitude=0.7)
+        .adsr(0.1, 0.3, 0.6, 0.5)
+        .volume(0.6)
+        .pan(0.2)
+        .clip(-0.7, 0.7)
+    )
 
     # Get full description
     print("\n2. Full patch description:")
@@ -247,12 +259,14 @@ def example_6_metadata_and_organization():
 
     # Create a patch with rich metadata
     print("\n1. Creating patch with metadata...")
-    patch = (PatchBuilder("Vintage Keys")
-            .set_description("Electric piano sound inspired by 1970s Rhodes")
-            .sine(440, amplitude=0.75)
-            .adsr(0.02, 0.5, 0.3, 0.8)
-            .volume(0.65)
-            .clip(-0.85, 0.85))
+    patch = (
+        PatchBuilder("Vintage Keys")
+        .set_description("Electric piano sound inspired by 1970s Rhodes")
+        .sine(440, amplitude=0.75)
+        .adsr(0.02, 0.5, 0.3, 0.8)
+        .volume(0.65)
+        .clip(-0.85, 0.85)
+    )
 
     # Save with additional metadata
     metadata = {
@@ -261,7 +275,7 @@ def example_6_metadata_and_organization():
         "genre": "jazz",
         "bpm": 120,
         "created": "2025-01-02",
-        "version": "1.0"
+        "version": "1.0",
     }
 
     library.save(patch, category="keys", metadata=metadata)
@@ -294,11 +308,13 @@ def example_7_batch_operations():
         freq = base_freq * i
         name = f"Harmonic_{i}"
 
-        patch = (PatchBuilder(name)
-                .set_description(f"Harmonic {i} of {base_freq}Hz = {freq}Hz")
-                .sine(freq, amplitude=0.8)
-                .adsr(0.05, 0.2, 0.7, 0.3)
-                .volume(0.5))
+        patch = (
+            PatchBuilder(name)
+            .set_description(f"Harmonic {i} of {base_freq}Hz = {freq}Hz")
+            .sine(freq, amplitude=0.8)
+            .adsr(0.05, 0.2, 0.7, 0.3)
+            .volume(0.5)
+        )
 
         library.save(patch, category="harmonics")
         print(f"   ✓ Created: {name} ({freq}Hz)")
@@ -340,11 +356,13 @@ def example_8_advanced_patches():
     print("\n1. Creating a detuned unison patch...")
 
     # Main oscillator at 440Hz
-    patch = (PatchBuilder("Detuned Unison")
-            .set_description("Three slightly detuned oscillators for richness")
-            .sine(440, amplitude=0.5)  # Center
-            .adsr(0.1, 0.3, 0.7, 0.4)
-            .volume(0.6))
+    patch = (
+        PatchBuilder("Detuned Unison")
+        .set_description("Three slightly detuned oscillators for richness")
+        .sine(440, amplitude=0.5)  # Center
+        .adsr(0.1, 0.3, 0.7, 0.4)
+        .volume(0.6)
+    )
 
     print(patch.describe())
     library.save(patch, category="synths")
@@ -352,12 +370,14 @@ def example_8_advanced_patches():
 
     # Create a bass patch with harmonics
     print("\n2. Creating harmonic-rich bass...")
-    bass = (PatchBuilder("Harmonic Bass")
-           .set_description("Fundamental with added harmonics")
-           .sawtooth(55, amplitude=0.8)  # Rich in harmonics
-           .adsr(0.01, 0.15, 0.7, 0.25)
-           .clip(-0.9, 0.9)
-           .volume(0.65))
+    bass = (
+        PatchBuilder("Harmonic Bass")
+        .set_description("Fundamental with added harmonics")
+        .sawtooth(55, amplitude=0.8)  # Rich in harmonics
+        .adsr(0.01, 0.15, 0.7, 0.25)
+        .clip(-0.9, 0.9)
+        .volume(0.65)
+    )
 
     print(bass.describe())
     library.save(bass, category="bass")
@@ -395,10 +415,12 @@ def example_9_preset_discovery():
                 print(f"│  ├─ {summary['name']}")
                 if desc:
                     print(f"│  │  └─ {desc}")
-                print(f"│  │     Components: {summary['components']} "
-                      f"(Osc:{summary['oscillators']}, "
-                      f"Mod:{summary['modulators']}, "
-                      f"FX:{summary['effects']})")
+                print(
+                    f"│  │     Components: {summary['components']} "
+                    f"(Osc:{summary['oscillators']}, "
+                    f"Mod:{summary['modulators']}, "
+                    f"FX:{summary['effects']})"
+                )
             except Exception as e:
                 print(f"│  ├─ {preset_name} (Error loading: {e})")
 
@@ -414,12 +436,14 @@ def example_10_export_import():
 
     # Create a special preset for export
     print("\n1. Creating a preset for export...")
-    export_patch = (PatchBuilder("Exported Sound")
-                   .set_description("A preset designed to be shared")
-                   .triangle(330, amplitude=0.75)
-                   .adsr(0.08, 0.25, 0.65, 0.35)
-                   .volume(0.6)
-                   .pan(0.1))
+    export_patch = (
+        PatchBuilder("Exported Sound")
+        .set_description("A preset designed to be shared")
+        .triangle(330, amplitude=0.75)
+        .adsr(0.08, 0.25, 0.65, 0.35)
+        .volume(0.6)
+        .pan(0.1)
+    )
 
     # Save to library
     library.save(export_patch, category="export")
@@ -427,16 +451,17 @@ def example_10_export_import():
 
     # The preset is already a JSON file that can be shared
     export_path = Path("demo_presets/export/Exported_Sound.json")
-    print(f"\n2. Preset saved as shareable JSON file:")
+    print("\n2. Preset saved as shareable JSON file:")
     print(f"   {export_path}")
 
     # Show the JSON content
     if export_path.exists():
         import json
-        with open(export_path, 'r') as f:
+
+        with open(export_path, "r") as f:
             config = json.load(f)
 
-        print(f"\n3. JSON structure:")
+        print("\n3. JSON structure:")
         print(f"   Name: {config.get('name')}")
         print(f"   Description: {config.get('description')}")
         print(f"   Version: {config.get('version')}")
@@ -456,8 +481,12 @@ def example_11_compare_presets():
     library = PresetLibrary("demo_presets")
 
     # Load multiple presets
-    preset_names = ["waveforms/Sine_440", "waveforms/Square_440",
-                    "waveforms/Triangle_440", "waveforms/Sawtooth_440"]
+    preset_names = [
+        "waveforms/Sine_440",
+        "waveforms/Square_440",
+        "waveforms/Triangle_440",
+        "waveforms/Sawtooth_440",
+    ]
 
     print("\n📊 WAVEFORM COMPARISON\n")
 
@@ -468,10 +497,12 @@ def example_11_compare_presets():
             patches.append(patch)
             summary = patch.summary()
 
-            print(f"{summary['name']:20} | Components: {summary['components']:2} | "
-                  f"Osc: {summary['oscillators']:2} | "
-                  f"Mod: {summary['modulators']:2} | "
-                  f"FX: {summary['effects']:2}")
+            print(
+                f"{summary['name']:20} | Components: {summary['components']:2} | "
+                f"Osc: {summary['oscillators']:2} | "
+                f"Mod: {summary['modulators']:2} | "
+                f"FX: {summary['effects']:2}"
+            )
         except Exception as e:
             print(f"{name:20} | Error: {e}")
 
@@ -487,10 +518,12 @@ def example_11_compare_presets():
         peak = np.max(np.abs(samples))
         crest_factor = peak / rms if rms > 0 else 0
 
-        print(f"{patch.get_name():20} | "
-              f"RMS: {rms:.4f} | "
-              f"Peak: {peak:.4f} | "
-              f"Crest: {crest_factor:.2f}")
+        print(
+            f"{patch.get_name():20} | "
+            f"RMS: {rms:.4f} | "
+            f"Peak: {peak:.4f} | "
+            f"Crest: {crest_factor:.2f}"
+        )
 
 
 def main():
@@ -560,4 +593,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -18,9 +18,7 @@ import soundfile as sf
 from src.constants import DEFAULT_SAMPLE_RATE
 
 
-def to_int16(
-    audio: np.ndarray | list, amplitude: float = 1.0
-) -> np.ndarray:
+def to_int16(audio: np.ndarray | list, amplitude: float = 1.0) -> np.ndarray:
     """Convert floating-point audio samples to 16-bit integer format.
 
     Converts normalized audio data (typically in range [-1.0, 1.0]) to
@@ -28,7 +26,8 @@ def to_int16(
 
     Args:
         audio: Audio samples as numpy array or list, expected in range [-1.0, 1.0].
-        amplitude: Amplitude scaling factor (0.0 to 1.0). Values > 1.0 may cause clipping.
+        amplitude: Amplitude scaling factor (0.0 to 1.0). Values > 1.0 may cause
+            clipping.
 
     Returns:
         np.ndarray: Audio samples as 16-bit signed integers.
@@ -46,7 +45,7 @@ def to_int16(
     audio_array = np.asarray(audio, dtype=np.float64)
     # Scale and convert to 16-bit range
     scaled = audio_array * amplitude * (2**15 - 1)
-    return np.clip(scaled, -2**15, 2**15 - 1).astype(np.int16)
+    return np.clip(scaled, -(2**15), 2**15 - 1).astype(np.int16)
 
 
 def play_wave(
@@ -61,7 +60,8 @@ def play_wave(
         audio: Audio samples to play (mono or stereo).
         sample_rate: Sample rate in Hz.
         amplitude: Playback amplitude (0.0 to 1.0). Default 0.5 for safety.
-        blocking: If True, waits for playback to complete. If False, returns immediately.
+        blocking: If True, waits for playback to complete. If False, returns
+            immediately.
 
     Example:
         >>> import numpy as np
@@ -83,11 +83,12 @@ def play_wave(
 
 
 def save_wave(
-        audio: np.ndarray | list,
-        audio_right: np.ndarray | list | None = None,
-        filename: str = "temp.wav",
-        sample_rate: int = DEFAULT_SAMPLE_RATE,
-        amplitude: float = 0.1) -> str:
+    audio: np.ndarray | list,
+    audio_right: np.ndarray | list | None = None,
+    filename: str = "temp.wav",
+    sample_rate: int = DEFAULT_SAMPLE_RATE,
+    amplitude: float = 0.1,
+) -> str:
     """Save audio samples to a WAV file.
 
     Saves mono or stereo audio to a WAV file. Automatically adds .wav

@@ -2,14 +2,13 @@
 
 import unittest
 import numpy as np
-from typing import Tuple
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.engine.modifier import (
-    Modifier,
     Panner,
     ModulatedPanner,
     Volume,
@@ -127,8 +126,10 @@ class TestPanner(unittest.TestCase):
             # Total power should always be 1.0
             power = left**2 + right**2
             self.assertAlmostEqual(
-                power, 1.0, places=5,
-                msg=f"Power not preserved at position {pos}: {power}"
+                power,
+                1.0,
+                places=5,
+                msg=f"Power not preserved at position {pos}: {power}",
             )
 
     def test_vectorized_panning(self) -> None:
@@ -180,7 +181,6 @@ class TestPanner(unittest.TestCase):
         expected_power = 100.0**2
         actual_power = left**2 + right**2
         self.assertAlmostEqual(actual_power, expected_power, places=3)
-
 
     def test_initialization_default(self):
         """Test Panner initializes with default center position."""
@@ -290,11 +290,13 @@ class TestModulatedPanner(unittest.TestCase):
 
         # Pan should change over time due to modulation
         left_values = [r[0] for r in results]
-        self.assertGreater(len(set(left_values)), 1,
-                          "Pan values should change over time")
+        self.assertGreater(
+            len(set(left_values)), 1, "Pan values should change over time"
+        )
 
     def test_modulation_position_mapping(self) -> None:
         """Test that modulator values [-1, 1] map directly to pan [-1, 1]."""
+
         # Create a simple modulator that yields known values
         class SimpleModulator:
             def __init__(self):
@@ -347,8 +349,10 @@ class TestModulatedPanner(unittest.TestCase):
             left, right = panner(1.0)
             power = left**2 + right**2
             self.assertAlmostEqual(
-                power, 1.0, places=5,
-                msg=f"Power not preserved during modulation at position {panner.position}"
+                power,
+                1.0,
+                places=5,
+                msg=f"Power not preserved during modulation at position {panner.position}",
             )
             next(panner)
 
@@ -369,10 +373,8 @@ class TestModulatedPanner(unittest.TestCase):
         self.assertEqual(len(right), num_samples)
 
         # Values should change over time
-        self.assertGreater(len(set(left)), 1,
-                          "Left channel should vary over time")
-        self.assertGreater(len(set(right)), 1,
-                          "Right channel should vary over time")
+        self.assertGreater(len(set(left)), 1, "Left channel should vary over time")
+        self.assertGreater(len(set(right)), 1, "Right channel should vary over time")
 
     def test_vectorized_preserves_power(self) -> None:
         """Test that vectorized modulated panning preserves power."""
@@ -386,10 +388,9 @@ class TestModulatedPanner(unittest.TestCase):
 
         # Check power preservation for each sample
         for i in range(num_samples):
-            power = left[i]**2 + right[i]**2
+            power = left[i] ** 2 + right[i] ** 2
             self.assertAlmostEqual(
-                power, 1.0, places=5,
-                msg=f"Power not preserved at sample {i}"
+                power, 1.0, places=5, msg=f"Power not preserved at sample {i}"
             )
 
     def test_negative_input_with_modulation(self) -> None:
@@ -418,13 +419,16 @@ class TestModulatedPanner(unittest.TestCase):
             expected_power = val**2
             actual_power = left**2 + right**2
             self.assertAlmostEqual(
-                actual_power, expected_power, places=5,
-                msg=f"Power not correct for input {val}"
+                actual_power,
+                expected_power,
+                places=5,
+                msg=f"Power not correct for input {val}",
             )
             next(panner)
 
     def test_modulation_range_clamping(self) -> None:
         """Test that modulation values are clamped to valid range."""
+
         # Create a modulator that produces out-of-range values
         class OutOfRangeModulator:
             def __init__(self):
@@ -672,7 +676,7 @@ class TestModulatedVolume(unittest.TestCase):
 
         # Should not raise
         volume.trigger_release()
-        self.assertTrue(hasattr(env, 'ended'))
+        self.assertTrue(hasattr(env, "ended"))
 
     def test_ended_property(self):
         """Test ended property reflects modulator state."""
@@ -1001,6 +1005,8 @@ class TestModulatedFrequency(unittest.TestCase):
 
 
 """Test cases for ModulatedVolume and ModulatedFrequency vectorization."""
+
+
 class TestModulatedVolumeVectorization(unittest.TestCase):
     """Test ModulatedVolume vectorized methods."""
 
@@ -1009,7 +1015,7 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
         env = ADSREnvelope(0.1, 0.1, 0.7, 0.1, sample_rate=1000)
         mod_vol = ModulatedVolume(env)
 
-        self.assertTrue(hasattr(mod_vol, 'scale_vectorized'))
+        self.assertTrue(hasattr(mod_vol, "scale_vectorized"))
         self.assertTrue(callable(mod_vol.scale_vectorized))
 
     def test_scale_vectorized_with_adsr(self):
@@ -1019,7 +1025,7 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
             decay_duration=0.1,
             sustain_level=0.7,
             release_duration=0.1,
-            sample_rate=1000
+            sample_rate=1000,
         )
         mod_vol = ModulatedVolume(env)
 
@@ -1094,7 +1100,7 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
         chain = Chain(osc, mod_vol)
 
         # This should use vectorization, not iterator fallback
-        samples = chain.get_samples(100, mode='vectorized')
+        samples = chain.get_samples(100, mode="vectorized")
 
         # Verify output
         self.assertEqual(len(samples), 100)
@@ -1115,12 +1121,14 @@ class TestModulatedFrequencyVectorization(unittest.TestCase):
         lfo = SineOscillator(5, sample_rate=1000)
         mod_freq = ModulatedFrequency(lfo)
 
-        self.assertTrue(hasattr(mod_freq, 'scale_vectorized'))
+        self.assertTrue(hasattr(mod_freq, "scale_vectorized"))
         self.assertTrue(callable(mod_freq.scale_vectorized))
 
     def test_scale_vectorized_with_oscillator(self):
         """Test ModulatedFrequency.scale_vectorized with oscillator modulator."""
-        lfo = SineOscillator(5, amplitude=1.0, sample_rate=1000)  # Amplitude 1.0 for clear variation
+        lfo = SineOscillator(
+            5, amplitude=1.0, sample_rate=1000
+        )  # Amplitude 1.0 for clear variation
         mod_freq = ModulatedFrequency(lfo)
 
         # Create test samples (frequencies)
@@ -1171,11 +1179,11 @@ class TestChainVectorizationPerformance(unittest.TestCase):
         chain = Chain(osc, mod_vol)
 
         # Check that ModulatedVolume has the vectorized method
-        self.assertTrue(hasattr(mod_vol, 'scale_vectorized'))
+        self.assertTrue(hasattr(mod_vol, "scale_vectorized"))
 
         # Generate samples - should use vectorization
         n = 1000
-        samples = chain.get_samples(n, mode='vectorized')
+        samples = chain.get_samples(n, mode="vectorized")
 
         # Verify correct output
         self.assertEqual(len(samples), n)
@@ -1194,7 +1202,7 @@ class TestChainVectorizationPerformance(unittest.TestCase):
             decay_duration=0.1,
             sustain_level=0.7,
             release_duration=0.1,
-            sample_rate=1000
+            sample_rate=1000,
         )
         mod_vol = ModulatedVolume(env)
         lfo = TriangleOscillator(1, phase=180, wave_range=(-1, 1), sample_rate=1000)
@@ -1204,7 +1212,7 @@ class TestChainVectorizationPerformance(unittest.TestCase):
 
         # Generate samples
         n = 500
-        samples = chain.get_samples(n, mode='vectorized')
+        samples = chain.get_samples(n, mode="vectorized")
 
         # Should produce stereo output from ModulatedPanner
         self.assertEqual(samples.ndim, 2)
@@ -1217,7 +1225,5 @@ class TestChainVectorizationPerformance(unittest.TestCase):
         self.assertEqual(len(right), n)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
-
-

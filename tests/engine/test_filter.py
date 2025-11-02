@@ -5,6 +5,7 @@ import numpy as np
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.engine.filter import butter, apply_filter
@@ -16,12 +17,7 @@ class TestCreateButterFilter(unittest.TestCase):
 
     def test_lowpass_filter_creation(self) -> None:
         """Test creating a low-pass filter."""
-        b, a = butter(
-            order=4,
-            cutoff=1000,
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="low"
-        )
+        b, a = butter(order=4, cutoff=1000, fs=DEFAULT_SAMPLE_RATE, btype="low")
 
         self.assertIsInstance(b, np.ndarray)
         self.assertIsInstance(a, np.ndarray)
@@ -30,24 +26,14 @@ class TestCreateButterFilter(unittest.TestCase):
 
     def test_highpass_filter_creation(self) -> None:
         """Test creating a high-pass filter."""
-        b, a = butter(
-            order=4,
-            cutoff=100,
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="high"
-        )
+        b, a = butter(order=4, cutoff=100, fs=DEFAULT_SAMPLE_RATE, btype="high")
 
         self.assertIsInstance(b, np.ndarray)
         self.assertIsInstance(a, np.ndarray)
 
     def test_bandpass_filter_creation(self) -> None:
         """Test creating a band-pass filter."""
-        b, a = butter(
-            order=4,
-            cutoff=(100, 1000),
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="band"
-        )
+        b, a = butter(order=4, cutoff=(100, 1000), fs=DEFAULT_SAMPLE_RATE, btype="band")
 
         self.assertIsInstance(b, np.ndarray)
         self.assertIsInstance(a, np.ndarray)
@@ -57,10 +43,7 @@ class TestCreateButterFilter(unittest.TestCase):
         for order in [2, 4, 6, 8]:
             with self.subTest(order=order):
                 b, a = butter(
-                    order=order,
-                    cutoff=1000,
-                    fs=DEFAULT_SAMPLE_RATE,
-                    btype="low"
+                    order=order, cutoff=1000, fs=DEFAULT_SAMPLE_RATE, btype="low"
                 )
 
                 # Higher order should have more coefficients
@@ -74,7 +57,7 @@ class TestCreateButterFilter(unittest.TestCase):
             order=4,
             cutoff=nyquist * 0.9,  # Just below Nyquist
             fs=DEFAULT_SAMPLE_RATE,
-            btype="low"
+            btype="low",
         )
 
         self.assertIsInstance(b, np.ndarray)
@@ -92,12 +75,7 @@ class TestApplyFilter(unittest.TestCase):
         signal = low_freq + high_freq
 
         # Create low-pass filter at 1000 Hz
-        b, a = butter(
-            order=6,
-            cutoff=1000,
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="low"
-        )
+        b, a = butter(order=6, cutoff=1000, fs=DEFAULT_SAMPLE_RATE, btype="low")
 
         # Apply filter
         filtered = apply_filter(b, a, signal)
@@ -106,12 +84,12 @@ class TestApplyFilter(unittest.TestCase):
         # Check energy in high frequency band using FFT
         fft_original = np.fft.fft(signal)
         fft_filtered = np.fft.fft(filtered)
-        freqs = np.fft.fftfreq(len(signal), 1/DEFAULT_SAMPLE_RATE)
+        freqs = np.fft.fftfreq(len(signal), 1 / DEFAULT_SAMPLE_RATE)
 
         # Energy above 2000 Hz should be reduced
         high_freq_mask = np.abs(freqs) > 2000
-        original_high_energy = np.sum(np.abs(fft_original[high_freq_mask])**2)
-        filtered_high_energy = np.sum(np.abs(fft_filtered[high_freq_mask])**2)
+        original_high_energy = np.sum(np.abs(fft_original[high_freq_mask]) ** 2)
+        filtered_high_energy = np.sum(np.abs(fft_filtered[high_freq_mask]) ** 2)
 
         self.assertLess(filtered_high_energy, original_high_energy * 0.1)
 
@@ -124,12 +102,7 @@ class TestApplyFilter(unittest.TestCase):
         signal = low_freq + high_freq
 
         # Create high-pass filter at 1000 Hz
-        b, a = butter(
-            order=6,
-            cutoff=1000,
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="high"
-        )
+        b, a = butter(order=6, cutoff=1000, fs=DEFAULT_SAMPLE_RATE, btype="high")
 
         # Apply filter
         filtered = apply_filter(b, a, signal)
@@ -137,12 +110,12 @@ class TestApplyFilter(unittest.TestCase):
         # Low frequency component should be attenuated
         fft_original = np.fft.fft(signal)
         fft_filtered = np.fft.fft(filtered)
-        freqs = np.fft.fftfreq(len(signal), 1/DEFAULT_SAMPLE_RATE)
+        freqs = np.fft.fftfreq(len(signal), 1 / DEFAULT_SAMPLE_RATE)
 
         # Energy below 500 Hz should be reduced
         low_freq_mask = np.abs(freqs) < 500
-        original_low_energy = np.sum(np.abs(fft_original[low_freq_mask])**2)
-        filtered_low_energy = np.sum(np.abs(fft_filtered[low_freq_mask])**2)
+        original_low_energy = np.sum(np.abs(fft_original[low_freq_mask]) ** 2)
+        filtered_low_energy = np.sum(np.abs(fft_filtered[low_freq_mask]) ** 2)
 
         self.assertLess(filtered_low_energy, original_low_energy * 0.1)
 
@@ -150,12 +123,7 @@ class TestApplyFilter(unittest.TestCase):
         """Test filtered signal has same length as input."""
         signal = np.random.randn(1000)
 
-        b, a = butter(
-            order=4,
-            cutoff=1000,
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="low"
-        )
+        b, a = butter(order=4, cutoff=1000, fs=DEFAULT_SAMPLE_RATE, btype="low")
 
         filtered = apply_filter(b, a, signal)
 
@@ -165,12 +133,7 @@ class TestApplyFilter(unittest.TestCase):
         """Test filter doesn't produce NaN or Inf."""
         signal = np.random.randn(1000)
 
-        b, a = butter(
-            order=4,
-            cutoff=1000,
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="low"
-        )
+        b, a = butter(order=4, cutoff=1000, fs=DEFAULT_SAMPLE_RATE, btype="low")
 
         filtered = apply_filter(b, a, signal)
 
@@ -182,12 +145,7 @@ class TestApplyFilter(unittest.TestCase):
         signal = np.zeros(1000)
         signal[500] = 1.0
 
-        b, a = butter(
-            order=4,
-            cutoff=100,
-            fs=1000,
-            btype="low"
-        )
+        b, a = butter(order=4, cutoff=100, fs=1000, btype="low")
 
         filtered = apply_filter(b, a, signal)
 
@@ -209,18 +167,13 @@ class TestBandpassFilter(unittest.TestCase):
         signal = low_freq + mid_freq + high_freq
 
         # Create band-pass filter: 200-1000 Hz
-        b, a = butter(
-            order=5,
-            cutoff=(200, 1000),
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="band"
-        )
+        b, a = butter(order=5, cutoff=(200, 1000), fs=DEFAULT_SAMPLE_RATE, btype="band")
 
         filtered = apply_filter(b, a, signal)
 
         # FFT analysis
         fft_filtered = np.fft.fft(filtered)
-        freqs = np.fft.fftfreq(len(signal), 1/DEFAULT_SAMPLE_RATE)
+        freqs = np.fft.fftfreq(len(signal), 1 / DEFAULT_SAMPLE_RATE)
 
         # Energy at 500 Hz should be preserved
         freq_500_idx = np.argmin(np.abs(freqs - 500))
@@ -235,12 +188,7 @@ class TestEdgeCases(unittest.TestCase):
         """Test filtering empty signal."""
         signal = np.array([])
 
-        b, a = butter(
-            order=4,
-            cutoff=1000,
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="low"
-        )
+        b, a = butter(order=4, cutoff=1000, fs=DEFAULT_SAMPLE_RATE, btype="low")
 
         # Should handle gracefully or raise appropriate error
         try:
@@ -254,12 +202,7 @@ class TestEdgeCases(unittest.TestCase):
         """Test filtering single sample."""
         signal = np.array([1.0])
 
-        b, a = butter(
-            order=2,
-            cutoff=1000,
-            fs=DEFAULT_SAMPLE_RATE,
-            btype="low"
-        )
+        b, a = butter(order=2, cutoff=1000, fs=DEFAULT_SAMPLE_RATE, btype="low")
 
         # Should handle gracefully
         try:
@@ -272,4 +215,3 @@ class TestEdgeCases(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

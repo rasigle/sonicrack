@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.engine.oscillator import SineOscillator, SquareOscillator
+from src.engine.oscillator import SineOscillator
 from src.engine.composer import Chain, WaveAdder
 from src.engine.modifier import Volume, Panner, Clipper
 

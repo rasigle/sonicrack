@@ -1,4 +1,5 @@
 """Test for WaveAdder mixed mono/stereo inputs bug fix."""
+
 import unittest
 import sys
 from pathlib import Path
@@ -6,7 +7,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
-from src.engine import SineOscillator, WaveAdder, Chain, ModulatedPanner, TriangleOscillator
+from src.engine import (
+    SineOscillator,
+    WaveAdder,
+    Chain,
+    ModulatedPanner,
+    TriangleOscillator,
+)
 
 
 class TestWaveAdderMixedInputs(unittest.TestCase):
@@ -17,7 +24,7 @@ class TestWaveAdderMixedInputs(unittest.TestCase):
         # Stereo input: Chain with ModulatedPanner
         stereo_gen = Chain(
             SineOscillator(440, sample_rate=1000),
-            ModulatedPanner(TriangleOscillator(1, sample_rate=1000))
+            ModulatedPanner(TriangleOscillator(1, sample_rate=1000)),
         )
 
         # Mono input
@@ -40,11 +47,11 @@ class TestWaveAdderMixedInputs(unittest.TestCase):
         # Two stereo inputs
         stereo1 = Chain(
             SineOscillator(440, amplitude=0.3, sample_rate=1000),
-            ModulatedPanner(TriangleOscillator(1, phase=180, sample_rate=1000))
+            ModulatedPanner(TriangleOscillator(1, phase=180, sample_rate=1000)),
         )
         stereo2 = Chain(
             SineOscillator(550, amplitude=0.3, sample_rate=1000),
-            ModulatedPanner(TriangleOscillator(1, sample_rate=1000))
+            ModulatedPanner(TriangleOscillator(1, sample_rate=1000)),
         )
 
         # One mono input
@@ -64,7 +71,7 @@ class TestWaveAdderMixedInputs(unittest.TestCase):
         mixer = WaveAdder(
             SineOscillator(440, sample_rate=1000),
             SineOscillator(550, sample_rate=1000),
-            stereo=True
+            stereo=True,
         )
 
         samples = mixer.get_samples(100)
@@ -79,11 +86,11 @@ class TestWaveAdderMixedInputs(unittest.TestCase):
         """Test WaveAdder stereo mode with all stereo inputs still works."""
         stereo1 = Chain(
             SineOscillator(440, sample_rate=1000),
-            ModulatedPanner(TriangleOscillator(1, sample_rate=1000))
+            ModulatedPanner(TriangleOscillator(1, sample_rate=1000)),
         )
         stereo2 = Chain(
             SineOscillator(550, sample_rate=1000),
-            ModulatedPanner(TriangleOscillator(2, sample_rate=1000))
+            ModulatedPanner(TriangleOscillator(2, sample_rate=1000)),
         )
 
         mixer = WaveAdder(stereo1, stereo2, stereo=True)
@@ -97,6 +104,5 @@ class TestWaveAdderMixedInputs(unittest.TestCase):
         self.assertFalse(np.allclose(samples[:, 0], samples[:, 1]))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
-

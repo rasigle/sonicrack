@@ -30,7 +30,7 @@ Example:
 
 from __future__ import annotations
 from typing import Any, Callable, Dict, List, Optional, Type
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from src.utils.logging_config import get_logger
@@ -40,6 +40,7 @@ logger = get_logger("builder.component_registry")
 
 class ComponentCategory(Enum):
     """Categories of audio synthesis components."""
+
     OSCILLATOR = "oscillator"
     MODULATOR = "modulator"
     MODIFIER = "modifier"
@@ -56,11 +57,13 @@ class ComponentDescriptor:
         factory: Class or factory function to create instances
         config_params: List of parameter names to store in preset configs
         description: Human-readable description
-        method_name: Optional method name for PatchBuilder (defaults to name without category suffix)
+        method_name: Optional method name for PatchBuilder (defaults to name without
+            category suffix)
         builder_handler: Optional custom handler for adding to PatchBuilder
         serializer: Optional custom serializer function
         deserializer: Optional custom deserializer function
     """
+
     name: str
     category: ComponentCategory
     factory: Type | Callable
@@ -79,7 +82,7 @@ class ComponentDescriptor:
             for cat in ComponentCategory:
                 suffix = f"_{cat.value}"
                 if base_name.endswith(suffix):
-                    base_name = base_name[:-len(suffix)]
+                    base_name = base_name[: -len(suffix)]
                     break
             self.method_name = base_name
 
@@ -112,7 +115,7 @@ class ComponentDescriptor:
             config[param] = value
 
         # Add keyword args if they're in config_params
-        for param in self.config_params[len(args):]:
+        for param in self.config_params[len(args) :]:
             if param in kwargs:
                 config[param] = kwargs[param]
 
@@ -131,7 +134,9 @@ class ComponentDescriptor:
             return self.deserializer(config)
 
         # Extract parameters from config
-        kwargs = {param: config[param] for param in self.config_params if param in config}
+        kwargs = {
+            param: config[param] for param in self.config_params if param in config
+        }
         return self.create_instance(**kwargs)
 
 
@@ -173,7 +178,9 @@ class ComponentRegistry:
             ValueError: If component name already registered
         """
         if descriptor.name in self._components:
-            logger.warning(f"Component '{descriptor.name}' already registered, overwriting")
+            logger.warning(
+                f"Component '{descriptor.name}' already registered, overwriting"
+            )
 
         self._components[descriptor.name] = descriptor
 
@@ -181,7 +188,9 @@ class ComponentRegistry:
         if descriptor.name not in self._categories[descriptor.category]:
             self._categories[descriptor.category].append(descriptor.name)
 
-        logger.debug(f"Registered component: {descriptor.name} ({descriptor.category.value})")
+        logger.debug(
+            f"Registered component: {descriptor.name} ({descriptor.category.value})"
+        )
 
     def get(self, name: str) -> Optional[ComponentDescriptor]:
         """Get component descriptor by name.
@@ -277,7 +286,7 @@ def register_component(
     factory: Type | Callable,
     config_params: List[str],
     description: str = "",
-    **kwargs
+    **kwargs,
 ) -> ComponentDescriptor:
     """Convenience function to register a component.
 
@@ -302,9 +311,8 @@ def register_component(
         factory=factory,
         config_params=config_params,
         description=description,
-        **kwargs
+        **kwargs,
     )
 
     registry.register(descriptor)
     return descriptor
-

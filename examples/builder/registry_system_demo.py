@@ -14,12 +14,7 @@ import numpy as np
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from src.builder import (
-    PatchBuilder,
-    register_component,
-    ComponentCategory,
-    registry
-)
+from src.builder import PatchBuilder, register_component, ComponentCategory, registry
 from src.engine.oscillator import Oscillator
 from src.engine.modifier import Modifier
 from src.constants import DEFAULT_SAMPLE_RATE
@@ -32,12 +27,14 @@ def example_1_basic_usage():
     print("=" * 70)
 
     # Use exactly like the original PatchBuilder
-    patch = (PatchBuilder("My Synth")
-             .set_description("A simple lead sound")
-             .sine(440, amplitude=0.8)
-             .adsr(0.1, 0.2, 0.7, 0.3)
-             .volume(0.6)
-             .pan(0.2))
+    patch = (
+        PatchBuilder("My Synth")
+        .set_description("A simple lead sound")
+        .sine(440, amplitude=0.8)
+        .adsr(0.1, 0.2, 0.7, 0.3)
+        .volume(0.6)
+        .pan(0.2)
+    )
 
     print("\nPatch description:")
     print(patch.describe())
@@ -72,8 +69,12 @@ def example_2_custom_oscillator():
     class NoiseOscillator(Oscillator):
         """White noise generator."""
 
-        def __init__(self, amplitude: float = 1.0, sample_rate: int = DEFAULT_SAMPLE_RATE):
-            super().__init__(frequency=0, amplitude=amplitude, phase=0, sample_rate=sample_rate)
+        def __init__(
+            self, amplitude: float = 1.0, sample_rate: int = DEFAULT_SAMPLE_RATE
+        ):
+            super().__init__(
+                frequency=0, amplitude=amplitude, phase=0, sample_rate=sample_rate
+            )
 
         def __iter__(self):
             """Generate infinite white noise."""
@@ -91,15 +92,17 @@ def example_2_custom_oscillator():
         category=ComponentCategory.OSCILLATOR,
         factory=NoiseOscillator,
         config_params=["amplitude", "sample_rate"],
-        description="White noise generator"
+        description="White noise generator",
     )
     print("   ✓ Registered")
 
     # Now use it immediately!
     print("\n2. Using the new oscillator...")
-    patch = (PatchBuilder("Noise Patch")
-             .noise(amplitude=0.5)  # Method auto-generated!
-             .volume(0.3))
+    patch = (
+        PatchBuilder("Noise Patch")
+        .noise(amplitude=0.5)  # Method auto-generated!
+        .volume(0.3)
+    )
 
     print(patch.describe())
 
@@ -147,16 +150,18 @@ def example_3_custom_effect():
         category=ComponentCategory.MODIFIER,
         factory=DistortionEffect,
         config_params=["drive", "mix"],
-        description="Soft clipping distortion/overdrive"
+        description="Soft clipping distortion/overdrive",
     )
     print("   ✓ Registered")
 
     # Use it in a patch
     print("\n2. Creating patch with distortion...")
-    patch = (PatchBuilder("Distorted Lead")
-             .sawtooth(440, amplitude=0.9)
-             .distortion(drive=3.0, mix=0.7)  # Auto-generated method!
-             .volume(0.6))
+    patch = (
+        PatchBuilder("Distorted Lead")
+        .sawtooth(440, amplitude=0.9)
+        .distortion(drive=3.0, mix=0.7)  # Auto-generated method!
+        .volume(0.6)
+    )
 
     print(patch.describe())
 
@@ -177,7 +182,9 @@ def example_4_list_components():
     all_components = registry.list_components()
     for comp in sorted(all_components):
         descriptor = registry.get(comp)
-        print(f"   - {comp:30} ({descriptor.category.value:12}) -> .{descriptor.method_name}()")
+        print(
+            f"   - {comp:30} ({descriptor.category.value:12}) -> .{descriptor.method_name}()"
+        )
 
     # List by category
     print("\n2. Components by category:")
@@ -199,11 +206,13 @@ def example_5_preset_compatibility():
 
     # Create patch with custom component (noise from example 2)
     print("\n1. Creating patch with custom components...")
-    patch = (PatchBuilder("Custom Patch")
-             .set_description("Uses custom registered components")
-             .noise(amplitude=0.6)
-             .volume(0.5)
-             .pan(-0.3))
+    patch = (
+        PatchBuilder("Custom Patch")
+        .set_description("Uses custom registered components")
+        .noise(amplitude=0.6)
+        .volume(0.5)
+        .pan(-0.3)
+    )
 
     # Save it
     preset_file = "custom_component_preset.json"
@@ -224,7 +233,8 @@ def example_5_preset_compatibility():
     # Show the JSON
     print("\n3. Preset JSON content:")
     import json
-    with open(preset_file, 'r') as f:
+
+    with open(preset_file, "r") as f:
         data = json.load(f)
     print(json.dumps(data, indent=2))
 
@@ -241,9 +251,16 @@ def example_6_plugin_system():
     class SuperSawOscillator(Oscillator):
         """Supersaw with multiple detuned voices."""
 
-        def __init__(self, frequency: float, voices: int = 7, detune: float = 0.1,
-                     sample_rate: int = DEFAULT_SAMPLE_RATE):
-            super().__init__(frequency=frequency, amplitude=1.0, phase=0, sample_rate=sample_rate)
+        def __init__(
+            self,
+            frequency: float,
+            voices: int = 7,
+            detune: float = 0.1,
+            sample_rate: int = DEFAULT_SAMPLE_RATE,
+        ):
+            super().__init__(
+                frequency=frequency, amplitude=1.0, phase=0, sample_rate=sample_rate
+            )
             self.voices = voices
             self.detune = detune
 
@@ -284,7 +301,7 @@ def example_6_plugin_system():
         category=ComponentCategory.OSCILLATOR,
         factory=SuperSawOscillator,
         config_params=["frequency", "voices", "detune", "sample_rate"],
-        description="Supersaw oscillator with multiple detuned voices"
+        description="Supersaw oscillator with multiple detuned voices",
     )
     print("   ✓ Registered supersaw oscillator")
 
@@ -293,16 +310,18 @@ def example_6_plugin_system():
         category=ComponentCategory.MODIFIER,
         factory=ResonantFilter,
         config_params=["cutoff", "resonance"],
-        description="Resonant low-pass filter"
+        description="Resonant low-pass filter",
     )
     print("   ✓ Registered resonant filter")
 
     # Now use the plugin components!
     print("\n2. Using plugin components...")
-    patch = (PatchBuilder("Plugin Demo")
-             .supersaw(440, voices=9, detune=0.15)
-             .resonant_filter(cutoff=2000, resonance=0.7)
-             .volume(0.6))
+    patch = (
+        PatchBuilder("Plugin Demo")
+        .supersaw(440, voices=9, detune=0.15)
+        .resonant_filter(cutoff=2000, resonance=0.7)
+        .volume(0.6)
+    )
 
     print(patch.describe())
 
@@ -357,4 +376,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

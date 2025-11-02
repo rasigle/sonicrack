@@ -5,6 +5,7 @@ import numpy as np
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.engine.noise import (
@@ -13,7 +14,9 @@ from src.engine.noise import (
     brownian_noise,
     blue_noise,
     perlin_noise,
-    velvet_noise, grey_noise, sample_hold_noise
+    velvet_noise,
+    grey_noise,
+    sample_hold_noise,
 )
 from src.constants import DEFAULT_SAMPLE_RATE
 
@@ -57,12 +60,14 @@ class TestWhiteNoise(unittest.TestCase):
 
         # Compute power spectrum
         fft = np.fft.fft(noise)
-        power = np.abs(fft[:len(fft)//2])**2
+        power = np.abs(fft[: len(fft) // 2]) ** 2
 
         # Divide into frequency bins and check variance
         n_bins = 10
         bin_size = len(power) // n_bins
-        bin_powers = [np.mean(power[i*bin_size:(i+1)*bin_size]) for i in range(n_bins)]
+        bin_powers = [
+            np.mean(power[i * bin_size : (i + 1) * bin_size]) for i in range(n_bins)
+        ]
 
         # Coefficient of variation should be low for flat spectrum
         cv = np.std(bin_powers) / np.mean(bin_powers)
@@ -97,9 +102,9 @@ class TestPinkNoise(unittest.TestCase):
 
         # Compute power spectrum
         fft = np.fft.fft(noise)
-        freqs = np.fft.fftfreq(len(noise), 1/DEFAULT_SAMPLE_RATE)
-        power = np.abs(fft[:len(fft)//2])**2
-        freqs_positive = freqs[:len(freqs)//2]
+        freqs = np.fft.fftfreq(len(noise), 1 / DEFAULT_SAMPLE_RATE)
+        power = np.abs(fft[: len(fft) // 2]) ** 2
+        freqs_positive = freqs[: len(freqs) // 2]
 
         # Skip DC component
         power = power[1:]
@@ -107,8 +112,8 @@ class TestPinkNoise(unittest.TestCase):
 
         # For pink noise, power should decrease with frequency
         # Check that higher frequencies have less power
-        low_freq_power = np.mean(power[:len(power)//10])
-        high_freq_power = np.mean(power[-len(power)//10:])
+        low_freq_power = np.mean(power[: len(power) // 10])
+        high_freq_power = np.mean(power[-len(power) // 10 :])
 
         self.assertGreater(low_freq_power, high_freq_power)
 
@@ -146,11 +151,11 @@ class TestBrownianNoise(unittest.TestCase):
 
         # Compute power spectrum
         fft = np.fft.fft(noise)
-        power = np.abs(fft[:len(fft)//2])**2
+        power = np.abs(fft[: len(fft) // 2]) ** 2
 
         # Low frequencies should dominate
-        low_freq_power = np.mean(power[:len(power)//10])
-        high_freq_power = np.mean(power[-len(power)//10:])
+        low_freq_power = np.mean(power[: len(power) // 10])
+        high_freq_power = np.mean(power[-len(power) // 10 :])
 
         self.assertGreater(low_freq_power, high_freq_power * 10)
 
@@ -178,11 +183,11 @@ class TestBlueNoise(unittest.TestCase):
 
         # Compute power spectrum
         fft = np.fft.fft(noise)
-        power = np.abs(fft[:len(fft)//2])**2
+        power = np.abs(fft[: len(fft) // 2]) ** 2
 
         # High frequencies should have more power than low
-        low_freq_power = np.mean(power[1:len(power)//10])
-        high_freq_power = np.mean(power[-len(power)//10:])
+        low_freq_power = np.mean(power[1 : len(power) // 10])
+        high_freq_power = np.mean(power[-len(power) // 10 :])
 
         self.assertGreater(high_freq_power, low_freq_power)
 
@@ -199,23 +204,14 @@ class TestPerlinNoise(unittest.TestCase):
 
     def test_basic_generation(self) -> None:
         """Test Perlin noise generates correct number of samples."""
-        noise = perlin_noise(
-            dur=1.0,
-            scale=10,
-            sr=1000
-        )
+        noise = perlin_noise(dur=1.0, scale=10, sr=1000)
 
         self.assertIsInstance(noise, np.ndarray)
         self.assertEqual(len(noise), 1000)
 
     def test_smoothness(self) -> None:
         """Test Perlin noise is smooth (continuous)."""
-        noise = perlin_noise(
-            dur=1.0,
-            scale=10,
-            sr=1000,
-            seed=42
-        )
+        noise = perlin_noise(dur=1.0, scale=10, sr=1000, seed=42)
 
         # Check that differences are small (smooth transitions)
         diff = np.abs(np.diff(noise))
@@ -228,16 +224,10 @@ class TestPerlinNoise(unittest.TestCase):
     def test_scale_parameter(self) -> None:
         """Test scale parameter affects variation rate."""
         noise_fine = perlin_noise(
-            dur=1.0,
-            scale=5,  # Smaller scale = finer variation
-            sr=1000,
-            seed=42
+            dur=1.0, scale=5, sr=1000, seed=42  # Smaller scale = finer variation
         )
         noise_coarse = perlin_noise(
-            dur=1.0,
-            scale=50,  # Larger scale = coarser variation
-            sr=1000,
-            seed=42
+            dur=1.0, scale=50, sr=1000, seed=42  # Larger scale = coarser variation
         )
 
         # Fine scale should have more variation
@@ -248,18 +238,8 @@ class TestPerlinNoise(unittest.TestCase):
 
     def test_reproducibility(self) -> None:
         """Test reproducibility with seed."""
-        noise1 = perlin_noise(
-            dur=0.1,
-            scale=10,
-            sr=1000,
-            seed=42
-        )
-        noise2 = perlin_noise(
-            dur=0.1,
-            scale=10,
-            sr=1000,
-            seed=42
-        )
+        noise1 = perlin_noise(dur=0.1, scale=10, sr=1000, seed=42)
+        noise2 = perlin_noise(dur=0.1, scale=10, sr=1000, seed=42)
 
         np.testing.assert_array_almost_equal(noise1, noise2, decimal=5)
 
@@ -305,7 +285,9 @@ class TestVelvetNoise(unittest.TestCase):
         # Should be approximately density% non-zero (within reasonable tolerance)
         expected_non_zero = total_count * 0.01
         # Allow 50% tolerance for randomness
-        self.assertLess(abs(non_zero_count - expected_non_zero), expected_non_zero * 0.5)
+        self.assertLess(
+            abs(non_zero_count - expected_non_zero), expected_non_zero * 0.5
+        )
 
     def test_amplitude_scaling(self) -> None:
         """Test amplitude parameter scales output."""
@@ -361,7 +343,7 @@ class TestGreyNoise(unittest.TestCase):
         grey = grey_noise(dur=1.0 / 1000, amplitude=1.0, sr=1000, seed=42)
 
         # They should be different (grey is filtered)
-        self.assertFalse(np.allclose(white[:len(grey)], grey, rtol=0.1))
+        self.assertFalse(np.allclose(white[: len(grey)], grey, rtol=0.1))
 
     def test_reproducibility(self) -> None:
         """Test reproducibility with seed."""
@@ -444,7 +426,5 @@ if __name__ == "__main__":
     unittest.main()
 
 
-
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

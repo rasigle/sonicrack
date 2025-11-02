@@ -20,11 +20,6 @@ from .utils import (
     load_wave,
     play_wave,
     note_to_frequency,
-    # Legacy API (for backward compatibility)
-    to_int16,
-    save_wave,
-    load_wave,
-    note_to_frequency,
 )
 
 # Logging utilities
@@ -53,4 +48,3 @@ __all__ = [
     "get_engine_logger",
     "DEFAULT_LOG_LEVEL",
 ]
-

@@ -79,7 +79,7 @@ class PresetLibrary:
             # Get relative path from preset_dir
             rel_path = preset_file.relative_to(self.preset_dir)
             # Remove .json extension and normalize path separators
-            preset_name = str(rel_path.with_suffix('')).replace('\\', '/')
+            preset_name = str(rel_path.with_suffix("")).replace("\\", "/")
             presets.append(preset_name)
 
         return sorted(presets)
@@ -101,7 +101,7 @@ class PresetLibrary:
 
         filepath = self.preset_dir / name
         if not filepath.suffix:
-            filepath = filepath.with_suffix('.json')
+            filepath = filepath.with_suffix(".json")
 
         return PatchBuilder.from_preset(filepath)
 
@@ -110,7 +110,7 @@ class PresetLibrary:
         builder: "PatchBuilder",
         name: Optional[str] = None,
         category: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Save a patch as a preset.
 
@@ -154,7 +154,7 @@ class PresetLibrary:
                 config["metadata"] = {}
             config["metadata"].update(metadata)
 
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             json.dump(config, f, indent=2)
 
         logger.info(f"Saved preset '{name}' to {filepath}")
@@ -171,7 +171,7 @@ class PresetLibrary:
         """
         filepath = self.preset_dir / name
         if not filepath.suffix:
-            filepath = filepath.with_suffix('.json')
+            filepath = filepath.with_suffix(".json")
 
         if filepath.exists():
             filepath.unlink()

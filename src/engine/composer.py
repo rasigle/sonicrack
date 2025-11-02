@@ -220,19 +220,21 @@ class Chain(Composer):
                 - Stereo: shape (n, 2)
         """
         # Generate samples from oscillator (vectorized)
-        if hasattr(self.oscillator, 'get_samples'):
-            samples = self.oscillator.get_samples(n, reset=False, mode='vectorized')
+        if hasattr(self.oscillator, "get_samples"):
+            samples = self.oscillator.get_samples(n, reset=False, mode="vectorized")
         else:
             # Fallback to iterator
-            samples = np.array([next(self.oscillator) for _ in range(n)], dtype=np.float32)
+            samples = np.array(
+                [next(self.oscillator) for _ in range(n)], dtype=np.float32
+            )
 
         # Apply each modifier in sequence using vectorized methods
         for modifier in self.modifiers:
             # Check for vectorized methods first (priority order for performance)
 
-            if hasattr(modifier, 'pan_vectorized'):
+            if hasattr(modifier, "pan_vectorized"):
                 # Panner/ModulatedPanner - optimized stereo panning
-                if hasattr(modifier, '__next__'):
+                if hasattr(modifier, "__next__"):
                     # ModulatedPanner - fully vectorized with modulation
                     left, right = modifier.pan_vectorized(samples, n)
                 else:
@@ -241,17 +243,18 @@ class Chain(Composer):
                 # Convert to stereo array: shape (n, 2)
                 samples = np.column_stack((left, right))
 
-            elif hasattr(modifier, 'scale_vectorized'):
+            elif hasattr(modifier, "scale_vectorized"):
                 # Volume/Frequency - vectorized scaling
                 samples = modifier.scale_vectorized(samples)
 
-            elif hasattr(modifier, 'clip_vectorized'):
+            elif hasattr(modifier, "clip_vectorized"):
                 # Clipper - vectorized clipping
                 samples = modifier.clip_vectorized(samples)
 
-            elif hasattr(modifier, '__call__') and not hasattr(modifier, '__next__'):
+            elif hasattr(modifier, "__call__") and not hasattr(modifier, "__next__"):
                 # Static modifier without state - can apply directly to array
-                # This handles Volume, Frequency, Clipper if they don't have vectorized methods
+                # This handles Volume, Frequency, Clipper if they don't have vectorized
+                # methods
                 samples = modifier(samples)
 
             else:
@@ -259,7 +262,7 @@ class Chain(Composer):
                 # This is rare and slower, but maintains correctness
                 result = []
                 for sample in samples:
-                    if hasattr(modifier, '__next__'):
+                    if hasattr(modifier, "__next__"):
                         next(modifier)  # Advance modifier state
                     result.append(modifier(sample))
 
@@ -354,8 +357,8 @@ class WaveAdder(Composer):
         # Fast path for single generator (no mixing needed)
         if len(self.generators) == 1:
             gen = self.generators[0]
-            if hasattr(gen, 'get_samples'):
-                samples = gen.get_samples(n, reset=False, mode='vectorized')
+            if hasattr(gen, "get_samples"):
+                samples = gen.get_samples(n, reset=False, mode="vectorized")
             else:
                 samples = np.array([next(gen) for _ in range(n)], dtype=np.float32)
 
@@ -370,8 +373,8 @@ class WaveAdder(Composer):
         # Generate samples from all generators (vectorized)
         all_samples = []
         for gen in self.generators:
-            if hasattr(gen, 'get_samples'):
-                samples = gen.get_samples(n, reset=False, mode='vectorized')
+            if hasattr(gen, "get_samples"):
+                samples = gen.get_samples(n, reset=False, mode="vectorized")
             else:
                 # Fallback to iterator
                 samples = np.array([next(gen) for _ in range(n)], dtype=np.float32)

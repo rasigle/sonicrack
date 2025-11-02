@@ -100,7 +100,7 @@ class ADSREnvelope(Modulator):
         self._update_phase_samples()
 
         # Vectorization state tracking
-        self._phase = 'attack'  # Current phase: 'attack', 'decay', 'sustain', 'release'
+        self._phase = "attack"  # Current phase: 'attack', 'decay', 'sustain', 'release'
         self._phase_position = 0  # Position within current phase (in samples)
 
     def _update_phase_samples(self):
@@ -207,7 +207,7 @@ class ADSREnvelope(Modulator):
         self.val = 0
         self.ended = False
         self.stepper = self._get_ads_stepper()
-        self._phase = 'attack'
+        self._phase = "attack"
         self._phase_position = 0
         return self
 
@@ -216,18 +216,18 @@ class ADSREnvelope(Modulator):
         self._phase_position += 1
 
         # Update phase tracking using pre-computed values (optimized)
-        if self._phase == 'attack' and self._phase_position >= self._attack_samples:
-            self._phase = 'decay'
+        if self._phase == "attack" and self._phase_position >= self._attack_samples:
+            self._phase = "decay"
             self._phase_position = 0
-        elif self._phase == 'decay' and self._phase_position >= self._decay_samples:
-            self._phase = 'sustain'
+        elif self._phase == "decay" and self._phase_position >= self._decay_samples:
+            self._phase = "sustain"
             self._phase_position = 0
 
         return self.val
 
     def trigger_release(self):
         self.stepper = self._get_r_stepper()
-        self._phase = 'release'
+        self._phase = "release"
         self._phase_position = 0
 
     def get_samples_iterator(
@@ -292,7 +292,7 @@ class ADSREnvelope(Modulator):
         # Process samples through current and subsequent phases
         while remaining > 0 and not self.ended:
 
-            if self._phase == 'attack':
+            if self._phase == "attack":
                 # Attack phase: 0 -> 1
                 if attack_samples > 0:
                     samples_in_phase = attack_samples - self._phase_position
@@ -302,27 +302,31 @@ class ADSREnvelope(Modulator):
                         # Generate attack curve
                         start_val = self._phase_position / attack_samples
                         end_val = (self._phase_position + chunk_size) / attack_samples
-                        samples[idx:idx+chunk_size] = np.linspace(
-                            start_val, end_val, chunk_size, endpoint=False, dtype=np.float32
+                        samples[idx : idx + chunk_size] = np.linspace(
+                            start_val,
+                            end_val,
+                            chunk_size,
+                            endpoint=False,
+                            dtype=np.float32,
                         )
 
                         self._phase_position += chunk_size
-                        self.val = samples[idx+chunk_size-1]
+                        self.val = samples[idx + chunk_size - 1]
                         idx += chunk_size
                         remaining -= chunk_size
 
                     # Check if attack phase completed
                     if self._phase_position >= attack_samples:
-                        self._phase = 'decay'
+                        self._phase = "decay"
                         self._phase_position = 0
                         self.val = 1.0
                 else:
                     # Zero attack time, skip to decay
-                    self._phase = 'decay'
+                    self._phase = "decay"
                     self._phase_position = 0
                     self.val = 1.0
 
-            elif self._phase == 'decay':
+            elif self._phase == "decay":
                 # Decay phase: 1 -> sustain_level
                 if decay_samples > 0:
                     samples_in_phase = decay_samples - self._phase_position
@@ -330,37 +334,45 @@ class ADSREnvelope(Modulator):
 
                     if chunk_size > 0:
                         # Generate decay curve
-                        start_val = 1.0 - (self._phase_position / decay_samples) * (1.0 - self.sustain_level)
-                        end_val = 1.0 - ((self._phase_position + chunk_size) / decay_samples) * (1.0 - self.sustain_level)
-                        samples[idx:idx+chunk_size] = np.linspace(
-                            start_val, end_val, chunk_size, endpoint=False, dtype=np.float32
+                        start_val = 1.0 - (self._phase_position / decay_samples) * (
+                            1.0 - self.sustain_level
+                        )
+                        end_val = 1.0 - (
+                            (self._phase_position + chunk_size) / decay_samples
+                        ) * (1.0 - self.sustain_level)
+                        samples[idx : idx + chunk_size] = np.linspace(
+                            start_val,
+                            end_val,
+                            chunk_size,
+                            endpoint=False,
+                            dtype=np.float32,
                         )
 
                         self._phase_position += chunk_size
-                        self.val = samples[idx+chunk_size-1]
+                        self.val = samples[idx + chunk_size - 1]
                         idx += chunk_size
                         remaining -= chunk_size
 
                     # Check if decay phase completed
                     if self._phase_position >= decay_samples:
-                        self._phase = 'sustain'
+                        self._phase = "sustain"
                         self._phase_position = 0
                         self.val = self.sustain_level
                 else:
                     # Zero decay time, skip to sustain
-                    self._phase = 'sustain'
+                    self._phase = "sustain"
                     self._phase_position = 0
                     self.val = self.sustain_level
 
-            elif self._phase == 'sustain':
+            elif self._phase == "sustain":
                 # Sustain phase: hold at sustain_level
-                samples[idx:idx+remaining] = self.sustain_level
+                samples[idx : idx + remaining] = self.sustain_level
                 self.val = self.sustain_level
                 self._phase_position += remaining
                 idx += remaining
                 remaining = 0
 
-            elif self._phase == 'release':
+            elif self._phase == "release":
                 # Release phase: current value -> 0
                 if release_samples > 0:
                     samples_in_phase = release_samples - self._phase_position
@@ -369,10 +381,18 @@ class ADSREnvelope(Modulator):
                     if chunk_size > 0:
                         # Generate release curve from current val to 0
                         # Note: val is set when trigger_release() is called
-                        start_val = self.val * (1.0 - self._phase_position / release_samples)
-                        end_val = self.val * (1.0 - (self._phase_position + chunk_size) / release_samples)
-                        samples[idx:idx+chunk_size] = np.linspace(
-                            start_val, end_val, chunk_size, endpoint=False, dtype=np.float32
+                        start_val = self.val * (
+                            1.0 - self._phase_position / release_samples
+                        )
+                        end_val = self.val * (
+                            1.0 - (self._phase_position + chunk_size) / release_samples
+                        )
+                        samples[idx : idx + chunk_size] = np.linspace(
+                            start_val,
+                            end_val,
+                            chunk_size,
+                            endpoint=False,
+                            dtype=np.float32,
                         )
 
                         self._phase_position += chunk_size
@@ -385,7 +405,7 @@ class ADSREnvelope(Modulator):
                         self.val = 0.0
                         # Fill remaining with zeros
                         if remaining > 0:
-                            samples[idx:idx+remaining] = 0.0
+                            samples[idx : idx + remaining] = 0.0
                             idx += remaining
                             remaining = 0
                 else:
@@ -393,7 +413,7 @@ class ADSREnvelope(Modulator):
                     self.ended = True
                     self.val = 0.0
                     if remaining > 0:
-                        samples[idx:idx+remaining] = 0.0
+                        samples[idx : idx + remaining] = 0.0
                         idx += remaining
                         remaining = 0
 

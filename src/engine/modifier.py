@@ -43,7 +43,9 @@ class Modifier(ABC):
     """Base class for all modifiers."""
 
     @abstractmethod
-    def __call__(self, val: Union[float, Tuple[float, ...]]) -> Union[float, Tuple[float, ...]]:
+    def __call__(
+        self, val: Union[float, Tuple[float, ...]]
+    ) -> Union[float, Tuple[float, ...]]:
         """Apply modification to a value.
 
         Args:
@@ -86,8 +88,8 @@ class Panner(Modifier):
         self._position: float = np.clip(position, -1.0, 1.0)
 
         # Precompute gains
-        self._left_gain: float = 0.
-        self._right_gain: float = 0.
+        self._left_gain: float = 0.0
+        self._right_gain: float = 0.0
         self._update_gains()
 
     @property
@@ -109,7 +111,9 @@ class Panner(Modifier):
         self._left_gain = np.cos(angle)
         self._right_gain = np.sin(angle)
 
-    def __call__(self, val: Union[float, np.ndarray]) -> Union[Tuple[float, float], Tuple[np.ndarray, np.ndarray]]:
+    def __call__(
+        self, val: Union[float, np.ndarray]
+    ) -> Union[Tuple[float, float], Tuple[np.ndarray, np.ndarray]]:
         """Convert mono signal to stereo with panning.
 
         Args:
@@ -174,8 +178,11 @@ class ModulatedPanner(Panner):
         # Input validation
         if modulator is None:
             raise TypeError("modulator cannot be None")
-        if not hasattr(modulator, '__iter__') and not hasattr(modulator, '__next__'):
-            raise TypeError(f"modulator must be iterable or have __next__, got {type(modulator).__name__}")
+        if not hasattr(modulator, "__iter__") and not hasattr(modulator, "__next__"):
+            raise TypeError(
+                f"modulator must be iterable or have __next__, got "
+                f"{type(modulator).__name__}"
+            )
 
         super().__init__(position=0.0)
         self.modulator = modulator
@@ -184,7 +191,7 @@ class ModulatedPanner(Panner):
         iter(self.modulator)
         logger.debug("ModulatedPanner initialized and modulator started")
 
-    def __iter__(self) -> 'ModulatedPanner':
+    def __iter__(self) -> "ModulatedPanner":
         """Re-initialize modulator for iteration."""
         iter(self.modulator)
         return self
@@ -200,7 +207,9 @@ class ModulatedPanner(Panner):
         self.position = mod_value  # Setter clips and updates gains
         return self.position
 
-    def pan_vectorized(self, samples: np.ndarray, num_samples: int) -> Tuple[np.ndarray, np.ndarray]:
+    def pan_vectorized(
+        self, samples: np.ndarray, num_samples: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Apply modulated panning to an array of samples (fully vectorized).
 
         Args:
@@ -211,11 +220,15 @@ class ModulatedPanner(Panner):
             Tuple of (left, right) stereo arrays.
         """
         # Get modulation values vectorized (50-100x faster than loop!)
-        if hasattr(self.modulator, 'get_samples'):
-            mod_values = self.modulator.get_samples(num_samples, reset=False, mode='vectorized')
+        if hasattr(self.modulator, "get_samples"):
+            mod_values = self.modulator.get_samples(
+                num_samples, reset=False, mode="vectorized"
+            )
         else:
             # Fallback to iterator if vectorization not available
-            mod_values = np.array([next(self.modulator) for _ in range(num_samples)], dtype=np.float32)
+            mod_values = np.array(
+                [next(self.modulator) for _ in range(num_samples)], dtype=np.float32
+            )
 
         # Clip to valid range
         mod_values = np.clip(mod_values, -1.0, 1.0)
@@ -259,14 +272,18 @@ class Volume(Modifier):
         """
         # Input validation
         if not isinstance(amplitude, (int, float, np.number)):
-            raise TypeError(f"amplitude must be a number, got {type(amplitude).__name__}")
+            raise TypeError(
+                f"amplitude must be a number, got {type(amplitude).__name__}"
+            )
         if amplitude < 0:
             raise ValueError(f"amplitude must be non-negative, got {amplitude}")
 
         self.amplitude: float = amplitude
         logger.debug(f"Volume initialized with amplitude: {amplitude}")
 
-    def __call__(self, val: Union[float, Tuple[float, ...], np.ndarray]) -> Union[float, Tuple[float, ...], np.ndarray]:
+    def __call__(
+        self, val: Union[float, Tuple[float, ...], np.ndarray]
+    ) -> Union[float, Tuple[float, ...], np.ndarray]:
         """Apply volume scaling to input.
 
         Args:
@@ -290,7 +307,9 @@ class Volume(Modifier):
             return val * self.amplitude
 
         logger.error(f"Invalid input type for Volume: {type(val)}")
-        raise TypeError("Input value must be an int, float, numpy number, array, or Iterable.")
+        raise TypeError(
+            "Input value must be an int, float, numpy number, array, or Iterable."
+        )
 
     def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
         """Apply volume scaling to array of samples (vectorized).
@@ -318,11 +337,13 @@ class ModulatedVolume(Volume):
         Raises:
             TypeError: If modulator is None or not iterable.
         """
-        # Input validation
         if modulator is None:
             raise TypeError("modulator cannot be None")
-        if not hasattr(modulator, '__iter__') and not hasattr(modulator, '__next__'):
-            raise TypeError(f"modulator must be iterable or have __next__, got {type(modulator).__name__}")
+        if not hasattr(modulator, "__iter__") and not hasattr(modulator, "__next__"):
+            raise TypeError(
+                f"modulator must be iterable or have __next__, "
+                f"got {type(modulator).__name__}"
+            )
 
         super().__init__(0.0)
         self.modulator = modulator
@@ -364,11 +385,13 @@ class ModulatedVolume(Volume):
         n = len(samples)
 
         # Get modulation values for all samples (vectorized)
-        if hasattr(self.modulator, 'get_samples'):
-            mod_values = self.modulator.get_samples(n, reset=False, mode='vectorized')
+        if hasattr(self.modulator, "get_samples"):
+            mod_values = self.modulator.get_samples(n, reset=False, mode="vectorized")
         else:
             # Fallback to iterator if modulator doesn't have get_samples
-            mod_values = np.array([next(self.modulator) for _ in range(n)], dtype=np.float32)
+            mod_values = np.array(
+                [next(self.modulator) for _ in range(n)], dtype=np.float32
+            )
 
         # Apply time-varying amplitude
         return (samples * mod_values).astype(np.float32)
@@ -399,14 +422,18 @@ class Frequency(Modifier):
         """
         # Input validation
         if not isinstance(frequency, (int, float, np.number)):
-            raise TypeError(f"frequency must be a number, got {type(frequency).__name__}")
+            raise TypeError(
+                f"frequency must be a number, got {type(frequency).__name__}"
+            )
         if frequency < 0:
             raise ValueError(f"frequency must be non-negative, got {frequency}")
 
         self.frequency = frequency
         logger.debug(f"Frequency initialized with multiplier: {frequency}")
 
-    def __call__(self, val: Union[float, Tuple[float, ...], np.ndarray]) -> Union[float, Tuple[float, ...], np.ndarray]:
+    def __call__(
+        self, val: Union[float, Tuple[float, ...], np.ndarray]
+    ) -> Union[float, Tuple[float, ...], np.ndarray]:
         """Apply frequency scaling to input.
 
         Args:
@@ -459,8 +486,11 @@ class ModulatedFrequency(Frequency):
         # Input validation
         if modulator is None:
             raise TypeError("modulator cannot be None")
-        if not hasattr(modulator, '__iter__') and not hasattr(modulator, '__next__'):
-            raise TypeError(f"modulator must be iterable or have __next__, got {type(modulator).__name__}")
+        if not hasattr(modulator, "__iter__") and not hasattr(modulator, "__next__"):
+            raise TypeError(
+                f"modulator must be iterable or have __next__, got "
+                f"{type(modulator).__name__}"
+            )
 
         super().__init__(1.0)
         self.modulator = modulator
@@ -502,11 +532,13 @@ class ModulatedFrequency(Frequency):
         n = len(samples)
 
         # Get modulation values for all samples (vectorized)
-        if hasattr(self.modulator, 'get_samples'):
-            mod_values = self.modulator.get_samples(n, reset=False, mode='vectorized')
+        if hasattr(self.modulator, "get_samples"):
+            mod_values = self.modulator.get_samples(n, reset=False, mode="vectorized")
         else:
             # Fallback to iterator if modulator doesn't have get_samples
-            mod_values = np.array([next(self.modulator) for _ in range(n)], dtype=np.float32)
+            mod_values = np.array(
+                [next(self.modulator) for _ in range(n)], dtype=np.float32
+            )
 
         # Apply time-varying frequency multiplier
         return (samples * mod_values).astype(np.float32)
@@ -531,18 +563,28 @@ class Clipper(Modifier):
         """
         # Input validation
         if not isinstance(wave_range, (tuple, list)):
-            raise TypeError(f"wave_range must be a tuple or list, got {type(wave_range).__name__}")
+            raise TypeError(
+                f"wave_range must be a tuple or list, got {type(wave_range).__name__}"
+            )
         if len(wave_range) != 2:
-            raise ValueError(f"wave_range must have exactly 2 elements, got {len(wave_range)}")
+            raise ValueError(
+                f"wave_range must have exactly 2 elements, got {len(wave_range)}"
+            )
 
         min_val, max_val = wave_range
 
         if not isinstance(min_val, (int, float, np.number)):
-            raise TypeError(f"wave_range min must be a number, got {type(min_val).__name__}")
+            raise TypeError(
+                f"wave_range min must be a number, got {type(min_val).__name__}"
+            )
         if not isinstance(max_val, (int, float, np.number)):
-            raise TypeError(f"wave_range max must be a number, got {type(max_val).__name__}")
+            raise TypeError(
+                f"wave_range max must be a number, got {type(max_val).__name__}"
+            )
         if min_val >= max_val:
-            raise ValueError(f"wave_range min ({min_val}) must be less than max ({max_val})")
+            raise ValueError(
+                f"wave_range min ({min_val}) must be less than max ({max_val})"
+            )
 
         self._min, self._max = float(min_val), float(max_val)
         logger.debug(f"Clipper initialized with range: ({self._min}, {self._max})")
@@ -557,7 +599,9 @@ class Clipper(Modifier):
         """Set clipping range and update min/max values."""
         self._min, self._max = value
 
-    def __call__(self, val: Union[float, Tuple[float, ...], np.ndarray]) -> Union[float, Tuple[float, ...], np.ndarray]:
+    def __call__(
+        self, val: Union[float, Tuple[float, ...], np.ndarray]
+    ) -> Union[float, Tuple[float, ...], np.ndarray]:
         """Clip input value(s) to range.
 
         Args:

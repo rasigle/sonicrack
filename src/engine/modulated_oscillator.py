@@ -103,7 +103,8 @@ class ModulatedOscillator:
         self.phase_mod = phase_mod
         self._modulators_count = len(modulators)
 
-        # Initialize all components to avoid issues when get_samples is called without reset
+        # Initialize all components to avoid issues when get_samples is called
+        # without reset
         iter(self)
 
     def __iter__(self):
@@ -196,18 +197,22 @@ class ModulatedOscillator:
         """
         # Import oscillator types for type checking
         from src.engine.oscillator import (
-            SineOscillator, SquareOscillator,
-            TriangleOscillator, SawtoothOscillator
+            SineOscillator,
+            SquareOscillator,
+            TriangleOscillator,
+            SawtoothOscillator,
         )
 
         # Step 1: Generate all modulator values in bulk (vectorized)
         mod_arrays = []
         for modulator in self.modulators:
-            if hasattr(modulator, 'get_samples'):
-                mod_vals = modulator.get_samples(n, reset=False, mode='vectorized')
+            if hasattr(modulator, "get_samples"):
+                mod_vals = modulator.get_samples(n, reset=False, mode="vectorized")
             else:
                 # Fallback to iterator for modulators without get_samples
-                mod_vals = np.array([next(modulator) for _ in range(n)], dtype=np.float32)
+                mod_vals = np.array(
+                    [next(modulator) for _ in range(n)], dtype=np.float32
+                )
             mod_arrays.append(mod_vals)
 
         # Step 2: Compute modulated parameters for ALL samples at once
@@ -225,16 +230,13 @@ class ModulatedOscillator:
             # Check if freq_mod can be vectorized
             try:
                 # Try vectorized call
-                freqs = self.freq_mod(
-                    np.full(n, base_freq, dtype=np.float32),
-                    mod_vals
-                )
+                freqs = self.freq_mod(np.full(n, base_freq, dtype=np.float32), mod_vals)
             except (TypeError, ValueError):
                 # Fallback to element-wise if function doesn't support arrays
-                freqs = np.array([
-                    self.freq_mod(base_freq, mod_vals[i])
-                    for i in range(n)
-                ], dtype=np.float32)
+                freqs = np.array(
+                    [self.freq_mod(base_freq, mod_vals[i]) for i in range(n)],
+                    dtype=np.float32,
+                )
         else:
             # Constant frequency
             freqs = np.full(n, base_freq, dtype=np.float32)
@@ -246,16 +248,13 @@ class ModulatedOscillator:
             # Check if amp_mod can be vectorized
             try:
                 # Try vectorized call
-                amps = self.amp_mod(
-                    np.full(n, base_amp, dtype=np.float32),
-                    mod_vals
-                )
+                amps = self.amp_mod(np.full(n, base_amp, dtype=np.float32), mod_vals)
             except (TypeError, ValueError):
                 # Fallback to element-wise if function doesn't support arrays
-                amps = np.array([
-                    self.amp_mod(base_amp, mod_vals[i])
-                    for i in range(n)
-                ], dtype=np.float32)
+                amps = np.array(
+                    [self.amp_mod(base_amp, mod_vals[i]) for i in range(n)],
+                    dtype=np.float32,
+                )
         else:
             # Constant amplitude
             amps = np.full(n, base_amp, dtype=np.float32)

@@ -11,7 +11,12 @@ Tests cover:
 import unittest
 
 from src.builder.component_registry import registry, ComponentCategory
-from src.engine.oscillator import SineOscillator, SquareOscillator, SawtoothOscillator, TriangleOscillator
+from src.engine.oscillator import (
+    SineOscillator,
+    SquareOscillator,
+    SawtoothOscillator,
+    TriangleOscillator,
+)
 from src.engine.modulator import ADSREnvelope
 from src.engine.modifier import Volume, Panner, Clipper
 
@@ -91,7 +96,12 @@ class TestOscillatorRegistrations(unittest.TestCase):
 
     def test_all_oscillators_have_common_params(self):
         """Test all oscillators have frequency, amplitude, phase, sample_rate in config."""
-        oscillator_names = ["sine_oscillator", "square_oscillator", "triangle_oscillator", "sawtooth_oscillator"]
+        oscillator_names = [
+            "sine_oscillator",
+            "square_oscillator",
+            "triangle_oscillator",
+            "sawtooth_oscillator",
+        ]
 
         for osc_name in oscillator_names:
             descriptor = registry.get(osc_name)
@@ -100,7 +110,9 @@ class TestOscillatorRegistrations(unittest.TestCase):
             self.assertIn("frequency", config_params, f"{osc_name} missing frequency")
             self.assertIn("amplitude", config_params, f"{osc_name} missing amplitude")
             self.assertIn("phase", config_params, f"{osc_name} missing phase")
-            self.assertIn("sample_rate", config_params, f"{osc_name} missing sample_rate")
+            self.assertIn(
+                "sample_rate", config_params, f"{osc_name} missing sample_rate"
+            )
 
 
 class TestModulatorRegistrations(unittest.TestCase):
@@ -241,7 +253,7 @@ class TestComponentCoverage(unittest.TestCase):
             "adsr_envelope",
             "volume",
             "panner",
-            "clipper"
+            "clipper",
         ]
 
         for component in expected_components:
@@ -254,7 +266,9 @@ class TestComponentCoverage(unittest.TestCase):
         modifiers = registry.get_by_category(ComponentCategory.MODIFIER)
 
         # Should have multiple of each
-        self.assertGreaterEqual(len(oscillators), 4, "Should have at least 4 oscillators")
+        self.assertGreaterEqual(
+            len(oscillators), 4, "Should have at least 4 oscillators"
+        )
         self.assertGreaterEqual(len(modulators), 1, "Should have at least 1 modulator")
         self.assertGreaterEqual(len(modifiers), 3, "Should have at least 3 modifiers")
 
@@ -297,6 +311,5 @@ class TestComponentCoverage(unittest.TestCase):
         self.assertIsNotNone(clipper)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
-

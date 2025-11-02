@@ -90,11 +90,13 @@ from src.engine.composer import (
     Chain,
     WaveAdder,
 )
+
 # Filters
 from src.engine.filter import (
     butter,
     apply_filter,
 )
+
 # Modifiers
 from src.engine.modifier import (
     Modifier,
@@ -106,14 +108,17 @@ from src.engine.modifier import (
     ModulatedFrequency,
     Clipper,
 )
+
 # Modulated Oscillator
 from src.engine.modulated_oscillator import ModulatedOscillator
+
 # Modulators
 from src.engine.modulator import (
     Modulator,
     ADSREnvelope,
     getadsr,
 )
+
 # Noise generators
 from src.engine.noise import (
     white_noise,
@@ -125,6 +130,7 @@ from src.engine.noise import (
     grey_noise,
     sample_hold_noise,
 )
+
 # Oscillators
 from src.engine.oscillator import (
     Oscillator,
@@ -143,20 +149,16 @@ __all__ = [
     "SawtoothOscillator",
     "TriangleOscillator",
     "synth",
-
     # Modulators
     "Modulator",
     "ADSREnvelope",
     "getadsr",
-
     # Modulated Oscillator
     "ModulatedOscillator",
-
     # Composers
     "Composer",
     "Chain",
     "WaveAdder",
-
     # Modifiers
     "Modifier",
     "Panner",
@@ -166,11 +168,9 @@ __all__ = [
     "Frequency",
     "ModulatedFrequency",
     "Clipper",
-
     # Filters
     "butter",
     "apply_filter",
-
     # Noise
     "white_noise",
     "pink_noise",

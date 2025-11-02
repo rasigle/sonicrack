@@ -69,7 +69,10 @@ from src.constants import DEFAULT_SAMPLE_RATE
 
 
 def white_noise(
-    dur: float, amplitude: float = 1.0, sr: float = DEFAULT_SAMPLE_RATE, seed: int = None
+    dur: float,
+    amplitude: float = 1.0,
+    sr: float = DEFAULT_SAMPLE_RATE,
+    seed: int = None,
 ) -> np.ndarray:
     """Generate white noise with flat frequency spectrum.
 
@@ -121,7 +124,10 @@ def white_noise(
 
 
 def pink_noise(
-    dur: float, amplitude: float = 1.0, sr: float = DEFAULT_SAMPLE_RATE, seed: int = None
+    dur: float,
+    amplitude: float = 1.0,
+    sr: float = DEFAULT_SAMPLE_RATE,
+    seed: int = None,
 ) -> np.ndarray:
     """Generate pink noise with 1/f frequency spectrum.
 
@@ -206,7 +212,10 @@ def pink_noise(
 
 
 def brownian_noise(
-    dur: float, amplitude: float = 1.0, sr: float = DEFAULT_SAMPLE_RATE, seed: int = None
+    dur: float,
+    amplitude: float = 1.0,
+    sr: float = DEFAULT_SAMPLE_RATE,
+    seed: int = None,
 ) -> np.ndarray:
     """Generate Brownian noise (red noise) with 1/f² frequency spectrum.
 
@@ -228,8 +237,8 @@ def brownian_noise(
             each time. Use an integer (e.g., 42) for consistent results.
 
     Returns:
-        np.ndarray: Array of Brownian noise values, normalized to [-amplitude, +amplitude].
-            Output is float32 for memory efficiency.
+        np.ndarray: Array of Brownian noise values, normalized to
+            [-amplitude, +amplitude]. Output is float32 for memory efficiency.
 
     Examples:
         >>> # Deep rumble for sub-bass
@@ -273,7 +282,10 @@ def brownian_noise(
 
 
 def blue_noise(
-    dur: float, amplitude: float = 1.0, sr: float = DEFAULT_SAMPLE_RATE, seed: int = None
+    dur: float,
+    amplitude: float = 1.0,
+    sr: float = DEFAULT_SAMPLE_RATE,
+    seed: int = None,
 ) -> np.ndarray:
     """Generate blue noise with increasing frequency spectrum.
 
@@ -338,7 +350,9 @@ def blue_noise(
     return (amplitude * blue).astype(np.float32)
 
 
-def perlin_noise(dur: float, scale: float=10., sr: float = DEFAULT_SAMPLE_RATE, seed=None) -> np.ndarray:
+def perlin_noise(
+    dur: float, scale: float = 10.0, sr: float = DEFAULT_SAMPLE_RATE, seed=None
+) -> np.ndarray:
     """Generate 1D Perlin noise for smooth, organic modulation.
 
     Perlin noise is a gradient noise function that produces smooth, continuous
@@ -561,7 +575,8 @@ def grey_noise(
         The implementation uses a simplified frequency-domain approach for efficiency.
 
     Performance:
-        Vectorized implementation using FFT-based filtering. Generates ~10M samples/second.
+        Vectorized implementation using FFT-based filtering.
+        Generates ~10M samples/second.
         More computationally intensive than white/pink noise due to filtering.
 
     See Also:
@@ -593,12 +608,11 @@ def grey_noise(
 
     # Simplified inverse A-weighting curve
     # Attenuates high frequencies and boosts lows
-    f1, f2, f3, f4 = 20.6, 107.7, 737.9, 12194.0
+    f1, _, _, f4 = 20.6, 107.7, 737.9, 12194.0
 
     # Inverse A-weighting formula (simplified)
-    weight = (
-        (f1**2 * freqs_safe**2)
-        / ((freqs_safe**2 + f1**2) * (freqs_safe**2 + f4**2))
+    weight = (f1**2 * freqs_safe**2) / (
+        (freqs_safe**2 + f1**2) * (freqs_safe**2 + f4**2)
     )
     weight = weight / np.max(weight)  # Normalize
 
@@ -643,7 +657,8 @@ def sample_hold_noise(
             Typical values range from 0.5 Hz (slow) to 100 Hz (fast).
             Default is 10 Hz. Lower rate = longer steps, higher rate = shorter steps.
         amplitude: Peak amplitude of the random values. Values typically range from
-            0.0 to 1.0. Default is 1.0. Output will be in range [-amplitude, +amplitude].
+            0.0 to 1.0. Default is 1.0. Output will be in range
+            [-amplitude, +amplitude].
         sr: Sample rate in Hz. Defaults to DEFAULT_SAMPLE_RATE (44100).
         seed: Random seed for reproducible output. If None, results will vary
             each time. Use an integer (e.g., 42) for consistent results.
@@ -696,4 +711,3 @@ def sample_hold_noise(
     stepped = stepped[:length]
 
     return (amplitude * stepped).astype(np.float32)
-

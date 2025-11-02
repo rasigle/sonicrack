@@ -18,12 +18,14 @@ def main():
     print("-" * 60)
 
     # Build a patch using the fluent API
-    my_patch = (PatchBuilder("My First Synth")
-               .set_description("A simple lead sound")
-               .sine(440, amplitude=0.8)
-               .adsr(0.1, 0.2, 0.7, 0.3)
-               .volume(0.6)
-               .pan(0.0))
+    my_patch = (
+        PatchBuilder("My First Synth")
+        .set_description("A simple lead sound")
+        .sine(440, amplitude=0.8)
+        .adsr(0.1, 0.2, 0.7, 0.3)
+        .volume(0.6)
+        .pan(0.0)
+    )
 
     print(my_patch.describe())
 
@@ -63,20 +65,24 @@ def main():
     print("✓ Created library in 'my_presets/' directory")
 
     # Save patches to the library with categories
-    bass = (PatchBuilder("Deep Bass")
-           .set_description("Sub bass sound")
-           .sine(55, amplitude=0.9)
-           .adsr(0.01, 0.1, 0.8, 0.2)
-           .volume(0.7))
+    bass = (
+        PatchBuilder("Deep Bass")
+        .set_description("Sub bass sound")
+        .sine(55, amplitude=0.9)
+        .adsr(0.01, 0.1, 0.8, 0.2)
+        .volume(0.7)
+    )
 
     library.save(bass, category="bass")
     print("✓ Saved bass preset")
 
-    lead = (PatchBuilder("Bright Lead")
-           .set_description("Lead synth")
-           .sawtooth(880, amplitude=0.8)
-           .adsr(0.05, 0.2, 0.6, 0.3)
-           .volume(0.6))
+    lead = (
+        PatchBuilder("Bright Lead")
+        .set_description("Lead synth")
+        .sawtooth(880, amplitude=0.8)
+        .adsr(0.05, 0.2, 0.6, 0.3)
+        .volume(0.6)
+    )
 
     library.save(lead, category="leads")
     print("✓ Saved lead preset")
@@ -93,7 +99,7 @@ def main():
 
     # List all presets
     all_presets = library.list_presets()
-    print(f"\nAll presets:")
+    print("\nAll presets:")
     for preset in all_presets:
         print(f"  - {preset}")
 
@@ -161,4 +167,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

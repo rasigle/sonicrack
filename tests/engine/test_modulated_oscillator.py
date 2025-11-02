@@ -5,9 +5,10 @@ import numpy as np
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.engine.oscillator import SineOscillator, SquareOscillator
+from src.engine.oscillator import SineOscillator
 from src.engine.modulator import ADSREnvelope
 from src.engine.modulated_oscillator import ModulatedOscillator
 
@@ -20,11 +21,7 @@ class TestModulatedOscillatorInitialization(unittest.TestCase):
         osc = SineOscillator(440)
         env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
 
-        mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            amp_mod=lambda a, e: a * e
-        )
+        mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
 
         self.assertIsNotNone(mod_osc)
         self.assertEqual(mod_osc.oscillator, osc)
@@ -40,7 +37,7 @@ class TestModulatedOscillatorInitialization(unittest.TestCase):
             env1,
             env2,
             amp_mod=lambda a, e: a * e,
-            freq_mod=lambda f, e: f * (1 + 0.1 * e)
+            freq_mod=lambda f, e: f * (1 + 0.1 * e),
         )
 
         self.assertEqual(mod_osc._modulators_count, 2)
@@ -51,11 +48,7 @@ class TestModulatedOscillatorInitialization(unittest.TestCase):
 
         # Should raise TypeError with non-Oscillator
         with self.assertRaises(TypeError):
-            ModulatedOscillator(
-                "not an oscillator",
-                env,
-                amp_mod=lambda a, e: a * e
-            )
+            ModulatedOscillator("not an oscillator", env, amp_mod=lambda a, e: a * e)
 
 
 class TestAmplitudeModulation(unittest.TestCase):
@@ -69,13 +62,11 @@ class TestAmplitudeModulation(unittest.TestCase):
             decay_duration=0.0,
             sustain_level=1.0,
             release_duration=0.0,
-            sample_rate=100
+            sample_rate=100,
         )
 
         mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            amp_mod=lambda base_amp, env_val: base_amp * env_val
+            osc, env, amp_mod=lambda base_amp, env_val: base_amp * env_val
         )
 
         # Generate samples during attack phase
@@ -91,13 +82,11 @@ class TestAmplitudeModulation(unittest.TestCase):
             attack_duration=0.0,
             decay_duration=0.0,
             sustain_level=0.0,
-            release_duration=0.0
+            release_duration=0.0,
         )
 
         mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            amp_mod=lambda base_amp, env_val: base_amp * env_val
+            osc, env, amp_mod=lambda base_amp, env_val: base_amp * env_val
         )
 
         samples = mod_osc.get_samples_iterator(10, reset=True)
@@ -115,9 +104,7 @@ class TestFrequencyModulation(unittest.TestCase):
         env = ADSREnvelope(0.1, 0.0, 1.0, 0.0, sample_rate=100)
 
         mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            freq_mod=lambda base_freq, env_val: base_freq * (1 + env_val)
+            osc, env, freq_mod=lambda base_freq, env_val: base_freq * (1 + env_val)
         )
 
         # Generate samples
@@ -137,9 +124,7 @@ class TestPhaseModulation(unittest.TestCase):
         env = ADSREnvelope(0.1, 0.0, 1.0, 0.0, sample_rate=100)
 
         mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            phase_mod=lambda base_phase, env_val: base_phase + env_val * 90
+            osc, env, phase_mod=lambda base_phase, env_val: base_phase + env_val * 90
         )
 
         # Generate samples
@@ -158,11 +143,7 @@ class TestTriggerRelease(unittest.TestCase):
         osc = SineOscillator(440)
         env = ADSREnvelope(0.1, 0.1, 0.7, 0.1)
 
-        mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            amp_mod=lambda a, e: a * e
-        )
+        mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
 
         # Generate some samples
         _ = mod_osc.get_samples_iterator(50, reset=True)
@@ -171,18 +152,14 @@ class TestTriggerRelease(unittest.TestCase):
         mod_osc.trigger_release()
 
         # Should have triggered release on envelope
-        self.assertTrue(hasattr(mod_osc, 'trigger_release'))
+        self.assertTrue(hasattr(mod_osc, "trigger_release"))
 
     def test_ended_property(self) -> None:
         """Test ended property reflects modulator state."""
         osc = SineOscillator(440)
         env = ADSREnvelope(0.05, 0.05, 0.7, 0.05, sample_rate=1000)
 
-        mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            amp_mod=lambda a, e: a * e
-        )
+        mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
 
         # Initially not ended
         self.assertFalse(mod_osc.ended)
@@ -204,11 +181,7 @@ class TestSampleGeneration(unittest.TestCase):
         osc = SineOscillator(440)
         env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
 
-        mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            amp_mod=lambda a, e: a * e
-        )
+        mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
 
         samples = mod_osc.get_samples_iterator(100, reset=True)
 
@@ -220,11 +193,7 @@ class TestSampleGeneration(unittest.TestCase):
         osc = SineOscillator(440)
         env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
 
-        mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            amp_mod=lambda a, e: a * e
-        )
+        mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
 
         samples = mod_osc.get_samples_vectorized(100)
 
@@ -236,11 +205,7 @@ class TestSampleGeneration(unittest.TestCase):
         osc = SineOscillator(440)
         env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
 
-        mod_osc = ModulatedOscillator(
-            osc,
-            env,
-            amp_mod=lambda a, e: a * e
-        )
+        mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
 
         # Small buffer should use iterator
         small = mod_osc.get_samples(100, mode="auto", reset=True)
@@ -265,7 +230,7 @@ class TestMultipleModulators(unittest.TestCase):
             env1,
             env2,
             amp_mod=lambda a, e: a * e,
-            freq_mod=lambda f, e: f * (1 + 0.1 * e)
+            freq_mod=lambda f, e: f * (1 + 0.1 * e),
         )
 
         samples = mod_osc.get_samples_iterator(100, reset=True)
@@ -287,7 +252,7 @@ class TestMultipleModulators(unittest.TestCase):
             env3,
             amp_mod=lambda a, e: a * e,
             freq_mod=lambda f, e: f * (1 + 0.1 * e),
-            phase_mod=lambda p, e: p + e * 10
+            phase_mod=lambda p, e: p + e * 10,
         )
 
         samples = mod_osc.get_samples_iterator(100, reset=True)
@@ -297,4 +262,3 @@ class TestMultipleModulators(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

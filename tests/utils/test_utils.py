@@ -14,11 +14,6 @@ from src.utils import (
     save_wave,
     load_wave,
     note_to_frequency,
-    # Legacy API
-    to_int16,
-    save_wave,
-    load_wave,
-    note_to_frequency,
 )
 from src.constants import DEFAULT_SAMPLE_RATE
 
@@ -44,7 +39,9 @@ class TestToInt16:
 
         # Half amplitude should be approximately half the value
         assert abs(result_half[0]) < abs(result_full[0])
-        assert abs(result_half[0] - result_full[0] / 2) < 10  # Allow small rounding error
+        assert (
+            abs(result_half[0] - result_full[0] / 2) < 10
+        )  # Allow small rounding error
 
     def test_clipping(self):
         """Test that values outside [-1, 1] are clipped."""
@@ -138,7 +135,9 @@ class TestSaveLoadWave:
 
         for sr in sample_rates:
             duration = 0.1
-            audio = np.sin(2 * np.pi * 440 * np.linspace(0, duration, int(sr * duration)))
+            audio = np.sin(
+                2 * np.pi * 440 * np.linspace(0, duration, int(sr * duration))
+            )
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 filepath = Path(tmpdir) / f"test_{sr}.wav"
@@ -317,4 +316,3 @@ class TestEdgeCases:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

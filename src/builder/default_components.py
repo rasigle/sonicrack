@@ -12,13 +12,12 @@ from src.builder.component_registry import (
     registry,
     register_component,
     ComponentCategory,
-    ComponentDescriptor
 )
 from src.engine.oscillator import (
     SineOscillator,
     SquareOscillator,
     SawtoothOscillator,
-    TriangleOscillator
+    TriangleOscillator,
 )
 from src.engine.modulator import ADSREnvelope
 from src.engine.modifier import Volume, Panner, Clipper
@@ -35,7 +34,7 @@ def register_oscillators():
         category=ComponentCategory.OSCILLATOR,
         factory=SineOscillator,
         config_params=["frequency", "amplitude", "phase", "sample_rate"],
-        description="Pure sine wave oscillator"
+        description="Pure sine wave oscillator",
     )
 
     register_component(
@@ -43,7 +42,7 @@ def register_oscillators():
         category=ComponentCategory.OSCILLATOR,
         factory=SquareOscillator,
         config_params=["frequency", "amplitude", "phase", "sample_rate"],
-        description="Square wave oscillator"
+        description="Square wave oscillator",
     )
 
     register_component(
@@ -51,7 +50,7 @@ def register_oscillators():
         category=ComponentCategory.OSCILLATOR,
         factory=TriangleOscillator,
         config_params=["frequency", "amplitude", "phase", "sample_rate"],
-        description="Triangle wave oscillator"
+        description="Triangle wave oscillator",
     )
 
     register_component(
@@ -59,7 +58,7 @@ def register_oscillators():
         category=ComponentCategory.OSCILLATOR,
         factory=SawtoothOscillator,
         config_params=["frequency", "amplitude", "phase", "sample_rate"],
-        description="Sawtooth wave oscillator"
+        description="Sawtooth wave oscillator",
     )
 
 
@@ -70,9 +69,15 @@ def register_modulators():
         name="adsr_envelope",
         category=ComponentCategory.MODULATOR,
         factory=ADSREnvelope,
-        config_params=["attack_duration", "decay_duration", "sustain_level",
-                       "release_duration", "sample_rate", "target"],
-        description="ADSR envelope generator"
+        config_params=[
+            "attack_duration",
+            "decay_duration",
+            "sustain_level",
+            "release_duration",
+            "sample_rate",
+            "target",
+        ],
+        description="ADSR envelope generator",
     )
 
 
@@ -84,7 +89,7 @@ def register_modifiers():
         category=ComponentCategory.MODIFIER,
         factory=Volume,
         config_params=["amplitude"],
-        description="Volume/amplitude control"
+        description="Volume/amplitude control",
     )
 
     register_component(
@@ -92,7 +97,7 @@ def register_modifiers():
         category=ComponentCategory.MODIFIER,
         factory=Panner,
         config_params=["position"],
-        description="Stereo panning (-1.0 left, 0.0 center, 1.0 right)"
+        description="Stereo panning (-1.0 left, 0.0 center, 1.0 right)",
     )
 
     register_component(
@@ -100,7 +105,7 @@ def register_modifiers():
         category=ComponentCategory.MODIFIER,
         factory=Clipper,
         config_params=["clip_range"],
-        description="Audio clipping/saturation effect"
+        description="Audio clipping/saturation effect",
     )
 
 
@@ -122,4 +127,3 @@ def register_all_components():
 
 # Auto-register on import
 register_all_components()
-

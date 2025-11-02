@@ -25,7 +25,6 @@ import json
 from pathlib import Path
 
 from src.builder.component_registry import registry, ComponentCategory
-from src.builder import default_components  # Auto-registers components
 from src.engine.modulated_oscillator import ModulatedOscillator
 from src.engine.composer import Chain, WaveAdder
 from src.engine.modifier import Modifier
@@ -71,7 +70,7 @@ class PatchBuilder:
             "version": "1.0",
             "name": name,
             "description": description,
-            "components": []
+            "components": [],
         }
         self._sample_rate = DEFAULT_SAMPLE_RATE
         self._name = name
@@ -135,7 +134,7 @@ class PatchBuilder:
             # Convert single oscillator to list
             self._source = [self._source, oscillator]
 
-        logger.debug(f"Added oscillator instance to source")
+        logger.debug("Added oscillator instance to source")
         return self
 
     def _add_modifier(self, comp_name: str, *args, **kwargs) -> PatchBuilder:
@@ -176,11 +175,7 @@ class PatchBuilder:
         return self
 
     def _add_modulator(
-        self,
-        comp_name: str,
-        *args,
-        target: str = "amplitude",
-        **kwargs
+        self, comp_name: str, *args, target: str = "amplitude", **kwargs
     ) -> PatchBuilder:
         """Generic method to add a modulator component.
 
@@ -211,21 +206,15 @@ class PatchBuilder:
         if self._source and isinstance(self._source, Oscillator):
             if target == "amplitude":
                 self._source = ModulatedOscillator(
-                    self._source,
-                    modulator,
-                    amp_mod=lambda base, mod: base * mod
+                    self._source, modulator, amp_mod=lambda base, mod: base * mod
                 )
             elif target == "frequency":
                 self._source = ModulatedOscillator(
-                    self._source,
-                    modulator,
-                    freq_mod=lambda base, mod: base * mod
+                    self._source, modulator, freq_mod=lambda base, mod: base * mod
                 )
             elif target == "phase":
                 self._source = ModulatedOscillator(
-                    self._source,
-                    modulator,
-                    phase_mod=lambda base, mod: base + mod
+                    self._source, modulator, phase_mod=lambda base, mod: base + mod
                 )
 
         # Add to config
@@ -261,21 +250,35 @@ class PatchBuilder:
             if descriptor.method_name == name:
                 # Determine component type and return appropriate handler
                 if descriptor.category == ComponentCategory.OSCILLATOR:
-                    return lambda *args, **kwargs: self.add_oscillator(comp_name, *args, **kwargs)
+                    return lambda *args, **kwargs: self.add_oscillator(
+                        comp_name, *args, **kwargs
+                    )
                 elif descriptor.category == ComponentCategory.MODIFIER:
-                    return lambda *args, **kwargs: self._add_modifier(comp_name, *args, **kwargs)
+                    return lambda *args, **kwargs: self._add_modifier(
+                        comp_name, *args, **kwargs
+                    )
                 elif descriptor.category == ComponentCategory.MODULATOR:
-                    return lambda *args, **kwargs: self._add_modulator(comp_name, *args, **kwargs)
+                    return lambda *args, **kwargs: self._add_modulator(
+                        comp_name, *args, **kwargs
+                    )
 
         # Special case for ADSR
         if name == "adsr":
             return self._adsr_helper
 
         # Not a component method
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{name}'"
+        )
 
-    def _adsr_helper(self, attack: float, decay: float, sustain: float,
-                    release: float, target: str = "amplitude") -> PatchBuilder:
+    def _adsr_helper(
+        self,
+        attack: float,
+        decay: float,
+        sustain: float,
+        release: float,
+        target: str = "amplitude",
+    ) -> PatchBuilder:
         """Helper for ADSR envelope with cleaner parameter names.
 
         Args:
@@ -289,9 +292,7 @@ class PatchBuilder:
             Self for method chaining
         """
         return self._add_modulator(
-            "adsr_envelope",
-            attack, decay, sustain, release,
-            target=target
+            "adsr_envelope", attack, decay, sustain, release, target=target
         )
 
     # ========================================================================
@@ -309,7 +310,7 @@ class PatchBuilder:
         """Set the patch description."""
         self._description = description
         self._config["description"] = description
-        logger.debug(f"Set patch description")
+        logger.debug(f"Set patch description: {description}")
         return self
 
     def get_name(self) -> str:
@@ -346,12 +347,12 @@ class PatchBuilder:
     def get_components(self) -> Dict[str, Any]:
         """Get all components of the patch."""
         return {
-            'source': self._source,
-            'modifiers': self._modifiers.copy(),
-            'modulators': self._modulators.copy(),
-            'name': self._name,
-            'description': self._description,
-            'sample_rate': self._sample_rate
+            "source": self._source,
+            "modifiers": self._modifiers.copy(),
+            "modulators": self._modulators.copy(),
+            "name": self._name,
+            "description": self._description,
+            "sample_rate": self._sample_rate,
         }
 
     def get_config(self) -> Dict[str, Any]:
@@ -417,7 +418,7 @@ class PatchBuilder:
             "modulators": modulators,
             "effects": effects,
             "components": len(self._config["components"]),
-            "sample_rate": self._sample_rate
+            "sample_rate": self._sample_rate,
         }
 
     # ========================================================================
@@ -433,9 +434,9 @@ class PatchBuilder:
                 break
 
         # Update source
-        if self._source and hasattr(self._source, 'freq'):
+        if self._source and hasattr(self._source, "freq"):
             self._source.freq = new_frequency
-        elif self._source and hasattr(self._source, 'oscillator'):
+        elif self._source and hasattr(self._source, "oscillator"):
             self._source.oscillator.frequency = new_frequency
 
         logger.debug(f"Modified frequency to {new_frequency}Hz")
@@ -450,9 +451,9 @@ class PatchBuilder:
                 break
 
         # Update source
-        if self._source and hasattr(self._source, 'amplitude'):
+        if self._source and hasattr(self._source, "amplitude"):
             self._source.amplitude = new_amplitude
-        elif self._source and hasattr(self._source, 'oscillator'):
+        elif self._source and hasattr(self._source, "oscillator"):
             self._source.oscillator.amplitude = new_amplitude
 
         logger.debug(f"Modified amplitude to {new_amplitude}")
@@ -464,9 +465,10 @@ class PatchBuilder:
 
         # Remove effects from config
         self._config["components"] = [
-            c for c in self._config["components"]
-            if registry.get(c["type"]) and
-            registry.get(c["type"]).category != ComponentCategory.MODIFIER
+            c
+            for c in self._config["components"]
+            if registry.get(c["type"])
+            and registry.get(c["type"]).category != ComponentCategory.MODIFIER
         ]
 
         logger.debug("Cleared all effects")
@@ -488,8 +490,7 @@ class PatchBuilder:
             if descriptor:
                 if descriptor.category == ComponentCategory.OSCILLATOR:
                     new_builder._source = registry.create_from_config(
-                        component,
-                        sample_rate=self._sample_rate
+                        component, sample_rate=self._sample_rate
                     )
                 elif descriptor.category == ComponentCategory.MODIFIER:
                     instance = registry.create_from_config(component)
@@ -532,7 +533,7 @@ class PatchBuilder:
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             json.dump(self._config, f, indent=2)
 
         logger.info(f"Saved preset to {filepath}")
@@ -542,7 +543,7 @@ class PatchBuilder:
         """Load a patch configuration from a preset file."""
         filepath = Path(filepath)
 
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             config = json.load(f)
 
         # Create builder
@@ -569,8 +570,11 @@ class PatchBuilder:
             # Call appropriate method based on category
             if descriptor.category == ComponentCategory.OSCILLATOR:
                 method = getattr(builder, descriptor.method_name)
-                params = {k: v for k, v in component.items()
-                         if k in descriptor.config_params and k != "sample_rate"}
+                params = {
+                    k: v
+                    for k, v in component.items()
+                    if k in descriptor.config_params and k != "sample_rate"
+                }
                 method(**params)
 
             elif descriptor.category == ComponentCategory.MODULATOR:
@@ -580,7 +584,7 @@ class PatchBuilder:
                         component.get("decay_duration", 0.1),
                         component.get("sustain_level", 0.7),
                         component.get("release_duration", 0.3),
-                        target=target
+                        target=target,
                     )
 
             elif descriptor.category == ComponentCategory.MODIFIER:
@@ -588,10 +592,12 @@ class PatchBuilder:
                 if comp_type == "clipper":
                     method(component.get("min", -1.0), component.get("max", 1.0))
                 else:
-                    params = {k: v for k, v in component.items()
-                             if k in descriptor.config_params}
+                    params = {
+                        k: v
+                        for k, v in component.items()
+                        if k in descriptor.config_params
+                    }
                     method(**params)
 
         logger.info(f"Loaded preset from {filepath}")
         return builder
-

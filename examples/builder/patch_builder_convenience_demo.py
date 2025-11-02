@@ -9,17 +9,19 @@ from utils import play_wave
 
 # Create a patch using fluent API
 print("Creating a patch...")
-patch = (PatchBuilder()
-        .sine(1000, amplitude=0.8)
-        .adsr(0.1, 0.2, 0.7, 0.3)
-        .volume(0.5)
-        .pan(0.3)
-        .clip(-0.9, 0.9))
+patch = (
+    PatchBuilder()
+    .sine(1000, amplitude=0.8)
+    .adsr(0.1, 0.2, 0.7, 0.3)
+    .volume(0.5)
+    .pan(0.3)
+    .clip(-0.9, 0.9)
+)
 
 # Display patch description
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print(patch.describe())
-print("="*60)
+print("=" * 60)
 
 # Get patch summary
 summary = patch.summary()
@@ -59,7 +61,7 @@ original_audio = patch.build()
 clone_audio = clone.build()
 
 original_samples = original_audio.get_samples(44100)
-clone_samples = clone_audio.get_samples(44100*5)
+clone_samples = clone_audio.get_samples(44100 * 5)
 
 play_wave(clone_samples)
 

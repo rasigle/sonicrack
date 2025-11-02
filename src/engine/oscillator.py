@@ -295,9 +295,11 @@ class Oscillator(ABC):
             n: Number of samples to produce. Defaults to `DEFAULT_SAMPLE_RATE`.
             reset: If True, reset the oscillator to initial state before generating.
             mode: Generation mode. Options:
-                - "auto": Automatically choose the best method (vectorized for n >= 512, iterator otherwise)
+                - "auto": Automatically choose the best method (vectorized for
+                    n >= 512, iterator otherwise)
                 - "iterator": Use Python iterator (slower, flexible)
-                - "vectorized": Use NumPy vectorization (faster, recommended for production)
+                - "vectorized": Use NumPy vectorization (faster, recommended for
+                    production)
 
         Returns:
             np.ndarray: Generated samples as NumPy array.

@@ -46,18 +46,18 @@ def demonstrate_constant_power_panning():
 
     # Plot the panning law
     plt.figure(figsize=(10, 6))
-    plt.plot(positions, left_gains, 'b-', label='Left Channel', linewidth=2)
-    plt.plot(positions, right_gains, 'r-', label='Right Channel', linewidth=2)
-    plt.plot(positions, total_powers, 'g--', label='Total Power', linewidth=2)
-    plt.xlabel('Pan Position (-1=Left, 1=Right)')
-    plt.ylabel('Gain / Power')
-    plt.title('Constant-Power Panning Law')
+    plt.plot(positions, left_gains, "b-", label="Left Channel", linewidth=2)
+    plt.plot(positions, right_gains, "r-", label="Right Channel", linewidth=2)
+    plt.plot(positions, total_powers, "g--", label="Total Power", linewidth=2)
+    plt.xlabel("Pan Position (-1=Left, 1=Right)")
+    plt.ylabel("Gain / Power")
+    plt.title("Constant-Power Panning Law")
     plt.legend()
     plt.grid(True, alpha=0.3)
-    plt.axhline(y=1.0, color='k', linestyle=':', alpha=0.5)
-    plt.axvline(x=0.0, color='k', linestyle=':', alpha=0.5)
+    plt.axhline(y=1.0, color="k", linestyle=":", alpha=0.5)
+    plt.axvline(x=0.0, color="k", linestyle=":", alpha=0.5)
     plt.tight_layout()
-    plt.savefig('panning_law.png', dpi=150)
+    plt.savefig("panning_law.png", dpi=150)
     print("\n✓ Saved plot to 'panning_law.png'")
 
 
@@ -81,6 +81,7 @@ def demonstrate_vectorized_panning():
 
     # Method 1: Element-by-element (slow)
     import time
+
     start = time.time()
     left_slow = []
     right_slow = []
@@ -127,7 +128,7 @@ def demonstrate_modulated_panning():
         decay_duration=0.2,
         sustain_level=0.5,
         release_duration=0.3,
-        sample_rate=sample_rate
+        sample_rate=sample_rate,
     )
 
     # Create modulated panner
@@ -173,31 +174,31 @@ def demonstrate_modulated_panning():
     fig, axes = plt.subplots(3, 1, figsize=(12, 8))
 
     # Pan position over time
-    axes[0].plot(time_axis, positions, 'g-', linewidth=2)
-    axes[0].set_ylabel('Pan Position')
-    axes[0].set_title('Modulated Panning with ADSR Envelope')
+    axes[0].plot(time_axis, positions, "g-", linewidth=2)
+    axes[0].set_ylabel("Pan Position")
+    axes[0].set_title("Modulated Panning with ADSR Envelope")
     axes[0].grid(True, alpha=0.3)
-    axes[0].axhline(y=0, color='k', linestyle=':', alpha=0.5)
+    axes[0].axhline(y=0, color="k", linestyle=":", alpha=0.5)
     axes[0].set_ylim(-1.1, 1.1)
 
     # Left and right channel gains
-    axes[1].plot(time_axis, left_values, 'b-', label='Left Channel', linewidth=2)
-    axes[1].plot(time_axis, right_values, 'r-', label='Right Channel', linewidth=2)
-    axes[1].set_ylabel('Channel Gain')
+    axes[1].plot(time_axis, left_values, "b-", label="Left Channel", linewidth=2)
+    axes[1].plot(time_axis, right_values, "r-", label="Right Channel", linewidth=2)
+    axes[1].set_ylabel("Channel Gain")
     axes[1].legend()
     axes[1].grid(True, alpha=0.3)
 
     # Total power
-    axes[2].plot(time_axis, powers, 'purple', linewidth=2)
-    axes[2].axhline(y=1.0, color='g', linestyle='--', label='Expected Power = 1.0')
-    axes[2].set_ylabel('Total Power')
-    axes[2].set_xlabel('Time (seconds)')
+    axes[2].plot(time_axis, powers, "purple", linewidth=2)
+    axes[2].axhline(y=1.0, color="g", linestyle="--", label="Expected Power = 1.0")
+    axes[2].set_ylabel("Total Power")
+    axes[2].set_xlabel("Time (seconds)")
     axes[2].legend()
     axes[2].grid(True, alpha=0.3)
     axes[2].set_ylim(0.95, 1.05)
 
     plt.tight_layout()
-    plt.savefig('modulated_panning.png', dpi=150)
+    plt.savefig("modulated_panning.png", dpi=150)
     print("\n✓ Saved plot to 'modulated_panning.png'")
 
     # Verify power preservation
@@ -223,7 +224,7 @@ def demonstrate_stereo_audio():
         decay_duration=0.5,
         sustain_level=1.0,
         release_duration=0.5,
-        sample_rate=sample_rate
+        sample_rate=sample_rate,
     )
 
     # Create modulated panner
@@ -262,28 +263,30 @@ def demonstrate_stereo_audio():
 
     print(f"✓ Generated {len(left_channel)} stereo samples")
     print(f"  Left channel range: [{left_channel.min():.4f}, {left_channel.max():.4f}]")
-    print(f"  Right channel range: [{right_channel.min():.4f}, {right_channel.max():.4f}]")
+    print(
+        f"  Right channel range: [{right_channel.min():.4f}, {right_channel.max():.4f}]"
+    )
 
     # Plot waveforms
     time_axis = np.arange(len(left_channel)) / sample_rate
 
     plt.figure(figsize=(12, 6))
     plt.subplot(2, 1, 1)
-    plt.plot(time_axis, left_channel, 'b-', linewidth=0.5, alpha=0.7)
-    plt.ylabel('Left Channel')
-    plt.title('Stereo Audio with Modulated Panning')
+    plt.plot(time_axis, left_channel, "b-", linewidth=0.5, alpha=0.7)
+    plt.ylabel("Left Channel")
+    plt.title("Stereo Audio with Modulated Panning")
     plt.grid(True, alpha=0.3)
     plt.xlim(0, duration)
 
     plt.subplot(2, 1, 2)
-    plt.plot(time_axis, right_channel, 'r-', linewidth=0.5, alpha=0.7)
-    plt.ylabel('Right Channel')
-    plt.xlabel('Time (seconds)')
+    plt.plot(time_axis, right_channel, "r-", linewidth=0.5, alpha=0.7)
+    plt.ylabel("Right Channel")
+    plt.xlabel("Time (seconds)")
     plt.grid(True, alpha=0.3)
     plt.xlim(0, duration)
 
     plt.tight_layout()
-    plt.savefig('stereo_audio.png', dpi=150)
+    plt.savefig("stereo_audio.png", dpi=150)
     print("\n✓ Saved plot to 'stereo_audio.png'")
 
 
@@ -323,4 +326,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

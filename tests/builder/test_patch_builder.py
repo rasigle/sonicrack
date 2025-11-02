@@ -93,18 +93,23 @@ class TestPatchBuilder(unittest.TestCase):
 
         # Should have envelope shape
         # Attack phase should ramp up
-        attack_samples = samples[:int(0.1 * 44100)]
-        self.assertTrue(np.mean(np.abs(attack_samples[:100])) < np.mean(np.abs(attack_samples[-100:])))
+        attack_samples = samples[: int(0.1 * 44100)]
+        self.assertTrue(
+            np.mean(np.abs(attack_samples[:100]))
+            < np.mean(np.abs(attack_samples[-100:]))
+        )
 
     def test_method_chaining(self):
         """Test fluent API method chaining."""
-        patch = (PatchBuilder()
-                .sine(440, amplitude=0.8)
-                .adsr(0.1, 0.2, 0.7, 0.3)
-                .volume(0.5)
-                .panner(0.0)
-                .clipper(-0.9, 0.9)
-                .build())
+        patch = (
+            PatchBuilder()
+            .sine(440, amplitude=0.8)
+            .adsr(0.1, 0.2, 0.7, 0.3)
+            .volume(0.5)
+            .panner(0.0)
+            .clipper(-0.9, 0.9)
+            .build()
+        )
 
         # Should successfully build
         samples = patch.get_samples(1000)
@@ -112,11 +117,13 @@ class TestPatchBuilder(unittest.TestCase):
 
     def test_multiple_oscillators(self):
         """Test mixing multiple oscillators."""
-        patch = (PatchBuilder()
-                .add_oscillator(PatchBuilder().sine(220).build())
-                .add_oscillator(PatchBuilder().sine(440).build())
-                .add_oscillator(PatchBuilder().sine(880).build())
-                .build())
+        patch = (
+            PatchBuilder()
+            .add_oscillator(PatchBuilder().sine(220).build())
+            .add_oscillator(PatchBuilder().sine(440).build())
+            .add_oscillator(PatchBuilder().sine(880).build())
+            .build()
+        )
 
         # Should create a WaveAdder
         samples = patch.get_samples(1000)
@@ -129,10 +136,9 @@ class TestPatchBuilder(unittest.TestCase):
 
     def test_get_config(self):
         """Test getting configuration dictionary."""
-        builder = (PatchBuilder()
-                  .sine(440, amplitude=0.8)
-                  .adsr(0.1, 0.2, 0.7, 0.3)
-                  .volume(0.5))
+        builder = (
+            PatchBuilder().sine(440, amplitude=0.8).adsr(0.1, 0.2, 0.7, 0.3).volume(0.5)
+        )
 
         config = builder.get_config()
 
@@ -149,14 +155,12 @@ class TestPatchBuilderIntegration(unittest.TestCase):
         """Test that builder output matches manually created patch."""
         # Create patch manually
         from src.engine import SineOscillator, Chain, Volume
+
         manual_osc = SineOscillator(440, amplitude=0.8)
         manual_patch = Chain(manual_osc, Volume(0.5))
 
         # Create same patch with builder
-        builder_patch = (PatchBuilder()
-                        .sine(440, amplitude=0.8)
-                        .volume(0.5)
-                        .build())
+        builder_patch = PatchBuilder().sine(440, amplitude=0.8).volume(0.5).build()
 
         # Both should generate similar samples
         manual_samples = manual_patch.get_samples(1000, reset=True)
@@ -169,10 +173,7 @@ class TestPatchBuilderIntegration(unittest.TestCase):
     def test_sample_rate_configuration(self):
         """Test setting custom sample rate."""
         custom_sr = 48000
-        patch = (PatchBuilder()
-                .set_sample_rate(custom_sr)
-                .sine(440)
-                .build())
+        patch = PatchBuilder().set_sample_rate(custom_sr).sine(440).build()
 
         # Should use custom sample rate
         self.assertEqual(patch._sample_rate, custom_sr)
@@ -189,10 +190,12 @@ class TestPatchBuilderConvenience(unittest.TestCase):
         self.assertEqual(patch1.get_description(), "A cool synthesizer")
 
         # Test with setter methods
-        patch2 = (PatchBuilder()
-                 .set_name("Lead Synth")
-                 .set_description("Bright lead sound")
-                 .sine(440))
+        patch2 = (
+            PatchBuilder()
+            .set_name("Lead Synth")
+            .set_description("Bright lead sound")
+            .sine(440)
+        )
         self.assertEqual(patch2.get_name(), "Lead Synth")
         self.assertEqual(patch2.get_description(), "Bright lead sound")
 
@@ -227,35 +230,36 @@ class TestPatchBuilderConvenience(unittest.TestCase):
         patch = PatchBuilder().sine(440).adsr(0.1, 0.2, 0.7, 0.3)
         modulators = patch.get_modulators()
 
-        self.assertIn('amplitude_mod', modulators)
+        self.assertIn("amplitude_mod", modulators)
 
     def test_get_components(self):
         """Test accessing all components."""
-        patch = (PatchBuilder("Test Patch")
-                .sine(440)
-                .adsr(0.1, 0.2, 0.7, 0.3)
-                .volume(0.5))
+        patch = (
+            PatchBuilder("Test Patch").sine(440).adsr(0.1, 0.2, 0.7, 0.3).volume(0.5)
+        )
 
         components = patch.get_components()
 
-        self.assertIn('source', components)
-        self.assertIn('modifiers', components)
-        self.assertIn('modulators', components)
-        self.assertIn('name', components)
-        self.assertIn('description', components)
-        self.assertIn('sample_rate', components)
+        self.assertIn("source", components)
+        self.assertIn("modifiers", components)
+        self.assertIn("modulators", components)
+        self.assertIn("name", components)
+        self.assertIn("description", components)
+        self.assertIn("sample_rate", components)
 
-        self.assertEqual(components['name'], "Test Patch")
-        self.assertEqual(len(components['modifiers']), 1)
+        self.assertEqual(components["name"], "Test Patch")
+        self.assertEqual(len(components["modifiers"]), 1)
 
     def test_describe(self):
         """Test patch description."""
-        builder = (PatchBuilder("My Lead")
-                  .set_description("Bright lead sound")
-                  .sine(440, amplitude=0.8)
-                  .adsr(0.1, 0.2, 0.7, 0.3)
-                  .volume(0.5)
-                  .panner(0.3))
+        builder = (
+            PatchBuilder("My Lead")
+            .set_description("Bright lead sound")
+            .sine(440, amplitude=0.8)
+            .adsr(0.1, 0.2, 0.7, 0.3)
+            .volume(0.5)
+            .panner(0.3)
+        )
 
         description = builder.describe().lower()
 
@@ -271,11 +275,13 @@ class TestPatchBuilderConvenience(unittest.TestCase):
 
     def test_summary(self):
         """Test patch summary statistics."""
-        builder = (PatchBuilder("Test")
-                  .sine(440)
-                  .adsr(0.1, 0.2, 0.7, 0.3)
-                  .volume(0.5)
-                  .panner(0.3))
+        builder = (
+            PatchBuilder("Test")
+            .sine(440)
+            .adsr(0.1, 0.2, 0.7, 0.3)
+            .volume(0.5)
+            .panner(0.3)
+        )
 
         summary = builder.summary()
 
@@ -297,7 +303,6 @@ class TestPatchBuilderConvenience(unittest.TestCase):
         # But modifying clone shouldn't affect original
         clone.volume(0.7)
         orig_volume = None
-        clone_volume = None
 
         for comp in original.get_config()["components"]:
             if comp["type"] == "volume":
@@ -305,7 +310,7 @@ class TestPatchBuilderConvenience(unittest.TestCase):
 
         for comp in clone.get_config()["components"]:
             if comp["type"] == "volume":
-                clone_volume = comp["amplitude"]
+                _ = comp["amplitude"]
 
         # Original should still have 0.5, clone should have 0.7
         self.assertEqual(orig_volume, 0.5)
@@ -336,11 +341,7 @@ class TestPatchBuilderConvenience(unittest.TestCase):
 
     def test_clear_effects(self):
         """Test clearing effects from patch."""
-        builder = (PatchBuilder()
-                  .sine(440)
-                  .volume(0.5)
-                  .panner(0.3)
-                  .clipper(-0.9, 0.9))
+        builder = PatchBuilder().sine(440).volume(0.5).panner(0.3).clipper(-0.9, 0.9)
 
         # Clear effects
         builder.clear_effects()
@@ -356,4 +357,3 @@ class TestPatchBuilderConvenience(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

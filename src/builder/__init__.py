@@ -1,4 +1,3 @@
-
 """High-level patch building and preset management.
 
 This package provides fluent API builders and preset management for creating
@@ -32,7 +31,7 @@ from src.builder.component_registry import (
     ComponentRegistry,
     ComponentDescriptor,
     ComponentCategory,
-    register_component
+    register_component,
 )
 
 __all__ = [

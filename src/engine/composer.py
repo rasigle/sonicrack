@@ -322,24 +322,26 @@ class WaveAdder(Composer):
                 samples = np.array([next(gen) for _ in range(n)], dtype=np.float32)
                 all_samples.append(samples)
 
+        # Normalize shapes for stereo mode (only if required mono/stereo combined)
+        if self.stereo:
+            # Check if we have mixed mono/stereo inputs
+            has_mono = any(samples.ndim == 1 for samples in all_samples)
+
+            if has_mono:
+                # Only convert mono inputs - skip stereo ones for performance
+                normalized_samples = []
+                for samples in all_samples:
+                    if samples.ndim == 1:
+                        # Mono: convert to stereo by duplicating
+                        samples = np.column_stack((samples, samples))
+                    # Stereo samples pass through unchanged
+                    normalized_samples.append(samples)
+                all_samples = normalized_samples
+
         # Stack all samples for vectorized combination
         stacked = np.stack(all_samples, axis=0)
 
-        if self.stereo:
-            # Handle stereo output
-            if stacked.ndim == 2:
-                # All generators produced mono, convert to stereo
-                result = stacked.mean(axis=0)
-                return np.column_stack([result, result])
-
-            if stacked.ndim == 3:
-                # Generators produced stereo (n_generators, n_samples, 2)
-                # Average across generators
-                return stacked.mean(axis=0)
-
-            # Mono generators
-            result = stacked.mean(axis=0)
-            return np.column_stack([result, result])
-
-        # Mono output: average across all generators
+        # Average across generators
+        # - Stereo: (n_generators, n, 2) -> (n, 2)
+        # - Mono: (n_generators, n) -> (n,)
         return stacked.mean(axis=0)

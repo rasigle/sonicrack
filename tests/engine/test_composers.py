@@ -18,7 +18,7 @@ class TestChain(unittest.TestCase):
 
     def setUp(self) -> None:
         """Create oscillators and modifiers for testing."""
-        self.osc = SineOscillator(freq=440, amp=1.0)
+        self.osc = SineOscillator(frequency=440, amplitude=1.0)
         self.volume = Volume(0.5)
         self.panner = Panner(0.5)
         self.clipper = Clipper((-0.5, 0.5))
@@ -119,8 +119,8 @@ class TestWaveAdder(unittest.TestCase):
 
     def setUp(self) -> None:
         """Create oscillators for testing."""
-        self.osc1 = SineOscillator(freq=440, amp=0.5)
-        self.osc2 = SineOscillator(freq=880, amp=0.5)
+        self.osc1 = SineOscillator(frequency=440, amplitude=0.5)
+        self.osc2 = SineOscillator(frequency=880, amplitude=0.5)
 
     def test_initialization(self) -> None:
         """Test wave adder initializes correctly."""
@@ -134,8 +134,8 @@ class TestWaveAdder(unittest.TestCase):
         samples = adder.get_samples_vectorized(100)
 
         # Mixed signal should be different from either source
-        osc1_samples = SineOscillator(440, amp=0.5).get_samples_vectorized(100)
-        osc2_samples = SineOscillator(880, amp=0.5).get_samples_vectorized(100)
+        osc1_samples = SineOscillator(440, amplitude=0.5).get_samples_vectorized(100)
+        osc2_samples = SineOscillator(880, amplitude=0.5).get_samples_vectorized(100)
 
         self.assertFalse(np.allclose(samples, osc1_samples))
         self.assertFalse(np.allclose(samples, osc2_samples))
@@ -165,7 +165,7 @@ class TestWaveAdder(unittest.TestCase):
 
     def test_multiple_generators(self) -> None:
         """Test wave adder with more than 2 generators."""
-        osc3 = SineOscillator(freq=1320, amp=0.33)
+        osc3 = SineOscillator(frequency=1320, amplitude=0.33)
 
         adder = WaveAdder(self.osc1, self.osc2, osc3)
         samples = adder.get_samples_vectorized(100)

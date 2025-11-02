@@ -46,8 +46,8 @@ class TestPresetSaveLoad(unittest.TestCase):
                       .sine(440, amplitude=0.8, phase=45)
                       .adsr(0.1, 0.2, 0.7, 0.3)
                       .volume(0.6)
-                      .pan(-0.5)
-                      .clip(-0.8, 0.8))
+                      .panner(-0.5)
+                      .clipper(-0.8, 0.8))
 
             builder.save_preset(filepath)
 
@@ -68,8 +68,8 @@ class TestPresetSaveLoad(unittest.TestCase):
             # Verify ADSR config
             adsr_config = config["components"][1]
             self.assertEqual(adsr_config["type"], "adsr_envelope")
-            self.assertEqual(adsr_config["attack"], 0.1)
-            self.assertEqual(adsr_config["sustain"], 0.7)
+            self.assertEqual(adsr_config["attack_duration"], 0.1)
+            self.assertEqual(adsr_config["sustain_level"], 0.7)
 
     def test_preset_json_format(self):
         """Test that preset JSON has expected structure."""

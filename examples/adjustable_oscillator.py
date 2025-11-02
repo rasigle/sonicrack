@@ -114,7 +114,7 @@ class WaveformViewer(QtWidgets.QMainWindow):
         sr = int(self.sr_spin.value())
 
         try:
-            osc = cls(freq=freq, amp=amp, phase=phase, sample_rate=sr)
+            osc = cls(freq=freq, amplitude=amp, phase=phase, sample_rate=sr)
         except TypeError:
             osc = cls(freq, amp, phase, sr)
         try:
@@ -130,7 +130,7 @@ class WaveformViewer(QtWidgets.QMainWindow):
         phase = float(self.phase_spin.value())
         sr = int(self.sr_spin.value())
         try:
-            osc = cls(freq=freq, amp=amp, phase=phase, sample_rate=sr)
+            osc = cls(freq=freq, amplitude=amp, phase=phase, sample_rate=sr)
         except TypeError:
             osc = cls(freq, amp, phase, sr)
         try:
@@ -147,8 +147,8 @@ class WaveformViewer(QtWidgets.QMainWindow):
         phase = float(self.phase_spin.value())
         sr = int(self.sr_spin.value())
 
-        self._osc.freq = freq
-        self._osc.amp = amp
+        self._osc.frequency = freq
+        self._osc.amplitude = amp
         self._osc.phase = phase
         self._osc.sample_rate = sr
 

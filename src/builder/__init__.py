@@ -25,10 +25,22 @@ Example:
     >>> loaded = library.load("leads/my_sound").build()
 """
 
-from src.builder.patch_builder import PatchBuilder
 from src.builder.preset_library import PresetLibrary
+from src.builder.patch_builder import PatchBuilder
+from src.builder.component_registry import (
+    registry,
+    ComponentRegistry,
+    ComponentDescriptor,
+    ComponentCategory,
+    register_component
+)
 
 __all__ = [
     "PatchBuilder",
     "PresetLibrary",
+    "registry",
+    "ComponentRegistry",
+    "ComponentDescriptor",
+    "ComponentCategory",
+    "register_component",
 ]

@@ -63,7 +63,7 @@ class TestAmplitudeModulation(unittest.TestCase):
 
     def test_amp_modulation_affects_output(self) -> None:
         """Test amplitude modulation changes output amplitude."""
-        osc = SineOscillator(freq=440, amp=1.0)
+        osc = SineOscillator(frequency=440, amplitude=1.0)
         env = ADSREnvelope(
             attack_duration=0.1,
             decay_duration=0.0,
@@ -86,7 +86,7 @@ class TestAmplitudeModulation(unittest.TestCase):
 
     def test_zero_envelope_produces_silence(self) -> None:
         """Test that zero envelope value produces silence."""
-        osc = SineOscillator(freq=440, amp=1.0)
+        osc = SineOscillator(frequency=440, amplitude=1.0)
         env = ADSREnvelope(
             attack_duration=0.0,
             decay_duration=0.0,
@@ -111,7 +111,7 @@ class TestFrequencyModulation(unittest.TestCase):
 
     def test_freq_modulation_changes_frequency(self) -> None:
         """Test frequency modulation affects oscillator frequency."""
-        osc = SineOscillator(freq=440, amp=1.0)
+        osc = SineOscillator(frequency=440, amplitude=1.0)
         env = ADSREnvelope(0.1, 0.0, 1.0, 0.0, sample_rate=100)
 
         mod_osc = ModulatedOscillator(
@@ -133,7 +133,7 @@ class TestPhaseModulation(unittest.TestCase):
 
     def test_phase_modulation(self) -> None:
         """Test phase modulation affects oscillator phase."""
-        osc = SineOscillator(freq=440, amp=1.0, phase=0.0)
+        osc = SineOscillator(frequency=440, amplitude=1.0, phase=0.0)
         env = ADSREnvelope(0.1, 0.0, 1.0, 0.0, sample_rate=100)
 
         mod_osc = ModulatedOscillator(

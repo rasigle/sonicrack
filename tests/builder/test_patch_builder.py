@@ -64,7 +64,7 @@ class TestPatchBuilder(unittest.TestCase):
 
     def test_with_pan(self):
         """Test adding stereo panning."""
-        patch = PatchBuilder().sine(440).pan(1.0).build()
+        patch = PatchBuilder().sine(440).panner(1.0).build()
 
         # Generate samples
         samples = patch.get_samples(100)
@@ -75,7 +75,7 @@ class TestPatchBuilder(unittest.TestCase):
 
     def test_with_clip(self):
         """Test adding clipping."""
-        patch = PatchBuilder().sine(440, amplitude=2.0).clip(-0.5, 0.5).build()
+        patch = PatchBuilder().sine(440, amplitude=2.0).clipper(-0.5, 0.5).build()
 
         # Generate samples
         samples = patch.get_samples(1000)
@@ -102,8 +102,8 @@ class TestPatchBuilder(unittest.TestCase):
                 .sine(440, amplitude=0.8)
                 .adsr(0.1, 0.2, 0.7, 0.3)
                 .volume(0.5)
-                .pan(0.0)
-                .clip(-0.9, 0.9)
+                .panner(0.0)
+                .clipper(-0.9, 0.9)
                 .build())
 
         # Should successfully build
@@ -149,7 +149,7 @@ class TestPatchBuilderIntegration(unittest.TestCase):
         """Test that builder output matches manually created patch."""
         # Create patch manually
         from src.engine import SineOscillator, Chain, Volume
-        manual_osc = SineOscillator(440, amp=0.8)
+        manual_osc = SineOscillator(440, amplitude=0.8)
         manual_patch = Chain(manual_osc, Volume(0.5))
 
         # Create same patch with builder
@@ -209,13 +209,13 @@ class TestPatchBuilderConvenience(unittest.TestCase):
         source = patch.get_source()
 
         self.assertIsInstance(source, SineOscillator)
-        self.assertEqual(source.freq, 440)
+        self.assertEqual(source.frequency, 440)
 
     def test_get_modifiers(self):
         """Test accessing modifiers list."""
         from src.engine.modifier import Volume, Panner
 
-        patch = PatchBuilder().sine(440).volume(0.5).pan(0.3)
+        patch = PatchBuilder().sine(440).volume(0.5).panner(0.3)
         modifiers = patch.get_modifiers()
 
         self.assertEqual(len(modifiers), 2)
@@ -255,19 +255,19 @@ class TestPatchBuilderConvenience(unittest.TestCase):
                   .sine(440, amplitude=0.8)
                   .adsr(0.1, 0.2, 0.7, 0.3)
                   .volume(0.5)
-                  .pan(0.3))
+                  .panner(0.3))
 
-        description = builder.describe()
+        description = builder.describe().lower()
 
         # Should contain name and description
-        self.assertIn("My Lead", description)
-        self.assertIn("Bright lead sound", description)
+        self.assertIn("my lead", description)
+        self.assertIn("bright lead sound", description)
         # Should contain component descriptions
-        self.assertIn("Sine Oscillator", description)
+        self.assertIn("sine wave oscillator", description)
         self.assertIn("440", description)
-        self.assertIn("ADSR Envelope", description)
-        self.assertIn("Volume", description)
-        self.assertIn("Panner", description)
+        self.assertIn("adsr envelope", description)
+        self.assertIn("volume", description)
+        self.assertIn("pan", description)
 
     def test_summary(self):
         """Test patch summary statistics."""
@@ -275,7 +275,7 @@ class TestPatchBuilderConvenience(unittest.TestCase):
                   .sine(440)
                   .adsr(0.1, 0.2, 0.7, 0.3)
                   .volume(0.5)
-                  .pan(0.3))
+                  .panner(0.3))
 
         summary = builder.summary()
 
@@ -339,8 +339,8 @@ class TestPatchBuilderConvenience(unittest.TestCase):
         builder = (PatchBuilder()
                   .sine(440)
                   .volume(0.5)
-                  .pan(0.3)
-                  .clip(-0.9, 0.9))
+                  .panner(0.3)
+                  .clipper(-0.9, 0.9))
 
         # Clear effects
         builder.clear_effects()

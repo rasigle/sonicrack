@@ -33,6 +33,7 @@ from collections.abc import Iterable
 from typing import Union, Tuple, Any
 
 import numpy as np
+from librosa import frequency_weighting
 
 from src.utils.logging_config import get_engine_logger
 
@@ -59,21 +60,21 @@ class Panner(Modifier):
     """Converts mono input into stereo output with configurable pan position.
 
     Args:
-        r: Right pan value. 0=fully left, 1=fully right, 0.5=center. Defaults to 0.5.
+        position: Right pan value. 0=fully left, 1=fully right, 0.5=center. Defaults to 0.5.
 
     Attributes:
-        right: Current right pan value.
+        position: Current right pan value.
     """
 
-    def __init__(self, r: float = 0.5) -> None:
+    def __init__(self, position: float = 0.5) -> None:
         """Initialize panner with pan position.
 
         Args:
-            r: Right pan value, 0 means 100% left panned and 1 means 100% right
+            position: Pan value, 0 means 100% left panned and 1 means 100% right
                 panned, 0.5 is center panned.
         """
-        self.right: float = r
-        logger.debug(f"Panner initialized with pan position: {r}")
+        self.position: float = np.clip(position, 0.0, 1.0)
+        logger.debug(f"Panner initialized with pan position: {position}")
 
     def __call__(self, val: float) -> Tuple[float, float]:
         """Convert mono signal to stereo with panning.
@@ -84,7 +85,7 @@ class Panner(Modifier):
         Returns:
             Tuple of (left, right) stereo values.
         """
-        right: float = self.right * 2
+        right: float = self.position * 2
         left: float = 2 - right
         return left * val, right * val
 
@@ -109,7 +110,7 @@ class ModulatedPanner(Panner):
             modulator: Any kind of generator that returns a value within the range
                 of [-1, 1] this is used to set the `r` value that has a range of [0, 1].
         """
-        super().__init__(r=0)
+        super().__init__(position=0)
         self.modulator = modulator
 
         # Auto-initialize the modulator to avoid common errors
@@ -127,8 +128,8 @@ class ModulatedPanner(Panner):
         Returns:
             Current pan position.
         """
-        self.right = (next(self.modulator) + 1) / 2
-        return self.right
+        self.position = (next(self.modulator) + 1) / 2
+        return self.position
 
 
 class Volume(Modifier):
@@ -137,21 +138,21 @@ class Volume(Modifier):
     Can be used to increase or decrease the amplitude of signals.
 
     Args:
-        amp: Amplitude multiplier. 1.0=no change, 0.0=silence. Defaults to 1.0.
+        amplitude: Amplitude multiplier. 1.0=no change, 0.0=silence. Defaults to 1.0.
 
     Attributes:
-        amp: Current amplitude multiplier.
+        amplitude: Current amplitude multiplier.
     """
 
-    def __init__(self, amp: float = 1.0) -> None:
+    def __init__(self, amplitude: float = 1.0) -> None:
         """Initialize volume modifier.
 
         Args:
-            amp: Sets the amplitude multiplier for the
+            amplitude: Sets the amplitude multiplier for the
                 input signal (1 : no change, 0 : no output).
         """
-        self.amp: float = amp
-        logger.debug(f"Volume initialized with amplitude: {amp}")
+        self.amplitude: float = amplitude
+        logger.debug(f"Volume initialized with amplitude: {amplitude}")
 
     def __call__(self, val: Union[float, Tuple[float, ...]]) -> Union[float, Tuple[float, ...]]:
         """Apply volume scaling to input.
@@ -166,11 +167,11 @@ class Volume(Modifier):
             TypeError: If input is not int, float, or Iterable.
         """
         if isinstance(val, Iterable):
-            return tuple(v * self.amp for v in val)
+            return tuple(v * self.amplitude for v in val)
 
         # Accept int, float, and numpy number types
         if isinstance(val, (int, float, np.number)):
-            return val * self.amp
+            return val * self.amplitude
 
         logger.error(f"Invalid input type for Volume: {type(val)}")
         raise TypeError("Input value must be an int, float, numpy number, or Iterable.")
@@ -197,8 +198,8 @@ class ModulatedVolume(Volume):
         return self
 
     def __next__(self):
-        self.amp = next(self.modulator)
-        return self.amp
+        self.amplitude = next(self.modulator)
+        return self.amplitude
 
     def trigger_release(self):
         if hasattr(self.modulator, "trigger_release"):
@@ -215,21 +216,21 @@ class Frequency(Modifier):
     """Scales the input values by `amp`, can be used to increase or decrease the
     amplitude."""
 
-    def __init__(self, freq: float = 1.0):
+    def __init__(self, frequency: float = 1.0):
         """Initializes the Frequency modifier.
 
         Args:
-            freq : sets the amplitude multiplier for the
+            frequency : sets the amplitude multiplier for the
                 input signal (1 : no change, 0 : no output).
         """
-        self.freq = freq
+        self.frequency = frequency
 
     def __call__(self, val):
         if isinstance(val, Iterable):
-            return tuple(v * self.freq for v in val)
+            return tuple(v * self.frequency for v in val)
 
         if isinstance(val, (int, float)):
-            return val * self.freq
+            return val * self.frequency
         raise TypeError("Input value must be an int, float, or Iterable.")
 
 
@@ -254,8 +255,8 @@ class ModulatedFrequency(Frequency):
         return self
 
     def __next__(self):
-        self.freq = next(self.modulator)
-        return self.freq
+        self.frequency = next(self.modulator)
+        return self.frequency
 
     def trigger_release(self):
         if hasattr(self.modulator, "trigger_release"):

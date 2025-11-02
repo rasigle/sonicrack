@@ -17,15 +17,15 @@ Functions:
 
 Example:
     >>> # Create and use an oscillator
-    >>> osc = SineOscillator(freq=440, amp=1.0, phase=0.0)
+    >>> osc = SineOscillator(frequency=440, amplitude=1.0, phase=0.0)
     >>> samples = osc.get_samples_vectorized(1000)  # Fast vectorized generation
     >>>
     >>> # Change parameters at runtime
-    >>> osc.freq = 880
+    >>> osc.frequency = 880
     >>> more_samples = osc.get_samples(500)
     >>>
     >>> # Use convenience function
-    >>> wave = synth(freq=440, dur=1.0, stype="sine")
+    >>> wave = synth(frequency=440, dur=1.0, stype="sine")
 
 Performance:
     - Iterator mode: Flexible but slower, suitable for small buffers
@@ -52,8 +52,8 @@ class Oscillator(ABC):
     modify the running parameters without reconstructing the instance.
 
     Args:
-        freq: Initial frequency in Hz.
-        amp: Initial amplitude. Defaults to 1.
+        frequency: Initial frequency in Hz.
+        amplitude: Initial amplitude. Defaults to 1.
         phase: Initial phase in degrees. Defaults to 0.0.
         sample_rate: Samples per second. Defaults to `DEFAULT_SAMPLE_RATE`.
         wave_range: Tuple specifying value range (min, max) of raw waveform before
@@ -67,16 +67,16 @@ class Oscillator(ABC):
 
     def __init__(
         self,
-        freq: float = 440,
-        amp: float = 1,
+        frequency: float = 440,
+        amplitude: float = 1,
         phase: float = 0.0,
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
     ):
         self.sample_rate = sample_rate  # Samples per second
 
-        self._freq = freq
-        self._amp = amp
+        self._freq = frequency
+        self._amp = amplitude
         self._phase = phase
         self._sample_rate = sample_rate
         self._wave_range = wave_range
@@ -85,8 +85,8 @@ class Oscillator(ABC):
         self._step = 0
 
         # Properties that can be changed
-        self._f = freq
-        self._a = amp
+        self._f = frequency
+        self._a = amplitude
         self._p = self._phase
 
         iter(self)
@@ -107,7 +107,7 @@ class Oscillator(ABC):
         return self._phase
 
     @property
-    def freq(self):
+    def frequency(self):
         """float: Current oscillator frequency in Hz.
 
         Setting this property updates implementation-specific internal state
@@ -115,13 +115,13 @@ class Oscillator(ABC):
         """
         return self._f
 
-    @freq.setter
-    def freq(self, value):
+    @frequency.setter
+    def frequency(self, value):
         self._f = value
         self._post_freq_set()
 
     @property
-    def amp(self):
+    def amplitude(self):
         """float: Current amplitude.
 
         Setting this property updates implementation-specific internal state
@@ -129,8 +129,8 @@ class Oscillator(ABC):
         """
         return self._a
 
-    @amp.setter
-    def amp(self, value):
+    @amplitude.setter
+    def amplitude(self, value):
         self._a = value
         self._post_amp_set()
 
@@ -210,9 +210,9 @@ class Oscillator(ABC):
         Returns:
             Oscillator: self, ready for iteration.
         """
-        self.freq = self._freq
+        self.frequency = self._freq
         self.phase = self._phase
-        self.amp = self._amp
+        self.amplitude = self._amp
         self._initialize_osc()
         return self
 
@@ -488,8 +488,8 @@ class SquareOscillator(SineOscillator):
 
     def __init__(
         self,
-        freq=440,
-        amp=1,
+        frequency=440,
+        amplitude=1,
         phase=0,
         sample_rate=DEFAULT_SAMPLE_RATE,
         wave_range=(-1, 1),
@@ -498,14 +498,14 @@ class SquareOscillator(SineOscillator):
         """Construct a square oscillator.
 
         Args:
-            freq: Frequency in Hz.
-            amp: Amplitude multiplier.
+            frequency: Frequency in Hz.
+            amplitude: Amplitude multiplier.
             phase: Phase in degrees.
             sample_rate: Sample rate in samples/sec.
             wave_range: Output raw range before amplitude scaling.
             threshold: Threshold used on sine reference to decide polarity.
         """
-        super().__init__(freq, amp, phase, sample_rate, wave_range)
+        super().__init__(frequency, amplitude, phase, sample_rate, wave_range)
         self.threshold = threshold
 
     def __next__(self):
@@ -547,9 +547,9 @@ class SquareOscillator(SineOscillator):
 
 
 def synth(
-    freq: float = 440,
+    frequency: float = 440,
     dur: float = 1.0,
-    amp: float = 1.0,
+    amplitude: float = 1.0,
     sr: float | int = DEFAULT_SAMPLE_RATE,
     stype: str = "sine",
     mode: str = "auto",
@@ -557,9 +557,9 @@ def synth(
     """Synthesizes a waveform of given type.
 
     Args:
-        freq (float): Frequency of the waveform in Hz.
+        frequency (float): Frequency of the waveform in Hz.
         dur (float): Duration of the waveform in seconds.
-        amp (float): Amplitude of the waveform.
+        amplitude (float): Amplitude of the waveform.
         sr (float): Sample rate in samples per second.
         stype (str): Type of waveform ('sine', 'square', 'sawtooth', 'triangle').
         mode (str): Generation mode ('auto', 'iterator', or 'vectorized'). Defaults to 'auto'.
@@ -585,7 +585,7 @@ def synth(
         "tri": TriangleOscillator,
     }
     try:
-        osc = synth_map[stype](freq=freq, amp=amp, sample_rate=sr)
+        osc = synth_map[stype](frequency=frequency, amplitude=amplitude, sample_rate=sr)
     except KeyError:
         raise ValueError(f"Unsupported waveform type: {stype}")
 

@@ -222,7 +222,7 @@ class ADSRDialog(QtWidgets.QDialog):
         # LFO
         amp_mod = np.ones_like(t)
         if self.lfo_enable.isChecked():
-            lfo_osc = SineOscillator(freq=self.lfo_freq_knob.value())
+            lfo_osc = SineOscillator(frequency=self.lfo_freq_knob.value())
             lfo = np.asarray(lfo_osc.get_samples(int(self.fs * self.duration)))
             if self.lfo_target_box.currentText() == "Amplitude":
                 amp_mod = 1 + lfo * self.lfo_depth_knob.value()

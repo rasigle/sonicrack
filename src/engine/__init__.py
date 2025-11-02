@@ -20,14 +20,14 @@ Performance:
 
 Example - Basic Synthesis:
     >>> from src.engine import SineOscillator
-    >>> osc = SineOscillator(freq=440, amp=0.8)
+    >>> osc = SineOscillator(frequency=440, amplitude=0.8)
     >>> samples = osc.get_samples_vectorized(44100)  # 1 second at 44.1kHz
 
 Example - Modulated Synthesis:
     >>> from src.engine import SineOscillator, ADSREnvelope, ModulatedOscillator
     >>>
     >>> # Create oscillator and envelope
-    >>> osc = SineOscillator(freq=440, amp=1.0)
+    >>> osc = SineOscillator(frequency=440, amplitude=1.0)
     >>> env = ADSREnvelope(
     ...     attack_duration=0.1,
     ...     decay_duration=0.2,

@@ -12,7 +12,7 @@ Example:
     >>> from engine import SineOscillator, ADSREnvelope
     >>>
     >>> # Create oscillator and envelope
-    >>> osc = SineOscillator(freq=440, amp=1.0)
+    >>> osc = SineOscillator(frequency=440, amplitude=1.0)
     >>> env = ADSREnvelope(
     ...     attack_duration=0.1,
     ...     decay_duration=0.2,
@@ -115,12 +115,12 @@ class ModulatedOscillator:
     def _modulate(self, mod_vals):
         if self.amp_mod is not None:
             new_amp = self.amp_mod(self.oscillator.init_amp, mod_vals[0])
-            self.oscillator.amp = new_amp
+            self.oscillator.amplitude = new_amp
 
         if self.freq_mod is not None:
             mod_val = mod_vals[1 if self._modulators_count == 2 else 0]
             new_freq = self.freq_mod(self.oscillator.init_freq, mod_val)
-            self.oscillator.freq = new_freq
+            self.oscillator.frequency = new_freq
 
         if self.phase_mod is not None:
             mod_val = mod_vals[2 if self._modulators_count == 3 else -1]

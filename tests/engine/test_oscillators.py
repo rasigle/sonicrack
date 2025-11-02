@@ -58,7 +58,7 @@ class TestSineOscillator(TestOscillatorBase):
 
     def setUp(self) -> None:
         """Create a sine oscillator for each test."""
-        self.osc = SineOscillator(freq=440, amp=1.0, sample_rate=44100)
+        self.osc = SineOscillator(frequency=440, amplitude=1.0, sample_rate=44100)
 
     def test_initialization(self) -> None:
         """Test oscillator initializes with correct parameters."""
@@ -77,7 +77,7 @@ class TestSineOscillator(TestOscillatorBase):
         sample_rate = 44100
         duration = 1.0  # 1 second
 
-        osc = SineOscillator(freq=freq, sample_rate=sample_rate)
+        osc = SineOscillator(frequency=freq, sample_rate=sample_rate)
         samples = osc.get_samples_vectorized(int(duration * sample_rate))
 
         # Use FFT to find dominant frequency
@@ -131,7 +131,7 @@ class TestSineOscillator(TestOscillatorBase):
 
     def test_amplitude_scaling(self) -> None:
         """Test amplitude parameter scales output correctly."""
-        osc = SineOscillator(freq=440, amp=0.5)
+        osc = SineOscillator(frequency=440, amplitude=0.5)
         samples = osc.get_samples_vectorized(1000)
 
         # Max amplitude should be around 0.5
@@ -174,7 +174,7 @@ class TestSquareOscillator(TestOscillatorBase):
 
     def setUp(self) -> None:
         """Create a square oscillator for each test."""
-        self.osc = SquareOscillator(freq=440, amp=1.0)
+        self.osc = SquareOscillator(frequency=440, amplitude=1.0)
 
     def test_binary_output(self) -> None:
         """Test square wave outputs only two values."""
@@ -201,7 +201,7 @@ class TestSawtoothOscillator(TestOscillatorBase):
 
     def setUp(self) -> None:
         """Create a sawtooth oscillator for each test."""
-        self.osc = SawtoothOscillator(freq=440, amp=1.0)
+        self.osc = SawtoothOscillator(frequency=440, amplitude=1.0)
 
     def test_range(self) -> None:
         """Test sawtooth wave covers full range."""
@@ -213,7 +213,7 @@ class TestSawtoothOscillator(TestOscillatorBase):
 
     def test_linear_ramp(self) -> None:
         """Test sawtooth produces linear ramp within each period."""
-        osc = SawtoothOscillator(freq=100, sample_rate=44100)
+        osc = SawtoothOscillator(frequency=100, sample_rate=44100)
         samples = osc.get_samples_vectorized(441)  # ~10 periods
 
         # Check that we have both increasing and decreasing values (resets)
@@ -227,7 +227,7 @@ class TestTriangleOscillator(TestOscillatorBase):
 
     def setUp(self) -> None:
         """Create a triangle oscillator for each test."""
-        self.osc = TriangleOscillator(freq=440, amp=1.0)
+        self.osc = TriangleOscillator(frequency=440, amplitude=1.0)
 
     def test_range(self) -> None:
         """Test triangle wave covers full range."""
@@ -254,7 +254,7 @@ class TestSynthFunction(unittest.TestCase):
 
         for waveform in waveforms:
             with self.subTest(waveform=waveform):
-                wave = synth(freq=440, dur=0.1, stype=waveform)
+                wave = synth(frequency=440, dur=0.1, stype=waveform)
 
                 self.assertIsInstance(wave, np.ndarray)
                 self.assertGreater(len(wave), 0)
@@ -264,20 +264,20 @@ class TestSynthFunction(unittest.TestCase):
         sample_rate = 44100
         duration = 0.5  # seconds
 
-        wave = synth(freq=440, dur=duration, sr=sample_rate)
+        wave = synth(frequency=440, dur=duration, sr=sample_rate)
 
         expected_samples = int(duration * sample_rate)
         self.assertEqual(len(wave), expected_samples)
 
     def test_mode_parameter(self) -> None:
         """Test synth respects mode parameter."""
-        wave = synth(freq=440, dur=0.1, mode="vectorized")
+        wave = synth(frequency=440, dur=0.1, mode="vectorized")
         self.assertIsInstance(wave, np.ndarray)
 
     def test_invalid_waveform(self) -> None:
         """Test synth raises error for invalid waveform type."""
         with self.assertRaises(ValueError):
-            synth(freq=440, dur=0.1, stype="invalid")
+            synth(frequency=440, dur=0.1, stype="invalid")
 
 
 class TestEdgeCases(unittest.TestCase):
@@ -285,7 +285,7 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_zero_frequency(self) -> None:
         """Test oscillator with zero frequency."""
-        osc = SineOscillator(freq=0)
+        osc = SineOscillator(frequency=0)
         samples = osc.get_samples_vectorized(100)
 
         # Should produce constant value (no oscillation)
@@ -293,7 +293,7 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_very_high_frequency(self) -> None:
         """Test oscillator with very high frequency."""
-        osc = SineOscillator(freq=20000, sample_rate=44100)
+        osc = SineOscillator(frequency=20000, sample_rate=44100)
         samples = osc.get_samples_vectorized(100)
 
         # Should still produce valid samples
@@ -301,7 +301,7 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_negative_amplitude(self) -> None:
         """Test oscillator with negative amplitude."""
-        osc = SineOscillator(freq=440, amp=-1.0)
+        osc = SineOscillator(frequency=440, amplitude=-1.0)
         samples = osc.get_samples_vectorized(100)
 
         # Should produce inverted waveform

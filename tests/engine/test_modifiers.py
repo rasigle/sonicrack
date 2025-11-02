@@ -28,7 +28,7 @@ class TestPanner(unittest.TestCase):
     def test_initialization(self) -> None:
         """Test panner initializes with correct pan position."""
         panner = Panner(0.5)
-        self.assertEqual(panner.right, 0.5)
+        self.assertEqual(panner.position, 0.5)
 
     def test_center_pan(self) -> None:
         """Test center panning produces equal left/right."""
@@ -80,8 +80,6 @@ class TestModulatedPanner(unittest.TestCase):
         env = ADSREnvelope(0.1, 0.1, 0.5, 0.1, sample_rate=100)
         panner = ModulatedPanner(env)
 
-        # No need to call iter() - auto-initialized!
-
         # Get several values
         results = []
         for _ in range(10):
@@ -100,7 +98,7 @@ class TestVolume(unittest.TestCase):
     def test_initialization(self) -> None:
         """Test volume initializes with correct amplitude."""
         volume = Volume(0.5)
-        self.assertEqual(volume.amp, 0.5)
+        self.assertEqual(volume.amplitude, 0.5)
 
     def test_volume_scaling(self) -> None:
         """Test volume correctly scales input."""
@@ -163,7 +161,7 @@ class TestFrequency(unittest.TestCase):
     def test_initialization(self) -> None:
         """Test frequency modifier initializes correctly."""
         freq_mod = Frequency(2.0)
-        self.assertEqual(freq_mod.freq, 2.0)
+        self.assertEqual(freq_mod.frequency, 2.0)
 
     def test_frequency_scaling(self) -> None:
         """Test frequency modifier scales value."""

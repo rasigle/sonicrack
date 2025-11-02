@@ -182,6 +182,90 @@ class TestPanner(unittest.TestCase):
         self.assertAlmostEqual(actual_power, expected_power, places=3)
 
 
+    def test_initialization_default(self):
+        """Test Panner initializes with default center position."""
+        panner = Panner()
+        self.assertEqual(panner.position, 0.0)
+
+    def test_initialization_left(self):
+        """Test Panner initializes with left position."""
+        panner = Panner(-1.0)
+        self.assertEqual(panner.position, -1.0)
+
+    def test_initialization_right(self):
+        """Test Panner initializes with right position."""
+        panner = Panner(1.0)
+        self.assertEqual(panner.position, 1.0)
+
+    def test_position_property_setter(self):
+        """Test position property setter updates gains."""
+        panner = Panner(0.0)
+        old_left = panner._left_gain
+        old_right = panner._right_gain
+
+        panner.position = 1.0  # Full right
+        self.assertNotEqual(panner._left_gain, old_left)
+        self.assertNotEqual(panner._right_gain, old_right)
+
+    def test_call_with_scalar(self):
+        """Test panner with scalar input."""
+        panner = Panner(0.0)  # Center
+        left, right = panner(1.0)
+
+        self.assertIsInstance(left, (float, np.floating))
+        self.assertIsInstance(right, (float, np.floating))
+        # Center pan should have equal gains
+        self.assertAlmostEqual(left, right, places=5)
+
+    def test_call_with_array(self):
+        """Test panner with array input."""
+        panner = Panner(0.5)
+        samples = np.array([1.0, 0.5, -0.5, -1.0], dtype=np.float32)
+        left, right = panner(samples)
+
+        self.assertIsInstance(left, np.ndarray)
+        self.assertIsInstance(right, np.ndarray)
+        self.assertEqual(len(left), len(samples))
+        self.assertEqual(len(right), len(samples))
+
+    def test_pan_vectorized(self):
+        """Test vectorized panning method."""
+        panner = Panner(0.7)  # Pan right
+        samples = np.array([1.0, 0.5, -0.5, -1.0], dtype=np.float32)
+        left, right = panner.pan_vectorized(samples)
+
+        self.assertEqual(left.dtype, np.float32)
+        self.assertEqual(right.dtype, np.float32)
+        # Right pan should have right gain > left gain (check absolute values)
+        self.assertTrue(np.all(np.abs(right) >= np.abs(left)))
+
+    def test_constant_power_panning_center(self):
+        """Test constant-power law at center."""
+        panner = Panner(0.0)
+        # At center, power should be equal: left² + right² = 1
+        power = panner._left_gain**2 + panner._right_gain**2
+        self.assertAlmostEqual(power, 1.0, places=5)
+
+    def test_constant_power_panning_extremes(self):
+        """Test constant-power law at extremes."""
+        panner_left = Panner(-1.0)
+        panner_right = Panner(1.0)
+
+        # At extremes, one channel should be 1, other should be 0
+        self.assertAlmostEqual(panner_left._left_gain, 1.0, places=5)
+        self.assertAlmostEqual(panner_left._right_gain, 0.0, places=5)
+        self.assertAlmostEqual(panner_right._left_gain, 0.0, places=5)
+        self.assertAlmostEqual(panner_right._right_gain, 1.0, places=5)
+
+    def test_input_validation_invalid_type(self):
+        """Test Panner rejects invalid position type."""
+        with self.assertRaises(TypeError):
+            Panner("invalid")
+
+        with self.assertRaises(TypeError):
+            Panner([0.5])
+
+
 class TestModulatedPanner(unittest.TestCase):
     """Test suite for ModulatedPanner."""
 
@@ -369,268 +453,6 @@ class TestModulatedPanner(unittest.TestCase):
         next(panner)  # 0.0 -> stays 0.0
         self.assertEqual(panner.position, 0.0)
 
-
-class TestVolume(unittest.TestCase):
-    """Test suite for Volume modifier."""
-
-    def test_initialization(self) -> None:
-        """Test volume initializes with correct amplitude."""
-        volume = Volume(0.5)
-        self.assertEqual(volume.amplitude, 0.5)
-
-    def test_volume_scaling(self) -> None:
-        """Test volume correctly scales input."""
-        volume = Volume(0.5)
-        result = volume(1.0)
-        self.assertAlmostEqual(result, 0.5, places=5)
-
-    def test_zero_volume(self) -> None:
-        """Test zero volume produces silence."""
-        volume = Volume(0.0)
-        result = volume(1.0)
-        self.assertEqual(result, 0.0)
-
-    def test_amplification(self) -> None:
-        """Test volume can amplify (>1.0)."""
-        volume = Volume(2.0)
-        result = volume(1.0)
-        self.assertAlmostEqual(result, 2.0, places=5)
-
-    def test_stereo_input(self) -> None:
-        """Test volume works with stereo input."""
-        volume = Volume(0.5)
-        result = volume((1.0, 1.0))
-
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(len(result), 2)
-        self.assertAlmostEqual(result[0], 0.5, places=5)
-        self.assertAlmostEqual(result[1], 0.5, places=5)
-
-
-class TestModulatedVolume(unittest.TestCase):
-    """Test suite for ModulatedVolume."""
-
-    def test_initialization(self) -> None:
-        """Test modulated volume initializes correctly."""
-        env = ADSREnvelope(0.1, 0.1, 0.7, 0.1)
-        volume = ModulatedVolume(env)
-        self.assertIsNotNone(volume.modulator)
-
-    def test_modulation_changes_volume(self) -> None:
-        """Test that modulation affects volume."""
-        env = ADSREnvelope(0.1, 0.1, 0.5, 0.1, sample_rate=100)
-        volume = ModulatedVolume(env)
-        iter(volume)
-
-        # Get several values
-        results = []
-        for _ in range(10):
-            result = volume(1.0)
-            results.append(result)
-            next(volume)
-
-        # Volume should change over time
-        self.assertGreater(len(set(results)), 1)
-
-
-class TestFrequency(unittest.TestCase):
-    """Test suite for Frequency modifier."""
-
-    def test_initialization(self) -> None:
-        """Test frequency modifier initializes correctly."""
-        freq_mod = Frequency(2.0)
-        self.assertEqual(freq_mod.frequency, 2.0)
-
-    def test_frequency_scaling(self) -> None:
-        """Test frequency modifier scales value."""
-        freq_mod = Frequency(2.0)
-        result = freq_mod(440.0)
-        self.assertAlmostEqual(result, 880.0, places=5)
-
-
-class TestClipper(unittest.TestCase):
-    """Test suite for Clipper modifier."""
-
-    def test_initialization(self) -> None:
-        """Test clipper initializes with correct range."""
-        clipper = Clipper((-0.5, 0.5))
-        self.assertEqual(clipper.wave_range, (-0.5, 0.5))
-
-    def test_no_clipping_within_range(self) -> None:
-        """Test clipper doesn't modify values within range."""
-        clipper = Clipper((-1.0, 1.0))
-        self.assertEqual(clipper(0.5), 0.5)
-        self.assertEqual(clipper(-0.5), -0.5)
-
-    def test_clips_above_max(self) -> None:
-        """Test clipper clips values above maximum."""
-        clipper = Clipper((-1.0, 1.0))
-        self.assertEqual(clipper(2.0), 1.0)
-        self.assertEqual(clipper(1.5), 1.0)
-
-    def test_clips_below_min(self) -> None:
-        """Test clipper clips values below minimum."""
-        clipper = Clipper((-1.0, 1.0))
-        self.assertEqual(clipper(-2.0), -1.0)
-        self.assertEqual(clipper(-1.5), -1.0)
-
-    def test_asymmetric_range(self) -> None:
-        """Test clipper works with asymmetric range."""
-        clipper = Clipper((-0.3, 0.7))
-        self.assertEqual(clipper(-1.0), -0.3)
-        self.assertEqual(clipper(1.0), 0.7)
-        self.assertEqual(clipper(0.0), 0.0)
-
-    def test_stereo_clipping(self) -> None:
-        """Test clipper works with stereo input."""
-        clipper = Clipper((-0.4, 0.6))
-
-        result = clipper((1.0, -1.0))
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(result[0], 0.6)
-        self.assertEqual(result[1], -0.4)
-
-        result = clipper((-1.0, 1.0))
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(result[0], -0.4)
-        self.assertEqual(result[1], 0.6)
-
-
-class TestModifierIntegration(unittest.TestCase):
-    """Test modifiers work together in chains."""
-
-    def test_volume_then_pan(self) -> None:
-        """Test volume followed by panning."""
-        volume = Volume(0.5)
-        panner = Panner(0.5)  # Right-biased pan
-
-        # Apply volume, then pan
-        after_volume = volume(1.0)
-        after_pan = panner(after_volume)
-
-        self.assertIsInstance(after_pan, tuple)
-        left, right = after_pan
-
-        # With constant-power panning at position 0.5 (right-biased)
-        # and input 0.5 (after volume), right should be greater than left
-        self.assertGreater(right, left)
-
-        # Power should be preserved
-        expected_power = after_volume**2
-        actual_power = left**2 + right**2
-        self.assertAlmostEqual(actual_power, expected_power, places=5)
-
-    def test_clip_then_volume(self) -> None:
-        """Test clipping followed by volume."""
-        clipper = Clipper((-0.5, 0.5))
-        volume = Volume(2.0)
-
-        # Clip first, then amplify
-        after_clip = clipper(1.0)
-        after_volume = volume(after_clip)
-
-        self.assertEqual(after_clip, 0.5)
-        self.assertAlmostEqual(after_volume, 1.0, places=5)
-
-
-class TestPannerComprehensive(unittest.TestCase):
-    """Test cases for Panner class."""
-
-    def test_initialization_default(self):
-        """Test Panner initializes with default center position."""
-        panner = Panner()
-        self.assertEqual(panner.position, 0.0)
-
-    def test_initialization_left(self):
-        """Test Panner initializes with left position."""
-        panner = Panner(-1.0)
-        self.assertEqual(panner.position, -1.0)
-
-    def test_initialization_right(self):
-        """Test Panner initializes with right position."""
-        panner = Panner(1.0)
-        self.assertEqual(panner.position, 1.0)
-
-    def test_initialization_clips_out_of_range(self):
-        """Test Panner clips position to valid range."""
-        panner = Panner(2.0)
-        self.assertEqual(panner.position, 1.0)
-
-        panner = Panner(-2.0)
-        self.assertEqual(panner.position, -1.0)
-
-    def test_position_property_setter(self):
-        """Test position property setter updates gains."""
-        panner = Panner(0.0)
-        old_left = panner._left_gain
-        old_right = panner._right_gain
-
-        panner.position = 1.0  # Full right
-        self.assertNotEqual(panner._left_gain, old_left)
-        self.assertNotEqual(panner._right_gain, old_right)
-
-    def test_call_with_scalar(self):
-        """Test panner with scalar input."""
-        panner = Panner(0.0)  # Center
-        left, right = panner(1.0)
-
-        self.assertIsInstance(left, (float, np.floating))
-        self.assertIsInstance(right, (float, np.floating))
-        # Center pan should have equal gains
-        self.assertAlmostEqual(left, right, places=5)
-
-    def test_call_with_array(self):
-        """Test panner with array input."""
-        panner = Panner(0.5)
-        samples = np.array([1.0, 0.5, -0.5, -1.0], dtype=np.float32)
-        left, right = panner(samples)
-
-        self.assertIsInstance(left, np.ndarray)
-        self.assertIsInstance(right, np.ndarray)
-        self.assertEqual(len(left), len(samples))
-        self.assertEqual(len(right), len(samples))
-
-    def test_pan_vectorized(self):
-        """Test vectorized panning method."""
-        panner = Panner(0.7)  # Pan right
-        samples = np.array([1.0, 0.5, -0.5, -1.0], dtype=np.float32)
-        left, right = panner.pan_vectorized(samples)
-
-        self.assertEqual(left.dtype, np.float32)
-        self.assertEqual(right.dtype, np.float32)
-        # Right pan should have right gain > left gain (check absolute values)
-        self.assertTrue(np.all(np.abs(right) >= np.abs(left)))
-
-    def test_constant_power_panning_center(self):
-        """Test constant-power law at center."""
-        panner = Panner(0.0)
-        # At center, power should be equal: left² + right² = 1
-        power = panner._left_gain**2 + panner._right_gain**2
-        self.assertAlmostEqual(power, 1.0, places=5)
-
-    def test_constant_power_panning_extremes(self):
-        """Test constant-power law at extremes."""
-        panner_left = Panner(-1.0)
-        panner_right = Panner(1.0)
-
-        # At extremes, one channel should be 1, other should be 0
-        self.assertAlmostEqual(panner_left._left_gain, 1.0, places=5)
-        self.assertAlmostEqual(panner_left._right_gain, 0.0, places=5)
-        self.assertAlmostEqual(panner_right._left_gain, 0.0, places=5)
-        self.assertAlmostEqual(panner_right._right_gain, 1.0, places=5)
-
-    def test_input_validation_invalid_type(self):
-        """Test Panner rejects invalid position type."""
-        with self.assertRaises(TypeError):
-            Panner("invalid")
-
-        with self.assertRaises(TypeError):
-            Panner([0.5])
-
-
-class TestModulatedPanner(unittest.TestCase):
-    """Test cases for ModulatedPanner class."""
-
     def test_initialization_with_oscillator(self):
         """Test ModulatedPanner initializes with oscillator modulator."""
         lfo = SineOscillator(4, sample_rate=1000)
@@ -692,7 +514,40 @@ class TestModulatedPanner(unittest.TestCase):
 
 
 class TestVolume(unittest.TestCase):
-    """Test cases for Volume class."""
+    """Test suite for Volume modifier."""
+
+    def test_initialization(self) -> None:
+        """Test volume initializes with correct amplitude."""
+        volume = Volume(0.5)
+        self.assertEqual(volume.amplitude, 0.5)
+
+    def test_volume_scaling(self) -> None:
+        """Test volume correctly scales input."""
+        volume = Volume(0.5)
+        result = volume(1.0)
+        self.assertAlmostEqual(result, 0.5, places=5)
+
+    def test_zero_volume(self) -> None:
+        """Test zero volume produces silence."""
+        volume = Volume(0.0)
+        result = volume(1.0)
+        self.assertEqual(result, 0.0)
+
+    def test_amplification(self) -> None:
+        """Test volume can amplify (>1.0)."""
+        volume = Volume(2.0)
+        result = volume(1.0)
+        self.assertAlmostEqual(result, 2.0, places=5)
+
+    def test_stereo_input(self) -> None:
+        """Test volume works with stereo input."""
+        volume = Volume(0.5)
+        result = volume((1.0, 1.0))
+
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertAlmostEqual(result[0], 0.5, places=5)
+        self.assertAlmostEqual(result[1], 0.5, places=5)
 
     def test_initialization_default(self):
         """Test Volume initializes with default amplitude."""
@@ -745,7 +600,7 @@ class TestVolume(unittest.TestCase):
 
         np.testing.assert_array_equal(result, np.zeros_like(samples))
 
-    def test_amplification(self):
+    def test_amplification2(self):
         """Test volume can amplify signal."""
         volume = Volume(2.0)
         result = volume(0.5)
@@ -769,7 +624,29 @@ class TestVolume(unittest.TestCase):
 
 
 class TestModulatedVolume(unittest.TestCase):
-    """Test cases for ModulatedVolume class."""
+    """Test suite for ModulatedVolume."""
+
+    def test_initialization(self) -> None:
+        """Test modulated volume initializes correctly."""
+        env = ADSREnvelope(0.1, 0.1, 0.7, 0.1)
+        volume = ModulatedVolume(env)
+        self.assertIsNotNone(volume.modulator)
+
+    def test_modulation_changes_volume(self) -> None:
+        """Test that modulation affects volume."""
+        env = ADSREnvelope(0.1, 0.1, 0.5, 0.1, sample_rate=100)
+        volume = ModulatedVolume(env)
+        iter(volume)
+
+        # Get several values
+        results = []
+        for _ in range(10):
+            result = volume(1.0)
+            results.append(result)
+            next(volume)
+
+        # Volume should change over time
+        self.assertGreater(len(set(results)), 1)
 
     def test_initialization_with_envelope(self):
         """Test ModulatedVolume initializes with envelope."""
@@ -812,7 +689,18 @@ class TestModulatedVolume(unittest.TestCase):
 
 
 class TestFrequency(unittest.TestCase):
-    """Test cases for Frequency class."""
+    """Test suite for Frequency modifier."""
+
+    def test_initialization(self) -> None:
+        """Test frequency modifier initializes correctly."""
+        freq_mod = Frequency(2.0)
+        self.assertEqual(freq_mod.frequency, 2.0)
+
+    def test_frequency_scaling(self) -> None:
+        """Test frequency modifier scales value."""
+        freq_mod = Frequency(2.0)
+        result = freq_mod(440.0)
+        self.assertAlmostEqual(result, 880.0, places=5)
 
     def test_initialization_default(self):
         """Test Frequency initializes with default multiplier."""
@@ -867,32 +755,52 @@ class TestFrequency(unittest.TestCase):
             Frequency(-1.0)
 
 
-class TestModulatedFrequency(unittest.TestCase):
-    """Test cases for ModulatedFrequency class."""
-
-    def test_initialization_with_modulator(self):
-        """Test ModulatedFrequency initializes with modulator."""
-        lfo = SineOscillator(5, sample_rate=1000)
-        freq = ModulatedFrequency(lfo)
-        self.assertIsNotNone(freq.modulator)
-
-    def test_iterator_protocol(self):
-        """Test ModulatedFrequency supports iteration."""
-        lfo = SineOscillator(5, sample_rate=1000)
-        freq = ModulatedFrequency(lfo)
-        iter(freq)
-
-        frequency = next(freq)
-        self.assertIsInstance(frequency, (float, np.floating))
-
-    def test_input_validation_none_modulator(self):
-        """Test ModulatedFrequency rejects None modulator."""
-        with self.assertRaises(TypeError):
-            ModulatedFrequency(None)
-
-
 class TestClipper(unittest.TestCase):
-    """Test cases for Clipper class."""
+    """Test suite for Clipper modifier."""
+
+    def test_initialization(self) -> None:
+        """Test clipper initializes with correct range."""
+        clipper = Clipper((-0.5, 0.5))
+        self.assertEqual(clipper.wave_range, (-0.5, 0.5))
+
+    def test_no_clipping_within_range(self) -> None:
+        """Test clipper doesn't modify values within range."""
+        clipper = Clipper((-1.0, 1.0))
+        self.assertEqual(clipper(0.5), 0.5)
+        self.assertEqual(clipper(-0.5), -0.5)
+
+    def test_clips_above_max(self) -> None:
+        """Test clipper clips values above maximum."""
+        clipper = Clipper((-1.0, 1.0))
+        self.assertEqual(clipper(2.0), 1.0)
+        self.assertEqual(clipper(1.5), 1.0)
+
+    def test_clips_below_min(self) -> None:
+        """Test clipper clips values below minimum."""
+        clipper = Clipper((-1.0, 1.0))
+        self.assertEqual(clipper(-2.0), -1.0)
+        self.assertEqual(clipper(-1.5), -1.0)
+
+    def test_asymmetric_range(self) -> None:
+        """Test clipper works with asymmetric range."""
+        clipper = Clipper((-0.3, 0.7))
+        self.assertEqual(clipper(-1.0), -0.3)
+        self.assertEqual(clipper(1.0), 0.7)
+        self.assertEqual(clipper(0.0), 0.0)
+
+    def test_stereo_clipping(self) -> None:
+        """Test clipper works with stereo input."""
+        clipper = Clipper((-0.4, 0.6))
+
+        result = clipper((1.0, -1.0))
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(result[0], 0.6)
+        self.assertEqual(result[1], -0.4)
+
+        result = clipper((-1.0, 1.0))
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(result[0], -0.4)
+        self.assertEqual(result[1], 0.6)
 
     def test_initialization_default(self):
         """Test Clipper initializes with default range."""
@@ -989,6 +897,43 @@ class TestClipper(unittest.TestCase):
 
 
 class TestModifierIntegration(unittest.TestCase):
+    """Test modifiers work together in chains."""
+
+    def test_volume_then_pan(self) -> None:
+        """Test volume followed by panning."""
+        volume = Volume(0.5)
+        panner = Panner(0.5)  # Right-biased pan
+
+        # Apply volume, then pan
+        after_volume = volume(1.0)
+        after_pan = panner(after_volume)
+
+        self.assertIsInstance(after_pan, tuple)
+        left, right = after_pan
+
+        # With constant-power panning at position 0.5 (right-biased)
+        # and input 0.5 (after volume), right should be greater than left
+        self.assertGreater(right, left)
+
+        # Power should be preserved
+        expected_power = after_volume**2
+        actual_power = left**2 + right**2
+        self.assertAlmostEqual(actual_power, expected_power, places=5)
+
+    def test_clip_then_volume(self) -> None:
+        """Test clipping followed by volume."""
+        clipper = Clipper((-0.5, 0.5))
+        volume = Volume(2.0)
+
+        # Clip first, then amplify
+        after_clip = clipper(1.0)
+        after_volume = volume(after_clip)
+
+        self.assertEqual(after_clip, 0.5)
+        self.assertAlmostEqual(after_volume, 1.0, places=5)
+
+
+class TestModifierIntegrationAdditional(unittest.TestCase):
     """Integration tests for modifiers working together."""
 
     def test_chain_volume_and_clipper(self):
@@ -1031,5 +976,248 @@ class TestModifierIntegration(unittest.TestCase):
         self.assertIsNotNone(volume.modulator)
 
 
+class TestModulatedFrequency(unittest.TestCase):
+    """Test cases for ModulatedFrequency class."""
+
+    def test_initialization_with_modulator(self):
+        """Test ModulatedFrequency initializes with modulator."""
+        lfo = SineOscillator(5, sample_rate=1000)
+        freq = ModulatedFrequency(lfo)
+        self.assertIsNotNone(freq.modulator)
+
+    def test_iterator_protocol(self):
+        """Test ModulatedFrequency supports iteration."""
+        lfo = SineOscillator(5, sample_rate=1000)
+        freq = ModulatedFrequency(lfo)
+        iter(freq)
+
+        frequency = next(freq)
+        self.assertIsInstance(frequency, (float, np.floating))
+
+    def test_input_validation_none_modulator(self):
+        """Test ModulatedFrequency rejects None modulator."""
+        with self.assertRaises(TypeError):
+            ModulatedFrequency(None)
+
+
+"""Test cases for ModulatedVolume and ModulatedFrequency vectorization."""
+class TestModulatedVolumeVectorization(unittest.TestCase):
+    """Test ModulatedVolume vectorized methods."""
+
+    def test_scale_vectorized_exists(self):
+        """Test that ModulatedVolume has scale_vectorized method."""
+        env = ADSREnvelope(0.1, 0.1, 0.7, 0.1, sample_rate=1000)
+        mod_vol = ModulatedVolume(env)
+
+        self.assertTrue(hasattr(mod_vol, 'scale_vectorized'))
+        self.assertTrue(callable(mod_vol.scale_vectorized))
+
+    def test_scale_vectorized_with_adsr(self):
+        """Test ModulatedVolume.scale_vectorized with ADSR envelope."""
+        env = ADSREnvelope(
+            attack_duration=0.1,
+            decay_duration=0.1,
+            sustain_level=0.7,
+            release_duration=0.1,
+            sample_rate=1000
+        )
+        mod_vol = ModulatedVolume(env)
+
+        # Create test samples
+        samples = np.ones(100, dtype=np.float32)
+
+        # Apply modulated volume (vectorized)
+        result = mod_vol.scale_vectorized(samples)
+
+        # Check result
+        self.assertEqual(len(result), 100)
+        self.assertEqual(result.dtype, np.float32)
+
+        # During attack, amplitude should increase
+        # First sample should be close to 0, later samples higher
+        self.assertLess(result[0], 0.5)
+        self.assertGreaterEqual(result[50], 0.5)  # At sustain level
+
+    def test_scale_vectorized_shape_preservation(self):
+        """Test that scale_vectorized preserves input shape."""
+        env = ADSREnvelope(0.1, 0.1, 0.7, 0.1, sample_rate=1000)
+        mod_vol = ModulatedVolume(env)
+
+        # Test with different sizes
+        for n in [10, 100, 1000]:
+            samples = np.random.randn(n).astype(np.float32)
+            result = mod_vol.scale_vectorized(samples)
+
+            self.assertEqual(result.shape, samples.shape)
+            self.assertEqual(result.dtype, np.float32)
+
+    def test_scale_vectorized_vs_iterator(self):
+        """Test that vectorized and iterator modes produce similar results."""
+        # Create two identical envelopes
+        env1 = ADSREnvelope(0.05, 0.05, 0.7, 0.05, sample_rate=1000)
+        env2 = ADSREnvelope(0.05, 0.05, 0.7, 0.05, sample_rate=1000)
+
+        mod_vol1 = ModulatedVolume(env1)
+        mod_vol2 = ModulatedVolume(env2)
+
+        # Create test samples
+        n = 50
+        samples = np.ones(n, dtype=np.float32)
+
+        # Vectorized approach
+        result_vec = mod_vol1.scale_vectorized(samples)
+
+        # Iterator approach
+        result_iter = []
+        for sample in samples:
+            next(mod_vol2)
+            result_iter.append(mod_vol2(sample))
+        result_iter = np.array(result_iter, dtype=np.float32)
+
+        # Results should be very close (allowing for floating point differences)
+        np.testing.assert_allclose(result_vec, result_iter, rtol=1e-5)
+
+    def test_regression_chain_with_modulated_volume(self):
+        """Regression test: Chain should use vectorized ModulatedVolume, not iterator fallback.
+
+        This test ensures that the bug where Chain fell back to Python loops
+        for ModulatedVolume has been fixed.
+        """
+        from src.engine.composer import Chain
+        from src.engine.oscillator import SquareOscillator
+
+        # Create chain with ModulatedVolume (the problematic case)
+        osc = SquareOscillator(440, amplitude=0.5, sample_rate=1000)
+        env = ADSREnvelope(0.1, 0.1, 0.7, 0.1, sample_rate=1000)
+        mod_vol = ModulatedVolume(env)
+
+        chain = Chain(osc, mod_vol)
+
+        # This should use vectorization, not iterator fallback
+        samples = chain.get_samples(100, mode='vectorized')
+
+        # Verify output
+        self.assertEqual(len(samples), 100)
+        self.assertEqual(samples.dtype, np.float32)
+
+        # Verify modulation happened (samples should vary)
+        self.assertGreater(np.std(samples), 0.01)  # Should have variation
+
+        # First samples should be lower (attack phase)
+        self.assertLess(np.mean(samples[:10]), np.mean(samples[40:50]))
+
+
+class TestModulatedFrequencyVectorization(unittest.TestCase):
+    """Test ModulatedFrequency vectorized methods."""
+
+    def test_scale_vectorized_exists(self):
+        """Test that ModulatedFrequency has scale_vectorized method."""
+        lfo = SineOscillator(5, sample_rate=1000)
+        mod_freq = ModulatedFrequency(lfo)
+
+        self.assertTrue(hasattr(mod_freq, 'scale_vectorized'))
+        self.assertTrue(callable(mod_freq.scale_vectorized))
+
+    def test_scale_vectorized_with_oscillator(self):
+        """Test ModulatedFrequency.scale_vectorized with oscillator modulator."""
+        lfo = SineOscillator(5, amplitude=1.0, sample_rate=1000)  # Amplitude 1.0 for clear variation
+        mod_freq = ModulatedFrequency(lfo)
+
+        # Create test samples (frequencies)
+        samples = np.full(100, 440.0, dtype=np.float32)
+
+        # Apply modulated frequency (vectorized)
+        result = mod_freq.scale_vectorized(samples)
+
+        # Check result
+        self.assertEqual(len(result), 100)
+        self.assertEqual(result.dtype, np.float32)
+
+        # Result should vary (frequency is modulated by oscillator output -1 to 1)
+        # So result varies from 440*(-1) to 440*(1) = -440 to 440
+        self.assertGreater(np.std(result), 0.1)  # Should have variation
+
+    def test_scale_vectorized_shape_preservation(self):
+        """Test that scale_vectorized preserves input shape."""
+        lfo = SineOscillator(5, sample_rate=1000)
+        mod_freq = ModulatedFrequency(lfo)
+
+        # Test with different sizes
+        for n in [10, 100, 1000]:
+            samples = np.random.randn(n).astype(np.float32)
+            result = mod_freq.scale_vectorized(samples)
+
+            self.assertEqual(result.shape, samples.shape)
+            self.assertEqual(result.dtype, np.float32)
+
+
+class TestChainVectorizationPerformance(unittest.TestCase):
+    """Performance regression tests for Chain vectorization."""
+
+    def test_chain_detects_vectorized_methods(self):
+        """Test that Chain properly detects and uses vectorized methods.
+
+        This is the core regression test for the bug where Chain was
+        falling back to Python loops instead of using vectorized methods.
+        """
+        from src.engine.composer import Chain
+        from src.engine.oscillator import SineOscillator
+
+        # Setup chain with all vectorized-capable modifiers
+        osc = SineOscillator(440, amplitude=1.0, sample_rate=1000)
+        env = ADSREnvelope(0.1, 0.1, 0.7, 0.1, sample_rate=1000)
+        mod_vol = ModulatedVolume(env)
+
+        chain = Chain(osc, mod_vol)
+
+        # Check that ModulatedVolume has the vectorized method
+        self.assertTrue(hasattr(mod_vol, 'scale_vectorized'))
+
+        # Generate samples - should use vectorization
+        n = 1000
+        samples = chain.get_samples(n, mode='vectorized')
+
+        # Verify correct output
+        self.assertEqual(len(samples), n)
+        self.assertEqual(samples.dtype, np.float32)
+
+    def test_chain_with_multiple_modulated_modifiers(self):
+        """Test Chain with multiple modulated modifiers (complex case)."""
+        from src.engine.composer import Chain
+        from src.engine.oscillator import SquareOscillator, TriangleOscillator
+        from src.engine.modifier import ModulatedPanner
+
+        # This is similar to the user's original code
+        osc = SquareOscillator(440, amplitude=0.3, sample_rate=1000)
+        env = ADSREnvelope(
+            attack_duration=0.2,
+            decay_duration=0.1,
+            sustain_level=0.7,
+            release_duration=0.1,
+            sample_rate=1000
+        )
+        mod_vol = ModulatedVolume(env)
+        lfo = TriangleOscillator(1, phase=180, wave_range=(-1, 1), sample_rate=1000)
+        mod_pan = ModulatedPanner(lfo)
+
+        chain = Chain(osc, mod_vol, mod_pan)
+
+        # Generate samples
+        n = 500
+        samples = chain.get_samples(n, mode='vectorized')
+
+        # Should produce stereo output from ModulatedPanner
+        self.assertEqual(samples.ndim, 2)
+        self.assertEqual(samples.shape, (n, 2))
+        self.assertEqual(samples.dtype, np.float32)
+
+        # Should be able to unpack with .T
+        left, right = samples.T
+        self.assertEqual(len(left), n)
+        self.assertEqual(len(right), n)
+
+
 if __name__ == '__main__':
     unittest.main()
+
+

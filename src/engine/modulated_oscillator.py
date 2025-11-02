@@ -103,6 +103,9 @@ class ModulatedOscillator:
         self.phase_mod = phase_mod
         self._modulators_count = len(modulators)
 
+        # Initialize all components to avoid issues when get_samples is called without reset
+        iter(self)
+
     def __iter__(self):
         iter(self.oscillator)
         [iter(modulator) for modulator in self.modulators]

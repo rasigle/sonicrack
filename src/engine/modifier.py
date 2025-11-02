@@ -349,6 +349,30 @@ class ModulatedVolume(Volume):
             return self.modulator.ended
         return False
 
+    def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
+        """Apply modulated volume scaling to array of samples (vectorized).
+
+        Args:
+            samples: Input array.
+
+        Returns:
+            Scaled array (float32) with time-varying amplitude.
+
+        Note:
+            This enables true vectorization in Chain, avoiding the iterator fallback.
+        """
+        n = len(samples)
+
+        # Get modulation values for all samples (vectorized)
+        if hasattr(self.modulator, 'get_samples'):
+            mod_values = self.modulator.get_samples(n, reset=False, mode='vectorized')
+        else:
+            # Fallback to iterator if modulator doesn't have get_samples
+            mod_values = np.array([next(self.modulator) for _ in range(n)], dtype=np.float32)
+
+        # Apply time-varying amplitude
+        return (samples * mod_values).astype(np.float32)
+
 
 class Frequency(Modifier):
     """Scales the input values by frequency multiplier.
@@ -462,6 +486,30 @@ class ModulatedFrequency(Frequency):
         if hasattr(self.modulator, "ended"):
             return self.modulator.ended
         return False
+
+    def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
+        """Apply modulated frequency scaling to array of samples (vectorized).
+
+        Args:
+            samples: Input array.
+
+        Returns:
+            Scaled array (float32) with time-varying frequency multiplier.
+
+        Note:
+            This enables true vectorization in Chain, avoiding the iterator fallback.
+        """
+        n = len(samples)
+
+        # Get modulation values for all samples (vectorized)
+        if hasattr(self.modulator, 'get_samples'):
+            mod_values = self.modulator.get_samples(n, reset=False, mode='vectorized')
+        else:
+            # Fallback to iterator if modulator doesn't have get_samples
+            mod_values = np.array([next(self.modulator) for _ in range(n)], dtype=np.float32)
+
+        # Apply time-varying frequency multiplier
+        return (samples * mod_values).astype(np.float32)
 
 
 class Clipper(Modifier):

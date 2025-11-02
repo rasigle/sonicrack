@@ -237,8 +237,8 @@ class Chain(Composer):
                     result.append(modifier(s))
                 # Convert to numpy array for consistency
                 if result and isinstance(result[0], tuple):
-                    # Stereo output - convert list of tuples to (n, 2) array
-                    samples = np.array(result, dtype=object)
+                    # Stereo output - convert list of tuples to (n, 2)
+                    samples = np.array(result, dtype=np.float64)
                 else:
                     # Mono output
                     samples = np.array(result, dtype=np.float32)

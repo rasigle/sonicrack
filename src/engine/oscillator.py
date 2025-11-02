@@ -294,6 +294,7 @@ class Oscillator(ABC):
         if mode == "iterator":
             samples_list = self.get_samples_iterator(n, reset=reset)
             return np.array(samples_list, dtype=np.float32)
+
         else:  # mode == "vectorized"
             if reset:
                 iter(self)

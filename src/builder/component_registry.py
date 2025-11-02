@@ -13,12 +13,12 @@ Classes:
     ComponentRegistry: Central registry for all components
 
 Example:
-    >>> from builder.component_registry import registry, ComponentDescriptor
+    >>> from builder import registry, ComponentDescriptor, PatchBuilder
     >>>
     >>> # Register a new oscillator
     >>> registry.register(ComponentDescriptor(
     ...     name="custom_oscillator",
-    ...     category="oscillator",
+    ...     category=ComponentCategory.OSCILLATOR,
     ...     factory=CustomOscillator,
     ...     config_params=["frequency", "amplitude"],
     ...     description="A custom oscillator"

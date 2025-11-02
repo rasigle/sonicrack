@@ -70,7 +70,7 @@ class Oscillator(ABC):
         freq: float = 440,
         amp: float = 1,
         phase: float = 0.0,
-        sample_rate: int = DEFAULT_SAMPLE_RATE,
+        sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
     ):
         self.sample_rate = sample_rate  # Samples per second
@@ -491,7 +491,7 @@ class SquareOscillator(SineOscillator):
         freq=440,
         amp=1,
         phase=0,
-        sample_rate=44_100,
+        sample_rate=DEFAULT_SAMPLE_RATE,
         wave_range=(-1, 1),
         threshold=0,
     ):

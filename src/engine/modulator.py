@@ -81,19 +81,80 @@ class ADSREnvelope(Modulator):
             sample_rate : the sample rate at which the notes are to be consumed.
         """
         super().__init__()
-        self.attack_duration = attack_duration
-        self.decay_duration = decay_duration
+        # Store as private attributes - access through properties
+        self._attack_duration = attack_duration
+        self._decay_duration = decay_duration
         self.sustain_level = sustain_level
-        self.release_duration = release_duration
+        self._release_duration = release_duration
         self._sample_rate = sample_rate
 
         self.stepper = None
         self.ended = False  # Initialize ended flag
         self.val = 0  # Initialize current value
 
+        # Pre-compute phase durations in samples (performance optimization)
+        # These will be set by _update_phase_samples()
+        self._attack_samples = 0
+        self._decay_samples = 0
+        self._release_samples = 0
+        self._update_phase_samples()
+
         # Vectorization state tracking
         self._phase = 'attack'  # Current phase: 'attack', 'decay', 'sustain', 'release'
         self._phase_position = 0  # Position within current phase (in samples)
+
+    def _update_phase_samples(self):
+        """Update pre-computed phase sample counts.
+
+        Called automatically when duration or sample_rate properties change.
+        """
+        self._attack_samples = int(self._attack_duration * self._sample_rate)
+        self._decay_samples = int(self._decay_duration * self._sample_rate)
+        self._release_samples = int(self._release_duration * self._sample_rate)
+
+    @property
+    def attack_duration(self) -> float:
+        """float: Attack duration in seconds."""
+        return self._attack_duration
+
+    @attack_duration.setter
+    def attack_duration(self, value: float):
+        """Set attack duration and update pre-computed samples."""
+        self._attack_duration = value
+        self._attack_samples = int(value * self._sample_rate)
+
+    @property
+    def decay_duration(self) -> float:
+        """float: Decay duration in seconds."""
+        return self._decay_duration
+
+    @decay_duration.setter
+    def decay_duration(self, value: float):
+        """Set decay duration and update pre-computed samples."""
+        self._decay_duration = value
+        self._decay_samples = int(value * self._sample_rate)
+
+    @property
+    def release_duration(self) -> float:
+        """float: Release duration in seconds."""
+        return self._release_duration
+
+    @release_duration.setter
+    def release_duration(self, value: float):
+        """Set release duration and update pre-computed samples."""
+        self._release_duration = value
+        self._release_samples = int(value * self._sample_rate)
+
+    @property
+    def sample_rate(self) -> float:
+        """float: Sample rate in samples per second."""
+        return self._sample_rate
+
+    @sample_rate.setter
+    def sample_rate(self, value: float):
+        """Set sample rate and update all pre-computed samples."""
+        self._sample_rate = value
+        self._update_phase_samples()
 
     def _get_ads_stepper(self):
         steppers = []
@@ -154,14 +215,11 @@ class ADSREnvelope(Modulator):
         self.val = next(self.stepper)
         self._phase_position += 1
 
-        # Update phase tracking for vectorization consistency
-        attack_samples = int(self.attack_duration * self._sample_rate)
-        decay_samples = int(self.decay_duration * self._sample_rate)
-
-        if self._phase == 'attack' and self._phase_position >= attack_samples:
+        # Update phase tracking using pre-computed values (optimized)
+        if self._phase == 'attack' and self._phase_position >= self._attack_samples:
             self._phase = 'decay'
             self._phase_position = 0
-        elif self._phase == 'decay' and self._phase_position >= decay_samples:
+        elif self._phase == 'decay' and self._phase_position >= self._decay_samples:
             self._phase = 'sustain'
             self._phase_position = 0
 
@@ -204,7 +262,7 @@ class ADSREnvelope(Modulator):
         """Generate n samples using true vectorized NumPy computation.
 
         This is a fully vectorized implementation that computes ADSR envelope
-        phases using NumPy operations, providing 50-100x speedup over iterator.
+        phases using NumPy operations, providing speedup over iterator.
         Properly handles state continuity across calls and all ADSR phases.
 
         Args:
@@ -217,6 +275,7 @@ class ADSREnvelope(Modulator):
             Maintains state continuity by tracking current phase and position.
             Supports mid-envelope calls, release phase, and phase transitions.
         """
+
         # Initialize stepper if needed
         if self.stepper is None:
             iter(self)
@@ -225,10 +284,10 @@ class ADSREnvelope(Modulator):
         idx = 0
         remaining = n
 
-        # Calculate phase durations in samples
-        attack_samples = int(self.attack_duration * self._sample_rate)
-        decay_samples = int(self.decay_duration * self._sample_rate)
-        release_samples = int(self.release_duration * self._sample_rate)
+        # Use pre-computed phase durations (optimized - no recalculation)
+        attack_samples = self._attack_samples
+        decay_samples = self._decay_samples
+        release_samples = self._release_samples
 
         # Process samples through current and subsequent phases
         while remaining > 0 and not self.ended:
@@ -385,6 +444,10 @@ class ADSREnvelope(Modulator):
         # Only if iterator mode is explicitly requested, use it
         if mode == "iterator":
             return self.get_samples_iterator(n, reset)
+
+        # Use vectorized mode
+        if reset:
+            iter(self)
         return self.get_samples_vectorized(n)
 
     def __str__(self):

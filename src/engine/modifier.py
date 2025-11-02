@@ -121,14 +121,23 @@ class ModulatedPanner(Panner):
     """Panner with modulated pan position.
 
     Same as Panner but takes a modulator to dynamically set the pan value.
-    The modulator should output values in range [0, 1] which are mapped to
-    pan positions [-1, 1].
+    The modulator should output values in range [-1, 1] for pan position.
+    This matches the natural output range of oscillators.
 
     Args:
-        modulator: Generator that returns values in range [0, 1].
+        modulator: Generator that returns values in range [-1, 1].
+                  -1 = hard left, 0 = center, 1 = hard right.
 
     Attributes:
         modulator: The modulator instance.
+
+    Example:
+        >>> from engine import SineOscillator, ModulatedPanner, Chain
+        >>> # LFO oscillates between -1 and 1, directly controlling pan
+        >>> lfo = SineOscillator(4)  # 4 Hz auto-pan, no wave_range needed!
+        >>> panner = ModulatedPanner(lfo)
+        >>> chain = Chain(SineOscillator(440), panner)
+        >>> samples = chain.get_samples(1000)
     """
 
     def __init__(self, modulator: Any) -> None:
@@ -136,7 +145,8 @@ class ModulatedPanner(Panner):
 
         Args:
             modulator: Any kind of generator that returns a value within the range
-                of [0, 1] this is used to set the pan position (mapped to [-1, 1]).
+                of [-1, 1]. This value directly sets the pan position:
+                -1 = hard left, 0 = center, 1 = hard right.
         """
         super().__init__(position=0.0)
         self.modulator = modulator
@@ -156,9 +166,9 @@ class ModulatedPanner(Panner):
         Returns:
             Current pan position.
         """
-        # Map modulator output [0, 1] to position [-1, 1]
+        # Use modulator output directly as pan position [-1, 1]
         mod_value = next(self.modulator)
-        self.position = np.clip(mod_value * 2.0 - 1.0, -1.0, 1.0)
+        self.position = np.clip(mod_value, -1.0, 1.0)
         self._update_gains()
         return self.position
 
@@ -172,7 +182,7 @@ class ModulatedPanner(Panner):
         Returns:
             Tuple of (left, right) stereo arrays.
         """
-        # Get modulation values for all samples
+        # Get modulation values for all samples (already in [-1, 1] range)
         mod_values = np.array([next(self) for _ in range(num_samples)])
 
         # Convert to angles [0, π/2]

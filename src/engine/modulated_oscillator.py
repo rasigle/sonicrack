@@ -46,7 +46,6 @@ Note:
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine import Modulator
 from src.engine.oscillator import Oscillator
 
 
@@ -95,11 +94,7 @@ class ModulatedOscillator:
                 f"Oscillator should be an instance of Oscillator. "
                 f"Given: {type(oscillator)}"
             )
-        if not all([isinstance(m, Modulator) for m in modulators]):
-            raise TypeError(
-                f"All given modulators should be instances of Modulator. "
-                f"Given: {[type(mod) for mod in modulators]}"
-            )
+
         self.oscillator = oscillator
         self.modulators = modulators
 

@@ -210,11 +210,11 @@ class TestModulatedPanner(unittest.TestCase):
                           "Pan values should change over time")
 
     def test_modulation_position_mapping(self) -> None:
-        """Test that modulator values [0, 1] map correctly to pan [-1, 1]."""
+        """Test that modulator values [-1, 1] map directly to pan [-1, 1]."""
         # Create a simple modulator that yields known values
         class SimpleModulator:
             def __init__(self):
-                self.values = [0.0, 0.25, 0.5, 0.75, 1.0]
+                self.values = [-1.0, -0.5, 0.0, 0.5, 1.0]
                 self.index = 0
 
             def __iter__(self):
@@ -231,7 +231,7 @@ class TestModulatedPanner(unittest.TestCase):
         mod = SimpleModulator()
         panner = ModulatedPanner(mod)
 
-        # Expected positions: 0.0->-1.0, 0.25->-0.5, 0.5->0.0, 0.75->0.5, 1.0->1.0
+        # Expected: direct mapping (no transformation)
         expected_positions = [-1.0, -0.5, 0.0, 0.5, 1.0]
 
         for expected_pos in expected_positions:
@@ -344,7 +344,7 @@ class TestModulatedPanner(unittest.TestCase):
         # Create a modulator that produces out-of-range values
         class OutOfRangeModulator:
             def __init__(self):
-                self.values = [-0.5, 1.5, 0.5]  # Out of [0, 1] range
+                self.values = [-1.5, 1.5, 0.0]  # Out of [-1, 1] range
                 self.index = 0
 
             def __iter__(self):
@@ -360,13 +360,13 @@ class TestModulatedPanner(unittest.TestCase):
         panner = ModulatedPanner(mod)
 
         # Position should be clamped to [-1, 1]
-        next(panner)  # -0.5 -> -2.0 -> clamped to -1.0
+        next(panner)  # -1.5 -> clamped to -1.0
         self.assertEqual(panner.position, -1.0)
 
-        next(panner)  # 1.5 -> 2.0 -> clamped to 1.0
+        next(panner)  # 1.5 -> clamped to 1.0
         self.assertEqual(panner.position, 1.0)
 
-        next(panner)  # 0.5 -> 0.0
+        next(panner)  # 0.0 -> stays 0.0
         self.assertEqual(panner.position, 0.0)
 
 

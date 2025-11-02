@@ -81,13 +81,18 @@ class PatchBuilder:
         """Generic method to add an oscillator component.
 
         Args:
-            comp_name: Component name from registry
+            comp_name: Component name from registry OR an oscillator instance
             *args: Positional arguments for component
             **kwargs: Keyword arguments for component
 
         Returns:
             Self for method chaining
         """
+        # Check if comp_name is actually an instance (for mixing multiple oscillators)
+        if not isinstance(comp_name, str):
+            # It's an actual oscillator instance
+            return self.add_source(comp_name)
+
         descriptor = registry.get(comp_name)
         if not descriptor:
             raise ValueError(f"Unknown component: {comp_name}")
@@ -97,13 +102,40 @@ class PatchBuilder:
             kwargs["sample_rate"] = self._sample_rate
 
         # Create instance
-        self._source = descriptor.create_instance(*args, **kwargs)
+        instance = descriptor.create_instance(*args, **kwargs)
+
+        # Add to source
+        self.add_source(instance)
 
         # Add to config
         config = descriptor.to_config(*args, **kwargs)
         self._config["components"].append(config)
 
         logger.debug(f"Added {comp_name}: {args}, {kwargs}")
+        return self
+
+    def add_source(self, oscillator: Any) -> PatchBuilder:
+        """Add an oscillator instance as a source.
+
+        If multiple sources are added, they will be mixed using WaveAdder.
+
+        Args:
+            oscillator: An oscillator or generator instance
+
+        Returns:
+            Self for method chaining
+        """
+        if self._source is None:
+            # First oscillator
+            self._source = oscillator
+        elif isinstance(self._source, list):
+            # Already have multiple oscillators
+            self._source.append(oscillator)
+        else:
+            # Convert single oscillator to list
+            self._source = [self._source, oscillator]
+
+        logger.debug(f"Added oscillator instance to source")
         return self
 
     def _add_modifier(self, comp_name: str, *args, **kwargs) -> PatchBuilder:

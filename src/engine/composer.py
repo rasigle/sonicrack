@@ -206,7 +206,7 @@ class Chain(Composer):
             n: Number of samples to produce.
 
         Returns:
-            np.ndarray: Array of n consecutive samples.
+            np.ndarray: Array of n consecutive samples (or array of tuples for stereo).
         """
         # Generate samples from oscillator
         if hasattr(self.oscillator, 'get_samples'):
@@ -217,12 +217,31 @@ class Chain(Composer):
 
         # Apply each modifier in sequence
         for modifier in self.modifiers:
-            if hasattr(modifier, 'process_samples'):
+            if hasattr(modifier, 'pan_vectorized') and hasattr(modifier, '__next__'):
+                # Special handling for ModulatedPanner - use pure NumPy for performance
+                left, right = modifier.pan_vectorized(samples, n)
+                # Stack as columns: shape (n, 2) for stereo
+                samples = np.column_stack((left, right))
+
+            elif hasattr(modifier, 'process_samples'):
                 # If modifier has vectorized processing
                 samples = modifier.process_samples(samples)
+
             elif hasattr(modifier, '__call__'):
-                # Apply modifier element-wise (slower fallback)
-                samples = np.array([modifier(s) for s in samples], dtype=np.float32)
+                # Apply modifier element-wise with proper iterator advancement
+                result = []
+                for s in samples:
+                    # Advance modifier if it's iterable (like ModulatedPanner)
+                    if hasattr(modifier, '__next__'):
+                        next(modifier)
+                    result.append(modifier(s))
+                # Convert to numpy array for consistency
+                if result and isinstance(result[0], tuple):
+                    # Stereo output - convert list of tuples to (n, 2) array
+                    samples = np.array(result, dtype=object)
+                else:
+                    # Mono output
+                    samples = np.array(result, dtype=np.float32)
 
         return samples
 

@@ -59,48 +59,76 @@ class Modifier(ABC):
 class Panner(Modifier):
     """Converts mono input into stereo output with configurable pan position.
 
+    Uses constant-power panning law for perceptually uniform panning.
+    Position range: -1.0 (hard left) to 1.0 (hard right), 0.0 (center).
+
     Args:
-        position: Right pan value. 0=fully left, 1=fully right, 0.5=center. Defaults to 0.5.
+        position: Pan position. -1.0=left, 0.0=center, 1.0=right. Defaults to 0.0.
 
     Attributes:
-        position: Current right pan value.
+        position: Current pan position (-1.0 to 1.0).
+        _left_gain: Precomputed left channel gain.
+        _right_gain: Precomputed right channel gain.
     """
 
-    def __init__(self, position: float = 0.5) -> None:
+    def __init__(self, position: float = 0.0) -> None:
         """Initialize panner with pan position.
 
         Args:
-            position: Pan value, 0 means 100% left panned and 1 means 100% right
-                panned, 0.5 is center panned.
+            position: Pan value, -1.0 means 100% left panned, 1.0 means 100% right
+                panned, 0.0 is center panned.
         """
-        self.position: float = np.clip(position, 0.0, 1.0)
+        self.position: float = np.clip(position, -1.0, 1.0)
+        self._update_gains()
         logger.debug(f"Panner initialized with pan position: {position}")
 
-    def __call__(self, val: float) -> Tuple[float, float]:
+    def _update_gains(self) -> None:
+        """Update left/right gains based on position using constant-power law."""
+
+        # Convert position from [-1, 1] to angle [0, π/2]
+        # -1.0 -> 0 (all left), 0.0 -> π/4 (center), 1.0 -> π/2 (all right)
+        angle = (self.position + 1.0) * np.pi / 4.0
+        self._left_gain = np.cos(angle)
+        self._right_gain = np.sin(angle)
+
+    def __call__(self, val: Union[float, np.ndarray]) -> Union[Tuple[float, float], Tuple[np.ndarray, np.ndarray]]:
         """Convert mono signal to stereo with panning.
 
         Args:
-            val: Mono input value.
+            val: Mono input value or array.
 
         Returns:
-            Tuple of (left, right) stereo values.
+            Tuple of (left, right) stereo values or arrays.
         """
-        right: float = self.position * 2
-        left: float = 2 - right
-        return left * val, right * val
+        if isinstance(val, np.ndarray):
+            return self._left_gain * val, self._right_gain * val
+
+        return self._left_gain * val, self._right_gain * val
+
+    def pan_vectorized(self, samples: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Apply panning to an array of samples (vectorized).
+
+        Args:
+            samples: Mono input array.
+
+        Returns:
+            Tuple of (left, right) stereo arrays.
+        """
+        return self._left_gain * samples, self._right_gain * samples
 
 
 class ModulatedPanner(Panner):
     """Panner with modulated pan position.
 
     Same as Panner but takes a modulator to dynamically set the pan value.
+    The modulator should output values in range [0, 1] which are mapped to
+    pan positions [-1, 1].
 
     Args:
-        modulator: Generator that returns values in range [-1, 1].
+        modulator: Generator that returns values in range [0, 1].
 
     Attributes:
         modulator: The modulator instance.
-        r: Current pan position (computed from modulator).
     """
 
     def __init__(self, modulator: Any) -> None:
@@ -108,9 +136,9 @@ class ModulatedPanner(Panner):
 
         Args:
             modulator: Any kind of generator that returns a value within the range
-                of [-1, 1] this is used to set the `r` value that has a range of [0, 1].
+                of [0, 1] this is used to set the pan position (mapped to [-1, 1]).
         """
-        super().__init__(position=0)
+        super().__init__(position=0.0)
         self.modulator = modulator
 
         # Auto-initialize the modulator to avoid common errors
@@ -123,13 +151,42 @@ class ModulatedPanner(Panner):
         return self
 
     def __next__(self) -> float:
-        """Get next modulated pan value.
+        """Get next modulated pan value and update gains.
 
         Returns:
             Current pan position.
         """
-        self.position = (next(self.modulator) + 1) / 2
+        # Map modulator output [0, 1] to position [-1, 1]
+        mod_value = next(self.modulator)
+        self.position = np.clip(mod_value * 2.0 - 1.0, -1.0, 1.0)
+        self._update_gains()
         return self.position
+
+    def pan_vectorized(self, samples: np.ndarray, num_samples: int) -> Tuple[np.ndarray, np.ndarray]:
+        """Apply modulated panning to an array of samples (vectorized).
+
+        Args:
+            samples: Mono input array.
+            num_samples: Number of samples to process.
+
+        Returns:
+            Tuple of (left, right) stereo arrays.
+        """
+        # Get modulation values for all samples
+        mod_values = np.array([next(self) for _ in range(num_samples)])
+
+        # Convert to angles [0, π/2]
+        angles = (mod_values + 1.0) * np.pi / 4.0
+
+        # Calculate gains
+        left_gains = np.cos(angles)
+        right_gains = np.sin(angles)
+
+        # Apply gains
+        left = left_gains * samples
+        right = right_gains * samples
+
+        return left, right
 
 
 class Volume(Modifier):

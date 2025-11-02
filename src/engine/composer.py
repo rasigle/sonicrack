@@ -67,7 +67,7 @@ class Composer(ABC):
             list: List of `n` consecutive samples produced by calling `next(self)`.
         """
         osc = iter(self) if reset else self
-        return np.array([next(osc) for _ in range(n)])
+        return np.array([next(osc) for _ in range(n)], np.float32)
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         """Generate n samples using iterator and convert to NumPy array.
@@ -85,8 +85,7 @@ class Composer(ABC):
             To get true vectorized performance, ensure underlying oscillators
             use their vectorized methods.
         """
-        samples = [next(self) for _ in range(n)]
-        return np.array(samples, dtype=np.float32)
+        return self.get_samples_iterator(n, reset=True)
 
     def get_samples(
         self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"

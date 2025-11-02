@@ -136,6 +136,9 @@ from src.engine.noise import (
     brownian_noise,
     blue_noise,
     perlin_noise,
+    velvet_noise,
+    grey_noise,
+    sample_hold_noise,
 )
 
 __all__ = [
@@ -174,6 +177,9 @@ __all__ = [
     "brownian_noise",
     "blue_noise",
     "perlin_noise",
+    "velvet_noise",
+    "grey_noise",
+    "sample_hold_noise",
 ]
 
 __version__ = "0.1.0"

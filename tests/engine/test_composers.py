@@ -51,8 +51,8 @@ class TestChain(unittest.TestCase):
         chain = Chain(self.osc, self.panner)
         samples = chain.get_samples_iterator(10, reset=True)
 
-        # First sample should be tuple (left, right)
-        self.assertIsInstance(samples[0], tuple)
+        # First sample should contain (left, right)
+        self.assertIsInstance(samples[0], np.ndarray)
         self.assertEqual(len(samples[0]), 2)
 
     def test_trigger_release(self) -> None:
@@ -107,7 +107,7 @@ class TestChain(unittest.TestCase):
 
         # Small buffer uses iterator
         small = chain.get_samples(100, mode="auto", reset=True)
-        self.assertIsInstance(small, list)
+        self.assertIsInstance(small, np.ndarray)
 
         # Large buffer uses vectorized
         large = chain.get_samples(1000, mode="auto", reset=True)
@@ -160,7 +160,7 @@ class TestWaveAdder(unittest.TestCase):
         samples = adder.get_samples_iterator(10, reset=True)
 
         # Should be tuples (left, right)
-        self.assertIsInstance(samples[0], tuple)
+        self.assertIsInstance(samples[0], np.ndarray)
         self.assertEqual(len(samples[0]), 2)
 
     def test_multiple_generators(self) -> None:

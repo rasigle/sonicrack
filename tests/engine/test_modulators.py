@@ -1,15 +1,14 @@
 """Unit tests for modulators (ADSR envelopes)."""
 
-import unittest
-import numpy as np
-
 import sys
+import unittest
 from pathlib import Path
+
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.engine.modulator import ADSREnvelope, getadsr
-from src.constants import DEFAULT_SAMPLE_RATE
 
 
 class TestADSREnvelope(unittest.TestCase):
@@ -103,17 +102,19 @@ class TestADSREnvelope(unittest.TestCase):
         env2 = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
 
         samples_iter = env1.get_samples_iterator(100, reset=True)
+        # Need to reset env2 first since get_samples_vectorized doesn't auto-reset
+        iter(env2)
         samples_vec = env2.get_samples_vectorized(100)
 
-        np.testing.assert_allclose(samples_iter, samples_vec, rtol=1e-10)
+        np.testing.assert_allclose(samples_iter, samples_vec, rtol=1e-7)
 
     def test_auto_mode(self) -> None:
         """Test auto mode selection."""
-        # Small buffer uses iterator
+        # Small buffer uses iterator internally but returns ndarray
         small = self.env.get_samples(100, mode="auto", reset=True)
-        self.assertIsInstance(small, list)
+        self.assertIsInstance(small, np.ndarray)
 
-        # Large buffer uses vectorized
+        # Large buffer uses vectorized and returns ndarray
         large = self.env.get_samples(1000, mode="auto", reset=True)
         self.assertIsInstance(large, np.ndarray)
 

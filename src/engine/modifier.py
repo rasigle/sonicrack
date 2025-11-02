@@ -30,74 +30,146 @@ Note:
 
 from abc import abstractmethod, ABC
 from collections.abc import Iterable
+from typing import Union, Tuple, Any
+
+from src.utils.logging_config import get_engine_logger
+
+logger = get_engine_logger("modifier")
 
 
 class Modifier(ABC):
     """Base class for all modifiers."""
 
     @abstractmethod
-    def __call__(self, val):
+    def __call__(self, val: Union[float, Tuple[float, ...]]) -> Union[float, Tuple[float, ...]]:
+        """Apply modification to a value.
+
+        Args:
+            val: Input value (mono float or stereo tuple).
+
+        Returns:
+            Modified value (same type as input).
+        """
         pass
 
 
 class Panner(Modifier):
-    """Will convert a mono input into stereo."""
+    """Converts mono input into stereo output with configurable pan position.
 
-    def __init__(self, r: float = 0.5):
-        """
+    Args:
+        r: Right pan value. 0=fully left, 1=fully right, 0.5=center. Defaults to 0.5.
+
+    Attributes:
+        right: Current right pan value.
+    """
+
+    def __init__(self, r: float = 0.5) -> None:
+        """Initialize panner with pan position.
 
         Args:
-            r : is the right pan value, 0 means 100% left panned and 1 means 100% right
+            r: Right pan value, 0 means 100% left panned and 1 means 100% right
                 panned, 0.5 is center panned.
         """
-        self.right = r
+        self.right: float = r
+        logger.debug(f"Panner initialized with pan position: {r}")
 
-    def __call__(self, val):
-        right = self.right * 2
-        left = 2 - right
+    def __call__(self, val: float) -> Tuple[float, float]:
+        """Convert mono signal to stereo with panning.
+
+        Args:
+            val: Mono input value.
+
+        Returns:
+            Tuple of (left, right) stereo values.
+        """
+        right: float = self.right * 2
+        left: float = 2 - right
         return left * val, right * val
 
 
 class ModulatedPanner(Panner):
-    """Same as the Panner but takes in a modulator to set the internal `r` value."""
+    """Panner with modulated pan position.
 
-    def __init__(self, modulator):
-        """
+    Same as Panner but takes a modulator to dynamically set the pan value.
+
+    Args:
+        modulator: Generator that returns values in range [-1, 1].
+
+    Attributes:
+        modulator: The modulator instance.
+        r: Current pan position (computed from modulator).
+    """
+
+    def __init__(self, modulator: Any) -> None:
+        """Initialize modulated panner.
 
         Args:
-            modulator : any kind of generator that returns a value within the range
+            modulator: Any kind of generator that returns a value within the range
                 of [-1, 1] this is used to set the `r` value that has a range of [0, 1].
         """
         super().__init__(r=0)
         self.modulator = modulator
 
-    def __iter__(self):
+        # Auto-initialize the modulator to avoid common errors
+        iter(self.modulator)
+        logger.debug("ModulatedPanner initialized and modulator started")
+
+    def __iter__(self) -> 'ModulatedPanner':
+        """Re-initialize modulator for iteration."""
         iter(self.modulator)
         return self
 
-    def __next__(self):
-        self.r = (next(self.modulator) + 1) / 2
-        return self.r
+    def __next__(self) -> float:
+        """Get next modulated pan value.
+
+        Returns:
+            Current pan position.
+        """
+        self.right = (next(self.modulator) + 1) / 2
+        return self.right
 
 
 class Volume(Modifier):
-    """Scales the input values by `amp`, can be used to increase or decrease the
-    amplitude."""
+    """Scales the input values by amplitude multiplier.
 
-    def __init__(self, amp: float = 1.0):
-        """
-        amp : sets the amplitude multiplier for the
-            input signal (1 : no change, 0 : no output).
-        """
-        self.amp = amp
+    Can be used to increase or decrease the amplitude of signals.
 
-    def __call__(self, val):
+    Args:
+        amp: Amplitude multiplier. 1.0=no change, 0.0=silence. Defaults to 1.0.
+
+    Attributes:
+        amp: Current amplitude multiplier.
+    """
+
+    def __init__(self, amp: float = 1.0) -> None:
+        """Initialize volume modifier.
+
+        Args:
+            amp: Sets the amplitude multiplier for the
+                input signal (1 : no change, 0 : no output).
+        """
+        self.amp: float = amp
+        logger.debug(f"Volume initialized with amplitude: {amp}")
+
+    def __call__(self, val: Union[float, Tuple[float, ...]]) -> Union[float, Tuple[float, ...]]:
+        """Apply volume scaling to input.
+
+        Args:
+            val: Input value (mono float or stereo tuple).
+
+        Returns:
+            Scaled value (same type as input).
+
+        Raises:
+            TypeError: If input is not int, float, or Iterable.
+        """
         if isinstance(val, Iterable):
             return tuple(v * self.amp for v in val)
 
         if isinstance(val, (int, float)):
             return val * self.amp
 
+        logger.error(f"Invalid input type for Volume: {type(val)}")
         raise TypeError("Input value must be an int, float, or Iterable.")
 
 
@@ -113,8 +185,11 @@ class ModulatedVolume(Volume):
         """
         super().__init__(0.0)
         self.modulator = modulator
+        # Auto-initialize the modulator to avoid common errors
+        iter(self.modulator)
 
     def __iter__(self):
+        """Re-initialize modulator for iteration."""
         iter(self.modulator)
         return self
 
@@ -167,8 +242,11 @@ class ModulatedFrequency(Frequency):
         """
         super().__init__(1.0)
         self.modulator = modulator
+        # Auto-initialize the modulator to avoid common errors
+        iter(self.modulator)
 
     def __iter__(self):
+        """Re-initialize modulator for iteration."""
         iter(self.modulator)
         return self
 
@@ -197,11 +275,12 @@ class Clipper(Modifier):
             wave_range: tuple of (min, max) values which are used to clip the input
                 signal.
         """
+        self.range = wave_range
         mi, ma = wave_range
         self.mm = lambda v: max(mi, min(ma, v))
 
     def __call__(self, val):
         if isinstance(val, Iterable):
-            return tuple(self.mm(v / 2) * 2 for v in val)
+            return tuple(self.mm(v) for v in val)
 
         return self.mm(val)

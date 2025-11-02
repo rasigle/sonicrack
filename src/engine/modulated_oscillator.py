@@ -172,7 +172,7 @@ class ModulatedOscillator:
         """
         if reset:
             iter(self)
-        return np.array([next(self) for _ in range(n)])
+        return np.array([next(self) for _ in range(n)], dtype=np.float32)
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         """Generate n samples using iterator and convert to NumPy array.
@@ -190,8 +190,7 @@ class ModulatedOscillator:
             For best performance, ensure the underlying oscillator uses
             vectorized generation internally.
         """
-        samples = [next(self) for _ in range(n)]
-        return np.array(samples, dtype=np.float32)
+        return self.get_samples_iterator(n, reset=True)
 
     def get_samples(
         self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
@@ -207,12 +206,14 @@ class ModulatedOscillator:
                 - "vectorized": Convert to NumPy array (returns ndarray)
 
         Returns:
-            np.ndarray or list[float]: Generated samples. Type depends on mode.
+            np.ndarray: Generated samples as NumPy array.
 
         Raises:
             ValueError: If mode is not one of "auto", "iterator", or "vectorized".
 
         Examples:
+            >>> from engine import SineOscillator, ADSREnvelope, ModulatedOscillator
+            >>>
             >>> osc = SineOscillator(440)
             >>> env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
             >>> mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
@@ -228,7 +229,8 @@ class ModulatedOscillator:
             mode = "vectorized" if n >= 512 else "iterator"
 
         if mode == "iterator":
-            return self.get_samples_iterator(n, reset=reset)
+            samples_list = self.get_samples_iterator(n, reset=reset)
+            return np.array(samples_list, dtype=np.float32)
         else:  # mode == "vectorized"
             if reset:
                 iter(self)

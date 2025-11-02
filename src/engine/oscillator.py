@@ -270,8 +270,7 @@ class Oscillator(ABC):
                 - "vectorized": Use NumPy vectorization (faster, recommended for production)
 
         Returns:
-            np.ndarray or list[float]: Generated samples. Returns ndarray for vectorized mode,
-            list for iterator mode.
+            np.ndarray: Generated samples as NumPy array.
 
         Raises:
             ValueError: If mode is not one of "auto", "iterator", or "vectorized".
@@ -293,7 +292,8 @@ class Oscillator(ABC):
             mode = "vectorized" if n >= 512 else "iterator"
 
         if mode == "iterator":
-            return self.get_samples_iterator(n, reset=reset)
+            samples_list = self.get_samples_iterator(n, reset=reset)
+            return np.array(samples_list, dtype=np.float32)
         else:  # mode == "vectorized"
             if reset:
                 iter(self)

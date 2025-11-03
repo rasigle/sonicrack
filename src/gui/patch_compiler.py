@@ -284,3 +284,106 @@ class PatchCompiler:
                 errors.append("Invalid connection: destination port is not an input")
 
         return errors
+
+    def build_patch_tree(self) -> dict[str, Any]:
+        """Build a hierarchical tree representation of the patch.
+
+        Returns:
+            Dictionary representing the patch tree structure.
+            If there's an output module, returns its tree.
+            If no output, returns a multi-root structure with all disconnected modules.
+        """
+        if not self.modules:
+            return {"error": "No modules in patch"}
+
+        # Find output module as root
+        output_module = None
+        for module in self.modules:
+            if module.module_category == ModuleCategory.OUTPUT:
+                output_module = module
+                break
+
+        # If we have an output module, build tree from it
+        if output_module:
+            visited = set()
+            return self._build_tree_node(output_module, visited)
+
+        # No output module - build a multi-root tree showing all modules
+        # First, find all modules that have no incoming connections (roots)
+        connected_as_input = set()
+        for start_port, end_port in self.connections:
+            connected_as_input.add(end_port.parent_module)
+
+        root_modules = [m for m in self.modules if m not in connected_as_input]
+
+        # If no clear roots, just show all modules
+        if not root_modules:
+            root_modules = self.modules
+
+        # Build a virtual root containing all roots
+        visited = set()
+        return {
+            "name": "Patch (no output)",
+            "type": "ROOT",
+            "id": 0,
+            "inputs": [
+                {"port_name": "Module", "node": self._build_tree_node(module, visited)}
+                for module in root_modules
+            ],
+            "modulations": [],
+        }
+
+    def _build_tree_node(
+        self, module: AudioModuleInterface, visited: set
+    ) -> dict[str, Any]:
+        """Build a tree node for a module recursively.
+
+        Args:
+            module: The module to build node for
+            visited: Set of already visited modules to prevent cycles
+
+        Returns:
+            Dictionary representing the tree node
+        """
+        module_id = id(module)
+
+        node = {
+            "name": getattr(module, "module_title", "Unknown"),
+            "type": (
+                module.module_category.value
+                if hasattr(module.module_category, "value")
+                else str(module.module_category)
+            ),
+            "id": module_id,
+            "inputs": [],
+            "modulations": [],
+        }
+
+        # Prevent infinite recursion
+        if module_id in visited:
+            node["cycle"] = True
+            return node
+
+        visited.add(module_id)
+
+        # Get modulation input names
+        mod_inputs = set(module.get_modulation_inputs())
+
+        # Get input connections
+        for input_port in getattr(module, "input_ports", []):
+            input_conn = self._find_connection_to_port(input_port)
+            if input_conn:
+                source_module = input_conn.parent_module
+                port_info = {
+                    "port_name": input_port.port_name,
+                    "node": self._build_tree_node(source_module, visited.copy()),
+                }
+
+                # Classify as modulation or main input
+                if input_port.port_name in mod_inputs:
+                    node["modulations"].append(port_info)
+                else:
+                    node["inputs"].append(port_info)
+
+        return node
+

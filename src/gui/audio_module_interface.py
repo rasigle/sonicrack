@@ -13,9 +13,7 @@ class ModuleCategory(StrEnum):
     """Categorizes modules by their role in the signal chain."""
 
     SOURCE = "Source"  # Oscillators, LFOs, Envelopes - no audio input required
-    MODIFIER = (
-        "Modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
-    )
+    MODIFIER = "Modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
     MIXER = "Mixer"  # Combines multiple audio inputs
     OUTPUT = "Output"  # Terminal node
 

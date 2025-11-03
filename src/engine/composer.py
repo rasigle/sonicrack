@@ -366,28 +366,24 @@ class WaveAdder(Composer):
         """
         # Fast path for single generator (no mixing needed)
         if len(self.generators) == 1:
-            gen = self.generators[0]
-            if hasattr(gen, "get_samples"):
-                samples = gen.get_samples(n, reset=False, mode="vectorized")
-            else:
-                samples = np.array([next(gen) for _ in range(n)], dtype=np.float32)
+            samples = self.generators[0].get_samples(n, reset=False, mode="vectorized")
 
             # Handle stereo conversion if needed
             if self.stereo and samples.ndim == 1:
                 samples = np.column_stack((samples, samples))
             elif not self.stereo and samples.ndim == 2:
                 samples = samples.mean(axis=1)
+            else:
+                raise ValueError(
+                    "Inconsistent stereo setting with single generator output."
+                )
 
             return samples.astype(np.float32)
 
         # Generate samples from all generators (vectorized)
         all_samples = []
         for gen in self.generators:
-            if hasattr(gen, "get_samples"):
-                samples = gen.get_samples(n, reset=False, mode="vectorized")
-            else:
-                # Fallback to iterator
-                samples = np.array([next(gen) for _ in range(n)], dtype=np.float32)
+            samples = gen.get_samples(n, reset=False, mode="vectorized")
             all_samples.append(samples)
 
         # Optimize for mono mode (most common case)

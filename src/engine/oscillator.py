@@ -195,7 +195,6 @@ class Oscillator(ABC):
         """Hook called after `phase` is changed."""
         pass
 
-    @abstractmethod
     def _initialize_osc(self):
         """Perform any subclass-specific initialization required when iteration starts.
 
@@ -217,7 +216,6 @@ class Oscillator(ABC):
         """
         return (((val + 1) / 2) * (max_val - min_val)) + min_val
 
-    @abstractmethod
     def __next__(self):
         """Return the next sample from the oscillator.
 

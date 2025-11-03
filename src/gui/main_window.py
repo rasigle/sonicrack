@@ -29,6 +29,7 @@ from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
 from src.gui.preset_manager import PresetManager
 from src.gui.widgets.spectrum_analyzer import SpectrumAnalyzer
+from src.gui.widgets.tree_analyzer import TreeAnalyzer
 from src.gui.widgets.waveform_display import WaveformDisplay
 
 logger = logging.getLogger(__name__)
@@ -183,6 +184,14 @@ class ModularSynthWindow(QMainWindow):
         spectrum_group.setLayout(spectrum_layout)
         layout.addWidget(spectrum_group)
 
+        # Tree analyzer
+        tree_group = QGroupBox("Patch Tree")
+        tree_layout = QVBoxLayout()
+        self.tree_analyzer = TreeAnalyzer()
+        tree_layout.addWidget(self.tree_analyzer)
+        tree_group.setLayout(tree_layout)
+        layout.addWidget(tree_group)
+
         # Control panel
         controls_group = QGroupBox("Playback")
         controls_layout = QVBoxLayout()
@@ -326,6 +335,7 @@ class ModularSynthWindow(QMainWindow):
                 )
             # Clear patch and stop playback
             self.audio_engine.set_patch(None)
+            self.tree_analyzer.clear()
             return False
 
         # Check for errors
@@ -342,6 +352,7 @@ class ModularSynthWindow(QMainWindow):
 
             # Clear patch and stop playback on error
             self.audio_engine.set_patch(None)
+            self.tree_analyzer.clear()
             return False
 
         # Compile
@@ -350,6 +361,10 @@ class ModularSynthWindow(QMainWindow):
         logging.info(patch)
         if patch:
             self.audio_engine.set_patch(patch)
+
+            # Update tree analyzer with patch structure
+            tree_data = self.patch_compiler.build_patch_tree()
+            self.tree_analyzer.update_tree(tree_data)
 
             # Get master volume from output module
             output_module_class = self.registry.get("Output")
@@ -365,6 +380,9 @@ class ModularSynthWindow(QMainWindow):
             logger.info("Patch compiled successfully")
             return True
         else:
+            # Clear tree on compilation failure
+            self.tree_analyzer.clear()
+
             if show_messages:
                 QMessageBox.critical(
                     self, "Compilation Failed", "Failed to compile patch."

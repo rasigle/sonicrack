@@ -23,10 +23,10 @@ from PyQt6.QtWidgets import (
 
 from src.gui.audio_engine import AudioEngine
 from src.gui.dialogs.about_dialog import show_about
-from src.gui.module_registry import MODULE_REGISTRY, initialize_modules
+from src.gui.dialogs.preset_dialog import PresetBrowserDialog, SavePresetDialog
+from src.gui.module_registry import initialize_modules
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
-from src.gui.dialogs.preset_dialog import PresetBrowserDialog, SavePresetDialog
 from src.gui.preset_manager import PresetManager
 from src.gui.widgets.spectrum_analyzer import SpectrumAnalyzer
 from src.gui.widgets.waveform_display import WaveformDisplay
@@ -50,7 +50,7 @@ class ModularSynthWindow(QMainWindow):
         super().__init__()
 
         # Initialize the module registry with all built-in modules
-        initialize_modules()
+        self.registry = initialize_modules()
 
         self.setWindowTitle("AudioPlayground - Modular Synthesizer")
         self.setGeometry(100, 100, 1400, 900)
@@ -138,7 +138,7 @@ class ModularSynthWindow(QMainWindow):
         scroll_layout = QVBoxLayout(scroll_content)
 
         # Add module buttons
-        for module_name in MODULE_REGISTRY.keys():
+        for module_name in self.registry.list_modules():
             btn = QPushButton(f"+ {module_name}")
             btn.setMinimumHeight(35)
             btn.clicked.connect(
@@ -288,8 +288,8 @@ class ModularSynthWindow(QMainWindow):
         Args:
             module_name: Name of the module type to add
         """
-        if module_name in MODULE_REGISTRY:
-            module_class = MODULE_REGISTRY[module_name]
+        module_class = self.registry.get(module_name)
+        if module_class:
             module = module_class()
 
             # Connect parameter change signal to auto-compile
@@ -301,6 +301,8 @@ class ModularSynthWindow(QMainWindow):
 
             # Auto-compile when module is added
             self._compile_patch()
+        else:
+            logger.error(f"Module not found: {module_name}")
 
     def _compile_patch(self, show_messages: bool = False) -> bool:
         """Compile the current patch automatically.
@@ -350,7 +352,7 @@ class ModularSynthWindow(QMainWindow):
             self.audio_engine.set_patch(patch)
 
             # Get master volume from output module
-            output_module_class = MODULE_REGISTRY.get("Output")
+            output_module_class = self.registry.get("Output")
             if output_module_class:
                 for module in modules:
                     if isinstance(module, output_module_class):
@@ -416,7 +418,7 @@ class ModularSynthWindow(QMainWindow):
         )
 
         # Check if output module was disconnected
-        output_module_class = MODULE_REGISTRY.get("Output")
+        output_module_class = self.registry.get("Output")
         if output_module_class and isinstance(end_port.parent_module, output_module_class):
             # Output was disconnected - stop playback and clear patch
             self.audio_engine.stop_playback()
@@ -536,9 +538,9 @@ class ModularSynthWindow(QMainWindow):
                 module_type = module_data["type"]
                 module_id = module_data["id"]
 
-                if module_type in MODULE_REGISTRY:
+                module_class = self.registry.get(module_type)
+                if module_class:
                     # Create module
-                    module_class = MODULE_REGISTRY[module_type]
                     module = module_class()
 
                     # Connect parameter change signal

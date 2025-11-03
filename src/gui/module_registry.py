@@ -72,25 +72,58 @@ class ModuleRegistry:
                 f"got {module_class.__bases__}"
             )
 
-        # Create a temporary instance to extract metadata
-        # We need to be careful here - some modules might need parameters
-        # So we'll use a try/except and fall back to class attributes
-        try:
-            temp_instance = module_class()
-            name = temp_instance.module_title
-            category_enum = temp_instance.module_category
-            category = category_enum.value if hasattr(category_enum, 'value') else str(category_enum)
-            description = temp_instance.module_description
-            version = temp_instance.module_version
-            author = temp_instance.module_author
-        except Exception as e:
-            logger.warning(f"Could not instantiate {module_class.__name__} to extract metadata: {e}")
-            # Fall back to defaults
-            name = module_class.__name__
-            category = "other"
-            description = ""
-            version = "1.0.0"
-            author = ""
+        # Extract metadata from class properties using property descriptors
+        # This avoids instantiation
+        name = module_class.__name__  # Default fallback
+        category = "other"  # Default fallback
+        description = ""
+        version = "1.0.0"
+        author = ""
+
+        # Try to get property values from the class
+        # Properties are descriptors, so we need to get them from __dict__
+        for attr_name in ['module_title', 'module_category', 'module_description',
+                          'module_version', 'module_author']:
+            # Walk through MRO to find the property
+            for cls in module_class.__mro__:
+                if attr_name in cls.__dict__:
+                    prop = cls.__dict__[attr_name]
+                    if isinstance(prop, property) and prop.fget:
+                        # Get the docstring or try to evaluate simple returns
+                        func = prop.fget
+                        # Check if function has simple return statement
+                        try:
+                            import ast
+                            source = inspect.getsource(func)
+                            tree = ast.parse(source)
+                            # Find return statements
+                            for node in ast.walk(tree):
+                                if isinstance(node, ast.Return) and node.value:
+                                    if isinstance(node.value, ast.Constant):
+                                        value = node.value.value
+                                        if attr_name == 'module_title':
+                                            name = value
+                                        elif attr_name == 'module_category':
+                                            # This will be an enum access, skip for now
+                                            pass
+                                        elif attr_name == 'module_description':
+                                            description = value
+                                        elif attr_name == 'module_version':
+                                            version = value
+                                        elif attr_name == 'module_author':
+                                            author = value
+                                        break
+                                    elif isinstance(node.value, ast.Attribute):
+                                        # Handle ModuleCategory.SOURCE etc
+                                        if attr_name == 'module_category':
+                                            if hasattr(node.value, 'attr'):
+                                                category_name = node.value.attr
+                                                # Map to lowercase
+                                                category = category_name.lower()
+                        except:
+                            # If source parsing fails, use defaults
+                            pass
+                    break
 
         # Allow overriding extracted metadata
         name = override_metadata.get("name", name)
@@ -370,53 +403,18 @@ def load_plugin(plugin_path: str) -> bool:
         return False
 
 
-# Backward compatibility: provide MODULE_REGISTRY dict-like interface
-class _RegistryCompat:
-    """Compatibility wrapper to make registry behave like a dict."""
-
-    def __getitem__(self, key):
-        result = _global_registry.get(key)
-        if result is None:
-            raise KeyError(f"Module '{key}' not found in registry")
-        return result
-
-    def __contains__(self, key):
-        return _global_registry.get(key) is not None
-
-    def get(self, key, default=None):
-        return _global_registry.get(key) or default
-
-    def keys(self):
-        return _global_registry.list_modules()
-
-    def values(self):
-        return _global_registry.get_all().values()
-
-    def items(self):
-        return _global_registry.get_all().items()
-
-    def __iter__(self):
-        return iter(_global_registry.list_modules())
-
-    def __len__(self):
-        return _global_registry.count()
-
-
-# Create the compatibility object
-MODULE_REGISTRY = _RegistryCompat()
-
+# Export public API
 __all__ = [
     "ModuleRegistry",
     "get_registry",
     "register_module",
     "discover_modules",
     "load_plugin",
-    "MODULE_REGISTRY",
     "initialize_modules",
 ]
 
 
-def initialize_modules():
+def initialize_modules() -> ModuleRegistry:
     """Initialize the module registry.
 
     This function:
@@ -429,8 +427,7 @@ def initialize_modules():
 
     # Auto-discover and register all modules in the modules package
     # This will import all .py files and trigger their @register_module decorators
-    count = discover_modules("src.gui.modules")
-
+    discover_modules("src.gui.modules")
     logger.info(f"Auto-discovered and initialized {registry.count()} modules")
 
     return registry

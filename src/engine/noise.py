@@ -65,7 +65,6 @@ Note:
 
 import numpy as np
 
-from constants import DEFAULT_SAMPLE_RATE
 from src.constants import DEFAULT_SAMPLE_RATE
 
 

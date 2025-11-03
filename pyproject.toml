@@ -10,10 +10,11 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.2.6",
     "scipy",
-    "sounddevice>=0.5.2",
-    "librosa>=0.11.0",
-    "pyqt6",
-
+    "sounddevice>=0.5.2", # Audio I/O
+    "mido", # Midi-support
+    "python-rtmidi>=1.5.8", # Midi I/O
+    "librosa>=0.11.0", # Audio analysis
+    "pyqt6", # GUI library
     # used in examples
     "pyqtgraph>=0.13.7",
     "notebook>=7.4.7",

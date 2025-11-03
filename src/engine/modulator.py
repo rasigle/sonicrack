@@ -226,9 +226,27 @@ class ADSREnvelope(Modulator):
         return self.val
 
     def trigger_release(self):
+        """Trigger the release phase of the envelope."""
         self.stepper = self._get_r_stepper()
         self._phase = "release"
         self._phase_position = 0
+
+    def trigger_note_on(self):
+        """Trigger note on - resets envelope to attack phase.
+
+        This is an alias for resetting the envelope, compatible with MIDI note on.
+        """
+        self.ended = False
+        self._phase = "attack"
+        self._phase_position = 0
+        self.val = 0
+
+    def trigger_note_off(self):
+        """Trigger note off - starts release phase.
+
+        This is an alias for trigger_release(), compatible with MIDI note off.
+        """
+        self.trigger_release()
 
     def get_samples_iterator(
         self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False

@@ -9,7 +9,7 @@ The builder automatically generates methods for all registered components,
 eliminating the need to manually add methods when new components are created.
 
 Example:
-    >>> from builder import PatchBuilder
+    >>> from src.builder import PatchBuilder
     >>>
     >>> # Methods are automatically available for all registered components
     >>> patch = (PatchBuilder("My Synth")

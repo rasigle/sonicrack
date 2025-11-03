@@ -6,7 +6,7 @@ and restore them, including all modules, connections, and parameters.
 
 import json
 import logging
-from typing import Any, Tuple, Optional
+from typing import Any
 from pathlib import Path
 from datetime import datetime
 
@@ -23,7 +23,7 @@ class PresetManager:
     - Metadata (name, author, tags, etc.)
     """
 
-    def __init__(self, preset_directory: Optional[Path] = None):
+    def __init__(self, preset_directory: Path | None = None):
         """Initialize the preset manager.
 
         Args:
@@ -40,13 +40,13 @@ class PresetManager:
     def save_preset(
         self,
         modules: list[Any],
-        connections: list[Tuple[Any, Any]],
+        connections: list[tuple[Any, Any]],
         name: str,
         author: str = "",
         description: str = "",
         tags: list[str] = None,
         category: str = "User",
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """Save a patch as a preset.
 
         Args:
@@ -118,7 +118,7 @@ class PresetManager:
             logger.error(f"Failed to save preset: {e}", exc_info=True)
             return None
 
-    def load_preset(self, filepath: Path) -> Optional[dict[str, Any]]:
+    def load_preset(self, filepath: Path) -> dict[str, Any] | None:
         """Load a preset from file.
 
         Args:
@@ -138,7 +138,7 @@ class PresetManager:
             logger.error(f"Failed to load preset: {e}", exc_info=True)
             return None
 
-    def list_presets(self, category: Optional[str] = None) -> list[dict[str, Any]]:
+    def list_presets(self, category: str | None = None) -> list[dict[str, Any]]:
         """List available presets.
 
         Args:
@@ -245,7 +245,7 @@ class PresetManager:
             logger.error(f"Failed to export preset: {e}", exc_info=True)
             return False
 
-    def import_preset(self, import_path: Path) -> Optional[Path]:
+    def import_preset(self, import_path: Path) -> Path | None:
         """Import a preset from an external location.
 
         Args:

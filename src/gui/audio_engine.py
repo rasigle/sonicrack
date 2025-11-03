@@ -1,7 +1,7 @@
 """Audio engine for real-time synthesis and playback."""
 
 import logging
-from typing import Optional, Any
+from typing import Any
 
 import numpy as np
 import sounddevice as sd
@@ -43,7 +43,7 @@ class AudioEngine(QObject):
         self.master_volume: float = 0.7
 
         # Buffer for visualization
-        self.current_buffer: Optional[np.ndarray] = None
+        self.current_buffer: np.ndarray | None = None
 
     def set_patch(self, patch: Any):
         """Set the audio patch to play.
@@ -180,7 +180,7 @@ class AudioEngine(QObject):
         except Exception as e:
             logger.error(f"Failed to stop playback: {e}", exc_info=True)
 
-    def generate_samples(self, num_samples: int) -> Optional[np.ndarray]:
+    def generate_samples(self, num_samples: int) -> np.ndarray | None:
         """Generate samples from the patch without playback.
 
         Args:

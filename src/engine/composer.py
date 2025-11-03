@@ -10,7 +10,7 @@ Classes:
     WaveAdder: Parallel mixer for combining multiple signal generators.
 
 Example:
-    >>> from engine import SineOscillator, Volume, Panner
+    >>> from src.engine import SineOscillator, Volume, Panner
     >>>
     >>> # Serial processing with Chain
     >>> osc = SineOscillator(440)
@@ -102,7 +102,7 @@ class Composer(ABC):
             ValueError: If mode is not one of "auto", "iterator", or "vectorized".
 
         Examples:
-            >>> from engine import SineOscillator, Volume
+            >>> from src.engine import SineOscillator, Volume
             >>>
             >>> chain = Chain(SineOscillator(), Volume(0.5))
             >>> samples1 = chain.get_samples(1000)  # Auto mode

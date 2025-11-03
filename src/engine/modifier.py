@@ -15,7 +15,7 @@ Classes:
     Clipper: Clips signals to specified range.
 
 Example:
-    >>> from engine import SineOscillator, Chain
+    >>> from src.engine import SineOscillator, Chain
     >>>
     >>> osc = SineOscillator(440)
     >>> volume = Volume(0.5)
@@ -30,7 +30,7 @@ Note:
 
 from abc import abstractmethod, ABC
 from collections.abc import Iterable
-from typing import Union, Tuple, Any
+from typing import Any
 
 import numpy as np
 
@@ -43,9 +43,7 @@ class Modifier(ABC):
     """Base class for all modifiers."""
 
     @abstractmethod
-    def __call__(
-        self, val: Union[float, Tuple[float, ...]]
-    ) -> Union[float, Tuple[float, ...]]:
+    def __call__(self, val: float | tuple[float, ...]) -> float | tuple[float, ...]:
         """Apply modification to a value.
 
         Args:
@@ -112,8 +110,8 @@ class Panner(Modifier):
         self._right_gain = np.sin(angle)
 
     def __call__(
-        self, val: Union[float, np.ndarray]
-    ) -> Union[Tuple[float, float], Tuple[np.ndarray, np.ndarray]]:
+        self, val: float | np.ndarray
+    ) -> tuple[float, float] | tuple[np.ndarray, np.ndarray]:
         """Convert mono signal to stereo with panning.
 
         Args:
@@ -127,7 +125,7 @@ class Panner(Modifier):
 
         return self._left_gain * val, self._right_gain * val
 
-    def pan_vectorized(self, samples: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def pan_vectorized(self, samples: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Apply panning to an array of samples (vectorized).
 
         Args:
@@ -156,7 +154,7 @@ class ModulatedPanner(Panner):
         modulator: The modulator instance.
 
     Example:
-        >>> from engine import SineOscillator, ModulatedPanner, Chain
+        >>> from src.engine import SineOscillator, ModulatedPanner, Chain
         >>> # LFO oscillates between -1 and 1, directly controlling pan
         >>> lfo = SineOscillator(4)  # 4 Hz auto-pan, no wave_range needed!
         >>> panner = ModulatedPanner(lfo)
@@ -209,7 +207,7 @@ class ModulatedPanner(Panner):
 
     def pan_vectorized(
         self, samples: np.ndarray, num_samples: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Apply modulated panning to an array of samples (fully vectorized).
 
         Args:
@@ -282,8 +280,8 @@ class Volume(Modifier):
         logger.debug(f"Volume initialized with amplitude: {amplitude}")
 
     def __call__(
-        self, val: Union[float, Tuple[float, ...], np.ndarray]
-    ) -> Union[float, Tuple[float, ...], np.ndarray]:
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
         """Apply volume scaling to input.
 
         Args:
@@ -432,8 +430,8 @@ class Frequency(Modifier):
         logger.debug(f"Frequency initialized with multiplier: {frequency}")
 
     def __call__(
-        self, val: Union[float, Tuple[float, ...], np.ndarray]
-    ) -> Union[float, Tuple[float, ...], np.ndarray]:
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
         """Apply frequency scaling to input.
 
         Args:
@@ -590,18 +588,18 @@ class Clipper(Modifier):
         logger.debug(f"Clipper initialized with range: ({self._min}, {self._max})")
 
     @property
-    def wave_range(self) -> Tuple[float, float]:
+    def wave_range(self) -> tuple[float, float]:
         """tuple[float, float]: Current clipping range (min, max)."""
         return self._min, self._max
 
     @wave_range.setter
-    def wave_range(self, value: Tuple[float, float]):
+    def wave_range(self, value: tuple[float, float]):
         """Set clipping range and update min/max values."""
         self._min, self._max = value
 
     def __call__(
-        self, val: Union[float, Tuple[float, ...], np.ndarray]
-    ) -> Union[float, Tuple[float, ...], np.ndarray]:
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
         """Clip input value(s) to range.
 
         Args:

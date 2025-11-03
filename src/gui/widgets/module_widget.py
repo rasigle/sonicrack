@@ -1,7 +1,9 @@
 """Base module widget for the modular synth interface."""
 
+from __future__ import annotations
+
 from abc import ABCMeta
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QRectF, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient, QFont
@@ -13,9 +15,12 @@ from PyQt6.QtWidgets import (
     QGraphicsProxyWidget,
 )
 
-from gui.audio_module_interface import ModuleCategory
 from src.gui.audio_module_interface import AudioModuleInterface
 from src.gui.patch_canvas import Port
+
+
+if TYPE_CHECKING:
+    from src.gui.audio_module_interface import ModuleCategory
 
 
 # Create a compatible metaclass that combines QGraphicsWidget's metaclass with ABCMeta

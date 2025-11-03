@@ -12,7 +12,6 @@ Example:
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Default log level
 DEFAULT_LOG_LEVEL = logging.INFO
@@ -30,7 +29,7 @@ LOGS_DIR.mkdir(exist_ok=True)
 
 def setup_logging(
     level: int = DEFAULT_LOG_LEVEL,
-    log_file: Optional[str] = None,
+    log_file: str | None = None,
     console_output: bool = True,
     detailed: bool = False,
 ) -> None:
@@ -72,7 +71,7 @@ def setup_logging(
         root_logger.addHandler(file_handler)
 
 
-def get_logger(name: str, level: Optional[int] = None) -> logging.Logger:
+def get_logger(name: str, level: int | None = None) -> logging.Logger:
     """Get a logger instance for a specific module.
 
     Args:

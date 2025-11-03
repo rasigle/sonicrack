@@ -1,6 +1,5 @@
 """Real-time waveform display widget."""
 
-from typing import Optional
 import numpy as np
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt
@@ -13,7 +12,7 @@ class WaveformDisplay(QWidget):
     Shows the time-domain representation of audio signals.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         """Initialize the waveform display.
 
         Args:
@@ -22,7 +21,7 @@ class WaveformDisplay(QWidget):
         super().__init__(parent)
 
         self.setMinimumSize(400, 150)
-        self.samples: Optional[np.ndarray] = None
+        self.samples: np.ndarray | None = None
         self.display_samples = 2048  # Number of samples to display
         self.is_stereo = False
 

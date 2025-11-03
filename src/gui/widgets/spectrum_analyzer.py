@@ -1,6 +1,5 @@
 """Real-time spectrum analyzer widget."""
 
-from typing import Optional
 import numpy as np
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt
@@ -13,7 +12,7 @@ class SpectrumAnalyzer(QWidget):
     Shows the frequency-domain representation of audio signals using FFT.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         """Initialize the spectrum analyzer.
 
         Args:
@@ -22,7 +21,7 @@ class SpectrumAnalyzer(QWidget):
         super().__init__(parent)
 
         self.setMinimumSize(400, 150)
-        self.fft_data: Optional[np.ndarray] = None
+        self.fft_data: np.ndarray | None = None
         self.fft_bins = 256
 
         # Visual properties

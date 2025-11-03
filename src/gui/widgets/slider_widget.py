@@ -1,6 +1,5 @@
 """Slider widgets for parameter control."""
 
-from typing import Optional
 from PyQt6.QtWidgets import QWidget, QSlider, QLabel, QVBoxLayout, QHBoxLayout
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -15,8 +14,8 @@ class VSlider(QWidget):
         label: str = "",
         min_value: float = 0.0,
         max_value: float = 1.0,
-        default_value: Optional[float] = None,
-        parent: Optional[QWidget] = None,
+        default_value: float | None = None,
+        parent: QWidget | None = None,
     ):
         """Initialize vertical slider.
 
@@ -94,8 +93,8 @@ class HSlider(QWidget):
         label: str = "",
         min_value: float = 0.0,
         max_value: float = 1.0,
-        default_value: Optional[float] = None,
-        parent: Optional[QWidget] = None,
+        default_value: float | None = None,
+        parent: QWidget | None = None,
     ):
         """Initialize horizontal slider.
 

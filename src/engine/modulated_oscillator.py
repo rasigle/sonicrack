@@ -9,7 +9,7 @@ Classes:
     ModulatedOscillator: Combines an oscillator with modulators for dynamic synthesis.
 
 Example:
-    >>> from engine import SineOscillator, ADSREnvelope
+    >>> from src.engine import SineOscillator, ADSREnvelope
     >>>
     >>> # Create oscillator and envelope
     >>> osc = SineOscillator(frequency=440, amplitude=1.0)
@@ -344,7 +344,7 @@ class ModulatedOscillator:
             ValueError: If mode is not one of "auto", "iterator", or "vectorized".
 
         Examples:
-            >>> from engine import SineOscillator, ADSREnvelope, ModulatedOscillator
+            >>> from src.engine import SineOscillator, ADSREnvelope, ModulatedOscillator
             >>>
             >>> osc = SineOscillator(440)
             >>> env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)

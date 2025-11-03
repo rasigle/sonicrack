@@ -584,7 +584,7 @@ class ModularSynthWindow(QMainWindow):
                             to_port = to_module.input_ports[to_port_idx]
 
                             # Create cable
-                            from .patch_canvas import Cable
+                            from src.gui.patch_canvas import Cable
 
                             cable = Cable(from_port, to_port)
                             self.patch_canvas.scene.addItem(cable)
@@ -616,10 +616,5 @@ def is_module_widget(obj: Any) -> bool:
     Returns:
         True if obj is a ModuleWidget, False otherwise
     """
-
-    logger.info(obj)
-    logger.info(type(obj))
     from src.gui.audio_module_interface import AudioModuleInterface
-
-    logger.info(isinstance(obj, AudioModuleInterface))
     return isinstance(obj, AudioModuleInterface)

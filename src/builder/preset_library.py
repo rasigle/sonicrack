@@ -5,7 +5,7 @@ audio synthesis builder in a structured manner with category support.
 """
 
 from __future__ import annotations
-from typing import Optional, Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 from pathlib import Path
 import json
 
@@ -53,7 +53,7 @@ class PresetLibrary:
         self.preset_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Initialized preset library at {self.preset_dir}")
 
-    def list_presets(self, category: Optional[str] = None) -> list[str]:
+    def list_presets(self, category: str | None = None) -> list[str]:
         """List available builder.
 
         Args:
@@ -108,9 +108,9 @@ class PresetLibrary:
     def save(
         self,
         builder: "PatchBuilder",
-        name: Optional[str] = None,
-        category: Optional[str] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        name: str | None = None,
+        category: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Save a patch as a preset.
 
@@ -122,7 +122,7 @@ class PresetLibrary:
                      Note: patch description is automatically included
 
         Example:
-            >>> from builder import PatchBuilder, PresetLibrary
+            >>> from src.builder import PatchBuilder, PresetLibrary
             >>>library = PresetLibrary("builder/")
             >>> builder = (PatchBuilder("Warm Lead")
             ...     .set_description("Smooth lead sound")

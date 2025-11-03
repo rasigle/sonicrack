@@ -1,6 +1,5 @@
 """Rotary knob widget for parameter control."""
 
-from typing import Optional
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt, QPointF, pyqtSignal, QRectF
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
@@ -19,8 +18,8 @@ class Knob(QWidget):
         label: str = "",
         min_value: float = 0.0,
         max_value: float = 1.0,
-        default_value: Optional[float] = None,
-        parent: Optional[QWidget] = None,
+        default_value: float | None = None,
+        parent: QWidget | None = None,
     ):
         """Initialize the knob.
 

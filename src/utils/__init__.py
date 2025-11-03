@@ -13,7 +13,7 @@ Quick imports:
 """
 
 # Audio utilities
-from .utils import (
+from src.utils.utils import (
     # Primary API (recommended)
     to_int16,
     save_wave,
@@ -23,7 +23,7 @@ from .utils import (
 )
 
 # Logging utilities
-from .logging_config import (
+from src.utils.logging_config import (
     setup_logging,
     get_logger,
     get_engine_logger,

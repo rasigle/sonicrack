@@ -13,7 +13,7 @@ Classes:
     ComponentRegistry: Central registry for all components
 
 Example:
-    >>> from builder import registry, ComponentDescriptor, PatchBuilder
+    >>> from src.builder import registry, ComponentDescriptor, PatchBuilder
     >>>
     >>> # Register a new oscillator
     >>> registry.register(ComponentDescriptor(
@@ -29,7 +29,7 @@ Example:
 """
 
 from __future__ import annotations
-from typing import Any, Callable, Optional, Type
+from typing import Any, Callable, Type
 from dataclasses import dataclass
 from enum import Enum
 
@@ -69,10 +69,10 @@ class ComponentDescriptor:
     factory: Type | Callable
     config_params: list[str]
     description: str = ""
-    method_name: Optional[str] = None
-    builder_handler: Optional[Callable] = None
-    serializer: Optional[Callable] = None
-    deserializer: Optional[Callable] = None
+    method_name: str | None = None
+    builder_handler: Callable | None = None
+    serializer: Callable | None = None
+    deserializer: Callable | None = None
 
     def __post_init__(self):
         """Set defaults for optional fields."""
@@ -148,7 +148,7 @@ class ComponentRegistry:
     deserialization.
 
     Example:
-        >>> from builder.component_registry import registry
+        >>> from src.builder.component_registry import registry
         >>>
         >>> # Register a component
         >>> registry.register(descriptor)
@@ -192,7 +192,7 @@ class ComponentRegistry:
             f"Registered component: {descriptor.name} ({descriptor.category.value})"
         )
 
-    def get(self, name: str) -> Optional[ComponentDescriptor]:
+    def get(self, name: str) -> ComponentDescriptor | None:
         """Get component descriptor by name.
 
         Args:

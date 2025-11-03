@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
@@ -102,8 +102,8 @@ class LFOModule(ModuleWidget):
 
     def create_component(
         self,
-        input_components: Optional[list[Any]] = None,
-        modulation_components: Optional[dict[str, Any]] = None,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
     ):
         """Create the LFO component."""
         wave_type = self.wave_combo.currentText()

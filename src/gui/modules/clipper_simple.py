@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -62,8 +62,8 @@ class ClipperModule(ModuleWidget):
 
     def create_component(
         self,
-        input_components: Optional[list[Any]] = None,
-        modulation_components: Optional[dict[str, Any]] = None,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
     ):
         """Create the clipper component."""
         threshold = self.threshold_knob.get_value()

@@ -11,12 +11,19 @@ from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "Volume"
 
+
 class VolumeModule(ModuleWidget):
     """Volume/Gain module."""
 
     def __init__(self):
         """Initialize volume module."""
-        super().__init__(TITLE, category= "modifier", width=140, height=180, color=QColor(180, 120, 80))
+        super().__init__(
+            TITLE,
+            category="modifier",
+            width=140,
+            height=180,
+            color=QColor(180, 120, 80),
+        )
 
         # Add ports
         self.in_port = self.add_input_port("In")
@@ -31,7 +38,9 @@ class VolumeModule(ModuleWidget):
 
         # Volume knob
         self.volume_knob = Knob("Volume", 0.0, 2.0, 1.0)
-        self.volume_knob.value_changed.connect(lambda: self.parameter_changed.emit("volume", self.volume_knob.get_value()))
+        self.volume_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("volume", self.volume_knob.get_value())
+        )
         layout.addWidget(self.volume_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.controls_widget.setLayout(layout)
@@ -58,8 +67,11 @@ class VolumeModule(ModuleWidget):
         """Volume can optionally use Mod port for modulation."""
         return ["Mod"]
 
-    def create_component(self, input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None):
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ):
         """Create the volume component."""
         volume = self.volume_knob.get_value()
 

@@ -10,6 +10,7 @@ from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "Mixer"
 
+
 class MixerModule(ModuleWidget):
     """Mixer module for combining multiple audio signals.
 
@@ -18,7 +19,9 @@ class MixerModule(ModuleWidget):
 
     def __init__(self):
         """Initialize mixer module."""
-        super().__init__(TITLE, category="mixer", width=160, height=200, color=QColor(100, 150, 100))
+        super().__init__(
+            TITLE, category="mixer", width=160, height=200, color=QColor(100, 150, 100)
+        )
 
         # Add multiple input ports
         self.in1_port = self.add_input_port("In 1")
@@ -57,8 +60,11 @@ class MixerModule(ModuleWidget):
         """Return MIXER since this combines multiple inputs."""
         return ModuleCategory.MIXER
 
-    def create_component(self, input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None):
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ):
         """Create the mixer component."""
         if input_components and len(input_components) > 0:
             return WaveAdder(*input_components)

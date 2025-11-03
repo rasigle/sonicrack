@@ -24,11 +24,7 @@ class AudioEngine(QObject):
     playback_stopped = pyqtSignal()
     error_occurred = pyqtSignal(str)
 
-    def __init__(
-        self,
-        sample_rate: int = DEFAULT_SAMPLE_RATE,
-        buffer_size: int = 2048
-    ):
+    def __init__(self, sample_rate: int = DEFAULT_SAMPLE_RATE, buffer_size: int = 2048):
         """Initialize the audio engine.
 
         Args:
@@ -56,6 +52,7 @@ class AudioEngine(QObject):
             patch: Audio component (oscillator, chain, etc.)
         """
         self.patch = patch
+
         logger.info(f"Patch set: {type(patch).__name__}")
 
     def set_master_volume(self, volume: float):
@@ -119,8 +116,8 @@ class AudioEngine(QObject):
             if len(stereo) >= frames:
                 outdata[:] = stereo[:frames].astype(np.float32)
             else:
-                outdata[:len(stereo)] = stereo.astype(np.float32)
-                outdata[len(stereo):] = 0
+                outdata[: len(stereo)] = stereo.astype(np.float32)
+                outdata[len(stereo) :] = 0
 
             # Store for visualization
             self.current_buffer = stereo[:frames].copy()
@@ -144,7 +141,7 @@ class AudioEngine(QObject):
 
         try:
             # Reset patch components
-            if hasattr(self.patch, 'reset'):
+            if hasattr(self.patch, "reset"):
                 self.patch.reset()
 
             # Open audio stream
@@ -153,7 +150,7 @@ class AudioEngine(QObject):
                 channels=2,
                 blocksize=self.buffer_size,
                 callback=self._audio_callback,
-                dtype=np.float32
+                dtype=np.float32,
             )
 
             self.stream.start()
@@ -222,4 +219,3 @@ class AudioEngine(QObject):
     def cleanup(self):
         """Clean up resources."""
         self.stop_playback()
-

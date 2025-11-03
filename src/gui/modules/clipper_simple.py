@@ -11,12 +11,19 @@ from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "Clipper"
 
+
 class ClipperModule(ModuleWidget):
     """Clipper module for distortion/limiting."""
 
     def __init__(self):
         """Initialize clipper module."""
-        super().__init__(title=TITLE, category="modifier", width=140, height=180, color=QColor(200, 150, 80))
+        super().__init__(
+            title=TITLE,
+            category="modifier",
+            width=140,
+            height=180,
+            color=QColor(200, 150, 80),
+        )
 
         # Add ports
         self.in_port = self.add_input_port("In")
@@ -30,7 +37,11 @@ class ClipperModule(ModuleWidget):
 
         # Threshold knob
         self.threshold_knob = Knob("Threshold", 0.1, 1.0, 1.0)
-        self.threshold_knob.value_changed.connect(lambda: self.parameter_changed.emit("threshold", self.threshold_knob.get_value()))
+        self.threshold_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit(
+                "threshold", self.threshold_knob.get_value()
+            )
+        )
         layout.addWidget(self.threshold_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.controls_widget.setLayout(layout)
@@ -51,8 +62,11 @@ class ClipperModule(ModuleWidget):
         """Clipper requires the In port to be connected."""
         return ["In"]
 
-    def create_component(self, input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None):
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ):
         """Create the clipper component."""
         threshold = self.threshold_knob.get_value()
         return Clipper((-threshold, threshold))

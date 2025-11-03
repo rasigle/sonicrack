@@ -6,9 +6,19 @@ from typing import Any
 from PyQt6.QtCore import Qt, QTimer, QPointF
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QToolBar, QLabel, QStatusBar, QMessageBox,
-    QGroupBox, QScrollArea, QSplitter, QDialog
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QToolBar,
+    QLabel,
+    QStatusBar,
+    QMessageBox,
+    QGroupBox,
+    QScrollArea,
+    QSplitter,
+    QDialog,
 )
 
 from src.gui.audio_engine import AudioEngine
@@ -129,7 +139,9 @@ class ModularSynthWindow(QMainWindow):
         for module_name in MODULE_REGISTRY.keys():
             btn = QPushButton(f"+ {module_name}")
             btn.setMinimumHeight(35)
-            btn.clicked.connect(lambda checked, name=module_name: self._add_module(name))
+            btn.clicked.connect(
+                lambda checked, name=module_name: self._add_module(name)
+            )
             scroll_layout.addWidget(btn)
 
         scroll_layout.addStretch()
@@ -187,7 +199,6 @@ class ModularSynthWindow(QMainWindow):
         btn_layout.addWidget(self.stop_btn)
 
         controls_layout.addLayout(btn_layout)
-
 
         controls_group.setLayout(controls_layout)
         layout.addWidget(controls_group)
@@ -299,13 +310,16 @@ class ModularSynthWindow(QMainWindow):
             True if compilation succeeded, False otherwise
         """
         # Get all modules and connections
-        modules = [item for item in self.patch_canvas.scene.items()
-                   if is_module_widget(item)]
+        modules = [
+            item for item in self.patch_canvas.scene.items() if is_module_widget(item)
+        ]
         connections = self.patch_canvas.get_connections()
 
         if not modules:
             if show_messages:
-                QMessageBox.warning(self, "No Modules", "Add some modules to the canvas first!")
+                QMessageBox.warning(
+                    self, "No Modules", "Add some modules to the canvas first!"
+                )
             # Clear patch and stop playback
             self.audio_engine.set_patch(None)
             return False
@@ -316,7 +330,9 @@ class ModularSynthWindow(QMainWindow):
 
         if errors:
             if show_messages:
-                error_msg = "Patch has errors:\n\n" + "\n".join(f"• {err}" for err in errors)
+                error_msg = "Patch has errors:\n\n" + "\n".join(
+                    f"• {err}" for err in errors
+                )
                 QMessageBox.warning(self, "Compilation Errors", error_msg)
             logger.warning(f"Patch compilation errors: {errors}")
 
@@ -344,7 +360,9 @@ class ModularSynthWindow(QMainWindow):
             return True
         else:
             if show_messages:
-                QMessageBox.critical(self, "Compilation Failed", "Failed to compile patch.")
+                QMessageBox.critical(
+                    self, "Compilation Failed", "Failed to compile patch."
+                )
             logger.error("Patch compilation failed")
             # Clear patch on failure
             self.audio_engine.set_patch(None)
@@ -389,10 +407,13 @@ class ModularSynthWindow(QMainWindow):
 
     def _on_cable_disconnected(self, start_port, end_port):
         """Handle cable disconnection."""
-        logger.debug(f"Cable disconnected: {start_port.port_name} -> {end_port.port_name}")
+        logger.debug(
+            f"Cable disconnected: {start_port.port_name} -> {end_port.port_name}"
+        )
 
         # Check if output module was disconnected
         from src.gui.module_registry import OutputModule
+
         if isinstance(end_port.parent_module, OutputModule):
             # Output was disconnected - stop playback and clear patch
             self.audio_engine.stop_playback()
@@ -424,9 +445,10 @@ class ModularSynthWindow(QMainWindow):
     def _new_patch(self):
         """Create a new patch."""
         reply = QMessageBox.question(
-            self, "New Patch",
+            self,
+            "New Patch",
             "Clear the current patch?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
@@ -445,15 +467,18 @@ class ModularSynthWindow(QMainWindow):
     def _save_preset(self):
         """Save the current patch as a preset."""
         # Get all modules and connections
-        modules = [item for item in self.patch_canvas.scene.items()
-                  if hasattr(item, 'component_category')]
+        modules = [
+            item
+            for item in self.patch_canvas.scene.items()
+            if hasattr(item, "component_category")
+        ]
         connections = self.patch_canvas.get_connections()
 
         if not modules:
             QMessageBox.warning(
                 self,
                 "No Modules",
-                "Add some modules to the canvas before saving a preset."
+                "Add some modules to the canvas before saving a preset.",
             )
             return
 
@@ -466,26 +491,20 @@ class ModularSynthWindow(QMainWindow):
             filepath = self.preset_manager.save_preset(
                 modules=modules,
                 connections=connections,
-                name=metadata['name'],
-                author=metadata['author'],
-                description=metadata['description'],
-                tags=metadata['tags'],
-                category=metadata['category']
+                name=metadata["name"],
+                author=metadata["author"],
+                description=metadata["description"],
+                tags=metadata["tags"],
+                category=metadata["category"],
             )
 
             if filepath:
                 QMessageBox.information(
-                    self,
-                    "Success",
-                    f"Preset saved successfully!\n\n{filepath.name}"
+                    self, "Success", f"Preset saved successfully!\n\n{filepath.name}"
                 )
                 self.statusbar.showMessage(f"Preset saved: {metadata['name']}")
             else:
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    "Failed to save preset."
-                )
+                QMessageBox.critical(self, "Error", "Failed to save preset.")
 
     def _load_preset(self):
         """Load a preset and rebuild the patch."""
@@ -510,9 +529,9 @@ class ModularSynthWindow(QMainWindow):
             # Create modules
             module_map = {}  # Maps preset module IDs to actual module instances
 
-            for module_data in preset_data.get('modules', []):
-                module_type = module_data['type']
-                module_id = module_data['id']
+            for module_data in preset_data.get("modules", []):
+                module_type = module_data["type"]
+                module_id = module_data["id"]
 
                 if module_type in MODULE_REGISTRY:
                     # Create module
@@ -523,20 +542,20 @@ class ModularSynthWindow(QMainWindow):
                     module.parameter_changed.connect(self._on_parameter_changed)
 
                     # Restore custom name if present
-                    custom_name = module_data.get('custom_name', '')
+                    custom_name = module_data.get("custom_name", "")
                     if custom_name:
                         module.set_custom_name(custom_name)
 
                     # Set position
-                    pos_data = module_data.get('position', {})
-                    x = pos_data.get('x', 0)
-                    y = pos_data.get('y', 0)
+                    pos_data = module_data.get("position", {})
+                    x = pos_data.get("x", 0)
+                    y = pos_data.get("y", 0)
 
                     # Add to canvas
                     self.patch_canvas.add_module(module, QPointF(x, y))
 
                     # Set parameters
-                    params = module_data.get('parameters', {})
+                    params = module_data.get("parameters", {})
                     module.set_parameters(params)
 
                     # Store in map
@@ -545,11 +564,11 @@ class ModularSynthWindow(QMainWindow):
                     logger.warning(f"Unknown module type: {module_type}")
 
             # Create connections
-            for conn_data in preset_data.get('connections', []):
-                from_module_id = conn_data['from_module']
-                from_port_idx = conn_data['from_port']
-                to_module_id = conn_data['to_module']
-                to_port_idx = conn_data['to_port']
+            for conn_data in preset_data.get("connections", []):
+                from_module_id = conn_data["from_module"]
+                from_port_idx = conn_data["from_port"]
+                to_module_id = conn_data["to_module"]
+                to_port_idx = conn_data["to_port"]
 
                 # Get modules
                 from_module = module_map.get(from_module_id)
@@ -565,6 +584,7 @@ class ModularSynthWindow(QMainWindow):
 
                             # Create cable
                             from .patch_canvas import Cable
+
                             cable = Cable(from_port, to_port)
                             self.patch_canvas.scene.addItem(cable)
 
@@ -572,23 +592,18 @@ class ModularSynthWindow(QMainWindow):
             self._compile_patch()
 
             # Show success message
-            preset_name = preset_data.get('metadata', {}).get('name', 'Unknown')
+            preset_name = preset_data.get("metadata", {}).get("name", "Unknown")
             self.statusbar.showMessage(f"Loaded preset: {preset_name}")
             logger.info(f"Preset loaded: {preset_name}")
 
         except Exception as e:
             logger.error(f"Failed to apply preset: {e}", exc_info=True)
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Failed to load preset:\n{e}"
-            )
+            QMessageBox.critical(self, "Error", f"Failed to load preset:\n{e}")
 
     def closeEvent(self, event):
         """Handle window close event."""
         self.audio_engine.cleanup()
         event.accept()
-
 
 
 def is_module_widget(obj: Any) -> bool:

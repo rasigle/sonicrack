@@ -18,5 +18,5 @@ def show_about(parent: QWidget):
         "<p>Version 0.1.0</p>"
         "</ul>"
         "<p><b>Author:</b></p>"
-        "<p>Rainer Sigle (rainer.sigle@live.de)</p>"
+        "<p>Rainer Sigle (rainer.sigle@live.de)</p>",
     )

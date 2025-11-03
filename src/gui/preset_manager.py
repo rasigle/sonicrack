@@ -45,7 +45,7 @@ class PresetManager:
         author: str = "",
         description: str = "",
         tags: List[str] = None,
-        category: str = "User"
+        category: str = "User",
     ) -> Optional[Path]:
         """Save a patch as a preset.
 
@@ -71,10 +71,10 @@ class PresetManager:
                     "tags": tags or [],
                     "category": category,
                     "created": datetime.now().isoformat(),
-                    "version": "1.0"
+                    "version": "1.0",
                 },
                 "modules": [],
-                "connections": []
+                "connections": [],
             }
 
             # Create module ID mapping
@@ -85,13 +85,12 @@ class PresetManager:
                 module_data = {
                     "id": module_id,
                     "type": module.module_title,
-                    "custom_name": module.custom_name if hasattr(module, 'custom_name') else "",
+                    "custom_name": (
+                        module.custom_name if hasattr(module, "custom_name") else ""
+                    ),
                     "component_category": module.get_module_category(),
-                    "position": {
-                        "x": module.pos().x(),
-                        "y": module.pos().y()
-                    },
-                    "parameters": module.get_parameters()
+                    "position": {"x": module.pos().x(), "y": module.pos().y()},
+                    "parameters": module.get_parameters(),
                 }
                 preset_data["modules"].append(module_data)
 
@@ -101,7 +100,7 @@ class PresetManager:
                     "from_module": module_ids[id(start_port.parent_module)],
                     "from_port": start_port.index,
                     "to_module": module_ids[id(end_port.parent_module)],
-                    "to_port": end_port.index
+                    "to_port": end_port.index,
                 }
                 preset_data["connections"].append(connection_data)
 
@@ -109,7 +108,7 @@ class PresetManager:
             filename = self._sanitize_filename(name) + ".json"
             filepath = self.preset_directory / filename
 
-            with open(filepath, 'w', encoding='utf-8') as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(preset_data, f, indent=2)
 
             logger.info(f"Preset saved: {filepath}")
@@ -129,7 +128,7 @@ class PresetManager:
             Preset data dictionary, or None if load failed
         """
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 preset_data = json.load(f)
 
             logger.info(f"Preset loaded: {filepath}")
@@ -215,10 +214,10 @@ class PresetManager:
         # Replace invalid characters with underscore
         invalid_chars = '<>:"/\\|?*'
         for char in invalid_chars:
-            name = name.replace(char, '_')
+            name = name.replace(char, "_")
 
         # Remove leading/trailing whitespace and dots
-        name = name.strip('. ')
+        name = name.strip(". ")
 
         # Limit length
         if len(name) > 100:
@@ -238,6 +237,7 @@ class PresetManager:
         """
         try:
             import shutil
+
             shutil.copy2(filepath, export_path)
             logger.info(f"Preset exported: {export_path}")
             return True
@@ -256,6 +256,7 @@ class PresetManager:
         """
         try:
             import shutil
+
             destination = self.preset_directory / import_path.name
             shutil.copy2(import_path, destination)
             logger.info(f"Preset imported: {destination}")
@@ -263,4 +264,3 @@ class PresetManager:
         except Exception as e:
             logger.error(f"Failed to import preset: {e}", exc_info=True)
             return None
-

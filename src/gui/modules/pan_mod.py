@@ -12,12 +12,19 @@ from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "Panner (Mod)"
 
+
 class PannerModule(ModuleWidget):
     """Panner module for stereo positioning."""
 
     def __init__(self):
         """Initialize panner module."""
-        super().__init__(TITLE, category="modifier", width=140, height=180, color=QColor(180, 80, 180))
+        super().__init__(
+            TITLE,
+            category="modifier",
+            width=140,
+            height=180,
+            color=QColor(180, 80, 180),
+        )
 
         # Add ports
         self.in_port = self.add_input_port("In")
@@ -32,7 +39,9 @@ class PannerModule(ModuleWidget):
 
         # Pan knob
         self.pan_knob = Knob("Pan", -1.0, 1.0, 0.0)
-        self.pan_knob.value_changed.connect(lambda: self.parameter_changed.emit("pan", self.pan_knob.get_value()))
+        self.pan_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("pan", self.pan_knob.get_value())
+        )
         layout.addWidget(self.pan_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.controls_widget.setLayout(layout)
@@ -59,8 +68,11 @@ class PannerModule(ModuleWidget):
         """Panner can optionally use Mod port for modulation."""
         return ["Mod"]
 
-    def create_component(self, input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None):
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ):
         """Create the panner component."""
         pan = self.pan_knob.get_value()
 

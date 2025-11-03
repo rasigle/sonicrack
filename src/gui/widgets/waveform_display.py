@@ -52,7 +52,7 @@ class WaveformDisplay(QWidget):
         # Downsample if needed
         if len(samples) > self.display_samples:
             step = len(samples) // self.display_samples
-            self.samples = samples[::step][:self.display_samples]
+            self.samples = samples[::step][: self.display_samples]
         else:
             self.samples = samples
 
@@ -159,4 +159,3 @@ class WaveformDisplay(QWidget):
             # Draw "No Signal" text
             painter.setPen(QColor(100, 100, 100))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No Signal")
-

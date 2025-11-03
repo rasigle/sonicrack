@@ -17,10 +17,12 @@ from src.gui.main_window import ModularSynthWindow
 def activate_ui_exception_logging():
     """Activate exception logging for the UI thread."""
     sys._excepthook = sys.excepthook
+
     def exception_hook(exctype, value, traceback):
         print(exctype, value, traceback)
         sys._excepthook(exctype, value, traceback)
         sys.exit(1)
+
     sys.excepthook = exception_hook
 
 
@@ -43,4 +45,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

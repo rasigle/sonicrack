@@ -10,12 +10,19 @@ from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "Output"
 
+
 class OutputModule(ModuleWidget):
     """Output module (sink for audio)."""
 
     def __init__(self):
         """Initialize output module."""
-        super().__init__("Output", category="output", width=140, height=120, color=QColor(200, 80, 80))
+        super().__init__(
+            "Output",
+            category="output",
+            width=140,
+            height=120,
+            color=QColor(200, 80, 80),
+        )
 
         # Add input port
         self.in_port = self.add_input_port("In")
@@ -28,7 +35,11 @@ class OutputModule(ModuleWidget):
 
         # Master volume
         self.volume_knob = Knob("Master", 0.0, 1.0, 0.7)
-        self.volume_knob.value_changed.connect(lambda: self.parameter_changed.emit("master_volume", self.volume_knob.get_value()))
+        self.volume_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit(
+                "master_volume", self.volume_knob.get_value()
+            )
+        )
         layout.addWidget(self.volume_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.controls_widget.setLayout(layout)
@@ -49,8 +60,11 @@ class OutputModule(ModuleWidget):
         """Output requires the In port to be connected."""
         return ["In"]
 
-    def create_component(self, input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None):
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ):
         """Output doesn't create a component, it returns the input component."""
         if input_components and len(input_components) > 0:
             return input_components[0]

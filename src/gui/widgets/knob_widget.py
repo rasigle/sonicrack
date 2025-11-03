@@ -20,7 +20,7 @@ class Knob(QWidget):
         min_value: float = 0.0,
         max_value: float = 1.0,
         default_value: Optional[float] = None,
-        parent: Optional[QWidget] = None
+        parent: Optional[QWidget] = None,
     ):
         """Initialize the knob.
 
@@ -90,7 +90,12 @@ class Knob(QWidget):
         # Draw outer track (background arc) - inverted with gap at bottom
         painter.setPen(QPen(QColor(60, 60, 60), 4))
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        track_rect = QRectF(center_x - radius - 2, center_y - radius - 2, (radius + 2) * 2, (radius + 2) * 2)
+        track_rect = QRectF(
+            center_x - radius - 2,
+            center_y - radius - 2,
+            (radius + 2) * 2,
+            (radius + 2) * 2,
+        )
         # Draw 270-degree arc with gap at bottom (from -45° to 225°)
         painter.drawArc(track_rect, int(-45 * 16), int(270 * 16))
 
@@ -107,12 +112,18 @@ class Knob(QWidget):
         # Arc from min_angle (225°) to current position
         painter.setPen(QPen(QColor(100, 180, 255), 4))
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        value_arc_rect = QRectF(center_x - radius - 2, center_y - radius - 2, (radius + 2) * 2, (radius + 2) * 2)
+        value_arc_rect = QRectF(
+            center_x - radius - 2,
+            center_y - radius - 2,
+            (radius + 2) * 2,
+            (radius + 2) * 2,
+        )
         arc_span = -(self.min_angle - current_angle)  # Negative for counter-clockwise
         painter.drawArc(value_arc_rect, int(self.min_angle * 16), int(arc_span * 16))
 
         # Draw indicator pointer (from center to edge)
         import math
+
         angle_rad = math.radians(current_angle)
 
         # Pointer starts from center, points outward
@@ -124,7 +135,11 @@ class Knob(QWidget):
         end_x = center_x + math.cos(angle_rad) * pointer_end_radius
         end_y = center_y - math.sin(angle_rad) * pointer_end_radius
 
-        painter.setPen(QPen(QColor(255, 200, 50), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.setPen(
+            QPen(
+                QColor(255, 200, 50), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap
+            )
+        )
         painter.drawLine(QPointF(start_x, start_y), QPointF(end_x, end_y))
 
         # Draw center dot for visual clarity
@@ -136,7 +151,9 @@ class Knob(QWidget):
         painter.setPen(QColor(220, 220, 220))
         font = QFont("Arial", 8, QFont.Weight.Bold)
         painter.setFont(font)
-        painter.drawText(QRectF(0, 70, self.width(), 20), Qt.AlignmentFlag.AlignCenter, self.label)
+        painter.drawText(
+            QRectF(0, 70, self.width(), 20), Qt.AlignmentFlag.AlignCenter, self.label
+        )
 
         # Draw value text (larger and more visible)
         value_text = f"{self._value:.2f}"
@@ -149,7 +166,9 @@ class Knob(QWidget):
         font.setWeight(QFont.Weight.Normal)
         painter.setFont(font)
         painter.setPen(QColor(200, 230, 255))
-        painter.drawText(QRectF(0, 52, self.width(), 16), Qt.AlignmentFlag.AlignCenter, value_text)
+        painter.drawText(
+            QRectF(0, 52, self.width(), 16), Qt.AlignmentFlag.AlignCenter, value_text
+        )
 
     def mousePressEvent(self, event):
         """Handle mouse press to start dragging."""

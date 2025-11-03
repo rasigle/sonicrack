@@ -1,11 +1,21 @@
 from typing import Dict, Any, List, Optional
 
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, \
-    QGraphicsProxyWidget
+from PyQt6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QComboBox,
+    QGraphicsProxyWidget,
+)
 
-from src.engine import SineOscillator, SquareOscillator, SawtoothOscillator, \
-    TriangleOscillator
+from src.engine import (
+    SineOscillator,
+    SquareOscillator,
+    SawtoothOscillator,
+    TriangleOscillator,
+)
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob, HSlider
 from src.gui.audio_module_interface import ModuleCategory
@@ -18,8 +28,13 @@ class OscillatorModule(ModuleWidget):
 
     def __init__(self):
         """Initialize oscillator module."""
-        super().__init__(TITLE, category="oscillator", width=220, height=200,
-                         color=QColor(80, 120, 200))
+        super().__init__(
+            TITLE,
+            category="oscillator",
+            width=220,
+            height=200,
+            color=QColor(80, 120, 200),
+        )
 
         # Add output port
         self.out_port = self.add_output_port("Out")
@@ -46,13 +61,14 @@ class OscillatorModule(ModuleWidget):
         knobs_layout = QHBoxLayout()
         self.freq_knob = Knob("Freq (Hz)", 20, 2000, 440)
         self.freq_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("frequency",
-                                                self.freq_knob.get_value()))
+            lambda: self.parameter_changed.emit("frequency", self.freq_knob.get_value())
+        )
         knobs_layout.addWidget(self.freq_knob)
 
         self.amp_knob = Knob("Amplitude", 0.0, 1.0, 0.5)
         self.amp_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("amplitude", self.amp_knob.get_value()))
+            lambda: self.parameter_changed.emit("amplitude", self.amp_knob.get_value())
+        )
         knobs_layout.addWidget(self.amp_knob)
 
         layout.addLayout(knobs_layout)
@@ -60,7 +76,8 @@ class OscillatorModule(ModuleWidget):
         # Phase control
         self.phase_slider = HSlider("Phase", 0, 360, 0)
         self.phase_slider.value_changed.connect(
-            lambda v: self.parameter_changed.emit("phase", v))
+            lambda v: self.parameter_changed.emit("phase", v)
+        )
         layout.addWidget(self.phase_slider)
 
         self.controls_widget.setLayout(layout)
@@ -82,8 +99,11 @@ class OscillatorModule(ModuleWidget):
         self.create_component()
         self.parameter_changed.emit("waveform", wave_type)
 
-    def create_component(self, input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None):
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ):
         """Create the oscillator component."""
         wave_type = self.wave_combo.currentText()
         freq = self.freq_knob.get_value()

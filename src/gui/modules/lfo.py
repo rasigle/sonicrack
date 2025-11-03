@@ -1,16 +1,27 @@
 from typing import Dict, Any, List, Optional
 
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, \
-    QGraphicsProxyWidget
+from PyQt6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QComboBox,
+    QGraphicsProxyWidget,
+)
 
-from src.engine import SineOscillator, SquareOscillator, SawtoothOscillator, \
-    TriangleOscillator
+from src.engine import (
+    SineOscillator,
+    SquareOscillator,
+    SawtoothOscillator,
+    TriangleOscillator,
+)
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob, HSlider
 from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "LFO"
+
 
 class LFOModule(ModuleWidget):
     """LFO (Low Frequency Oscillator) module for modulation.
@@ -20,7 +31,13 @@ class LFOModule(ModuleWidget):
 
     def __init__(self):
         """Initialize LFO module."""
-        super().__init__(TITLE, category="oscillator", width=220, height=200, color=QColor(100, 140, 200))
+        super().__init__(
+            TITLE,
+            category="oscillator",
+            width=220,
+            height=200,
+            color=QColor(100, 140, 200),
+        )
 
         # Add output port
         self.out_port = self.add_output_port("Out")
@@ -43,18 +60,24 @@ class LFOModule(ModuleWidget):
         # Frequency control (knobs) - optimized for LFO range
         knobs_layout = QHBoxLayout()
         self.freq_knob = Knob("Rate (Hz)", 0.01, 20.0, 1.0)
-        self.freq_knob.value_changed.connect(lambda: self.parameter_changed.emit("frequency", self.freq_knob.get_value()))
+        self.freq_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("frequency", self.freq_knob.get_value())
+        )
         knobs_layout.addWidget(self.freq_knob)
 
         self.amp_knob = Knob("Depth", 0.0, 1.0, 0.5)
-        self.amp_knob.value_changed.connect(lambda: self.parameter_changed.emit("amplitude", self.amp_knob.get_value()))
+        self.amp_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("amplitude", self.amp_knob.get_value())
+        )
         knobs_layout.addWidget(self.amp_knob)
 
         layout.addLayout(knobs_layout)
 
         # Phase control
         self.phase_slider = HSlider("Phase", 0, 360, 0)
-        self.phase_slider.value_changed.connect(lambda v: self.parameter_changed.emit("phase", v))
+        self.phase_slider.value_changed.connect(
+            lambda v: self.parameter_changed.emit("phase", v)
+        )
         layout.addWidget(self.phase_slider)
 
         self.controls_widget.setLayout(layout)
@@ -76,8 +99,11 @@ class LFOModule(ModuleWidget):
         self.component = self.create_component()
         self.parameter_changed.emit("waveform", wave_type)
 
-    def create_component(self, input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None):
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ):
         """Create the LFO component."""
         wave_type = self.wave_combo.currentText()
         freq = self.freq_knob.get_value()
@@ -89,13 +115,18 @@ class LFOModule(ModuleWidget):
         if wave_type == "Sine":
             return SineOscillator(freq, amplitude=amp, phase=phase, wave_range=(-1, 1))
         if wave_type == "Square":
-            return SquareOscillator(freq, amplitude=amp, phase=phase, wave_range=(-1, 1))
+            return SquareOscillator(
+                freq, amplitude=amp, phase=phase, wave_range=(-1, 1)
+            )
         if wave_type == "Sawtooth":
-            return SawtoothOscillator(freq, amplitude=amp, phase=phase, wave_range=(-1, 1))
+            return SawtoothOscillator(
+                freq, amplitude=amp, phase=phase, wave_range=(-1, 1)
+            )
         if wave_type == "Triangle":
-            return TriangleOscillator(freq, amplitude=amp, phase=phase, wave_range=(-1, 1))
+            return TriangleOscillator(
+                freq, amplitude=amp, phase=phase, wave_range=(-1, 1)
+            )
         raise ValueError(f"Unknown waveform type: {wave_type}")
-
 
     def get_parameters(self) -> Dict[str, Any]:
         """Get current parameters."""

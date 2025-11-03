@@ -12,4 +12,3 @@ synthesis engine, featuring:
 from src.gui.main_window import ModularSynthWindow
 
 __all__ = ["ModularSynthWindow"]
-

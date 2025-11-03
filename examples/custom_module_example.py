@@ -57,12 +57,16 @@ class LowPassFilter(Modifier):
         if input_samples.ndim == 1:
             # Mono
             for i in range(len(input_samples)):
-                output[i] = self.last_output + self.alpha * (input_samples[i] - self.last_output)
+                output[i] = self.last_output + self.alpha * (
+                    input_samples[i] - self.last_output
+                )
                 self.last_output = output[i]
         else:
             # Stereo
             for i in range(len(input_samples)):
-                output[i] = self.last_output + self.alpha * (input_samples[i] - self.last_output)
+                output[i] = self.last_output + self.alpha * (
+                    input_samples[i] - self.last_output
+                )
                 self.last_output = output[i]
 
         return output
@@ -84,7 +88,7 @@ class LowPassFilterModule(ModuleWidget):
             category="modifier",  # Category for organization
             width=160,  # Module width in pixels
             height=180,  # Module height in pixels
-            color=QColor(80, 180, 120)  # Module color
+            color=QColor(80, 180, 120),  # Module color
         )
 
         # Add input/output ports
@@ -147,9 +151,11 @@ class LowPassFilterModule(ModuleWidget):
         """
         return []
 
-    def create_component(self,
-                        input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None) -> Any:
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ) -> Any:
         """Create the filter audio component.
 
         This is called by the patch compiler to create the actual audio
@@ -177,9 +183,7 @@ class LowPassFilterModule(ModuleWidget):
         Returns:
             Dictionary of parameter name -> value
         """
-        return {
-            "cutoff": self.cutoff_knob.get_value()
-        }
+        return {"cutoff": self.cutoff_knob.get_value()}
 
     def set_parameters(self, params: Dict[str, Any]):
         """Set parameter values from a loaded preset.
@@ -205,6 +209,7 @@ MODULE_REGISTRY = {
 
 # === Usage Example ===
 
+
 def example_usage():
     """Example of how this module works in a patch."""
 
@@ -229,12 +234,18 @@ def example_usage():
 
 # === Advanced Example: Filter with Modulation ===
 
+
 class ModulatedLowPassFilterModule(ModuleWidget):
     """Filter with cutoff modulation support."""
 
     def __init__(self):
-        super().__init__("Mod Filter", category="modifier", width=160, height=200,
-                         color=QColor(100, 200, 130))
+        super().__init__(
+            "Mod Filter",
+            category="modifier",
+            width=160,
+            height=200,
+            color=QColor(100, 200, 130),
+        )
 
         # Add both audio and modulation inputs
         self.in_port = self.add_input_port("In")
@@ -252,9 +263,11 @@ class ModulatedLowPassFilterModule(ModuleWidget):
     def get_modulation_inputs(self) -> List[str]:
         return ["Cutoff Mod"]  # Modulation is optional
 
-    def create_component(self,
-                        input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None):
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ):
         """Create filter with optional cutoff modulation."""
         base_cutoff = self.cutoff_knob.get_value()
 
@@ -294,4 +307,3 @@ The AudioModuleInterface makes it easy to extend the modular synth:
 This is a production-ready, maintainable architecture for building
 complex modular synth patches!
 """
-

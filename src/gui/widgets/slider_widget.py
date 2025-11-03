@@ -16,7 +16,7 @@ class VSlider(QWidget):
         min_value: float = 0.0,
         max_value: float = 1.0,
         default_value: Optional[float] = None,
-        parent: Optional[QWidget] = None
+        parent: Optional[QWidget] = None,
     ):
         """Initialize vertical slider.
 
@@ -95,7 +95,7 @@ class HSlider(QWidget):
         min_value: float = 0.0,
         max_value: float = 1.0,
         default_value: Optional[float] = None,
-        parent: Optional[QWidget] = None
+        parent: Optional[QWidget] = None,
     ):
         """Initialize horizontal slider.
 
@@ -161,4 +161,3 @@ class HSlider(QWidget):
         """Set current value."""
         slider_value = self._value_to_slider(value)
         self.slider.setValue(slider_value)
-

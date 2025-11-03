@@ -1,4 +1,5 @@
 """Modular cable patching system for connecting audio components."""
+
 from __future__ import annotations
 
 from typing import Optional, Tuple, List, TYPE_CHECKING
@@ -21,7 +22,7 @@ class Port(QGraphicsItem):
         port_type: str,  # "input" or "output"
         port_name: str,
         parent_module: ModuleWidget,
-        index: int = 0
+        index: int = 0,
     ):
         """Initialize a port.
 
@@ -279,6 +280,7 @@ class PatchCanvas(QGraphicsView):
 
             # Delete selected modules (and their connected cables)
             from src.gui.widgets.module_widget import ModuleWidget
+
             for item in selected_items:
                 if isinstance(item, ModuleWidget):
                     # First, remove all cables connected to this module's ports
@@ -288,7 +290,9 @@ class PatchCanvas(QGraphicsView):
 
                     for cable in cables_to_remove:
                         if cable.start_port and cable.end_port:
-                            self.cable_disconnected.emit(cable.start_port, cable.end_port)
+                            self.cable_disconnected.emit(
+                                cable.start_port, cable.end_port
+                            )
                         cable.remove()
 
                     # Remove the module itself
@@ -331,4 +335,3 @@ class PatchCanvas(QGraphicsView):
         self.scene.clear()
         self.dragging_cable = None
         self.drag_start_port = None
-

@@ -80,7 +80,7 @@ class SpectrumAnalyzer(QWidget):
                     buckets.append(np.max(normalized[start:end]))
             self.fft_data = np.array(buckets)
         else:
-            self.fft_data = normalized[:self.fft_bins]
+            self.fft_data = normalized[: self.fft_bins]
 
         self.update()
 
@@ -130,9 +130,10 @@ class SpectrumAnalyzer(QWidget):
                 else:
                     color = self.bar_color
 
-                painter.fillRect(int(x), int(y), max(1, int(bar_width) - 1), int(bar_height), color)
+                painter.fillRect(
+                    int(x), int(y), max(1, int(bar_width) - 1), int(bar_height), color
+                )
         else:
             # Draw "No Signal" text
             painter.setPen(QColor(100, 100, 100))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No Signal")
-

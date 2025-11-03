@@ -13,6 +13,7 @@ from src.gui.audio_module_interface import AudioModuleInterface
 # Create a compatible metaclass that combines QGraphicsWidget's metaclass with ABCMeta
 class ModuleWidgetMeta(type(QGraphicsWidget), ABCMeta):
     """Combined metaclass for QGraphicsWidget and ABC."""
+
     pass
 
 
@@ -34,7 +35,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         category: str,
         width: int = 200,
         height: int = 150,
-        color: Optional[QColor] = None
+        color: Optional[QColor] = None,
     ):
         """Initialize a module widget.
 
@@ -118,7 +119,11 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
                 painter.setPen(QColor(130, 130, 130))
                 font_comp = QFont("Arial", 6)
                 painter.setFont(font_comp)
-                painter.drawText(comp_rect, Qt.AlignmentFlag.AlignCenter, f"[{self.component_category}]")
+                painter.drawText(
+                    comp_rect,
+                    Qt.AlignmentFlag.AlignCenter,
+                    f"[{self.component_category}]",
+                )
         else:
             # No custom name - show component type
             if self.get_module_category():
@@ -126,7 +131,11 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
                 painter.setPen(QColor(200, 200, 200))
                 font_comp = QFont("Arial", 8, QFont.Weight.Bold)
                 painter.setFont(font_comp)
-                painter.drawText(comp_rect, Qt.AlignmentFlag.AlignCenter, f"[{self.component_category}]")
+                painter.drawText(
+                    comp_rect,
+                    Qt.AlignmentFlag.AlignCenter,
+                    f"[{self.component_category}]",
+                )
 
         # Draw port labels
         painter.setPen(QColor(220, 220, 220))
@@ -228,10 +237,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
             # Show rename dialog
             current_name = self.get_display_name()
             new_name, ok = QInputDialog.getText(
-                None,
-                "Rename Module",
-                "Enter new name:",
-                text=current_name
+                None, "Rename Module", "Enter new name:", text=current_name
             )
             if ok:
                 self.set_custom_name(new_name)
@@ -271,7 +277,13 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
 
             # For other areas, check if we clicked on a child widget
             # If not on a child widget, enable dragging
-            child_item = self.scene().itemAt(self.mapToScene(event.pos()), self.scene().views()[0].transform()) if self.scene() else None
+            child_item = (
+                self.scene().itemAt(
+                    self.mapToScene(event.pos()), self.scene().views()[0].transform()
+                )
+                if self.scene()
+                else None
+            )
 
             # If we clicked directly on the module (not on child controls), enable dragging
             if child_item == self:
@@ -303,7 +315,6 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
             params: Dictionary of parameter names to values
         """
         pass
-
 
     def update_component(self):
         """Update the audio component with current parameter values."""

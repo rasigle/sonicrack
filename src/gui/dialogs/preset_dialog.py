@@ -4,9 +4,21 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem,
-    QPushButton, QLabel, QLineEdit, QTextEdit, QGroupBox, QComboBox,
-    QFileDialog, QMessageBox, QSplitter, QWidget
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QLabel,
+    QLineEdit,
+    QTextEdit,
+    QGroupBox,
+    QComboBox,
+    QFileDialog,
+    QMessageBox,
+    QSplitter,
+    QWidget,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -220,21 +232,18 @@ class PresetBrowserDialog(QDialog):
         self.author_label.setText(f"<b>Author:</b> {preset.get('author', '-')}")
         self.category_label.setText(f"<b>Category:</b> {preset.get('category', '-')}")
 
-        tags = preset.get('tags', [])
+        tags = preset.get("tags", [])
         tags_str = ", ".join(tags) if tags else "-"
         self.tags_label.setText(f"<b>Tags:</b> {tags_str}")
 
-        self.description_text.setText(preset.get('description', ''))
+        self.description_text.setText(preset.get("description", ""))
 
-        created = preset.get('created', '-')
-        if created != '-':
+        created = preset.get("created", "-")
+        if created != "-":
             # Format date nicely
-            try:
-                from datetime import datetime
-                dt = datetime.fromisoformat(created)
-                created = dt.strftime("%Y-%m-%d %H:%M")
-            except:
-                pass
+            from datetime import datetime
+            dt = datetime.fromisoformat(created)
+            created = dt.strftime("%Y-%m-%d %H:%M")
         self.created_label.setText(f"<b>Created:</b> {created}")
 
     def _clear_details(self):
@@ -253,7 +262,7 @@ class PresetBrowserDialog(QDialog):
             return
 
         preset_meta = current_item.data(Qt.ItemDataRole.UserRole)
-        filepath = Path(preset_meta['filepath'])
+        filepath = Path(preset_meta["filepath"])
 
         # Load full preset data
         preset_data = self.preset_manager.load_preset(filepath)
@@ -262,11 +271,7 @@ class PresetBrowserDialog(QDialog):
             self.preset_selected.emit(preset_data)
             self.accept()
         else:
-            QMessageBox.critical(
-                self,
-                "Load Error",
-                "Failed to load preset file."
-            )
+            QMessageBox.critical(self, "Load Error", "Failed to load preset file.")
 
     def _on_delete_clicked(self):
         """Handle delete button click."""
@@ -275,17 +280,17 @@ class PresetBrowserDialog(QDialog):
             return
 
         preset_meta = current_item.data(Qt.ItemDataRole.UserRole)
-        name = preset_meta.get('name', 'Unnamed')
+        name = preset_meta.get("name", "Unnamed")
 
         reply = QMessageBox.question(
             self,
             "Delete Preset",
             f"Are you sure you want to delete '{name}'?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            filepath = Path(preset_meta['filepath'])
+            filepath = Path(preset_meta["filepath"])
             if self.preset_manager.delete_preset(filepath):
                 self._load_presets()
                 QMessageBox.information(self, "Success", "Preset deleted.")
@@ -295,10 +300,7 @@ class PresetBrowserDialog(QDialog):
     def _on_import_clicked(self):
         """Handle import button click."""
         filepath, _ = QFileDialog.getOpenFileName(
-            self,
-            "Import Preset",
-            "",
-            "JSON Files (*.json);;All Files (*)"
+            self, "Import Preset", "", "JSON Files (*.json);;All Files (*)"
         )
 
         if filepath:
@@ -316,17 +318,14 @@ class PresetBrowserDialog(QDialog):
             return
 
         preset_meta = current_item.data(Qt.ItemDataRole.UserRole)
-        name = preset_meta.get('name', 'preset')
+        name = preset_meta.get("name", "preset")
 
         filepath, _ = QFileDialog.getSaveFileName(
-            self,
-            "Export Preset",
-            f"{name}.json",
-            "JSON Files (*.json);;All Files (*)"
+            self, "Export Preset", f"{name}.json", "JSON Files (*.json);;All Files (*)"
         )
 
         if filepath:
-            source = Path(preset_meta['filepath'])
+            source = Path(preset_meta["filepath"])
             if self.preset_manager.export_preset(source, Path(filepath)):
                 QMessageBox.information(self, "Success", "Preset exported.")
             else:
@@ -369,7 +368,9 @@ class SavePresetDialog(QDialog):
         layout.addWidget(QLabel("Category:"))
         self.category_combo = QComboBox()
         self.category_combo.setEditable(True)
-        self.category_combo.addItems(["User", "Bass", "Lead", "Pad", "FX", "Drums", "Other"])
+        self.category_combo.addItems(
+            ["User", "Bass", "Lead", "Pad", "FX", "Drums", "Other"]
+        )
         layout.addWidget(self.category_combo)
 
         # Tags
@@ -403,11 +404,7 @@ class SavePresetDialog(QDialog):
     def _on_save_clicked(self):
         """Handle save button click."""
         if not self.name_edit.text().strip():
-            QMessageBox.warning(
-                self,
-                "Missing Name",
-                "Please enter a preset name."
-            )
+            QMessageBox.warning(self, "Missing Name", "Please enter a preset name.")
             self.name_edit.setFocus()
             return
 
@@ -427,6 +424,5 @@ class SavePresetDialog(QDialog):
             "author": self.author_edit.text().strip(),
             "category": self.category_combo.currentText().strip(),
             "tags": tags,
-            "description": self.description_edit.toPlainText().strip()
+            "description": self.description_edit.toPlainText().strip(),
         }
-

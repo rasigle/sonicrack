@@ -11,8 +11,11 @@ from typing import List, Dict, Any, Optional
 
 class ModuleCategory(Enum):
     """Categorizes modules by their role in the signal chain."""
+
     SOURCE = "source"  # Oscillators, LFOs, Envelopes - no audio input required
-    MODIFIER = "modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
+    MODIFIER = (
+        "modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
+    )
     MIXER = "mixer"  # Combines multiple audio inputs
     OUTPUT = "output"  # Terminal node
 
@@ -34,9 +37,11 @@ class AudioModuleInterface(ABC):
         pass
 
     @abstractmethod
-    def create_component(self,
-                        input_components: Optional[List[Any]] = None,
-                        modulation_components: Optional[Dict[str, Any]] = None) -> Any:
+    def create_component(
+        self,
+        input_components: Optional[List[Any]] = None,
+        modulation_components: Optional[Dict[str, Any]] = None,
+    ) -> Any:
         """Create the audio engine component for this module.
 
         This is called by the patch compiler to instantiate the actual
@@ -44,11 +49,11 @@ class AudioModuleInterface(ABC):
 
         Args:
             input_components: List of compiled audio components from input connections.
-                             For SOURCE modules, this is None.
-                             For MODIFIER modules, this contains exactly one component.
-                             For MIXER modules, this contains multiple components.
+                For SOURCE modules, this is None.
+                For MODIFIER modules, this contains exactly one component.
+                For MIXER modules, this contains multiple components.
             modulation_components: Dictionary mapping modulation port names to
-                                  their compiled components (e.g., {"mod": lfo_component})
+                their compiled components (e.g., {"mod": lfo_component})
 
         Returns:
             The audio engine component (Oscillator, Envelope, Chain, etc.)
@@ -94,14 +99,16 @@ class AudioModuleInterface(ABC):
         for port_name in self.get_required_inputs():
             port = self._find_port_by_name(port_name)
             if port and not self._is_port_connected(port, connections):
-                module_name = getattr(self, 'module_title', 'Unknown Module')
-                errors.append(f"{module_name}: Required input '{port_name}' is not connected")
+                module_name = getattr(self, "module_title", "Unknown Module")
+                errors.append(
+                    f"{module_name}: Required input '{port_name}' is not connected"
+                )
 
         return errors
 
     def _find_port_by_name(self, port_name: str):
         """Helper to find a port by name."""
-        for port in getattr(self, 'input_ports', []):
+        for port in getattr(self, "input_ports", []):
             if port.port_name == port_name:
                 return port
         return None
@@ -112,4 +119,3 @@ class AudioModuleInterface(ABC):
             if end_port == port:
                 return True
         return False
-

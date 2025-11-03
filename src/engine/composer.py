@@ -39,6 +39,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.engine_component_registry import register_component, ComponentCategory
 from src.engine.modifier import Modifier
 from src.engine.modulated_oscillator import ModulatedOscillator
 from src.engine.oscillator import Oscillator
@@ -125,6 +126,11 @@ class Composer(ABC):
         return self.get_samples_vectorized(n)
 
 
+@register_component(
+    category=ComponentCategory.COMPOSER,
+    description="Chains a generator with multiple modifiers in sequence.",
+    tags=["composer", "chain"]
+)
 class Chain(Composer):
     """A component that allows for chaining a single generator with multiple modifiers
     after it.
@@ -276,7 +282,11 @@ class Chain(Composer):
 
         return samples.astype(np.float32)
 
-
+@register_component(
+    category=ComponentCategory.COMPOSER,
+    description="Adds the output of multiple generators together.",
+    tags=["composer", "wave_adder"]
+)
 class WaveAdder(Composer):
     """Component that returns the mean of the output of multiple generators.
 

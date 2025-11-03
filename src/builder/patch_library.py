@@ -1,6 +1,6 @@
 """Preset library management for audio synthesis patches.
 
-This module provides the PresetLibrary class for organizing, saving, and loading
+This module provides the PatchLibrary class for organizing, saving, and loading
 audio synthesis builder in a structured manner with category support.
 """
 
@@ -14,11 +14,11 @@ from src.utils.logging_config import get_logger
 if TYPE_CHECKING:
     from src.builder.patch_builder import PatchBuilder
 
-logger = get_logger("builder.preset_library")
+logger = get_logger("builder.patch_library")
 
 
-class PresetLibrary:
-    """Manage a library of audio synthesis builder.
+class PatchLibrary:
+    """Manage a library of audio synthesis patches.
 
     This class provides utilities for managing collections of builder,
     including listing, loading, saving, and organizing builder with
@@ -28,19 +28,20 @@ class PresetLibrary:
         preset_dir: Directory containing preset files
 
     Example:
-        >>> from src.builder import PresetLibrary, PatchBuilder
+        >>> from src.builder import PatchLibrary, PatchBuilder
         >>>
-        >>> library = PresetLibrary("builder/")
+        >>> #
+        >>> library = PatchLibrary("builder/")
         >>>
         >>> # List available builder
         >>> builder = library.list_presets()
         >>>
-        >>> # Load preset
+        >>> # Load a preset via name
         >>> patch = library.load("bass_synth").build()
         >>>
         >>> # Save current patch
-        >>> builder = PatchBuilder().sine(440).adsr(0.1, 0.2, 0.7, 0.3)
-        >>> library.save(builder, "my_patch", category="leads")
+        >>> sine_osc = PatchBuilder().sine(440).adsr(0.1, 0.2, 0.7, 0.3)
+        >>> library.save(sine_osc, "my_patch", category="leads")
     """
 
     def __init__(self, preset_dir: str | Path = "builder"):
@@ -63,7 +64,7 @@ class PresetLibrary:
             List of preset names (without .json extension)
 
         Example:
-            >>> library = PresetLibrary()
+            >>> library = PatchLibrary()
             >>> all_presets = library.list_presets()
             >>> lead_presets = library.list_presets(category="leads")
         """
@@ -84,7 +85,7 @@ class PresetLibrary:
 
         return sorted(presets)
 
-    def load(self, name: str) -> "PatchBuilder":
+    def load(self, name: str) -> PatchBuilder:
         """Load a preset by name.
 
         Args:
@@ -94,7 +95,7 @@ class PresetLibrary:
             PatchBuilder configured from preset
 
         Example:
-            >>> library = PresetLibrary()
+            >>> library = PatchLibrary()
             >>> patch = library.load("bass_synth").build()
         """
         from src.builder.patch_builder import PatchBuilder
@@ -107,7 +108,7 @@ class PresetLibrary:
 
     def save(
         self,
-        builder: "PatchBuilder",
+        builder: PatchBuilder,
         name: str | None = None,
         category: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -122,8 +123,8 @@ class PresetLibrary:
                      Note: patch description is automatically included
 
         Example:
-            >>> from src.builder import PatchBuilder, PresetLibrary
-            >>>library = PresetLibrary("builder/")
+            >>> from src.builder import PatchBuilder, PatchLibrary
+            >>>library = PatchLibrary("builder/")
             >>> builder = (PatchBuilder("Warm Lead")
             ...     .set_description("Smooth lead sound")
             ...     .sine(440)
@@ -166,7 +167,7 @@ class PresetLibrary:
             name: Preset name to delete
 
         Example:
-            >>> library = PresetLibrary()
+            >>> library = PatchLibrary()
             >>> library.delete("old_preset")
         """
         filepath = self.preset_dir / name
@@ -186,7 +187,7 @@ class PresetLibrary:
             List of category names
 
         Example:
-            >>> library = PresetLibrary()
+            >>> library = PatchLibrary()
             >>> lib_categories = library.get_categories()
             >>> print(lib_categories)
             ['bass', 'leads', 'pads', 'fx']

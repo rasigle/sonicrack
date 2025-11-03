@@ -4,7 +4,7 @@ This is a simplified introduction to the preset system showing the most
 common use cases.
 """
 
-from builder import PatchBuilder, PresetLibrary
+from builder import PatchBuilder, PatchLibrary
 
 
 def main():
@@ -61,7 +61,7 @@ def main():
     print("-" * 60)
 
     # Create a library
-    library = PresetLibrary("my_presets")
+    library = PatchLibrary("my_presets")
     print("✓ Created library in 'my_presets/' directory")
 
     # Save patches to the library with categories

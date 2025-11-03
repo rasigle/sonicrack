@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.builder import PatchBuilder, PresetLibrary
+from src.builder import PatchBuilder, PatchLibrary
 
 
 class TestPresetSaveLoad(unittest.TestCase):
@@ -103,7 +103,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_create_library(self):
         """Test creating a preset library."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            PresetLibrary(tmpdir)
+            PatchLibrary(tmpdir)
 
             # Directory should exist
             self.assertTrue(Path(tmpdir).exists())
@@ -111,7 +111,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_save_to_library(self):
         """Test saving preset to library."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PresetLibrary(tmpdir)
+            library = PatchLibrary(tmpdir)
 
             builder = PatchBuilder().sine(440).volume(0.5)
             library.save(builder, "my_patch")
@@ -123,7 +123,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_load_from_library(self):
         """Test loading preset from library."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PresetLibrary(tmpdir)
+            library = PatchLibrary(tmpdir)
 
             # Save preset
             builder = PatchBuilder().sine(440).volume(0.5)
@@ -140,7 +140,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_list_presets(self):
         """Test listing builder in library."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PresetLibrary(tmpdir)
+            library = PatchLibrary(tmpdir)
 
             # Save multiple builder
             library.save(PatchBuilder().sine(440), "preset1")
@@ -158,7 +158,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_save_with_category(self):
         """Test saving preset with category."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PresetLibrary(tmpdir)
+            library = PatchLibrary(tmpdir)
 
             builder = PatchBuilder().sine(440)
             library.save(builder, "lead1", category="leads")
@@ -170,7 +170,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_list_presets_by_category(self):
         """Test listing builder filtered by category."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PresetLibrary(tmpdir)
+            library = PatchLibrary(tmpdir)
 
             # Save builder in different categories
             library.save(PatchBuilder().sine(440), "lead1", category="leads")
@@ -187,7 +187,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_get_categories(self):
         """Test getting list of categories."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PresetLibrary(tmpdir)
+            library = PatchLibrary(tmpdir)
 
             # Save builder in categories
             library.save(PatchBuilder().sine(440), "p1", category="leads")
@@ -205,7 +205,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_delete_preset(self):
         """Test deleting a preset."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PresetLibrary(tmpdir)
+            library = PatchLibrary(tmpdir)
 
             # Save preset
             library.save(PatchBuilder().sine(440), "to_delete")
@@ -222,7 +222,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_save_with_metadata(self):
         """Test saving preset with metadata."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PresetLibrary(tmpdir)
+            library = PatchLibrary(tmpdir)
 
             builder = PatchBuilder().sine(440)
             metadata = {

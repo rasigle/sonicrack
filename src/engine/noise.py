@@ -65,6 +65,7 @@ Note:
 
 import numpy as np
 
+from src.engine.engine_component_registry import register_component, ComponentCategory
 from src.constants import DEFAULT_SAMPLE_RATE
 
 
@@ -713,6 +714,11 @@ def sample_hold_noise(
     return (amplitude * stepped).astype(np.float32)
 
 
+@register_component(
+    category=ComponentCategory.OSCILLATOR,
+    description="Generates various types of noise for synthesis and modulation.",
+    tags=["oscillater", "noise", "modulation", "synthesis"],
+)
 class NoiseGenerator:
     """Wrapper class for noise generation functions.
 

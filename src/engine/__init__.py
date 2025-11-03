@@ -181,5 +181,3 @@ __all__ = [
     "grey_noise",
     "sample_hold_noise",
 ]
-
-__version__ = "0.1.0"

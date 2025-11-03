@@ -24,12 +24,7 @@ from typing import Any
 import json
 from pathlib import Path
 
-from src.builder.component_registry import registry, ComponentCategory
-from src.engine.modulated_oscillator import ModulatedOscillator
-from src.engine.composer import Chain, WaveAdder
-from src.engine.modifier import Modifier
-from src.engine.modulator import Modulator
-from src.engine.oscillator import Oscillator
+from src.engine.engine_component_registry import registry, ComponentCategory
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.utils.logging_config import get_logger
 
@@ -64,8 +59,8 @@ class PatchBuilder:
             description: Optional description of the patch
         """
         self._source: Any | None = None
-        self._modifiers: list[Modifier] = []
-        self._modulators: dict[str, Modulator] = {}
+        self._modifiers: list[Any] = []
+        self._modulators: dict[str, Any] = {}
         self._config: dict[str, Any] = {
             "version": "1.0",
             "name": name,
@@ -125,13 +120,11 @@ class PatchBuilder:
             Self for method chaining
         """
         if self._source is None:
-            # First oscillator
-            self._source = oscillator
+            self._source = oscillator   # Set the first oscillator
         elif isinstance(self._source, list):
-            # Already have multiple oscillators
-            self._source.append(oscillator)
+            self._source.append(oscillator)  # Add to the existing list of oscillators
         else:
-            # Convert single oscillator to list
+            # Convert to a list and add the new oscillator
             self._source = [self._source, oscillator]
 
         logger.debug("Added oscillator instance to source")
@@ -202,20 +195,28 @@ class PatchBuilder:
         # Store modulator
         self._modulators[f"{target}_mod"] = modulator
 
-        # Wrap source if it's an oscillator
-        if self._source and isinstance(self._source, Oscillator):
-            if target == "amplitude":
-                self._source = ModulatedOscillator(
-                    self._source, modulator, amp_mod=lambda base, mod: base * mod
-                )
-            elif target == "frequency":
-                self._source = ModulatedOscillator(
-                    self._source, modulator, freq_mod=lambda base, mod: base * mod
-                )
-            elif target == "phase":
-                self._source = ModulatedOscillator(
-                    self._source, modulator, phase_mod=lambda base, mod: base + mod
-                )
+        # Check if source is an oscillator and wrap with ModulatedOscillator
+        if self._source:
+            source_type = type(self._source).__name__
+
+            # Check if source has oscillator-like interface (has frequency attribute)
+            if hasattr(self._source, 'frequency') or 'Oscillator' in source_type:
+                # Get ModulatedOscillator from registry if available
+                mod_osc_desc = registry.get('modulated_oscillator')
+                if mod_osc_desc:
+                    # Create modulation function based on target
+                    if target == "amplitude":
+                        self._source = mod_osc_desc.create_instance(
+                            self._source, modulator, amp_mod=lambda base, mod: base * mod
+                        )
+                    elif target == "frequency":
+                        self._source = mod_osc_desc.create_instance(
+                            self._source, modulator, freq_mod=lambda base, mod: base * mod
+                        )
+                    elif target == "phase":
+                        self._source = mod_osc_desc.create_instance(
+                            self._source, modulator, phase_mod=lambda base, mod: base + mod
+                        )
 
         # Add to config
         config = descriptor.to_config(*args, **kwargs)
@@ -336,11 +337,11 @@ class PatchBuilder:
         """Get the source oscillator/generator."""
         return self._source
 
-    def get_modifiers(self) -> list[Modifier]:
+    def get_modifiers(self) -> list[Any]:
         """Get list of modifiers (effects)."""
         return self._modifiers.copy()
 
-    def get_modulators(self) -> dict[str, Modulator]:
+    def get_modulators(self) -> dict[str, Any]:
         """Get dictionary of modulators."""
         return self._modulators.copy()
 
@@ -503,21 +504,37 @@ class PatchBuilder:
     # ========================================================================
 
     def build(self) -> Any:
-        """Build the final patch from the configuration."""
+        """Build the final patch from the configuration.
+
+        Uses registry-based component lookup to create Chain and WaveAdder
+        without direct class dependencies.
+        """
         if self._source is None:
             raise ValueError("No source oscillator added to patch")
 
-        # Handle multiple oscillators
+        # Handle multiple oscillators - use WaveAdder from registry
         if isinstance(self._source, list):
-            source = WaveAdder(*self._source)
-            logger.info(f"Built WaveAdder with {len(self._source)} oscillators")
+            wave_adder_desc = registry.get('wave_adder')
+            if wave_adder_desc:
+                source = wave_adder_desc.create_instance(*self._source)
+                logger.info(f"Built WaveAdder with {len(self._source)} oscillators")
+            else:
+                # Fallback: just use first oscillator if WaveAdder not registered
+                logger.warning("WaveAdder not registered, using first oscillator only")
+                source = self._source[0]
         else:
             source = self._source
 
-        # Apply modifiers in chain
+        # Apply modifiers in chain - use Chain from registry
         if self._modifiers:
-            result = Chain(source, *self._modifiers)
-            logger.info(f"Built Chain with {len(self._modifiers)} modifiers")
+            chain_desc = registry.get('chain')
+            if chain_desc:
+                result = chain_desc.create_instance(source, *self._modifiers)
+                logger.info(f"Built Chain with {len(self._modifiers)} modifiers")
+            else:
+                # Fallback: just use source without chain
+                logger.warning("Chain not registered, returning source without modifiers")
+                result = source
         else:
             result = source
 

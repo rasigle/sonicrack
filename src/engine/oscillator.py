@@ -43,6 +43,7 @@ from abc import abstractmethod, ABC
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.engine_component_registry import register_component, ComponentCategory
 
 
 class Oscillator(ABC):
@@ -333,6 +334,11 @@ class Oscillator(ABC):
             return self.get_samples_vectorized(n)
 
 
+@register_component(
+    category=ComponentCategory.OSCILLATOR,
+    description="Sawtooth wave oscillator",
+    tags=["basic", "oscillator", "sawtooth"]
+)
 class SawtoothOscillator(Oscillator):
     """Sawtooth wave generator.
 
@@ -399,6 +405,11 @@ class SawtoothOscillator(Oscillator):
         return samples.astype(np.float32)
 
 
+@register_component(
+    category=ComponentCategory.OSCILLATOR,
+    description="Triangle wave oscillator",
+    tags=["basic", "oscillator", "triangle"]
+)
 class TriangleOscillator(SawtoothOscillator):
     """Triangle wave generator derived from sawtooth logic.
 
@@ -450,6 +461,11 @@ class TriangleOscillator(SawtoothOscillator):
         return samples.astype(np.float32)
 
 
+@register_component(
+    category=ComponentCategory.OSCILLATOR,
+    description="Pure sine wave oscillator",
+    tags=["basic", "oscillator", "sine"]
+)
 class SineOscillator(Oscillator):
     """Sine wave generator.
 
@@ -511,6 +527,11 @@ class SineOscillator(Oscillator):
         return samples.astype(np.float32)
 
 
+@register_component(
+    category=ComponentCategory.OSCILLATOR,
+    description="Square wave oscillator",
+    tags=["basic", "oscillator", "square"]
+)
 class SquareOscillator(SineOscillator):
     """Square wave generator built on sine reference.
 

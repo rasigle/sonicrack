@@ -45,10 +45,16 @@ Note:
 
 import numpy as np
 
+from src.engine.engine_component_registry import register_component, ComponentCategory
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.oscillator import Oscillator
 
 
+@register_component(
+    category=ComponentCategory.OSCILLATOR,
+    description="Oscillator with modulation support (amplitude, frequency, phase)",
+    tags=["oscillator", "modulated", "advanced"]
+)
 class ModulatedOscillator:
     """Creates a modulated oscillator by using a plain oscillator along with modulators,
     the `[parameter]_mod` functions of the signature (float, float) -> float are used

@@ -9,7 +9,7 @@ Components:
     PresetLibrary: Manage collections of saved builder
 
 Example:
-    >>> from src.builder import PatchBuilder, PresetLibrary
+    >>> from src.builder import PatchBuilder, PatchLibrary
     >>>
     >>> # Create patch with fluent API
     >>> patch = (PatchBuilder()
@@ -19,26 +19,24 @@ Example:
     ...     .build())
     >>>
     >>> # Save and load builder
-    >>> library = PresetLibrary("my_presets/")
+    >>> library = PatchLibrary("my_presets/")
     >>> library.save(PatchBuilder().sine(440), "my_sound", category="leads")
     >>> loaded = library.load("leads/my_sound").build()
 """
 
-from src.builder.preset_library import PresetLibrary
+from src.builder.patch_library import PatchLibrary
 from src.builder.patch_builder import PatchBuilder
-from src.builder.component_registry import (
+from src.engine.engine_component_registry import (
     registry,
-    ComponentRegistry,
-    ComponentDescriptor,
     ComponentCategory,
+    ComponentDescriptor,
     register_component,
 )
 
 __all__ = [
     "PatchBuilder",
-    "PresetLibrary",
+    "PatchLibrary",
     "registry",
-    "ComponentRegistry",
     "ComponentDescriptor",
     "ComponentCategory",
     "register_component",

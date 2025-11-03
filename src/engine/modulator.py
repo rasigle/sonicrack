@@ -47,6 +47,7 @@ from abc import ABC
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.engine_component_registry import register_component, ComponentCategory
 
 
 class Modulator(ABC):
@@ -55,7 +56,12 @@ class Modulator(ABC):
         pass
 
 
-class ADSREnvelope(Modulator):
+@register_component(
+    category=ComponentCategory.MODULATOR,
+    description="ADSR envelope generator",
+    tags=["envelope", "modulator", "adsr"]
+)
+class ADSREnvelope(Modulator, ):
     """A simple ADSR envelope with the four stages attack, decay, release and sustain.
 
     Has `.trigger_release()` implemented to trigger the release stage of the envelope.

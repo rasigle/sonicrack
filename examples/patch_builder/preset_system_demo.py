@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from builder import PatchBuilder, PresetLibrary
+from builder import PatchBuilder, PatchLibrary
 
 
 def print_section(title: str):
@@ -71,7 +71,7 @@ def example_2_library_management():
     print_section("Example 2: Preset Library Management")
 
     # Initialize library
-    library = PresetLibrary("demo_presets")
+    library = PatchLibrary("demo_presets")
     print("\n1. Initialized preset library at: demo_presets/")
 
     # Create and save multiple presets in different categories
@@ -148,7 +148,7 @@ def example_3_loading_and_playing():
     """Example 3: Load and play presets from library."""
     print_section("Example 3: Loading & Playing Presets")
 
-    library = PresetLibrary("demo_presets")
+    library = PatchLibrary("demo_presets")
 
     # Load a preset
     print("\n1. Loading 'leads/Bright_Lead' preset...")
@@ -171,7 +171,7 @@ def example_4_modifying_presets():
     """Example 4: Load, modify, and save as new preset."""
     print_section("Example 4: Modifying Existing Presets")
 
-    library = PresetLibrary("demo_presets")
+    library = PatchLibrary("demo_presets")
 
     # Load existing preset
     print("\n1. Loading 'bass/Deep_Bass' preset...")
@@ -255,7 +255,7 @@ def example_6_metadata_and_organization():
     """Example 6: Adding metadata to presets."""
     print_section("Example 6: Metadata & Organization")
 
-    library = PresetLibrary("demo_presets")
+    library = PatchLibrary("demo_presets")
 
     # Create a patch with rich metadata
     print("\n1. Creating patch with metadata...")
@@ -298,7 +298,7 @@ def example_7_batch_operations():
     """Example 7: Batch operations on presets."""
     print_section("Example 7: Batch Operations")
 
-    library = PresetLibrary("demo_presets")
+    library = PatchLibrary("demo_presets")
 
     # Create multiple variations programmatically
     print("\n1. Creating harmonic series presets...")
@@ -350,7 +350,7 @@ def example_8_advanced_patches():
     """Example 8: Creating and saving advanced multi-oscillator patches."""
     print_section("Example 8: Advanced Multi-Oscillator Patches")
 
-    library = PresetLibrary("demo_presets")
+    library = PatchLibrary("demo_presets")
 
     # Create a layered patch (this would require mixing support)
     print("\n1. Creating a detuned unison patch...")
@@ -388,7 +388,7 @@ def example_9_preset_discovery():
     """Example 9: Browsing and discovering presets."""
     print_section("Example 9: Preset Discovery & Browsing")
 
-    library = PresetLibrary("demo_presets")
+    library = PatchLibrary("demo_presets")
 
     # Get all categories
     categories = library.get_categories()
@@ -432,7 +432,7 @@ def example_10_export_import():
     """Example 10: Exporting and importing preset collections."""
     print_section("Example 10: Export & Import Presets")
 
-    library = PresetLibrary("demo_presets")
+    library = PatchLibrary("demo_presets")
 
     # Create a special preset for export
     print("\n1. Creating a preset for export...")
@@ -478,7 +478,7 @@ def example_11_compare_presets():
     """Example 11: Compare different presets."""
     print_section("Example 11: Comparing Presets")
 
-    library = PresetLibrary("demo_presets")
+    library = PatchLibrary("demo_presets")
 
     # Load multiple presets
     preset_names = [

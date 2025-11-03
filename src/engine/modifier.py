@@ -35,6 +35,7 @@ from typing import Any
 import numpy as np
 
 from src.utils.logging_config import get_engine_logger
+from src.engine.engine_component_registry import register_component, ComponentCategory
 
 logger = get_engine_logger("modifier")
 
@@ -55,6 +56,11 @@ class Modifier(ABC):
         pass
 
 
+@register_component(
+    category=ComponentCategory.MODIFIER,
+    description="Stereo panner with constant-power panning law",
+    tags=["modifier", "panner", "stereo"]
+)
 class Panner(Modifier):
     """Converts mono input into stereo output with configurable pan position.
 
@@ -139,6 +145,12 @@ class Panner(Modifier):
         return left, right
 
 
+
+@register_component(
+    category=ComponentCategory.MODIFIER,
+    description="Stereo panner with modulated position",
+    tags=["modifier", "panner", "modulated", "stereo"]
+)
 class ModulatedPanner(Panner):
     """Panner with modulated pan position.
 
@@ -245,6 +257,11 @@ class ModulatedPanner(Panner):
         return left.astype(np.float32), right.astype(np.float32)
 
 
+@register_component(
+    category=ComponentCategory.MODIFIER,
+    description="Volume control modifier",
+    tags=["modifier", "volume", "amplitude"]
+)
 class Volume(Modifier):
     """Scales the input values by amplitude multiplier.
 
@@ -321,6 +338,11 @@ class Volume(Modifier):
         return (samples * self.amplitude).astype(np.float32)
 
 
+@register_component(
+    category=ComponentCategory.MODIFIER,
+    description="Volume control with modulated amplitude",
+    tags=["modifier", "volume", "modulated", "amplitude"]
+)
 class ModulatedVolume(Volume):
     """Same as the volume component but the internal `amp` is set by a modulator."""
 
@@ -395,6 +417,11 @@ class ModulatedVolume(Volume):
         return (samples * mod_values).astype(np.float32)
 
 
+@register_component(
+    category=ComponentCategory.MODIFIER,
+    description="Frequency scaling modifier",
+    tags=["modifier", "frequency"]
+)
 class Frequency(Modifier):
     """Scales the input values by frequency multiplier.
 
@@ -467,6 +494,11 @@ class Frequency(Modifier):
         return (samples * self.frequency).astype(np.float32)
 
 
+@register_component(
+    category=ComponentCategory.MODIFIER,
+    description="Frequency modifier with modulation",
+    tags=["modifier", "frequency", "modulated"]
+)
 class ModulatedFrequency(Frequency):
     """Same as the frequency component but the internal `freq` is set by a modulator."""
 
@@ -542,6 +574,11 @@ class ModulatedFrequency(Frequency):
         return (samples * mod_values).astype(np.float32)
 
 
+@register_component(
+    category=ComponentCategory.MODIFIER,
+    description="Audio clipper/limiter",
+    tags=["modifier", "clipper", "limiter"]
+)
 class Clipper(Modifier):
     """Component that clips the input signal to the given wave range.
 

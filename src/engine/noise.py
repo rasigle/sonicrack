@@ -65,6 +65,7 @@ Note:
 
 import numpy as np
 
+from constants import DEFAULT_SAMPLE_RATE
 from src.constants import DEFAULT_SAMPLE_RATE
 
 
@@ -711,3 +712,103 @@ def sample_hold_noise(
     stepped = stepped[:length]
 
     return (amplitude * stepped).astype(np.float32)
+
+
+class NoiseGenerator:
+    """Wrapper class for noise generation functions.
+
+    Provides a consistent interface for the noise functions from the engine.
+    Implements iterator protocol for compatibility with modulated components.
+    """
+
+    def __init__(self, noise_type: str = "White", amplitude: float = 0.5,
+                 sample_rate: int | float = DEFAULT_SAMPLE_RATE,):
+        """Initialize noise generator.
+
+        Args:
+            noise_type: Type of noise to generate
+            amplitude: Amplitude scaling factor (0.0-1.0)
+            sample_rate: Sample rate in Hz
+        """
+        self.noise_type: str = noise_type
+        self.amplitude: float = amplitude
+        self._sample_rate: int | float = sample_rate
+
+        self._buffer = None
+        self._buffer_index = 0
+        self._buffer_size = 1024  # Generate in chunks for efficiency
+
+    def __iter__(self):
+        """Initialize iterator (required for iterator protocol)."""
+        self._buffer = None
+        self._buffer_index = 0
+        return self
+
+    def __next__(self) -> float:
+        """Get next noise sample (required for iterator protocol).
+
+        Returns:
+            Next noise sample value
+        """
+        # Refill buffer if needed
+        if self._buffer is None or self._buffer_index >= len(self._buffer):
+            duration = self._buffer_size / self._sample_rate
+            self._buffer = self._generate_noise(duration, self._buffer_size)
+            self._buffer_index = 0
+
+        sample = self._buffer[self._buffer_index]
+        self._buffer_index += 1
+        return float(sample)
+
+    def _generate_noise(self, duration: float, num_samples: int) -> np.ndarray:
+        """Generate noise samples for the current type.
+
+        Args:
+            duration: Duration in seconds
+            num_samples: Number of samples to generate
+
+        Returns:
+            Array of noise samples
+        """
+        # Generate the appropriate noise type
+        if self.noise_type == "White":
+            return white_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+        if self.noise_type == "Pink":
+            return pink_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+        if self.noise_type == "Brown":
+            return brownian_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+        if self.noise_type == "Blue":
+            return blue_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+        if self.noise_type == "Grey":
+            return grey_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+        if self.noise_type == "Velvet":
+            return velvet_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+        if self.noise_type == "Sample & Hold":
+            return sample_hold_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+
+        raise ValueError(f"Unknown noise type: {self.noise_type}")
+
+    def get_samples(self, num_samples: int, reset: bool = True, mode: str = "auto") -> np.ndarray:
+        """Generate noise samples (compatible with modulator interface).
+
+        Args:
+            num_samples: Number of samples to generate
+            reset: Whether to reset the iterator (ignored for noise)
+            mode: Generation mode ("auto", "iterator", "vectorized")
+
+        Returns:
+            Array of noise samples
+        """
+        return self.get_samples_vectorized(num_samples)
+
+    def get_samples_vectorized(self, num_samples: int) -> np.ndarray:
+        """Generate noise samples (vectorized).
+
+        Args:
+            num_samples: Number of samples to generate
+
+        Returns:
+            Array of noise samples
+        """
+        duration = num_samples / self._sample_rate
+        return self._generate_noise(duration, num_samples)

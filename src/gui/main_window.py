@@ -11,11 +11,12 @@ from PyQt6.QtWidgets import (
 )
 
 from .audio_engine import AudioEngine
+from .dialogs.about_dialog import show_about
 from .modules.module_registry import MODULE_REGISTRY
 from .modules.output import OutputModule
 from .patch_canvas import PatchCanvas
 from .patch_compiler import PatchCompiler
-from .preset_dialogs import PresetBrowserDialog, SavePresetDialog
+from gui.dialogs.preset_dialog import PresetBrowserDialog, SavePresetDialog
 from .preset_manager import PresetManager
 from .widgets.spectrum_analyzer import SpectrumAnalyzer
 from .widgets.waveform_display import WaveformDisplay
@@ -247,7 +248,7 @@ class ModularSynthWindow(QMainWindow):
         help_menu = menubar.addMenu("&Help")
 
         about_action = QAction("&About", self)
-        about_action.triggered.connect(self._show_about)
+        about_action.triggered.connect(show_about)
         help_menu.addAction(about_action)
 
     def _setup_toolbar(self):
@@ -447,23 +448,6 @@ class ModularSynthWindow(QMainWindow):
         self.waveform_display.clear()
         self.spectrum_analyzer.clear()
         self.statusbar.showMessage("Canvas cleared")
-
-    def _show_about(self):
-        """Show about dialog."""
-        QMessageBox.about(
-            self,
-            "About AudioPlayground",
-            "<h2>AudioPlayground Modular Synthesizer</h2>"
-            "<p>A full-featured modular synthesis environment.</p>"
-            "<p><b>Features:</b></p>"
-            "<ul>"
-            "<li>Visual modular patching</li>"
-            "<li>Real-time audio synthesis</li>"
-            "<li>Waveform and spectrum visualization</li>"
-            "<li>High-performance audio engine</li>"
-            "</ul>"
-            "<p>Version 0.1.0</p>"
-        )
 
     def _save_preset(self):
         """Save the current patch as a preset."""

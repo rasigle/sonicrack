@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from .preset_manager import PresetManager
+from gui.preset_manager import PresetManager
 
 logger = logging.getLogger(__name__)
 

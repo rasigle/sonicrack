@@ -99,6 +99,39 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
 
+    # === Metadata Properties ===
+    @property
+    def module_title(self) -> str:
+        """Return the module title/name.
+
+        Subclasses should override this to provide the display name.
+        """
+        return "Module"
+
+    @property
+    def module_description(self) -> str:
+        """Return a description of what this module does.
+
+        Subclasses can override this to provide helpful tooltips/documentation.
+        """
+        return ""
+
+    @property
+    def module_version(self) -> str:
+        """Return the module version.
+
+        Subclasses can override this for versioning.
+        """
+        return "1.0.0"
+
+    @property
+    def module_author(self) -> str:
+        """Return the module author.
+
+        Subclasses can override this to credit the author.
+        """
+        return ""
+
     # === UI Construction Helpers ===
     @staticmethod
     def _create_controls_container() -> QWidget:

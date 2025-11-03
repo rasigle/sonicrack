@@ -16,8 +16,10 @@ from src.engine import (
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.widgets import Knob, HSlider
 from src.gui.widgets.module_widget import ModuleWidget
+from src.gui.module_registry import register_module
 
 
+@register_module()
 class OscillatorModule(ModuleWidget):
     """Oscillator module with frequency and amplitude controls."""
 
@@ -86,6 +88,11 @@ class OscillatorModule(ModuleWidget):
     def module_title(self) -> str:
         """Return the module title."""
         return "Oscillator"
+
+    @property
+    def module_description(self) -> str:
+        """Return module description."""
+        return "Multi-waveform oscillator with frequency and amplitude controls"
 
     @property
     def module_category(self) -> ModuleCategory:

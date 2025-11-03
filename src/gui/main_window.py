@@ -23,8 +23,7 @@ from PyQt6.QtWidgets import (
 
 from src.gui.audio_engine import AudioEngine
 from src.gui.dialogs.about_dialog import show_about
-from src.gui.module_registry import MODULE_REGISTRY
-from src.gui.modules.output import OutputModule
+from src.gui.module_registry import MODULE_REGISTRY, initialize_modules
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
 from src.gui.dialogs.preset_dialog import PresetBrowserDialog, SavePresetDialog
@@ -49,6 +48,9 @@ class ModularSynthWindow(QMainWindow):
     def __init__(self):
         """Initialize the main window."""
         super().__init__()
+
+        # Initialize the module registry with all built-in modules
+        initialize_modules()
 
         self.setWindowTitle("AudioPlayground - Modular Synthesizer")
         self.setGeometry(100, 100, 1400, 900)
@@ -313,7 +315,6 @@ class ModularSynthWindow(QMainWindow):
         modules = [
             item for item in self.patch_canvas.scene.items() if is_module_widget(item)
         ]
-        logger.info(modules)
         connections = self.patch_canvas.get_connections()
 
         if not modules:
@@ -349,10 +350,12 @@ class ModularSynthWindow(QMainWindow):
             self.audio_engine.set_patch(patch)
 
             # Get master volume from output module
-            for module in modules:
-                if isinstance(module, OutputModule):
-                    self.audio_engine.set_master_volume(module.get_master_volume())
-                    break
+            output_module_class = MODULE_REGISTRY.get("Output")
+            if output_module_class:
+                for module in modules:
+                    if isinstance(module, output_module_class):
+                        self.audio_engine.set_master_volume(module.get_master_volume())
+                        break
 
             if show_messages:
                 QMessageBox.information(self, "Success", "Patch compiled successfully!")
@@ -413,9 +416,8 @@ class ModularSynthWindow(QMainWindow):
         )
 
         # Check if output module was disconnected
-        from src.gui.module_registry import OutputModule
-
-        if isinstance(end_port.parent_module, OutputModule):
+        output_module_class = MODULE_REGISTRY.get("Output")
+        if output_module_class and isinstance(end_port.parent_module, output_module_class):
             # Output was disconnected - stop playback and clear patch
             self.audio_engine.stop_playback()
             self.audio_engine.set_patch(None)

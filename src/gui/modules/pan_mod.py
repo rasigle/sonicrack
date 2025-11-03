@@ -7,8 +7,10 @@ from src.engine import ModulatedPanner, Panner
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
+from src.gui.module_registry import register_module
 
 
+@register_module()
 class PannerModule(ModuleWidget):
     """Panner module for stereo positioning."""
 
@@ -51,6 +53,11 @@ class PannerModule(ModuleWidget):
     def module_title(self) -> str:
         """Return the module title."""
         return "Panner (Mod)"
+
+    @property
+    def module_description(self) -> str:
+        """Return module description."""
+        return "Stereo panner with modulation input"
 
     @property
     def module_category(self) -> ModuleCategory:

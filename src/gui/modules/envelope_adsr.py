@@ -5,10 +5,12 @@ from PyQt6.QtWidgets import QHBoxLayout
 
 from src.engine import ADSREnvelope
 from src.gui.audio_module_interface import ModuleCategory
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
 
+@register_module()
 class ADSRModule(ModuleWidget):
     """ADSR envelope module."""
 
@@ -80,6 +82,11 @@ class ADSRModule(ModuleWidget):
     def module_title(self) -> str:
         """Return the module title."""
         return "ADSR Envelope"
+
+    @property
+    def module_description(self) -> str:
+        """Return module description."""
+        return "ADSR envelope generator for modulation"
 
     @property
     def module_category(self) -> ModuleCategory:

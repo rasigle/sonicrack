@@ -5,8 +5,10 @@ from PyQt6.QtGui import QColor
 from src.engine import WaveAdder
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.widgets.module_widget import ModuleWidget
+from src.gui.module_registry import register_module
 
 
+@register_module()
 class MixerModule(ModuleWidget):
     """Mixer module for combining multiple audio signals.
 
@@ -41,6 +43,11 @@ class MixerModule(ModuleWidget):
     def module_title(self) -> str:
         """Return the module title."""
         return "Mixer"
+
+    @property
+    def module_description(self) -> str:
+        """Return module description."""
+        return "4-channel audio mixer"
 
     @property
     def module_category(self) -> ModuleCategory:

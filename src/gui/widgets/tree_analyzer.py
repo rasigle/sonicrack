@@ -72,12 +72,12 @@ class TreeAnalyzer(QWidget):
             QTreeWidgetItem for display
         """
         # Validate node
-        if not node or "name" not in node or "type" not in node:
+        if not node or "name" not in node:
             logger.error(f"Invalid node data: {node}")
             return QTreeWidgetItem(["<invalid>", ""])
 
         # Create item
-        item = QTreeWidgetItem([node["name"], node["type"]])
+        item = QTreeWidgetItem([node["name"], node["name"]])
 
         # Mark cycles
         if node.get("cycle", False):

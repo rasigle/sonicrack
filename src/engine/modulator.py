@@ -42,31 +42,55 @@ Note:
 """
 
 import itertools
-from abc import ABC
 
 import numpy as np
 
+from src.engine.audio_component import Generator, ComponentDescriptor
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.engine_component_registry import register_component, ComponentCategory
+from src.engine.audio_component_registry import register_component, ComponentCategory
 
 
-class Modulator(ABC):
+class Modulator(Generator):
+    """Base class for all modulators.
 
-    def __init__(self):
-        pass
+    Modulators generate time-varying control signals used to modulate
+    parameters of other audio components (e.g., amplitude, frequency).
+    """
+
+    descriptor = ComponentDescriptor(
+        name="Modulator",
+        category=ComponentCategory.MODULATOR,
+        description="Base class for modulators",
+        tags=["modulator", "base"],
+        config_params=["sample_rate"],
+        fluent_api_name="modulator"
+    )
+
+    def __init__(self, sample_rate: float = DEFAULT_SAMPLE_RATE):
+        """Initialize a new Modulator instance.
+
+        Args:
+            sample_rate : the sample rate at which the notes are to be consumed.
+        """
+        super().__init__(sample_rate=sample_rate)
 
 
-@register_component(
-    category=ComponentCategory.MODULATOR,
-    description="ADSR envelope generator",
-    tags=["envelope", "modulator", "adsr"]
-)
-class ADSREnvelope(Modulator, ):
+@register_component()
+class ADSREnvelope(Generator):
     """A simple ADSR envelope with the four stages attack, decay, release and sustain.
 
     Has `.trigger_release()` implemented to trigger the release stage of the envelope.
     similarly has `.ended`, a flag to indicate the end of the release stage.
     """
+
+    descriptor = ComponentDescriptor(
+        name="ADSREnvelope",
+        category=ComponentCategory.MODULATOR,
+        description="ADSR envelope generator",
+        tags=["envelope", "modulator", "adsr"],
+        config_params=["attack_duration", "decay_duration", "sustain_level", "release_duration", "sample_rate"],
+        fluent_api_name="adsr"
+    )
 
     def __init__(
         self,
@@ -86,13 +110,13 @@ class ADSREnvelope(Modulator, ):
             release_duration : time taken to reach 0 from current value in s.
             sample_rate : the sample rate at which the notes are to be consumed.
         """
-        super().__init__()
         # Store as private attributes - access through properties
         self._attack_duration = attack_duration
         self._decay_duration = decay_duration
         self.sustain_level = sustain_level
         self._release_duration = release_duration
         self._sample_rate = sample_rate
+        super().__init__()
 
         self.stepper = None
         self.ended = False  # Initialize ended flag

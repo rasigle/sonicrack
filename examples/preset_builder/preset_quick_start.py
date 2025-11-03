@@ -4,7 +4,7 @@ This is a simplified introduction to the preset system showing the most
 common use cases.
 """
 
-from builder import PatchBuilder, PatchLibrary
+from builder import PresetBuilder, PresetLibrary
 
 
 def main():
@@ -19,7 +19,7 @@ def main():
 
     # Build a patch using the fluent API
     my_patch = (
-        PatchBuilder("My First Synth")
+        PresetBuilder("My First Synth")
         .set_description("A simple lead sound")
         .sine(440, amplitude=0.8)
         .adsr(0.1, 0.2, 0.7, 0.3)
@@ -46,7 +46,7 @@ def main():
     print("-" * 60)
 
     # Load the preset
-    loaded = PatchBuilder.from_preset("my_first_synth.json")
+    loaded = PresetBuilder.from_preset("my_first_synth.json")
     print("✓ Loaded successfully!")
 
     # Build and use it
@@ -61,12 +61,12 @@ def main():
     print("-" * 60)
 
     # Create a library
-    library = PatchLibrary("my_presets")
+    library = PresetLibrary("my_presets")
     print("✓ Created library in 'my_presets/' directory")
 
     # Save patches to the library with categories
     bass = (
-        PatchBuilder("Deep Bass")
+        PresetBuilder("Deep Bass")
         .set_description("Sub bass sound")
         .sine(55, amplitude=0.9)
         .adsr(0.01, 0.1, 0.8, 0.2)
@@ -77,7 +77,7 @@ def main():
     print("✓ Saved bass preset")
 
     lead = (
-        PatchBuilder("Bright Lead")
+        PresetBuilder("Bright Lead")
         .set_description("Lead synth")
         .sawtooth(880, amplitude=0.8)
         .adsr(0.05, 0.2, 0.6, 0.3)

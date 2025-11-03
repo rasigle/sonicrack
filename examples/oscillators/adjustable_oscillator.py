@@ -7,7 +7,6 @@ from engine import (
     SawtoothOscillator,
     SquareOscillator,
     TriangleOscillator,
-    Oscillator,
 )
 
 CLASS_MAP = {

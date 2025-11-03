@@ -65,7 +65,8 @@ Note:
 
 import numpy as np
 
-from src.engine.engine_component_registry import register_component, ComponentCategory
+from src.engine.audio_component import Generator, ComponentDescriptor
+from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.constants import DEFAULT_SAMPLE_RATE
 
 
@@ -714,24 +715,24 @@ def sample_hold_noise(
     return (amplitude * stepped).astype(np.float32)
 
 
-@register_component(
-    category=ComponentCategory.OSCILLATOR,
-    description="Generates various types of noise for synthesis and modulation.",
-    tags=["oscillater", "noise", "modulation", "synthesis"],
-)
-class NoiseGenerator:
+@register_component()
+class NoiseGenerator(Generator):
     """Wrapper class for noise generation functions.
 
     Provides a consistent interface for the noise functions from the engine.
     Implements iterator protocol for compatibility with modulated components.
     """
 
-    def __init__(
-        self,
-        noise_type: str = "White",
-        amplitude: float = 0.5,
-        sample_rate: int | float = DEFAULT_SAMPLE_RATE,
-    ):
+    descriptor = ComponentDescriptor(
+        name="Noise Generator",
+        category=ComponentCategory.OSCILLATOR,
+        description="Generates various types of noise for synthesis and modulation.",
+        fluent_api_name="noise",
+        tags=["oscillator", "noise", "modulation", "synthesis"],
+    )
+
+    def __init__(self, noise_type: str = "White", amplitude: float = 0.5,
+                 sample_rate: int | float = DEFAULT_SAMPLE_RATE):
         """Initialize noise generator.
 
         Args:
@@ -739,6 +740,7 @@ class NoiseGenerator:
             amplitude: Amplitude scaling factor (0.0-1.0)
             sample_rate: Sample rate in Hz
         """
+        super().__init__(sample_rate)
         self.noise_type: str = noise_type
         self.amplitude: float = amplitude
         self._sample_rate: int | float = sample_rate

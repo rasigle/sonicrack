@@ -84,6 +84,17 @@ Version: 0.1.0
 License: See LICENSE file
 """
 
+from src.engine.audio_component import (
+    AudioComponent,
+    ComponentCategory,
+    ComponentDescriptor
+)
+from src.engine.audio_component_registry import (
+    AudioComponentRegistry,
+    register_component,
+    audio_registry,
+)
+
 # Composers
 from src.engine.composer import (
     Composer,
@@ -142,6 +153,14 @@ from src.engine.oscillator import (
 )
 
 __all__ = [
+    # Audio Component Base
+    "AudioComponent",
+    "ComponentCategory",
+    "ComponentDescriptor",
+    "AudioComponentRegistry",
+    # Registry
+    "register_component",
+    "audio_registry",
     # Oscillators
     "Oscillator",
     "SineOscillator",

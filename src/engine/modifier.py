@@ -28,20 +28,22 @@ Note:
     be used standalone by calling them directly with signal values.
 """
 
-from abc import abstractmethod, ABC
+from abc import abstractmethod
 from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
 
+from src.engine.audio_component import AudioComponent, ComponentDescriptor
+from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.utils.logging_config import get_engine_logger
-from src.engine.engine_component_registry import register_component, ComponentCategory
 
 logger = get_engine_logger("modifier")
 
 
-class Modifier(ABC):
-    """Base class for all modifiers."""
+
+class Modifier(AudioComponent):
+    """Base for components that modify signals (effects, filters)."""
 
     @abstractmethod
     def __call__(self, val: float | tuple[float, ...]) -> float | tuple[float, ...]:
@@ -56,11 +58,7 @@ class Modifier(ABC):
         pass
 
 
-@register_component(
-    category=ComponentCategory.MODIFIER,
-    description="Stereo panner with constant-power panning law",
-    tags=["modifier", "panner", "stereo"]
-)
+@register_component()
 class Panner(Modifier):
     """Converts mono input into stereo output with configurable pan position.
 
@@ -74,6 +72,15 @@ class Panner(Modifier):
         _left_gain: Precomputed left channel gain.
         _right_gain: Precomputed right channel gain.
     """
+
+    descriptor = ComponentDescriptor(
+        name="Panner",
+        category=ComponentCategory.MODIFIER,
+        config_params=["position"],
+        description="Stereo panner with constant-power panning law",
+        fluent_api_name="panner",
+        tags = ["modifier", "panner", "stereo"]
+    )
 
     def __init__(self, position: float = 0.0) -> None:
         """Initialize panner with pan position.
@@ -146,11 +153,7 @@ class Panner(Modifier):
 
 
 
-@register_component(
-    category=ComponentCategory.MODIFIER,
-    description="Stereo panner with modulated position",
-    tags=["modifier", "panner", "modulated", "stereo"]
-)
+@register_component()
 class ModulatedPanner(Panner):
     """Panner with modulated pan position.
 
@@ -173,6 +176,14 @@ class ModulatedPanner(Panner):
         >>> chain = Chain(SineOscillator(440), panner)
         >>> samples = chain.get_samples(1000)
     """
+    descriptor = ComponentDescriptor(
+        name="Panner (Mod)",
+        category=ComponentCategory.MODIFIER,
+        description="Stereo panner with modulated position",
+        fluent_api_name="panner (mod)",
+        tags=["modifier", "panner", "modulated", "stereo"]
+
+    )
 
     def __init__(self, modulator: Any) -> None:
         """Initialize modulated panner.
@@ -257,11 +268,7 @@ class ModulatedPanner(Panner):
         return left.astype(np.float32), right.astype(np.float32)
 
 
-@register_component(
-    category=ComponentCategory.MODIFIER,
-    description="Volume control modifier",
-    tags=["modifier", "volume", "amplitude"]
-)
+@register_component()
 class Volume(Modifier):
     """Scales the input values by amplitude multiplier.
 
@@ -273,6 +280,14 @@ class Volume(Modifier):
     Attributes:
         amplitude: Current amplitude multiplier.
     """
+    descriptor = ComponentDescriptor(
+        name="Volume",
+        category=ComponentCategory.MODIFIER,
+        description="Volume control modifier",
+        fluent_api_name="volume",
+        config_params=["amplitude"],
+        tags=["modifier", "volume", "amplitude"]
+    )
 
     def __init__(self, amplitude: float = 1.0) -> None:
         """Initialize volume modifier.
@@ -323,7 +338,8 @@ class Volume(Modifier):
 
         logger.error(f"Invalid input type for Volume: {type(val)}")
         raise TypeError(
-            "Input value must be an int, float, numpy number, array, or Iterable."
+            f"Input value must be an int, float, numpy number, array, or Iterable. "
+            f"Got {type(val)}"
         )
 
     def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
@@ -338,13 +354,17 @@ class Volume(Modifier):
         return (samples * self.amplitude).astype(np.float32)
 
 
-@register_component(
-    category=ComponentCategory.MODIFIER,
-    description="Volume control with modulated amplitude",
-    tags=["modifier", "volume", "modulated", "amplitude"]
-)
+@register_component()
 class ModulatedVolume(Volume):
     """Same as the volume component but the internal `amp` is set by a modulator."""
+
+    descriptor = ComponentDescriptor(
+        name="Volume (Mod)",
+        category=ComponentCategory.MODIFIER,
+        description="Volume control modifier",
+        fluent_api_name="volume (mod)",
+        tags=["modifier", "volume", "amplitude"]
+    )
 
     def __init__(self, modulator):
         """Initialize modulated volume.
@@ -417,11 +437,7 @@ class ModulatedVolume(Volume):
         return (samples * mod_values).astype(np.float32)
 
 
-@register_component(
-    category=ComponentCategory.MODIFIER,
-    description="Frequency scaling modifier",
-    tags=["modifier", "frequency"]
-)
+@register_component()
 class Frequency(Modifier):
     """Scales the input values by frequency multiplier.
 
@@ -433,6 +449,14 @@ class Frequency(Modifier):
     Attributes:
         frequency: Current frequency multiplier.
     """
+    descriptor = ComponentDescriptor(
+        name="Frequency",
+        category=ComponentCategory.MODIFIER,
+        description="Frequency scaling modifier",
+        fluent_api_name="frequency",
+        tags=["modifier", "frequency"]
+    )
+
 
     def __init__(self, frequency: float = 1.0):
         """Initialize frequency modifier.
@@ -494,13 +518,17 @@ class Frequency(Modifier):
         return (samples * self.frequency).astype(np.float32)
 
 
-@register_component(
-    category=ComponentCategory.MODIFIER,
-    description="Frequency modifier with modulation",
-    tags=["modifier", "frequency", "modulated"]
-)
+@register_component()
 class ModulatedFrequency(Frequency):
     """Same as the frequency component but the internal `freq` is set by a modulator."""
+
+    descriptor = ComponentDescriptor(
+        name="Frequency (Mod)",
+        category=ComponentCategory.MODIFIER,
+        description="Frequency scaling modifier",
+        fluent_api_name="frequency (mod)",
+        tags=["modifier", "frequency"]
+    )
 
     def __init__(self, modulator):
         """Initialize modulated frequency.
@@ -574,16 +602,21 @@ class ModulatedFrequency(Frequency):
         return (samples * mod_values).astype(np.float32)
 
 
-@register_component(
-    category=ComponentCategory.MODIFIER,
-    description="Audio clipper/limiter",
-    tags=["modifier", "clipper", "limiter"]
-)
+@register_component()
 class Clipper(Modifier):
     """Component that clips the input signal to the given wave range.
 
     Uses NumPy's optimized clip function for fast, vectorized clipping.
     """
+
+    descriptor = ComponentDescriptor(
+        name="Clipper",
+        category=ComponentCategory.MODIFIER,
+        description="Audio clipper/limiter",
+        config_params=["wave_range"],
+        fluent_api_name="clipper",
+        tags=["modifier", "clipper", "limiter"]
+    )
 
     def __init__(self, wave_range: tuple[float, float] = (-1.0, 1.0)):
         """Initialize clipper with wave range.

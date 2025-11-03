@@ -38,14 +38,19 @@ from collections.abc import Sequence
 
 import numpy as np
 
+from src.engine.audio_component import AudioComponent, ComponentDescriptor
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.engine_component_registry import register_component, ComponentCategory
+from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.engine.modifier import Modifier
 from src.engine.modulated_oscillator import ModulatedOscillator
 from src.engine.oscillator import Oscillator
 
 
-class Composer(ABC):
+class Composer(AudioComponent, ABC):
+    """Base for components that combine signals (chain, mixer)."""
+
+    def __init__(self, *components: AudioComponent):
+        self.components = components
 
     @abstractmethod
     def __next__(self):
@@ -126,17 +131,20 @@ class Composer(ABC):
         return self.get_samples_vectorized(n)
 
 
-@register_component(
-    category=ComponentCategory.COMPOSER,
-    description="Chains a generator with multiple modifiers in sequence.",
-    tags=["composer", "chain"]
-)
+@register_component()
 class Chain(Composer):
     """A component that allows for chaining a single generator with multiple modifiers
     after it.
 
     For sequential composition of waves.
     """
+
+    descriptor = ComponentDescriptor(
+        name = "Chain",
+        category=ComponentCategory.COMPOSER,
+        description="Chains a generator with multiple modifiers in sequence.",
+        tags=["composer", "chain"]
+    )
 
     def __init__(self, oscillator, *modifiers):
         """Initialize the Chain.
@@ -152,6 +160,8 @@ class Chain(Composer):
             TypeError: If any modifier is not a Modifier instance.
             ValueError: If oscillator is None.
         """
+        super().__init__()
+
         # Input validation
         if oscillator is None:
             raise ValueError("oscillator cannot be None")
@@ -282,18 +292,21 @@ class Chain(Composer):
 
         return samples.astype(np.float32)
 
-@register_component(
-    category=ComponentCategory.COMPOSER,
-    description="Adds the output of multiple generators together.",
-    tags=["composer", "wave_adder"]
-)
+@register_component()
 class WaveAdder(Composer):
     """Component that returns the mean of the output of multiple generators.
 
     For parallel composition of waves.
     """
 
-    def __init__(self, *generators, stereo=False):
+    descriptor = ComponentDescriptor(
+        name="WaveAdder",
+        category=ComponentCategory.COMPOSER,
+        description="Adds the output of multiple generators together.",
+        tags=["composer", "wave_adder"]
+    )
+
+    def __init__(self, *generators, stereo: bool = False):
         """Initialize WaveAdder.
 
         Args:
@@ -306,6 +319,8 @@ class WaveAdder(Composer):
             ValueError: If no generators provided.
             TypeError: If stereo is not a boolean.
         """
+        super().__init__(*generators)
+
         # Input validation
         if len(generators) == 0:
             raise ValueError("WaveAdder requires at least one generator")

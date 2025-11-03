@@ -16,7 +16,7 @@ AudioPlayground is a **world-class audio synthesis framework** combining:
 - **High-performance vectorized audio engine** (5-47M samples/sec)
 - **Professional modular synthesizer GUI** (10 module types)
 - **Plugin-ready dynamic module system** (zero-maintenance registration)
-- **Fluent builder API** for programmatic patches
+- **Fluent builder API** for programmatic presets
 - **Comprehensive preset management** with JSON serialization
 
 Perfect for:
@@ -37,7 +37,7 @@ Perfect for:
 - **Live visualizations** - Waveform and FFT spectrum analyzer
 - **Interactive controls** - Rotary knobs, sliders, dropdowns
 - **Auto-compilation** - Patches update automatically
-- **Preset system** - Save/load complete patches
+- **Patch system** - Save/load complete patches
 - **Professional UI** - Polished, intuitive interface
 
 ### ⚡ **High-Performance Engine**
@@ -152,7 +152,7 @@ python examples/modular_synth_app.py
 - ✅ 20 Hz refresh rate
 
 ### **Preset Management**
-- ✅ Save patches as JSON
+- ✅ Save presets as JSON
 - ✅ Load saved presets
 - ✅ Metadata support (author, description, tags)
 - ✅ Category organization
@@ -226,27 +226,27 @@ python examples/modular_synth_app.py
 
 ## 🎓 Examples
 
-### **Programmatic Patches** (Builder API)
+### **Programmatic Presets** (Builder API)
 
 ```python
-from src.builder import PatchBuilder
+from src.builder import PresetBuilder
 
-# Create a simple synth patch
-patch = (PatchBuilder()
-    .sine_oscillator(frequency=440, amplitude=0.5)
-    .adsr_envelope(attack=0.1, sustain_level=0.7)
-    .modulated_volume()
-    .build())
+# Create a simple synth preset
+preset = (PresetBuilder()
+         .sine_oscillator(frequency=440, amplitude=0.5)
+         .adsr_envelope(attack=0.1, sustain_level=0.7)
+         .modulated_volume()
+         .build())
 
 # Generate audio
-samples = patch.get_samples(44100)  # 1 second
+samples = preset.get_samples(44100)  # 1 second
 ```
 
 ### **Complex FM Synthesis**
 
 ```python
 # FM synthesis with modulated parameters
-patch = (PatchBuilder()
+preset = (PresetBuilder()
     .sine_oscillator(frequency=220)           # Carrier
     .sine_oscillator(frequency=440)           # Modulator
     .modulated_oscillator(freq_mod=True)      # FM
@@ -256,7 +256,7 @@ patch = (PatchBuilder()
 ```
 
 See [examples/](examples/) for more:
-- `builder/` - Programmatic patch examples
+- `builder/` - Programmatic preset examples
 - `modular_synth_app.py` - GUI application
 - `noise_comparison.ipynb` - Noise generator comparison
 
@@ -344,7 +344,7 @@ See [DYNAMIC_MODULE_REGISTRATION.md](documentation/DYNAMIC_MODULE_REGISTRATION.m
 ## 🎯 Use Cases
 
 ### **Electronic Music Production**
-- Create experimental patches
+- Create experimental presetes
 - FM/AM synthesis
 - Modulation effects
 - Live performance
@@ -378,10 +378,10 @@ AudioPlayground/
 ├── src/
 │   ├── engine/          # Vectorized audio engine
 │   ├── gui/             # PyQt6 modular synth UI
-│   ├── builder/         # Fluent API for patches
+│   ├── builder/         # Fluent API for presetes
 │   └── utils/           # Helper functions
 ├── tests/               # Comprehensive test suite
-├── examples/            # Example patches & notebooks
+├── examples/            # Example presetes & notebooks
 ├── documentation/       # Extensive documentation
 └── README.md           # You are here!
 ```
@@ -511,7 +511,7 @@ Connect audio components just like a hardware modular synthesizer:
 
 ---
 
-## 🎓 Example Patches
+## 🎓 Example Presets
 
 ### Simple Sine Wave
 
@@ -556,7 +556,7 @@ See [QUICK_START_GUI.md](QUICK_START_GUI.md) for complete tutorials.
 └─────────────┴───────────┴───────────────┘
                     ↓
          ┌──────────────────────┐
-         │   Patch Compiler     │
+         │   Preset Compiler    │
          │ (Visual → Audio)     │
          └──────────┬───────────┘
                     ↓
@@ -577,12 +577,12 @@ See [QUICK_START_GUI.md](QUICK_START_GUI.md) for complete tutorials.
 
 Based on comprehensive benchmarking:
 
-| Component | Performance | Realtime Factor |
-|-----------|-------------|-----------------|
-| Simple Oscillator | 47M samples/sec | 1000x+ |
-| Modulated Oscillator | 5-10M samples/sec | 100-200x |
-| Complex Patch | 5M samples/sec | 100x+ |
-| Polyphonic (40 voices) | 2M samples/sec | 40x+ |
+| Component              | Performance       | Realtime Factor |
+|------------------------|-------------------|-----------------|
+| Simple Oscillator      | 47M samples/sec   | 1000x+          |
+| Modulated Oscillator   | 5-10M samples/sec | 100-200x        |
+| Complex Preset         | 5M samples/sec    | 100x+           |
+| Polyphonic (40 voices) | 2M samples/sec    | 40x+            |
 
 All measurements on standard hardware. See [ENGINE_REVIEW.md](documentation/ENGINE_REVIEW.md) for details.
 
@@ -633,7 +633,7 @@ That's it! The module appears automatically in the GUI.
 
 - [ ] **More Modules**: Filters, effects, LFO, mixer
 - [ ] **MIDI Support**: Keyboard input, CC mapping, MIDI learn
-- [ ] **Preset System**: Save/load patches as JSON
+- [ ] **Preset System**: Save/load presets as JSON
 - [ ] **Enhanced UI**: Zoom, pan, undo/redo
 
 ### Future Features

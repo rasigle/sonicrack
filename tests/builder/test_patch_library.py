@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.builder import PatchBuilder, PatchLibrary
+from src.builder import PresetBuilder, PresetLibrary
 
 
 class TestPresetSaveLoad(unittest.TestCase):
@@ -22,14 +22,14 @@ class TestPresetSaveLoad(unittest.TestCase):
             filepath = Path(tmpdir) / "test_preset.json"
 
             # Create and save patch
-            builder = PatchBuilder().sine(440, amplitude=0.8).volume(0.5)
+            builder = PresetBuilder().sine(440, amplitude=0.8).volume(0.5)
             builder.save_preset(filepath)
 
             # File should exist
             self.assertTrue(filepath.exists())
 
             # Load preset
-            loaded_builder = PatchBuilder.from_preset(filepath)
+            loaded_builder = PresetBuilder.from_preset(filepath)
             loaded_patch = loaded_builder.build()
 
             # Should generate samples
@@ -43,18 +43,18 @@ class TestPresetSaveLoad(unittest.TestCase):
 
             # Create complex patch
             builder = (
-                PatchBuilder()
+                PresetBuilder()
                 .sine(440, amplitude=0.8, phase=45)
                 .adsr(0.1, 0.2, 0.7, 0.3)
                 .volume(0.6)
                 .panner(-0.5)
-                .clipper(-0.8, 0.8)
+                .clipper((-0.8, 0.8))
             )
 
             builder.save_preset(filepath)
 
             # Load and verify
-            loaded_builder = PatchBuilder.from_preset(filepath)
+            loaded_builder = PresetBuilder.from_preset(filepath)
             config = loaded_builder.get_config()
 
             # Check components were loaded
@@ -62,14 +62,14 @@ class TestPresetSaveLoad(unittest.TestCase):
 
             # Verify oscillator config
             osc_config = config["components"][0]
-            self.assertEqual(osc_config["type"], "sine_oscillator")
+            self.assertEqual(osc_config["name"], "Sine")
             self.assertEqual(osc_config["frequency"], 440)
             self.assertEqual(osc_config["amplitude"], 0.8)
             self.assertEqual(osc_config["phase"], 45)
 
             # Verify ADSR config
             adsr_config = config["components"][1]
-            self.assertEqual(adsr_config["type"], "adsr_envelope")
+            self.assertEqual(adsr_config["name"], "ADSREnvelope")
             self.assertEqual(adsr_config["attack_duration"], 0.1)
             self.assertEqual(adsr_config["sustain_level"], 0.7)
 
@@ -78,7 +78,7 @@ class TestPresetSaveLoad(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             filepath = Path(tmpdir) / "test.json"
 
-            builder = PatchBuilder().sine(440).volume(0.5)
+            builder = PresetBuilder().sine(440).volume(0.5)
             builder.save_preset(filepath)
 
             # Read JSON directly
@@ -94,7 +94,7 @@ class TestPresetSaveLoad(unittest.TestCase):
     def test_load_nonexistent_preset_raises_error(self):
         """Test loading nonexistent preset raises error."""
         with self.assertRaises(FileNotFoundError):
-            PatchBuilder.from_preset("nonexistent.json")
+            PresetBuilder.from_preset("nonexistent.json")
 
 
 class TestPresetLibrary(unittest.TestCase):
@@ -103,7 +103,7 @@ class TestPresetLibrary(unittest.TestCase):
     def test_create_library(self):
         """Test creating a preset library."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            PatchLibrary(tmpdir)
+            PresetLibrary(tmpdir)
 
             # Directory should exist
             self.assertTrue(Path(tmpdir).exists())
@@ -111,9 +111,9 @@ class TestPresetLibrary(unittest.TestCase):
     def test_save_to_library(self):
         """Test saving preset to library."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PatchLibrary(tmpdir)
+            library = PresetLibrary(tmpdir)
 
-            builder = PatchBuilder().sine(440).volume(0.5)
+            builder = PresetBuilder().sine(440).volume(0.5)
             library.save(builder, "my_patch")
 
             # File should exist
@@ -123,10 +123,10 @@ class TestPresetLibrary(unittest.TestCase):
     def test_load_from_library(self):
         """Test loading preset from library."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PatchLibrary(tmpdir)
+            library = PresetLibrary(tmpdir)
 
             # Save preset
-            builder = PatchBuilder().sine(440).volume(0.5)
+            builder = PresetBuilder().sine(440).volume(0.5)
             library.save(builder, "test_patch")
 
             # Load preset
@@ -140,12 +140,12 @@ class TestPresetLibrary(unittest.TestCase):
     def test_list_presets(self):
         """Test listing builder in library."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PatchLibrary(tmpdir)
+            library = PresetLibrary(tmpdir)
 
             # Save multiple builder
-            library.save(PatchBuilder().sine(440), "preset1")
-            library.save(PatchBuilder().square(220), "preset2")
-            library.save(PatchBuilder().triangle(880), "preset3")
+            library.save(PresetBuilder().sine(440), "preset1")
+            library.save(PresetBuilder().square(220), "preset2")
+            library.save(PresetBuilder().triangle(880), "preset3")
 
             # List builder
             presets = library.list_presets()
@@ -158,9 +158,9 @@ class TestPresetLibrary(unittest.TestCase):
     def test_save_with_category(self):
         """Test saving preset with category."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PatchLibrary(tmpdir)
+            library = PresetLibrary(tmpdir)
 
-            builder = PatchBuilder().sine(440)
+            builder = PresetBuilder().sine(440)
             library.save(builder, "lead1", category="leads")
 
             # File should be in category subdirectory
@@ -170,12 +170,12 @@ class TestPresetLibrary(unittest.TestCase):
     def test_list_presets_by_category(self):
         """Test listing builder filtered by category."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PatchLibrary(tmpdir)
+            library = PresetLibrary(tmpdir)
 
             # Save builder in different categories
-            library.save(PatchBuilder().sine(440), "lead1", category="leads")
-            library.save(PatchBuilder().sine(220), "bass1", category="bass")
-            library.save(PatchBuilder().sine(110), "bass2", category="bass")
+            library.save(PresetBuilder().sine(440), "lead1", category="leads")
+            library.save(PresetBuilder().sine(220), "bass1", category="bass")
+            library.save(PresetBuilder().sine(110), "bass2", category="bass")
 
             # List bass builder
             bass_presets = library.list_presets(category="bass")
@@ -187,12 +187,12 @@ class TestPresetLibrary(unittest.TestCase):
     def test_get_categories(self):
         """Test getting list of categories."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PatchLibrary(tmpdir)
+            library = PresetLibrary(tmpdir)
 
             # Save builder in categories
-            library.save(PatchBuilder().sine(440), "p1", category="leads")
-            library.save(PatchBuilder().sine(220), "p2", category="bass")
-            library.save(PatchBuilder().sine(880), "p3", category="fx")
+            library.save(PresetBuilder().sine(440), "p1", category="leads")
+            library.save(PresetBuilder().sine(220), "p2", category="bass")
+            library.save(PresetBuilder().sine(880), "p3", category="fx")
 
             # Get categories
             categories = library.get_categories()
@@ -205,10 +205,10 @@ class TestPresetLibrary(unittest.TestCase):
     def test_delete_preset(self):
         """Test deleting a preset."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PatchLibrary(tmpdir)
+            library = PresetLibrary(tmpdir)
 
             # Save preset
-            library.save(PatchBuilder().sine(440), "to_delete")
+            library.save(PresetBuilder().sine(440), "to_delete")
 
             # Verify it exists
             self.assertIn("to_delete", library.list_presets())
@@ -222,9 +222,9 @@ class TestPresetLibrary(unittest.TestCase):
     def test_save_with_metadata(self):
         """Test saving preset with metadata."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            library = PatchLibrary(tmpdir)
+            library = PresetLibrary(tmpdir)
 
-            builder = PatchBuilder().sine(440)
+            builder = PresetBuilder().sine(440)
             metadata = {
                 "author": "Test Author",
                 "description": "Test preset",

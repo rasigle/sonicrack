@@ -1,6 +1,6 @@
-"""Preset library management for audio synthesis patches.
+"""Preset library management for audio synthesis presets.
 
-This module provides the PatchLibrary class for organizing, saving, and loading
+This module provides the PresetLibrary class for organizing, saving, and loading
 audio synthesis builder in a structured manner with category support.
 """
 
@@ -12,13 +12,13 @@ import json
 from src.utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from src.builder.patch_builder import PatchBuilder
+    from src.builder.preset_builder import PresetBuilder
 
-logger = get_logger("builder.patch_library")
+logger = get_logger("builder.preset_library")
 
 
-class PatchLibrary:
-    """Manage a library of audio synthesis patches.
+class PresetLibrary:
+    """Manage a library of audio synthesis presets.
 
     This class provides utilities for managing collections of builder,
     including listing, loading, saving, and organizing builder with
@@ -28,20 +28,20 @@ class PatchLibrary:
         preset_dir: Directory containing preset files
 
     Example:
-        >>> from src.builder import PatchLibrary, PatchBuilder
+        >>> from src.builder import PresetLibrary, PresetBuilder
         >>>
         >>> #
-        >>> library = PatchLibrary("builder/")
+        >>> library = PresetLibrary("builder/")
         >>>
         >>> # List available builder
         >>> builder = library.list_presets()
         >>>
         >>> # Load a preset via name
-        >>> patch = library.load("bass_synth").build()
+        >>> preset = library.load("bass_synth").build()
         >>>
-        >>> # Save current patch
-        >>> sine_osc = PatchBuilder().sine(440).adsr(0.1, 0.2, 0.7, 0.3)
-        >>> library.save(sine_osc, "my_patch", category="leads")
+        >>> # Save current preset
+        >>> sine_osc = PresetBuilder().sine(440).adsr(0.1, 0.2, 0.7, 0.3)
+        >>> library.save(sine_osc, "my_preset", category="leads")
     """
 
     def __init__(self, preset_dir: str | Path = "builder"):
@@ -64,7 +64,7 @@ class PatchLibrary:
             List of preset names (without .json extension)
 
         Example:
-            >>> library = PatchLibrary()
+            >>> library = PresetLibrary()
             >>> all_presets = library.list_presets()
             >>> lead_presets = library.list_presets(category="leads")
         """
@@ -85,55 +85,55 @@ class PatchLibrary:
 
         return sorted(presets)
 
-    def load(self, name: str) -> PatchBuilder:
+    def load(self, name: str) -> PresetBuilder:
         """Load a preset by name.
 
         Args:
             name: Preset name (with or without .json extension)
 
         Returns:
-            PatchBuilder configured from preset
+            PresetBuilder configured from preset
 
         Example:
-            >>> library = PatchLibrary()
-            >>> patch = library.load("bass_synth").build()
+            >>> library = PresetLibrary()
+            >>> preset = library.load("bass_synth").build()
         """
-        from src.builder.patch_builder import PatchBuilder
+        from src.builder.preset_builder import PresetBuilder
 
         filepath = self.preset_dir / name
         if not filepath.suffix:
             filepath = filepath.with_suffix(".json")
 
-        return PatchBuilder.from_preset(filepath)
+        return PresetBuilder.from_preset(filepath)
 
     def save(
         self,
-        builder: PatchBuilder,
+        builder: PresetBuilder,
         name: str | None = None,
         category: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        """Save a patch as a preset.
+        """Save a preset as a preset.
 
         Args:
-            builder: PatchBuilder instance to save
-            name: Preset filename (if None, uses patch name)
+            builder: PresetBuilder instance to save
+            name: Preset filename (if None, uses preset name)
             category: Optional category/subdirectory
             metadata: Optional metadata (author, tags, etc.)
-                     Note: patch description is automatically included
+                     Note: preset description is automatically included
 
         Example:
-            >>> from src.builder import PatchBuilder, PatchLibrary
-            >>>library = PatchLibrary("builder/")
-            >>> builder = (PatchBuilder("Warm Lead")
+            >>> from src.builder import PresetBuilder, PresetLibrary
+            >>>library = PresetLibrary("builder/")
+            >>> builder = (PresetBuilder("Warm Lead")
             ...     .set_description("Smooth lead sound")
             ...     .sine(440)
             ...     .adsr(0.1, 0.2, 0.7, 0.3))
-            >>> library.save(builder, category="leads")  # Uses patch name
+            >>> library.save(builder, category="leads")  # Uses preset name
             >>> # Or with custom filename:
             >>> library.save(builder, "my_lead", category="leads")
         """
-        # Use patch name if no filename provided
+        # Use preset name if no filename provided
         if name is None:
             name = builder.get_name()
             # Sanitize filename
@@ -167,7 +167,7 @@ class PatchLibrary:
             name: Preset name to delete
 
         Example:
-            >>> library = PatchLibrary()
+            >>> library = PresetLibrary()
             >>> library.delete("old_preset")
         """
         filepath = self.preset_dir / name
@@ -187,7 +187,7 @@ class PatchLibrary:
             List of category names
 
         Example:
-            >>> library = PatchLibrary()
+            >>> library = PresetLibrary()
             >>> lib_categories = library.get_categories()
             >>> print(lib_categories)
             ['bass', 'leads', 'pads', 'fx']

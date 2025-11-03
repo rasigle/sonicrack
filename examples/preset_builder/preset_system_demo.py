@@ -1,18 +1,18 @@
 """Comprehensive demonstration of the preset system.
 
 This example showcases the full capabilities of the preset system including:
-- Creating patches with the fluent API
+- Creating presetes with the fluent API
 - Saving and loading individual presets
 - Organizing presets into categories
 - Managing a preset library
 - Importing and exporting presets
-- Modifying and cloning patches
+- Modifying and cloning presetes
 - Batch operations on presets
 - Metadata management
 - Preset browsing and discovery
 
 The preset system enables musicians and sound designers to:
-1. Build complex patches programmatically
+1. Build complex presetes programmatically
 2. Save and share their creations
 3. Build a personal sound library
 4. Quickly iterate on existing designs
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from builder import PatchBuilder, PatchLibrary
+from builder import PresetBuilder, PresetLibrary
 
 
 def print_section(title: str):
@@ -36,32 +36,32 @@ def example_1_basic_save_load():
     """Example 1: Basic preset save and load operations."""
     print_section("Example 1: Basic Preset Save & Load")
 
-    # Create a simple sine wave patch
-    print("\n1. Creating a simple sine wave patch...")
-    patch = (
-        PatchBuilder("Pure Sine")
+    # Create a simple sine wave preset
+    print("\n1. Creating a simple sine wave preset...")
+    preset = (
+        PresetBuilder("Pure Sine")
         .set_description("Simple 440Hz sine wave")
         .sine(440, amplitude=0.8)
         .volume(0.6)
     )
 
-    print(patch.describe())
+    print(preset.describe())
 
     # Save to a JSON file
     print("\n2. Saving preset to file...")
     preset_path = Path("temp_presets/pure_sine.json")
-    patch.save_preset(preset_path)
+    preset.save_preset(preset_path)
     print(f"   ✓ Saved to: {preset_path}")
 
     # Load it back
     print("\n3. Loading preset from file...")
-    loaded_patch = PatchBuilder.from_preset(preset_path)
+    loaded_preset = PresetBuilder.from_preset(preset_path)
     print("   ✓ Loaded successfully!")
-    print(loaded_patch.describe())
+    print(loaded_preset.describe())
 
     # Build and generate audio
     print("\n4. Generating audio from loaded preset...")
-    audio = loaded_patch.build()
+    audio = loaded_preset.build()
     samples = audio.get_samples(44100)  # 1 second
     print(f"   ✓ Generated {len(samples)} samples")
 
@@ -71,56 +71,56 @@ def example_2_library_management():
     print_section("Example 2: Preset Library Management")
 
     # Initialize library
-    library = PatchLibrary("demo_presets")
+    library = PresetLibrary("demo_presets")
     print("\n1. Initialized preset library at: demo_presets/")
 
     # Create and save multiple presets in different categories
     print("\n2. Creating and saving categorized presets...")
 
     # Bass sounds
-    bass_patch = (
-        PatchBuilder("Deep Bass")
+    bass_preset = (
+        PresetBuilder("Deep Bass")
         .set_description("Sub bass for electronic music")
         .sine(55, amplitude=0.9)  # A1
         .adsr(0.01, 0.1, 0.8, 0.2)
         .volume(0.7)
     )
-    library.save(bass_patch, category="bass")
+    library.save(bass_preset, category="bass")
     print("   ✓ Saved: Deep Bass (bass category)")
 
     # Lead sounds
-    lead_patch = (
-        PatchBuilder("Bright Lead")
+    lead_preset = (
+        PresetBuilder("Bright Lead")
         .set_description("Cutting lead sound")
         .sawtooth(880, amplitude=0.8)  # A5
         .adsr(0.05, 0.2, 0.6, 0.3)
         .volume(0.6)
-        .clipper(-0.8, 0.8)
+        .clipper((-0.8, 0.8))
     )
-    library.save(lead_patch, category="leads")
+    library.save(lead_preset, category="leads")
     print("   ✓ Saved: Bright Lead (leads category)")
 
     # Pad sounds
-    pad_patch = (
-        PatchBuilder("Warm Pad")
+    pad_preset = (
+        PresetBuilder("Warm Pad")
         .set_description("Atmospheric pad with slow attack")
         .sine(220, amplitude=0.6)  # A3
         .adsr(2.0, 1.5, 0.7, 3.0)
         .volume(0.4)
         .panner(0.0)
     )
-    library.save(pad_patch, category="pads")
+    library.save(pad_preset, category="pads")
     print("   ✓ Saved: Warm Pad (pads category)")
 
     # FX sounds
-    fx_patch = (
-        PatchBuilder("Sweep FX")
+    fx_preset = (
+        PresetBuilder("Sweep FX")
         .set_description("Rising sweep effect")
         .square(100, amplitude=0.7)
         .volume(0.5)
         .panner(-0.3)
     )
-    library.save(fx_patch, category="fx")
+    library.save(fx_preset, category="fx")
     print("   ✓ Saved: Sweep FX (fx category)")
 
     # List categories
@@ -148,16 +148,16 @@ def example_3_loading_and_playing():
     """Example 3: Load and play presets from library."""
     print_section("Example 3: Loading & Playing Presets")
 
-    library = PatchLibrary("demo_presets")
+    library = PresetLibrary("demo_presets")
 
     # Load a preset
     print("\n1. Loading 'leads/Bright_Lead' preset...")
-    patch = library.load("leads/Bright_Lead")
-    print(patch.describe())
+    preset = library.load("leads/Bright_Lead")
+    print(preset.describe())
 
     # Build and generate audio
     print("\n2. Building and generating audio...")
-    audio = patch.build()
+    audio = preset.build()
     samples = audio.get_samples(int(44100 * 1.5))  # 1.5 seconds
     print(f"   ✓ Generated {len(samples)} samples")
 
@@ -171,7 +171,7 @@ def example_4_modifying_presets():
     """Example 4: Load, modify, and save as new preset."""
     print_section("Example 4: Modifying Existing Presets")
 
-    library = PatchLibrary("demo_presets")
+    library = PresetLibrary("demo_presets")
 
     # Load existing preset
     print("\n1. Loading 'bass/Deep_Bass' preset...")
@@ -202,50 +202,50 @@ def example_4_modifying_presets():
         print(f"   - {preset}")
 
 
-def example_5_patch_inspection():
-    """Example 5: Inspecting patch details."""
-    print_section("Example 5: Patch Inspection & Analysis")
+def example_5_preset_inspection():
+    """Example 5: Inspecting preset details."""
+    print_section("Example 5: preset Inspection & Analysis")
 
-    # Create a complex patch
-    print("\n1. Creating a complex multi-component patch...")
-    patch = (
-        PatchBuilder("Complex Synth")
+    # Create a complex preset
+    print("\n1. Creating a complex multi-component preset...")
+    preset = (
+        PresetBuilder("Complex Synth")
         .set_description("Multi-stage synthesis example")
         .sawtooth(440, amplitude=0.7)
         .adsr(0.1, 0.3, 0.6, 0.5)
         .volume(0.6)
         .panner(0.2)
-        .clipper(-0.7, 0.7)
+        .clipper((-0.7, 0.7))
     )
 
     # Get full description
-    print("\n2. Full patch description:")
-    print(patch.describe())
+    print("\n2. Full preset description:")
+    print(preset.describe())
 
     # Get summary statistics
-    print("\n3. Patch summary:")
-    summary = patch.summary()
+    print("\n3. preset summary:")
+    summary = preset.summary()
     for key, value in summary.items():
         print(f"   {key}: {value}")
 
     # Access individual components
     print("\n4. Component access:")
-    source = patch.get_source()
+    source = preset.get_source()
     print(f"   Source type: {type(source).__name__}")
 
-    modifiers = patch.get_modifiers()
+    modifiers = preset.get_modifiers()
     print(f"   Number of modifiers: {len(modifiers)}")
     for i, mod in enumerate(modifiers, 1):
         print(f"     {i}. {type(mod).__name__}")
 
-    modulators = patch.get_modulators()
+    modulators = preset.get_modulators()
     print(f"   Number of modulators: {len(modulators)}")
     for name, mod in modulators.items():
         print(f"     {name}: {type(mod).__name__}")
 
     # Get full component dictionary
     print("\n5. All components:")
-    components = patch.get_components()
+    components = preset.get_components()
     print(f"   Name: {components['name']}")
     print(f"   Description: {components['description']}")
     print(f"   Sample rate: {components['sample_rate']} Hz")
@@ -255,17 +255,17 @@ def example_6_metadata_and_organization():
     """Example 6: Adding metadata to presets."""
     print_section("Example 6: Metadata & Organization")
 
-    library = PatchLibrary("demo_presets")
+    library = PresetLibrary("demo_presets")
 
-    # Create a patch with rich metadata
-    print("\n1. Creating patch with metadata...")
-    patch = (
-        PatchBuilder("Vintage Keys")
+    # Create a preset with rich metadata
+    print("\n1. Creating preset with metadata...")
+    preset = (
+        PresetBuilder("Vintage Keys")
         .set_description("Electric piano sound inspired by 1970s Rhodes")
         .sine(440, amplitude=0.75)
         .adsr(0.02, 0.5, 0.3, 0.8)
         .volume(0.65)
-        .clipper(-0.85, 0.85)
+        .clipper((-0.85, 0.85))
     )
 
     # Save with additional metadata
@@ -278,7 +278,7 @@ def example_6_metadata_and_organization():
         "version": "1.0",
     }
 
-    library.save(patch, category="keys", metadata=metadata)
+    library.save(preset, category="keys", metadata=metadata)
     print("   ✓ Saved with metadata:")
     for key, value in metadata.items():
         print(f"     {key}: {value}")
@@ -298,7 +298,7 @@ def example_7_batch_operations():
     """Example 7: Batch operations on presets."""
     print_section("Example 7: Batch Operations")
 
-    library = PatchLibrary("demo_presets")
+    library = PresetLibrary("demo_presets")
 
     # Create multiple variations programmatically
     print("\n1. Creating harmonic series presets...")
@@ -308,15 +308,15 @@ def example_7_batch_operations():
         freq = base_freq * i
         name = f"Harmonic_{i}"
 
-        patch = (
-            PatchBuilder(name)
+        preset = (
+            PresetBuilder(name)
             .set_description(f"Harmonic {i} of {base_freq}Hz = {freq}Hz")
             .sine(freq, amplitude=0.8)
             .adsr(0.05, 0.2, 0.7, 0.3)
             .volume(0.5)
         )
 
-        library.save(patch, category="harmonics")
+        library.save(preset, category="harmonics")
         print(f"   ✓ Created: {name} ({freq}Hz)")
 
     # List all harmonics
@@ -337,45 +337,45 @@ def example_7_batch_operations():
     freq = 440
     for wave_name, wave_func in waveforms.items():
         name = f"{wave_name.capitalize()}_440"
-        patch = PatchBuilder(name)
-        wave_func(patch, freq)
-        patch.set_description(f"{wave_name.capitalize()} wave at {freq}Hz")
-        patch.volume(0.6)
+        preset = PresetBuilder(name)
+        wave_func(preset, freq)
+        preset.set_description(f"{wave_name.capitalize()} wave at {freq}Hz")
+        preset.volume(0.6)
 
-        library.save(patch, category="waveforms")
+        library.save(preset, category="waveforms")
         print(f"   ✓ Created: {name}")
 
 
-def example_8_advanced_patches():
-    """Example 8: Creating and saving advanced multi-oscillator patches."""
-    print_section("Example 8: Advanced Multi-Oscillator Patches")
+def example_8_advanced_presetes():
+    """Example 8: Creating and saving advanced multi-oscillator presetes."""
+    print_section("Example 8: Advanced Multi-Oscillator presetes")
 
-    library = PatchLibrary("demo_presets")
+    library = PresetLibrary("demo_presets")
 
-    # Create a layered patch (this would require mixing support)
-    print("\n1. Creating a detuned unison patch...")
+    # Create a layered preset (this would require mixing support)
+    print("\n1. Creating a detuned unison preset...")
 
     # Main oscillator at 440Hz
-    patch = (
-        PatchBuilder("Detuned Unison")
+    preset = (
+        PresetBuilder("Detuned Unison")
         .set_description("Three slightly detuned oscillators for richness")
         .sine(440, amplitude=0.5)  # Center
         .adsr(0.1, 0.3, 0.7, 0.4)
         .volume(0.6)
     )
 
-    print(patch.describe())
-    library.save(patch, category="synths")
+    print(preset.describe())
+    library.save(preset, category="synths")
     print("   ✓ Saved: Detuned Unison")
 
-    # Create a bass patch with harmonics
+    # Create a bass preset with harmonics
     print("\n2. Creating harmonic-rich bass...")
     bass = (
-        PatchBuilder("Harmonic Bass")
+        PresetBuilder("Harmonic Bass")
         .set_description("Fundamental with added harmonics")
         .sawtooth(55, amplitude=0.8)  # Rich in harmonics
         .adsr(0.01, 0.15, 0.7, 0.25)
-        .clipper(-0.9, 0.9)
+        .clipper((-0.9, 0.9))
         .volume(0.65)
     )
 
@@ -388,7 +388,7 @@ def example_9_preset_discovery():
     """Example 9: Browsing and discovering presets."""
     print_section("Example 9: Preset Discovery & Browsing")
 
-    library = PatchLibrary("demo_presets")
+    library = PresetLibrary("demo_presets")
 
     # Get all categories
     categories = library.get_categories()
@@ -404,9 +404,9 @@ def example_9_preset_discovery():
         for preset_name in presets:
             # Load and get summary
             try:
-                patch = library.load(preset_name)
-                summary = patch.summary()
-                desc = patch.get_description()
+                preset = library.load(preset_name)
+                summary = preset.summary()
+                desc = preset.get_description()
 
                 # Truncate description if too long
                 if len(desc) > 50:
@@ -432,12 +432,12 @@ def example_10_export_import():
     """Example 10: Exporting and importing preset collections."""
     print_section("Example 10: Export & Import Presets")
 
-    library = PatchLibrary("demo_presets")
+    library = PresetLibrary("demo_presets")
 
     # Create a special preset for export
     print("\n1. Creating a preset for export...")
-    export_patch = (
-        PatchBuilder("Exported Sound")
+    export_preset = (
+        PresetBuilder("Exported Sound")
         .set_description("A preset designed to be shared")
         .triangle(330, amplitude=0.75)
         .adsr(0.08, 0.25, 0.65, 0.35)
@@ -446,7 +446,7 @@ def example_10_export_import():
     )
 
     # Save to library
-    library.save(export_patch, category="export")
+    library.save(export_preset, category="export")
     print("   ✓ Saved to library")
 
     # The preset is already a JSON file that can be shared
@@ -470,7 +470,7 @@ def example_10_export_import():
         print("\n4. This file can be:")
         print("   - Shared with other users")
         print("   - Version controlled (git)")
-        print("   - Loaded with PatchBuilder.from_preset()")
+        print("   - Loaded with presetBuilder.from_preset()")
         print("   - Imported into another PresetLibrary")
 
 
@@ -478,7 +478,7 @@ def example_11_compare_presets():
     """Example 11: Compare different presets."""
     print_section("Example 11: Comparing Presets")
 
-    library = PatchLibrary("demo_presets")
+    library = PresetLibrary("demo_presets")
 
     # Load multiple presets
     preset_names = [
@@ -490,12 +490,12 @@ def example_11_compare_presets():
 
     print("\n📊 WAVEFORM COMPARISON\n")
 
-    patches = []
+    presetes = []
     for name in preset_names:
         try:
-            patch = library.load(name)
-            patches.append(patch)
-            summary = patch.summary()
+            preset = library.load(name)
+            presetes.append(preset)
+            summary = preset.summary()
 
             print(
                 f"{summary['name']:20} | Components: {summary['components']:2} | "
@@ -509,8 +509,8 @@ def example_11_compare_presets():
     # Generate and compare audio characteristics
     print("\n\n🎵 AUDIO CHARACTERISTICS\n")
 
-    for patch in patches:
-        audio = patch.build()
+    for preset in presetes:
+        audio = preset.build()
         samples = audio.get_samples(4410)  # 0.1 second at 44100 Hz
 
         # Calculate basic characteristics
@@ -519,7 +519,7 @@ def example_11_compare_presets():
         crest_factor = peak / rms if rms > 0 else 0
 
         print(
-            f"{patch.get_name():20} | "
+            f"{preset.get_name():20} | "
             f"RMS: {rms:.4f} | "
             f"Peak: {peak:.4f} | "
             f"Crest: {crest_factor:.2f}"
@@ -549,7 +549,7 @@ def main():
     example_4_modifying_presets()
     input("\nPress Enter to continue to next example...")
 
-    example_5_patch_inspection()
+    example_5_preset_inspection()
     input("\nPress Enter to continue to next example...")
 
     example_6_metadata_and_organization()
@@ -558,7 +558,7 @@ def main():
     example_7_batch_operations()
     input("\nPress Enter to continue to next example...")
 
-    example_8_advanced_patches()
+    example_8_advanced_presetes()
     input("\nPress Enter to continue to next example...")
 
     example_9_preset_discovery()
@@ -573,7 +573,7 @@ def main():
     print_section("Demo Complete!")
     print("\n✅ All examples completed successfully!")
     print("\nThe preset system enables:")
-    print("  • Saving and loading patches")
+    print("  • Saving and loading presetes")
     print("  • Organizing presets in categories")
     print("  • Managing preset libraries")
     print("  • Adding rich metadata")

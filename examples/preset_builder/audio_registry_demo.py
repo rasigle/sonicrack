@@ -1,4 +1,4 @@
-"""Demonstration of the Component Registry System.
+"""Demonstration of the Engine Component Registry System.
 
 This example shows how the registry system makes it easy to:
 1. Use the RegistryPatchBuilder (drop-in replacement for PatchBuilder)
@@ -7,17 +7,11 @@ This example shows how the registry system makes it easy to:
 4. Maintain backward compatibility with presets
 """
 
-import sys
-from pathlib import Path
 import numpy as np
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
-from src.builder import PatchBuilder, register_component, ComponentCategory, registry
-from src.engine.oscillator import Oscillator
-from src.engine.modifier import Modifier
-from src.constants import DEFAULT_SAMPLE_RATE
+from builder import PresetBuilder, ComponentCategory
+from constants import DEFAULT_SAMPLE_RATE
+from engine import Oscillator, Modifier, register_component, audio_registry, ComponentDescriptor
 
 
 def example_1_basic_usage():
@@ -28,7 +22,7 @@ def example_1_basic_usage():
 
     # Use exactly like the original PatchBuilder
     patch = (
-        PatchBuilder("My Synth")
+        PresetBuilder("My Synth")
         .set_description("A simple lead sound")
         .sine(440, amplitude=0.8)
         .adsr(0.1, 0.2, 0.7, 0.3)
@@ -54,7 +48,7 @@ def example_1_basic_usage():
     print("✓ Saved preset")
 
     # Load preset
-    loaded = PatchBuilder.from_preset("temp_registry_test.json")
+    loaded = PresetBuilder.from_preset("temp_registry_test.json")
     print("✓ Loaded preset")
     print(f"  Loaded patch name: {loaded.get_name()}")
 
@@ -69,6 +63,14 @@ def example_2_custom_oscillator():
     class NoiseOscillator(Oscillator):
         """White noise generator."""
 
+        descriptor = ComponentDescriptor(
+            name="MyCustomNoiseOscillator",
+            category=ComponentCategory.OSCILLATOR,
+            config_params=["amplitude", "sample_rate"],
+            description="White noise generator",
+            fluent_api_name="my_custom_noise"
+        )
+
         def __init__(
             self, amplitude: float = 1.0, sample_rate: int = DEFAULT_SAMPLE_RATE
         ):
@@ -76,31 +78,28 @@ def example_2_custom_oscillator():
                 frequency=0, amplitude=amplitude, phase=0, sample_rate=sample_rate
             )
 
-        def __iter__(self):
-            """Generate infinite white noise."""
-            while True:
-                yield self.amp * (2 * np.random.random() - 1)
+        def __next__(self):
+            """Return next white noise sample.
+
+            Returns:
+                float: Random value scaled by amplitude.
+            """
+            return self._a * (2 * np.random.random() - 1)
 
         def get_samples_vectorized(self, n: int) -> np.ndarray:
             """Generate n samples of white noise."""
-            return self.amp * (2 * np.random.random(n) - 1)
+            return self._a * (2 * np.random.random(n) - 1)
+
 
     # Register it with the system
-    print("\n1. Registering custom 'noise' oscillator...")
-    register_component(
-        name="noise_oscillator",
-        category=ComponentCategory.OSCILLATOR,
-        factory=NoiseOscillator,
-        config_params=["amplitude", "sample_rate"],
-        description="White noise generator",
-    )
+    audio_registry.register(NoiseOscillator)
     print("   ✓ Registered")
 
     # Now use it immediately!
     print("\n2. Using the new oscillator...")
     patch = (
-        PatchBuilder("Noise Patch")
-        .noise(amplitude=0.5)  # Method auto-generated!
+        PresetBuilder("Noise Patch")
+        .my_custom_noise(amplitude=0.5)  # Method auto-generated!
         .volume(0.3)
     )
 
@@ -121,6 +120,14 @@ def example_3_custom_effect():
     # Define a custom distortion effect
     class DistortionEffect(Modifier):
         """Simple distortion/overdrive effect."""
+
+        descriptor = ComponentDescriptor(
+            name="Distortion",
+            category=ComponentCategory.MODIFIER,
+            config_params=["drive", "mix"],
+            description="Soft clipping distortion/overdrive",
+            fluent_api_name="distortion"
+        )
 
         def __init__(self, drive: float = 2.0, mix: float = 1.0):
             self.drive = drive
@@ -145,19 +152,13 @@ def example_3_custom_effect():
 
     # Register it
     print("\n1. Registering custom 'distortion' effect...")
-    register_component(
-        name="distortion",
-        category=ComponentCategory.MODIFIER,
-        factory=DistortionEffect,
-        config_params=["drive", "mix"],
-        description="Soft clipping distortion/overdrive",
-    )
+    audio_registry.register(DistortionEffect)
     print("   ✓ Registered")
 
     # Use it in a patch
     print("\n2. Creating patch with distortion...")
     patch = (
-        PatchBuilder("Distorted Lead")
+        PresetBuilder("Distorted Lead")
         .sawtooth(440, amplitude=0.9)
         .distortion(drive=3.0, mix=0.7)  # Auto-generated method!
         .volume(0.6)
@@ -179,23 +180,23 @@ def example_4_list_components():
 
     # List all registered components
     print("\n1. All registered components:")
-    all_components = registry.list_components()
-    for comp in sorted(all_components):
-        descriptor = registry.get(comp)
+    for comp in sorted(audio_registry.list_components()):
+        descriptor = audio_registry.get(comp, strict=True).descriptor
         print(
-            f"   - {comp:30} ({descriptor.category.value:12}) -> .{descriptor.method_name}()"
+            f"   - {comp:30} ({descriptor.category.value:12}) -> .{descriptor.name}()"
         )
 
     # List by category
     print("\n2. Components by category:")
     for category in ComponentCategory:
-        components = registry.get_by_category(category)
+        components = audio_registry.list_by_category(category)
         print(f"\n   {category.value.upper()}:")
-        for desc in components:
-            params = ", ".join(desc.config_params)
-            print(f"     - {desc.method_name}({params})")
-            if desc.description:
-                print(f"       {desc.description}")
+        for component in components:
+            desc = audio_registry.get(component, strict=True).descriptor
+            print(f"     - {desc.name} ({desc.description})")
+            params = ", ".join(desc.config_params) if desc.config_params else []
+            if params:
+                print(f"       Parameter: {params}")
 
 
 def example_5_preset_compatibility():
@@ -207,11 +208,11 @@ def example_5_preset_compatibility():
     # Create patch with custom component (noise from example 2)
     print("\n1. Creating patch with custom components...")
     patch = (
-        PatchBuilder("Custom Patch")
+        PresetBuilder("Custom Patch")
         .set_description("Uses custom registered components")
-        .noise(amplitude=0.6)
+        .my_custom_noise(amplitude=0.6)
         .volume(0.5)
-        .pan(-0.3)
+        .panner(-0.3)
     )
 
     # Save it
@@ -221,7 +222,7 @@ def example_5_preset_compatibility():
 
     # Load it back
     print("\n2. Loading preset...")
-    loaded = PatchBuilder.from_preset(preset_file)
+    loaded = PresetBuilder.from_preset(preset_file)
     print(f"   ✓ Loaded: {loaded.get_name()}")
     print(f"   ✓ Description: {loaded.get_description()}")
 
@@ -251,6 +252,14 @@ def example_6_plugin_system():
     class SuperSawOscillator(Oscillator):
         """Supersaw with multiple detuned voices."""
 
+        descriptor = ComponentDescriptor(
+            name="SuperSaw",
+            category=ComponentCategory.OSCILLATOR,
+            config_params=["frequency", "voices", "detune", "sample_rate"],
+            description="Supersaw oscillator with multiple detuned voices",
+            fluent_api_name="supersaw"
+        )
+
         def __init__(
             self,
             frequency: float,
@@ -269,14 +278,14 @@ def example_6_plugin_system():
             phase = 0
             while True:
                 yield np.sin(2 * np.pi * phase)
-                phase = (phase + self.freq / self.sample_rate) % 1.0
+                phase = (phase + self.frequency / self.sample_rate) % 1.0
 
         def get_samples_vectorized(self, n: int) -> np.ndarray:
             # Mix multiple detuned voices
             result = np.zeros(n)
             for i in range(self.voices):
                 detune_factor = 1.0 + self.detune * (i - self.voices // 2) / self.voices
-                freq = self.freq * detune_factor
+                freq = self.frequency * detune_factor
                 t = np.arange(n) / self.sample_rate
                 result += np.sin(2 * np.pi * freq * t)
             return result / self.voices
@@ -284,6 +293,14 @@ def example_6_plugin_system():
     # Plugin 2: Resonant filter (simplified)
     class ResonantFilter(Modifier):
         """Simple resonant low-pass filter."""
+
+        descriptor = ComponentDescriptor(
+            name="ResonantFilter",
+            category=ComponentCategory.MODIFIER,
+            config_params=["cutoff", "resonance"],
+            description="Resonant low-pass filter",
+            fluent_api_name="resonant_filter"
+        )
 
         def __init__(self, cutoff: float = 1000, resonance: float = 0.5):
             self.cutoff = cutoff
@@ -296,28 +313,16 @@ def example_6_plugin_system():
     # Register plugin components
     print("\n1. Registering plugin components...")
 
-    register_component(
-        name="supersaw_oscillator",
-        category=ComponentCategory.OSCILLATOR,
-        factory=SuperSawOscillator,
-        config_params=["frequency", "voices", "detune", "sample_rate"],
-        description="Supersaw oscillator with multiple detuned voices",
-    )
+    audio_registry.register(SuperSawOscillator)
     print("   ✓ Registered supersaw oscillator")
 
-    register_component(
-        name="resonant_filter",
-        category=ComponentCategory.MODIFIER,
-        factory=ResonantFilter,
-        config_params=["cutoff", "resonance"],
-        description="Resonant low-pass filter",
-    )
+    audio_registry.register(ResonantFilter)
     print("   ✓ Registered resonant filter")
 
     # Now use the plugin components!
     print("\n2. Using plugin components...")
     patch = (
-        PatchBuilder("Plugin Demo")
+        PresetBuilder("Plugin Demo")
         .supersaw(440, voices=9, detune=0.15)
         .resonant_filter(cutoff=2000, resonance=0.7)
         .volume(0.6)

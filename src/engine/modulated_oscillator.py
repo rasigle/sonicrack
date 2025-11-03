@@ -45,17 +45,14 @@ Note:
 
 import numpy as np
 
-from src.engine.engine_component_registry import register_component, ComponentCategory
+from src.engine.audio_component import ComponentDescriptor, Generator
+from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.oscillator import Oscillator
 
 
-@register_component(
-    category=ComponentCategory.OSCILLATOR,
-    description="Oscillator with modulation support (amplitude, frequency, phase)",
-    tags=["oscillator", "modulated", "advanced"]
-)
-class ModulatedOscillator:
+@register_component()
+class ModulatedOscillator(Generator):
     """Creates a modulated oscillator by using a plain oscillator along with modulators,
     the `[parameter]_mod` functions of the signature (float, float) -> float are used
     to decide the method of modulation.
@@ -68,9 +65,15 @@ class ModulatedOscillator:
     __next__ to generate the sequence of values.
     """
 
-    def __init__(
-        self, oscillator, *modulators, amp_mod=None, freq_mod=None, phase_mod=None
-    ):
+    descriptor = ComponentDescriptor(
+        name="ModulatedOscillator",
+        category=ComponentCategory.OSCILLATOR,
+        description="Oscillator with modulation support (amplitude, frequency, phase)",
+        tags=["oscillator", "modulated", "advanced"]
+    )
+
+    def __init__(self, oscillator, *modulators, amp_mod=None, freq_mod=None,
+                 phase_mod=None):
         """Initialize the ModulatedOscillator.
 
         Args:
@@ -95,6 +98,8 @@ class ModulatedOscillator:
                 value and the modulator value and returns the modified value.
                 If set the third modulator of the last modulator is used for the values.
         """
+
+        super().__init__()
         if not isinstance(oscillator, Oscillator):
             raise TypeError(
                 f"Oscillator should be an instance of Oscillator. "

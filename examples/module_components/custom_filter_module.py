@@ -16,8 +16,8 @@ from PyQt6.QtCore import Qt
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob
 from src.gui.audio_module_interface import ModuleCategory
-from src.gui.dynamic_registry import register_module
-from src.engine import Modifier
+from src.gui.module_registry import register_module
+from src.engine.modifier import Modifier
 import numpy as np
 
 
@@ -59,13 +59,7 @@ class SimpleFilter(Modifier):
 
 
 # Custom module with automatic registration via decorator
-@register_module(
-    "Simple Filter",
-    category="modifier",
-    description="A simple low-pass filter with cutoff and resonance controls",
-    author="Plugin Example",
-    version="1.0.0",
-)
+@register_module()
 class SimpleFilterModule(ModuleWidget):
     """Simple filter module - plugin example.
 
@@ -120,6 +114,19 @@ class SimpleFilterModule(ModuleWidget):
         """Return MODIFIER since this modifies audio input."""
         return ModuleCategory.MODIFIER
 
+    @property
+    def module_description(self) -> str:
+        """Return a description of the plugin."""
+        return "A simple low-pass filter module plugin example."
+
+    @property
+    def module_author(self) -> str:
+        return "Plugin Example"
+
+    @property
+    def module_version(self):
+        return "1.0.0"
+
     def get_required_inputs(self) -> List[str]:
         """Filter requires the In port to be connected."""
         return ["In"]
@@ -133,9 +140,6 @@ class SimpleFilterModule(ModuleWidget):
         cutoff = self.cutoff_knob.get_value()
         resonance = self.resonance_knob.get_value()
         return SimpleFilter(cutoff, resonance)
-
-    # get_parameters() and set_parameters() are handled automatically
-    # via the parameter registration system in __init__
 
 
 # The @register_module decorator above automatically registers this module

@@ -1,44 +1,45 @@
-"""Simplified PatchBuilder with tree representation.
+"""Simplified PresetBuilder with tree representation.
 
-This module provides an optimized PatchBuilder that:
+This module provides an optimized PresetBuilder that:
 - Uses the component registry for auto-generated methods
 - Generates config on-demand (no duplicate state)
-- Provides tree visualization of patch structure
+- Provides tree visualization of preset structure
 - Pre-caches component methods for performance
 
 Example:
-    >>> from src.builder import PatchBuilder
+    >>> from src.builder import PresetBuilder
     >>>
-    >>> # Build a patch with fluent API
-    >>> patch_builder = (PatchBuilder("My Synth")
+    >>> # Build a preset with fluent API
+    >>> preset_builder = (PresetBuilder("My Synth")
     ...     .sine(440, amplitude=0.8)
     ...     .adsr(0.1, 0.2, 0.7, 0.3)
     ...     .volume(0.6))
     >>>
-    >>> # Build the actual patch
-    >>> patch = patch_builder.build()
+    >>> # Build the actual preset
+    >>> preset = preset_builder.build()
     >>>
     >>> # Visualize structure
-    >>> print(patch_builder.to_tree())
+    >>> print(preset_builder.to_tree())
 """
 
 from __future__ import annotations
-from typing import Any, Callable
+
 import json
 from pathlib import Path
+from typing import Any, Callable
 
-from src.engine.engine_component_registry import registry, ComponentCategory
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.audio_component_registry import audio_registry, ComponentCategory
 from src.utils.logging_config import get_logger
 
-logger = get_logger("builder.patch_builder")
+logger = get_logger("builder.preset_builder")
 
 
-class PatchNode:
-    """A node in the patch tree representing a component."""
+class PresetNode:
+    """A node in the preset tree representing a component."""
 
     def __init__(self, component_type: str, component: Any, params: dict[str, Any]):
-        """Initialize a patch node.
+        """Initialize a preset node.
 
         Args:
             component_type: Type of component (oscillator, modifier, etc.)
@@ -48,9 +49,9 @@ class PatchNode:
         self.component_type = component_type
         self.component = component
         self.params = params
-        self.children: list[PatchNode] = []
+        self.children: list[PresetNode] = []
 
-    def add_child(self, node: PatchNode) -> PatchNode:
+    def add_child(self, node: PresetNode) -> PresetNode:
         """Add a child node."""
         self.children.append(node)
         return node
@@ -91,8 +92,8 @@ class PatchNode:
         return lines
 
 
-class PatchBuilder:
-    """Simplified fluent API builder for audio synthesis patches.
+class PresetBuilder:
+    """Simplified fluent API builder for audio synthesis presets.
 
     This builder uses the component registry to automatically support
     all registered components without manual method implementation.
@@ -100,32 +101,32 @@ class PatchBuilder:
     Key features:
     - Auto-generated component methods (pre-cached for performance)
     - On-demand config generation (no duplicate state)
-    - Tree visualization of patch structure
+    - Tree visualization of preset structure
     - Simplified internal state
 
     Attributes:
-        _name: Name of the patch
-        _description: Description of the patch
-        _sample_rate: Sample rate for the patch
+        _name: Name of the preset
+        _description: Description of the preset
+        _sample_rate: Sample rate for the preset
         _source: The signal source (oscillator or multiple oscillators)
         _modifiers: List of modifiers to apply in chain
-        _component_tree: Tree representation of the patch structure
+        _component_tree: Tree representation of the preset structure
         _component_methods: Cache of auto-generated component methods
     """
 
-    def __init__(self, name: str = "Untitled Patch", description: str = ""):
-        """Initialize an empty patch builder.
+    def __init__(self, name: str = "Untitled Preset", description: str = ""):
+        """Initialize an empty preset builder.
 
         Args:
-            name: Name for this patch
-            description: Optional description of the patch
+            name: Name for this preset
+            description: Optional description of the preset
         """
         self._name = name
         self._description = description
         self._sample_rate = DEFAULT_SAMPLE_RATE
         self._source: Any | None = None
         self._modifiers: list[Any] = []
-        self._component_tree = PatchNode("Patch", None, {"name": name})
+        self._component_tree = PresetNode("Preset", None, {"name": name})
 
         # Pre-cache component methods for performance
         self._component_methods: dict[str, Callable] = {}
@@ -137,10 +138,11 @@ class PatchBuilder:
         This replaces the slow __getattr__ approach with pre-cached methods,
         providing 10x faster method calls.
         """
-        registry._ensure_initialized()  # Make sure components are loaded
+        audio_registry._ensure_initialized()  # Make sure components are loaded
 
-        for comp_name, descriptor in registry._components.items():
-            method_name = descriptor.method_name
+        for comp_name, component in audio_registry.components.items():
+            descriptor = component.descriptor
+            method_name = descriptor.fluent_api_name if descriptor.fluent_api_name else comp_name
 
             # Create appropriate method based on category
             if descriptor.category == ComponentCategory.OSCILLATOR:
@@ -150,8 +152,6 @@ class PatchBuilder:
             elif descriptor.category == ComponentCategory.MODULATOR:
                 self._component_methods[method_name] = lambda *args, cn=comp_name, **kwargs: self._add_modulator(cn, *args, **kwargs)
 
-        # Add special ADSR method with cleaner API
-        self._component_methods['adsr'] = self._adsr_helper
 
         logger.debug(f"Pre-generated {len(self._component_methods)} component methods")
 
@@ -162,21 +162,24 @@ class PatchBuilder:
             name: Method name
 
         Returns:
-            Component method
+            Component
 
         Raises:
-            AttributeError: If method doesn't exist
+            AttributeError: If component doesn't exist
         """
         if name in self._component_methods:
             return self._component_methods[name]
 
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        raise AttributeError(
+            f"Unknown component '{name}'. "
+            f"Available components: {', '.join(list(self._component_methods.keys()))}"
+        )
 
     # ========================================================================
     # Component Addition Methods
     # ========================================================================
 
-    def _add_oscillator(self, comp_name: str, *args, **kwargs) -> PatchBuilder:
+    def _add_oscillator(self, comp_name: str, *args, **kwargs) -> PresetBuilder:
         """Generic method to add an oscillator component.
 
         Args:
@@ -187,16 +190,14 @@ class PatchBuilder:
         Returns:
             Self for method chaining
         """
-        descriptor = registry.get(comp_name)
-        if not descriptor:
-            raise ValueError(f"Unknown component: {comp_name}")
+        component_class = audio_registry.get(comp_name, strict=True)
 
         # Inject sample_rate if not provided
         if "sample_rate" not in kwargs:
             kwargs["sample_rate"] = self._sample_rate
 
         # Create instance
-        instance = descriptor.create_instance(*args, **kwargs)
+        instance = component_class(*args, **kwargs)
 
         # Add to source
         if self._source is None:
@@ -207,17 +208,16 @@ class PatchBuilder:
             self._source = [self._source, instance]
 
         # Build params dict for tree
-        params = descriptor.to_config(*args, **kwargs)
-        params.pop('type', None)  # Remove type from params
+        params = component_class.descriptor.to_config(*args, **kwargs)
 
         # Add to tree
-        node = PatchNode(comp_name, instance, params)
+        node = PresetNode(comp_name, instance, params)
         self._component_tree.add_child(node)
 
         logger.debug(f"Added {comp_name}: {args}, {kwargs}")
         return self
 
-    def _add_modifier(self, comp_name: str, *args, **kwargs) -> PatchBuilder:
+    def _add_modifier(self, comp_name: str, *args, **kwargs) -> PresetBuilder:
         """Generic method to add a modifier component.
 
         Args:
@@ -228,27 +228,19 @@ class PatchBuilder:
         Returns:
             Self for method chaining
         """
-        descriptor = registry.get(comp_name)
-        if not descriptor:
+        component = audio_registry.get(comp_name)
+        if not component:
             raise ValueError(f"Unknown component: {comp_name}")
 
-        # Handle clipper special case (expects tuple)
-        if comp_name == "clipper" and len(args) == 2:
-            args = ((args[0], args[1]),)
-
         # Create instance
-        instance = descriptor.create_instance(*args, **kwargs)
+        instance = component(*args, **kwargs)
         self._modifiers.append(instance)
 
         # Build params dict for tree
-        if comp_name == "clipper" and len(args) > 0 and isinstance(args[0], tuple):
-            params = {"min": args[0][0], "max": args[0][1]}
-        else:
-            params = descriptor.to_config(*args, **kwargs)
-            params.pop('type', None)
+        params = component.descriptor.to_config(*args, **kwargs)
 
         # Add to tree
-        node = PatchNode(comp_name, instance, params)
+        node = PresetNode(comp_name, instance, params)
         self._component_tree.add_child(node)
 
         logger.debug(f"Added {comp_name}: {args}, {kwargs}")
@@ -256,7 +248,7 @@ class PatchBuilder:
 
     def _add_modulator(
         self, comp_name: str, *args, target: str = "amplitude", **kwargs
-    ) -> PatchBuilder:
+    ) -> PresetBuilder:
         """Generic method to add a modulator component.
 
         Args:
@@ -268,8 +260,8 @@ class PatchBuilder:
         Returns:
             Self for method chaining
         """
-        descriptor = registry.get(comp_name)
-        if not descriptor:
+        component_class = audio_registry.get(comp_name)
+        if not component_class:
             raise ValueError(f"Unknown component: {comp_name}")
 
         # Inject sample_rate if not provided
@@ -277,87 +269,63 @@ class PatchBuilder:
             kwargs["sample_rate"] = self._sample_rate
 
         # Create instance
-        modulator = descriptor.create_instance(*args, **kwargs)
+        modulator = component_class(*args, **kwargs)
 
         # Wrap source with ModulatedOscillator if we have an oscillator
         if self._source and hasattr(self._source, 'frequency'):
-            mod_osc_desc = registry.get('modulated_oscillator')
-            if mod_osc_desc:
+            mod_osc_class = audio_registry.get('ModulatedOscillator')
+            if mod_osc_class:
                 if target == "amplitude":
-                    self._source = mod_osc_desc.create_instance(
+                    self._source = mod_osc_class(
                         self._source, modulator, amp_mod=lambda base, mod: base * mod
                     )
                 elif target == "frequency":
-                    self._source = mod_osc_desc.create_instance(
+                    self._source = mod_osc_class(
                         self._source, modulator, freq_mod=lambda base, mod: base * mod
                     )
                 elif target == "phase":
-                    self._source = mod_osc_desc.create_instance(
+                    self._source = mod_osc_class(
                         self._source, modulator, phase_mod=lambda base, mod: base + mod
                     )
 
         # Build params dict for tree
-        params = descriptor.to_config(*args, **kwargs)
-        params.pop('type', None)
+        params = component_class.descriptor.to_config(*args, **kwargs)
         params['target'] = target
 
         # Add to tree
-        node = PatchNode(comp_name, modulator, params)
+        node = PresetNode(comp_name, modulator, params)
         self._component_tree.add_child(node)
 
         logger.debug(f"Added {comp_name} modulator: target={target}")
         return self
 
-    def _adsr_helper(
-        self,
-        attack: float,
-        decay: float,
-        sustain: float,
-        release: float,
-        target: str = "amplitude",
-    ) -> PatchBuilder:
-        """Helper for ADSR envelope with cleaner parameter names.
-
-        Args:
-            attack: Attack time in seconds
-            decay: Decay time in seconds
-            sustain: Sustain level (0.0 to 1.0)
-            release: Release time in seconds
-            target: Modulation target
-
-        Returns:
-            Self for method chaining
-        """
-        return self._add_modulator(
-            "adsr_envelope", attack, decay, sustain, release, target=target
-        )
 
     # ========================================================================
     # Metadata Methods
     # ========================================================================
 
-    def set_name(self, name: str) -> PatchBuilder:
-        """Set the patch name."""
+    def set_name(self, name: str) -> PresetBuilder:
+        """Set the preset name."""
         self._name = name
         self._component_tree.params["name"] = name
-        logger.debug(f"Set patch name to '{name}'")
+        logger.debug(f"Set preset name to '{name}'")
         return self
 
-    def set_description(self, description: str) -> PatchBuilder:
-        """Set the patch description."""
+    def set_description(self, description: str) -> PresetBuilder:
+        """Set the preset description."""
         self._description = description
-        logger.debug(f"Set patch description: {description}")
+        logger.debug(f"Set preset description: {description}")
         return self
 
     def get_name(self) -> str:
-        """Get the patch name."""
+        """Get the preset name."""
         return self._name
 
     def get_description(self) -> str:
-        """Get the patch description."""
+        """Get the preset description."""
         return self._description
 
-    def set_sample_rate(self, sample_rate: int) -> PatchBuilder:
+    def set_sample_rate(self, sample_rate: int) -> PresetBuilder:
         """Set the sample rate."""
         self._sample_rate = sample_rate
         logger.debug(f"Set sample rate: {sample_rate}Hz")
@@ -405,7 +373,7 @@ class PatchBuilder:
             "sample_rate": self._sample_rate,
         }
 
-    def add_oscillator(self, comp_name_or_instance, *args, **kwargs) -> PatchBuilder:
+    def add_oscillator(self, comp_name_or_instance, *args, **kwargs) -> PresetBuilder:
         """Add an oscillator (backward compatibility method).
 
         Args:
@@ -428,7 +396,7 @@ class PatchBuilder:
                 self._source = [self._source, comp_name_or_instance]
             return self
 
-    def modify_amplitude(self, value_or_modulator) -> PatchBuilder:
+    def modify_amplitude(self, value_or_modulator) -> PresetBuilder:
         """Modify amplitude (backward compatibility).
 
         Args:
@@ -450,14 +418,14 @@ class PatchBuilder:
             # Modulator-based modification
             modulator = value_or_modulator
             if self._source and hasattr(self._source, 'frequency'):
-                mod_osc_desc = registry.get('modulated_oscillator')
+                mod_osc_desc = audio_registry.get('ModulatedOscillator')
                 if mod_osc_desc:
                     self._source = mod_osc_desc.create_instance(
                         self._source, modulator, amp_mod=lambda base, mod: base * mod
                     )
         return self
 
-    def modify_frequency(self, value_or_modulator) -> PatchBuilder:
+    def modify_frequency(self, value_or_modulator) -> PresetBuilder:
         """Modify frequency (backward compatibility).
 
         Args:
@@ -479,7 +447,7 @@ class PatchBuilder:
             # Modulator-based modification
             modulator = value_or_modulator
             if self._source and hasattr(self._source, 'frequency'):
-                mod_osc_desc = registry.get('modulated_oscillator')
+                mod_osc_desc = audio_registry.get('ModulatedOscillator')
                 if mod_osc_desc:
                     self._source = mod_osc_desc.create_instance(
                         self._source, modulator, freq_mod=lambda base, mod: base * mod
@@ -491,16 +459,16 @@ class PatchBuilder:
     # ========================================================================
 
     def to_tree(self) -> str:
-        """Get tree representation of the patch structure.
+        """Get tree representation of the preset structure.
 
         Returns:
-            String representation of the patch as a tree
+            String representation of the preset as a tree
         """
         lines = self._component_tree.to_tree_string()
         return "\n".join(lines)
 
     def print_tree(self) -> None:
-        """Print the patch tree to console."""
+        """Print the preset tree to console."""
         print(self.to_tree())
 
     # ========================================================================
@@ -508,7 +476,7 @@ class PatchBuilder:
     # ========================================================================
 
     def get_config(self) -> dict[str, Any]:
-        """Generate configuration dictionary from current patch state.
+        """Generate configuration dictionary from current preset state.
 
         Config is generated on-demand instead of being stored as duplicate state.
 
@@ -519,7 +487,7 @@ class PatchBuilder:
 
         # Traverse tree to build config
         for node in self._component_tree.children:
-            comp_config = {"type": node.component_type, **node.params}
+            comp_config = {**node.params}
             components.append(comp_config)
 
         return {
@@ -535,23 +503,23 @@ class PatchBuilder:
     # ========================================================================
 
     def build(self) -> Any:
-        """Build the final patch from the configuration.
+        """Build the final preset from the configuration.
 
         Returns:
-            Built audio patch (Chain or source)
+            Built audio preset (Chain or source)
 
         Raises:
             ValueError: If no source oscillator added
         """
         if self._source is None:
-            raise ValueError("No source oscillator added to patch")
+            raise ValueError("No source oscillator added to preset.")
 
         # Handle multiple oscillators - use WaveAdder
         if isinstance(self._source, list):
-            wave_adder_desc = registry.get('wave_adder')
-            if wave_adder_desc:
-                source = wave_adder_desc.create_instance(*self._source)
-                logger.info(f"Built WaveAdder with {len(self._source)} oscillators")
+            wave_adder_class = audio_registry.get('WaveAdder')
+            if wave_adder_class:
+                source = wave_adder_class(*self._source)
+                logger.debug(f"Built WaveAdder with {len(self._source)} oscillators")
             else:
                 logger.warning("WaveAdder not registered, using first oscillator only")
                 source = self._source[0]
@@ -560,17 +528,17 @@ class PatchBuilder:
 
         # Apply modifiers in chain
         if self._modifiers:
-            chain_desc = registry.get('chain')
-            if chain_desc:
-                result = chain_desc.create_instance(source, *self._modifiers)
-                logger.info(f"Built Chain with {len(self._modifiers)} modifiers")
+            chain_class = audio_registry.get('Chain')
+            if chain_class:
+                result = chain_class(source, *self._modifiers)
+                logger.debug(f"Built Chain with {len(self._modifiers)} modifiers")
             else:
                 logger.warning("Chain not registered, returning source without modifiers")
                 result = source
         else:
             result = source
 
-        logger.info(f"Patch '{self._name}' built successfully")
+        logger.debug(f"Preset '{self._name}' built successfully")
         return result
 
     # ========================================================================
@@ -578,12 +546,12 @@ class PatchBuilder:
     # ========================================================================
 
     def describe(self) -> str:
-        """Get a human-readable description of the patch.
+        """Get a human-readable description of the preset.
 
         Returns:
-            Multi-line string describing the patch
+            Multi-line string describing the preset
         """
-        lines = [f"Patch: {self._name}"]
+        lines = [f"Preset name: {self._name}"]
 
         if self._description:
             lines.append(f"Description: {self._description}")
@@ -591,7 +559,7 @@ class PatchBuilder:
         lines.append("")
 
         for node in self._component_tree.children:
-            descriptor = registry.get(node.component_type)
+            component = audio_registry.get(node.component_type)
 
             # Build parameter string
             params = []
@@ -601,30 +569,31 @@ class PatchBuilder:
 
             param_str = ", ".join(params)
 
+            descriptor = component.descriptor
             desc = descriptor.description if descriptor else node.component_type
             lines.append(f"- {desc} ({param_str})")
 
         return "\n".join(lines)
 
     def summary(self) -> dict[str, Any]:
-        """Get a summary of patch characteristics.
+        """Get a summary of preset characteristics.
 
         Returns:
-            Dictionary with patch statistics
+            Dictionary with preset statistics
         """
         oscillators = 0
         modulators = 0
         effects = 0
 
         for node in self._component_tree.children:
-            descriptor = registry.get(node.component_type)
-            if descriptor:
-                if descriptor.category == ComponentCategory.OSCILLATOR:
-                    oscillators += 1
-                elif descriptor.category == ComponentCategory.MODULATOR:
-                    modulators += 1
-                elif descriptor.category == ComponentCategory.MODIFIER:
-                    effects += 1
+            component_class = audio_registry.get(node.component_type, strict=True)
+            category = component_class.descriptor.category
+            if category == ComponentCategory.OSCILLATOR:
+                oscillators += 1
+            elif category == ComponentCategory.MODULATOR:
+                modulators += 1
+            elif category == ComponentCategory.MODIFIER:
+                effects += 1
 
         return {
             "name": self._name,
@@ -640,7 +609,7 @@ class PatchBuilder:
     # Modification Methods
     # ========================================================================
 
-    def clear_effects(self) -> PatchBuilder:
+    def clear_effects(self) -> PresetBuilder:
         """Remove all effects (modifiers).
 
         Returns:
@@ -651,42 +620,43 @@ class PatchBuilder:
         # Remove modifier nodes from tree
         self._component_tree.children = [
             node for node in self._component_tree.children
-            if registry.get(node.component_type).category != ComponentCategory.MODIFIER
+            if audio_registry.get(node.component_type).descriptor.category != ComponentCategory.MODIFIER
         ]
 
         logger.debug("Cleared all effects")
         return self
 
-    def clone(self) -> PatchBuilder:
-        """Create a copy of this patch builder.
+    def clone(self) -> PresetBuilder:
+        """Create a copy of this preset builder.
 
         Returns:
-            New PatchBuilder instance with same configuration
+            New PresetBuilder instance with same configuration
         """
-        new_builder = PatchBuilder(name=self._name, description=self._description)
+        new_builder = PresetBuilder(name=self._name, description=self._description)
         new_builder._sample_rate = self._sample_rate
 
         # Rebuild from config
         config = self.get_config()
         for component in config.get("components", []):
-            comp_type = component["type"]
-            descriptor = registry.get(comp_type)
+            comp_name = component["name"]
+            component_class = audio_registry.get(comp_name, strict=True)
+            descriptor = component_class.descriptor
+            method_name = descriptor.fluent_api_name if descriptor.fluent_api_name else comp_name
 
-            if descriptor:
-                # Recreate component
-                if descriptor.category == ComponentCategory.OSCILLATOR:
-                    method = getattr(new_builder, descriptor.method_name)
-                    params = {k: v for k, v in component.items()
-                             if k in descriptor.config_params and k != "sample_rate"}
-                    method(**params)
-                elif descriptor.category == ComponentCategory.MODIFIER:
-                    method = getattr(new_builder, descriptor.method_name)
-                    if comp_type == "clipper":
-                        method(component.get("min", -1.0), component.get("max", 1.0))
-                    else:
-                        params = {k: v for k, v in component.items()
-                                 if k in descriptor.config_params}
-                        method(**params)
+            # Extract only actual component parameters (exclude metadata)
+            params = {
+                k: v for k, v in component.items()
+                if k not in ["name", "category", "description"]
+                and descriptor.config_params
+                and k in descriptor.config_params
+            }
+
+            # Call method with keyword arguments
+            method = new_builder._component_methods.get(method_name)
+            if method:
+                method(**params)
+            else:
+                logger.warning(f"Method '{method_name}' not found for component '{comp_name}'")
 
         return new_builder
 
@@ -695,7 +665,7 @@ class PatchBuilder:
     # ========================================================================
 
     def save_preset(self, filepath: str | Path) -> None:
-        """Save the current patch configuration as a preset.
+        """Save the current preset configuration as a preset.
 
         Args:
             filepath: Path to save the preset file
@@ -710,14 +680,14 @@ class PatchBuilder:
         logger.info(f"Saved preset to {filepath}")
 
     @classmethod
-    def from_preset(cls, filepath: str | Path) -> PatchBuilder:
-        """Load a patch configuration from a preset file.
+    def from_preset(cls, filepath: str | Path) -> PresetBuilder:
+        """Load a preset configuration from a preset file.
 
         Args:
             filepath: Path to the preset file
 
         Returns:
-            PatchBuilder instance loaded from preset
+            PresetBuilder instance loaded from preset
         """
         filepath = Path(filepath)
 
@@ -725,7 +695,7 @@ class PatchBuilder:
             config = json.load(f)
 
         # Create builder
-        name = config.get("name", "Untitled Patch")
+        name = config.get("name", "Untitled Preset")
         description = config.get("description", "")
         builder = cls(name=name, description=description)
 
@@ -735,41 +705,25 @@ class PatchBuilder:
 
         # Reconstruct from components
         for component in config.get("components", []):
-            comp_type = component["type"]
-            descriptor = registry.get(comp_type)
+            comp_type = component["name"]
+            component_class = audio_registry.get(comp_type, strict=True)
+            descriptor = component_class.descriptor
+            method_name = descriptor.fluent_api_name if descriptor.fluent_api_name else comp_type
 
-            if not descriptor:
-                logger.warning(f"Unknown component type: {comp_type}, skipping")
-                continue
+            # Extract only actual component parameters (exclude metadata)
+            params = {
+                k: v for k, v in component.items()
+                if k not in ["name", "category", "description"]
+                and descriptor.config_params
+                and k in descriptor.config_params
+            }
 
-            target = component.get("target", "amplitude")
-
-            # Call appropriate method based on category
-            if descriptor.category == ComponentCategory.OSCILLATOR:
-                method = getattr(builder, descriptor.method_name)
-                params = {k: v for k, v in component.items()
-                         if k in descriptor.config_params and k != "sample_rate"}
+            # Call method with keyword arguments
+            method = builder._component_methods.get(method_name)
+            if method:
                 method(**params)
-
-            elif descriptor.category == ComponentCategory.MODULATOR:
-                if comp_type == "adsr_envelope":
-                    builder.adsr(
-                        component.get("attack_duration", 0.1),
-                        component.get("decay_duration", 0.1),
-                        component.get("sustain_level", 0.7),
-                        component.get("release_duration", 0.3),
-                        target=target,
-                    )
-
-            elif descriptor.category == ComponentCategory.MODIFIER:
-                method = getattr(builder, descriptor.method_name)
-                if comp_type == "clipper":
-                    method(component.get("min", -1.0), component.get("max", 1.0))
-                else:
-                    params = {k: v for k, v in component.items()
-                             if k in descriptor.config_params}
-                    method(**params)
+            else:
+                logger.warning(f"Method '{method_name}' not found for component '{comp_type}'")
 
         logger.info(f"Loaded preset from {filepath}")
         return builder
-

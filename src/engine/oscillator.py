@@ -42,11 +42,12 @@ from abc import abstractmethod, ABC
 
 import numpy as np
 
+from src.engine.audio_component import Generator, ComponentDescriptor
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.engine_component_registry import register_component, ComponentCategory
+from src.engine.audio_component_registry import register_component, ComponentCategory
 
 
-class Oscillator(ABC):
+class Oscillator(Generator):
     """Base class for all signal generators.
 
     The oscillator is initialized with fixed initial values but exposes properties to
@@ -74,7 +75,7 @@ class Oscillator(ABC):
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
     ):
-        self.sample_rate = sample_rate  # Samples per second
+        super().__init__(sample_rate=sample_rate)
 
         self._freq = frequency
         self._amp = amplitude
@@ -332,11 +333,7 @@ class Oscillator(ABC):
             return self.get_samples_vectorized(n)
 
 
-@register_component(
-    category=ComponentCategory.OSCILLATOR,
-    description="Sawtooth wave oscillator",
-    tags=["basic", "oscillator", "sawtooth"]
-)
+@register_component()
 class SawtoothOscillator(Oscillator):
     """Sawtooth wave generator.
 
@@ -347,6 +344,15 @@ class SawtoothOscillator(Oscillator):
     The implementation uses an internal period (`_period`) computed from
     `sample_rate / freq`.
     """
+
+    descriptor = ComponentDescriptor(
+        name="Sawtooth",
+        category=ComponentCategory.OSCILLATOR,
+        description="Sawtooth wave oscillator",
+        fluent_api_name="sawtooth",
+        config_params=["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
+        tags=["basic", "oscillator", "sawtooth"]
+    )
 
     def _post_freq_set(self):
         """Update derived period when frequency changes."""
@@ -403,17 +409,22 @@ class SawtoothOscillator(Oscillator):
         return samples.astype(np.float32)
 
 
-@register_component(
-    category=ComponentCategory.OSCILLATOR,
-    description="Triangle wave oscillator",
-    tags=["basic", "oscillator", "triangle"]
-)
+@register_component()
 class TriangleOscillator(SawtoothOscillator):
     """Triangle wave generator derived from sawtooth logic.
 
     The triangle waveform is computed by taking the absolute of a centered
     sawtooth and scaling it to [-1, 1] before amplitude scaling.
     """
+
+    descriptor = ComponentDescriptor(
+        name="Triangle",
+        category=ComponentCategory.OSCILLATOR,
+        description="Triangle wave oscillator",
+        tags=["basic", "oscillator", "triangle"],
+        fluent_api_name="triangle",
+        config_params = ["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
+    )
 
     def __next__(self):
         """Compute next triangle sample and advance index.
@@ -459,17 +470,22 @@ class TriangleOscillator(SawtoothOscillator):
         return samples.astype(np.float32)
 
 
-@register_component(
-    category=ComponentCategory.OSCILLATOR,
-    description="Pure sine wave oscillator",
-    tags=["basic", "oscillator", "sine"]
-)
+@register_component()
 class SineOscillator(Oscillator):
     """Sine wave generator.
 
     The sine oscillator uses `_step` to advance the internal phase per sample.
     Phase is converted from degrees to radians in `_post_phase_set`.
     """
+
+    descriptor = ComponentDescriptor(
+        name="Sine",
+        category=ComponentCategory.OSCILLATOR,
+        description="Pure sine wave oscillator",
+        tags=["basic", "oscillator", "sine"],
+        fluent_api_name="sine",
+        config_params = ["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
+    )
 
     def _post_freq_set(self):
         """Recompute the angular step per sample when frequency changes."""
@@ -525,17 +541,22 @@ class SineOscillator(Oscillator):
         return samples.astype(np.float32)
 
 
-@register_component(
-    category=ComponentCategory.OSCILLATOR,
-    description="Square wave oscillator",
-    tags=["basic", "oscillator", "square"]
-)
+@register_component()
 class SquareOscillator(SineOscillator):
     """Square wave generator built on sine reference.
 
     The square wave threshold compares the underlying sine value to `threshold`
     and yields either `wave_range[0]` or `wave_range[1]` accordingly.
     """
+
+    descriptor = ComponentDescriptor(
+        name="Square",
+        category=ComponentCategory.OSCILLATOR,
+        description="Square wave oscillator",
+        tags=["basic", "oscillator", "square"],
+        fluent_api_name="square",
+        config_params = ["frequency", "amplitude", "phase", "sample_rate", "wave_range"]
+    )
 
     def __init__(
         self,

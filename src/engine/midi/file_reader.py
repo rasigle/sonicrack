@@ -25,6 +25,7 @@ from pathlib import Path
 
 try:
     import mido
+
     MIDO_AVAILABLE = True
 except ImportError:
     MIDO_AVAILABLE = False
@@ -80,8 +81,7 @@ class MIDIFile:
         """
         if not MIDO_AVAILABLE:
             raise RuntimeError(
-                "mido library not installed. "
-                "Install with: pip install mido"
+                "mido library not installed. " "Install with: pip install mido"
             )
 
         self.filepath = Path(filepath)
@@ -125,7 +125,7 @@ class MIDIFile:
                 current_time += msg.time * tick_duration
 
             # Update tempo if meta message
-            if msg.type == 'set_tempo':
+            if msg.type == "set_tempo":
                 tempo = msg.tempo
                 self._tempo = tempo
                 continue
@@ -149,53 +149,46 @@ class MIDIFile:
         Returns:
             Converted MIDIMessage or None if message type not supported
         """
-        channel = getattr(msg, 'channel', 0)
+        channel = getattr(msg, "channel", 0)
 
-        if msg.type == 'note_on':
+        if msg.type == "note_on":
             # Note: velocity=0 is note_off
             if msg.velocity == 0:
                 return NoteOffMessage(
-                    timestamp=timestamp,
-                    channel=channel,
-                    note=msg.note,
-                    velocity=0
+                    timestamp=timestamp, channel=channel, note=msg.note, velocity=0
                 )
             else:
                 return NoteOnMessage(
                     timestamp=timestamp,
                     channel=channel,
                     note=msg.note,
-                    velocity=msg.velocity
+                    velocity=msg.velocity,
                 )
 
-        elif msg.type == 'note_off':
+        elif msg.type == "note_off":
             return NoteOffMessage(
                 timestamp=timestamp,
                 channel=channel,
                 note=msg.note,
-                velocity=getattr(msg, 'velocity', 64)
+                velocity=getattr(msg, "velocity", 64),
             )
 
-        elif msg.type == 'control_change':
+        elif msg.type == "control_change":
             return ControlChangeMessage(
                 timestamp=timestamp,
                 channel=channel,
                 controller=msg.control,
-                value=msg.value
+                value=msg.value,
             )
 
-        elif msg.type == 'pitchwheel':
+        elif msg.type == "pitchwheel":
             return PitchBendMessage(
-                timestamp=timestamp,
-                channel=channel,
-                value=msg.pitch
+                timestamp=timestamp, channel=channel, value=msg.pitch
             )
 
-        elif msg.type == 'program_change':
+        elif msg.type == "program_change":
             return ProgramChangeMessage(
-                timestamp=timestamp,
-                channel=channel,
-                program=msg.program
+                timestamp=timestamp, channel=channel, program=msg.program
             )
 
         # Unsupported message type
@@ -213,10 +206,7 @@ class MIDIFile:
         return max(msg.timestamp for msg in self.messages)
 
     def get_notes_in_range(
-        self,
-        start_time: float,
-        end_time: float,
-        channel: Optional[int] = None
+        self, start_time: float, end_time: float, channel: Optional[int] = None
     ) -> List[MIDIMessage]:
         """Get all MIDI messages in a time range.
 
@@ -236,8 +226,7 @@ class MIDIFile:
             >>> ch1_messages = midi.get_notes_in_range(0, 10.0, channel=0)
         """
         messages = [
-            msg for msg in self.messages
-            if start_time <= msg.timestamp <= end_time
+            msg for msg in self.messages if start_time <= msg.timestamp <= end_time
         ]
 
         if channel is not None:
@@ -277,7 +266,8 @@ class MIDIFile:
             Number of note messages
         """
         return sum(
-            1 for msg in self.messages
+            1
+            for msg in self.messages
             if isinstance(msg, (NoteOnMessage, NoteOffMessage))
         )
 
@@ -325,7 +315,8 @@ class MIDIFile:
             Tuple of (lowest_note, highest_note) or (0, 0) if no notes
         """
         notes = [
-            msg.note for msg in self.messages
+            msg.note
+            for msg in self.messages
             if isinstance(msg, (NoteOnMessage, NoteOffMessage))
         ]
 
@@ -346,4 +337,3 @@ class MIDIFile:
     def __len__(self) -> int:
         """Return number of messages."""
         return len(self.messages)
-

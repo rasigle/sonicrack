@@ -44,14 +44,15 @@ except ImportError:
 # ANSI color codes for terminal output
 class Colors:
     """Terminal color codes."""
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
+
+    HEADER = "\033[95m"
+    BLUE = "\033[94m"
+    CYAN = "\033[96m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
 
 
 # Common CC controller names
@@ -152,7 +153,6 @@ def format_message(msg: MIDIMessage) -> str:
         return f"{timestamp_str} {channel_str} {type(msg).__name__}"
 
 
-
 def main():
     """Main function."""
     print(f"\n{Colors.BOLD}{Colors.HEADER}=== MIDI Input Demo ==={Colors.ENDC}\n")
@@ -185,7 +185,10 @@ def main():
         selected_device = devices[0]
         print(f"\nUsing: {Colors.BOLD}{selected_device}{Colors.ENDC}")
     else:
-        print(f"\nSelect device (1-{len(devices)}) or press Enter for first device: ", end="")
+        print(
+            f"\nSelect device (1-{len(devices)}) or press Enter for first device: ",
+            end="",
+        )
         choice = input().strip()
 
         if choice == "":
@@ -205,7 +208,9 @@ def main():
         print(f"Using: {Colors.BOLD}{selected_device}{Colors.ENDC}")
 
     # Show exit instructions
-    print(f"\n{Colors.BOLD}Listening for MIDI messages... (Press Ctrl+C to exit){Colors.ENDC}\n")
+    print(
+        f"\n{Colors.BOLD}Listening for MIDI messages... (Press Ctrl+C to exit){Colors.ENDC}\n"
+    )
     print("=" * 80)
 
     # Create MIDI input with callback
@@ -234,4 +239,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

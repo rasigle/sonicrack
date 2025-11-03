@@ -7,6 +7,7 @@ modifying the central registry.
 New modules should use the @register_module decorator in their own files.
 See dynamic_registry.py for the plugin system documentation.
 """
+
 import importlib
 import importlib.util
 import inspect
@@ -17,6 +18,7 @@ from typing import Type, Callable
 from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)
+
 
 class ModuleRegistry:
     """Central registry for all available modules.
@@ -39,9 +41,7 @@ class ModuleRegistry:
         self._metadata: dict[str, dict] = {}
 
     def register(
-        self,
-        module_class: Type[ModuleWidget],
-        **override_metadata
+        self, module_class: Type[ModuleWidget], **override_metadata
     ) -> Type[ModuleWidget]:
         """Register a module class.
 
@@ -82,8 +82,13 @@ class ModuleRegistry:
 
         # Try to get property values from the class
         # Properties are descriptors, so we need to get them from __dict__
-        for attr_name in ['module_title', 'module_category', 'module_description',
-                          'module_version', 'module_author']:
+        for attr_name in [
+            "module_title",
+            "module_category",
+            "module_description",
+            "module_version",
+            "module_author",
+        ]:
             # Walk through MRO to find the property
             for cls in module_class.__mro__:
                 if attr_name in cls.__dict__:
@@ -94,6 +99,7 @@ class ModuleRegistry:
                         # Check if function has simple return statement
                         try:
                             import ast
+
                             source = inspect.getsource(func)
                             tree = ast.parse(source)
                             # Find return statements
@@ -101,22 +107,22 @@ class ModuleRegistry:
                                 if isinstance(node, ast.Return) and node.value:
                                     if isinstance(node.value, ast.Constant):
                                         value = node.value.value
-                                        if attr_name == 'module_title':
+                                        if attr_name == "module_title":
                                             name = value
-                                        elif attr_name == 'module_category':
+                                        elif attr_name == "module_category":
                                             # This will be an enum access, skip for now
                                             pass
-                                        elif attr_name == 'module_description':
+                                        elif attr_name == "module_description":
                                             description = value
-                                        elif attr_name == 'module_version':
+                                        elif attr_name == "module_version":
                                             version = value
-                                        elif attr_name == 'module_author':
+                                        elif attr_name == "module_author":
                                             author = value
                                         break
                                     elif isinstance(node.value, ast.Attribute):
                                         # Handle ModuleCategory.SOURCE etc
-                                        if attr_name == 'module_category':
-                                            if hasattr(node.value, 'attr'):
+                                        if attr_name == "module_category":
+                                            if hasattr(node.value, "attr"):
                                                 category_name = node.value.attr
                                                 # Map to lowercase
                                                 category = category_name.lower()
@@ -154,8 +160,11 @@ class ModuleRegistry:
             "description": description,
             "author": author,
             "version": version,
-            **{k: v for k, v in override_metadata.items()
-               if k not in ["name", "category", "description", "author", "version"]}
+            **{
+                k: v
+                for k, v in override_metadata.items()
+                if k not in ["name", "category", "description", "author", "version"]
+            },
         }
 
         logger.info(f"Registered module: {name} ({module_class.__name__})")
@@ -308,11 +317,9 @@ def register_module(**override_metadata) -> Callable:
             ...
         ```
     """
+
     def decorator(cls: Type[ModuleWidget]) -> Type[ModuleWidget]:
-        _global_registry.register(
-            module_class=cls,
-            **override_metadata
-        )
+        _global_registry.register(module_class=cls, **override_metadata)
         return cls
 
     return decorator

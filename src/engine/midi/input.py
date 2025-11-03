@@ -23,6 +23,7 @@ import threading
 
 try:
     import mido
+
     MIDO_AVAILABLE = True
 except ImportError:
     MIDO_AVAILABLE = False
@@ -211,6 +212,7 @@ class MIDIInput:
 
         if timeout > 0:
             import time
+
             deadline = time.time() + timeout
 
         while True:
@@ -218,6 +220,7 @@ class MIDIInput:
                 remaining = None
                 if deadline is not None:
                     import time
+
                     remaining = max(0, deadline - time.time())
                     if remaining <= 0:
                         break
@@ -272,61 +275,52 @@ class MIDIInput:
         self._current_time += raw_msg.time
 
         timestamp = self._current_time
-        channel = getattr(raw_msg, 'channel', 0)
+        channel = getattr(raw_msg, "channel", 0)
 
         # Convert based on message type
-        if raw_msg.type == 'note_on':
+        if raw_msg.type == "note_on":
             # Note: mido uses velocity=0 for note_on as note_off
             if raw_msg.velocity == 0:
                 return NoteOffMessage(
-                    timestamp=timestamp,
-                    channel=channel,
-                    note=raw_msg.note,
-                    velocity=0
+                    timestamp=timestamp, channel=channel, note=raw_msg.note, velocity=0
                 )
             else:
                 return NoteOnMessage(
                     timestamp=timestamp,
                     channel=channel,
                     note=raw_msg.note,
-                    velocity=raw_msg.velocity
+                    velocity=raw_msg.velocity,
                 )
 
-        elif raw_msg.type == 'note_off':
+        elif raw_msg.type == "note_off":
             return NoteOffMessage(
                 timestamp=timestamp,
                 channel=channel,
                 note=raw_msg.note,
-                velocity=raw_msg.velocity
+                velocity=raw_msg.velocity,
             )
 
-        elif raw_msg.type == 'control_change':
+        elif raw_msg.type == "control_change":
             return ControlChangeMessage(
                 timestamp=timestamp,
                 channel=channel,
                 controller=raw_msg.control,
-                value=raw_msg.value
+                value=raw_msg.value,
             )
 
-        elif raw_msg.type == 'pitchwheel':
+        elif raw_msg.type == "pitchwheel":
             return PitchBendMessage(
-                timestamp=timestamp,
-                channel=channel,
-                value=raw_msg.pitch
+                timestamp=timestamp, channel=channel, value=raw_msg.pitch
             )
 
-        elif raw_msg.type == 'program_change':
+        elif raw_msg.type == "program_change":
             return ProgramChangeMessage(
-                timestamp=timestamp,
-                channel=channel,
-                program=raw_msg.program
+                timestamp=timestamp, channel=channel, program=raw_msg.program
             )
 
-        elif raw_msg.type == 'aftertouch':
+        elif raw_msg.type == "aftertouch":
             return AftertouchMessage(
-                timestamp=timestamp,
-                channel=channel,
-                pressure=raw_msg.value
+                timestamp=timestamp, channel=channel, pressure=raw_msg.value
             )
 
         else:
@@ -352,4 +346,3 @@ class MIDIInput:
         """Cleanup on deletion."""
         self.stop()
         self.close()
-

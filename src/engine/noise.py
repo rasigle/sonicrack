@@ -720,8 +720,12 @@ class NoiseGenerator:
     Implements iterator protocol for compatibility with modulated components.
     """
 
-    def __init__(self, noise_type: str = "White", amplitude: float = 0.5,
-                 sample_rate: int | float = DEFAULT_SAMPLE_RATE,):
+    def __init__(
+        self,
+        noise_type: str = "White",
+        amplitude: float = 0.5,
+        sample_rate: int | float = DEFAULT_SAMPLE_RATE,
+    ):
         """Initialize noise generator.
 
         Args:
@@ -771,23 +775,39 @@ class NoiseGenerator:
         """
         # Generate the appropriate noise type
         if self.noise_type == "White":
-            return white_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+            return white_noise(
+                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+            )
         if self.noise_type == "Pink":
-            return pink_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+            return pink_noise(
+                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+            )
         if self.noise_type == "Brown":
-            return brownian_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+            return brownian_noise(
+                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+            )
         if self.noise_type == "Blue":
-            return blue_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+            return blue_noise(
+                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+            )
         if self.noise_type == "Grey":
-            return grey_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+            return grey_noise(
+                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+            )
         if self.noise_type == "Velvet":
-            return velvet_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+            return velvet_noise(
+                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+            )
         if self.noise_type == "Sample & Hold":
-            return sample_hold_noise(dur=duration, amplitude=self.amplitude, sr=self._sample_rate)
+            return sample_hold_noise(
+                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+            )
 
         raise ValueError(f"Unknown noise type: {self.noise_type}")
 
-    def get_samples(self, num_samples: int, reset: bool = True, mode: str = "auto") -> np.ndarray:
+    def get_samples(
+        self, num_samples: int, reset: bool = True, mode: str = "auto"
+    ) -> np.ndarray:
         """Generate noise samples (compatible with modulator interface).
 
         Args:

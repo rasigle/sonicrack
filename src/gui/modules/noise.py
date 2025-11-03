@@ -46,15 +46,9 @@ class NoiseModule(ModuleWidget):
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("Type:"))
         self.type_combo = QComboBox()
-        self.type_combo.addItems([
-            "White",
-            "Pink",
-            "Brown",
-            "Blue",
-            "Grey",
-            "Velvet",
-            "Sample & Hold"
-        ])
+        self.type_combo.addItems(
+            ["White", "Pink", "Brown", "Blue", "Grey", "Velvet", "Sample & Hold"]
+        )
         self.type_combo.currentTextChanged.connect(self._on_type_changed)
         type_layout.addWidget(self.type_combo)
         layout.addLayout(type_layout)
@@ -86,7 +80,9 @@ class NoiseModule(ModuleWidget):
     @property
     def module_description(self) -> str:
         """Return module description."""
-        return "Multi-type noise generator (White, Pink, Brown, Blue, Grey, Velvet, S&H)"
+        return (
+            "Multi-type noise generator (White, Pink, Brown, Blue, Grey, Velvet, S&H)"
+        )
 
     @property
     def module_category(self) -> ModuleCategory:
@@ -109,4 +105,3 @@ class NoiseModule(ModuleWidget):
 
         # Create noise generator with current settings
         return NoiseGenerator(noise_type=noise_type, amplitude=amp)
-

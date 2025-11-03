@@ -1,6 +1,5 @@
 """Tests for monophonic MIDI synthesizer."""
 
-import pytest
 import numpy as np
 from src.engine.midi.monophonic_synth import MonophonicSynth
 from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
@@ -31,6 +30,7 @@ class TestMonophonicSynth:
 
     def test_init(self):
         """Test initialization."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -43,6 +43,7 @@ class TestMonophonicSynth:
 
     def test_note_on(self):
         """Test note on."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -56,6 +57,7 @@ class TestMonophonicSynth:
 
     def test_note_off(self):
         """Test note off."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -67,6 +69,7 @@ class TestMonophonicSynth:
 
     def test_note_off_wrong_note(self):
         """Test note off for different note doesn't stop current note."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -79,6 +82,7 @@ class TestMonophonicSynth:
 
     def test_velocity_zero_is_note_off(self):
         """Test that velocity 0 triggers note off."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -91,6 +95,7 @@ class TestMonophonicSynth:
 
     def test_monophonic_behavior(self):
         """Test that new note replaces old note."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -107,6 +112,7 @@ class TestMonophonicSynth:
 
     def test_get_samples_no_voice(self):
         """Test get_samples returns silence when no voice."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -118,6 +124,7 @@ class TestMonophonicSynth:
 
     def test_get_samples_with_voice(self):
         """Test get_samples returns audio when voice active."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -131,6 +138,7 @@ class TestMonophonicSynth:
 
     def test_process_message_note_on(self):
         """Test processing NoteOnMessage."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -144,6 +152,7 @@ class TestMonophonicSynth:
 
     def test_process_message_note_off(self):
         """Test processing NoteOffMessage."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -160,6 +169,7 @@ class TestMonophonicSynth:
 
     def test_reset(self):
         """Test reset clears state."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -175,6 +185,7 @@ class TestMonophonicSynth:
 
     def test_invalid_note_number(self):
         """Test invalid note numbers are ignored."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -189,6 +200,7 @@ class TestMonophonicSynth:
 
     def test_invalid_velocity(self):
         """Test invalid velocities are ignored."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -203,6 +215,7 @@ class TestMonophonicSynth:
 
     def test_repr(self):
         """Test string representation."""
+
         def voice_factory():
             return DummyVoice()
 
@@ -220,6 +233,7 @@ class TestMonophonicSynth:
 
     def test_with_real_oscillator(self):
         """Test with actual oscillator."""
+
         def voice_factory():
             return SineOscillator(440)
 
@@ -232,4 +246,3 @@ class TestMonophonicSynth:
         assert not np.allclose(samples, 0.0)
         # Should be roughly between -1 and 1 (with some headroom)
         assert np.abs(samples).max() < 2.0
-

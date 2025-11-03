@@ -220,4 +220,3 @@ class TestTranspose:
             transpose(-1, 5)
         with pytest.raises(ValueError):
             transpose(128, 5)
-

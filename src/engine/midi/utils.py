@@ -26,24 +26,31 @@ Example:
 """
 
 import re
-from typing import Optional
 
 
 # Note name to semitone mapping (C = 0)
 NOTE_NAMES = {
-    "C": 0, "C#": 1, "Db": 1,
-    "D": 2, "D#": 3, "Eb": 3,
+    "C": 0,
+    "C#": 1,
+    "Db": 1,
+    "D": 2,
+    "D#": 3,
+    "Eb": 3,
     "E": 4,
-    "F": 5, "F#": 6, "Gb": 6,
-    "G": 7, "G#": 8, "Ab": 8,
-    "A": 9, "A#": 10, "Bb": 10,
+    "F": 5,
+    "F#": 6,
+    "Gb": 6,
+    "G": 7,
+    "G#": 8,
+    "Ab": 8,
+    "A": 9,
+    "A#": 10,
+    "Bb": 10,
     "B": 11,
 }
 
 # Reverse mapping for note number to name
-SEMITONE_TO_NOTE = [
-    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
-]
+SEMITONE_TO_NOTE = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 
 def midi_to_frequency(note: int, a4_tuning: float = 440.0) -> float:
@@ -101,6 +108,7 @@ def frequency_to_midi(frequency: float, a4_tuning: float = 440.0) -> int:
 
     # Inverse of midi_to_frequency formula
     import math
+
     note = 69 + 12 * math.log2(frequency / a4_tuning)
 
     # Round to nearest integer and clamp to valid range
@@ -137,7 +145,7 @@ def note_name_to_midi(note_name: str) -> int:
         58
     """
     # Parse note name with regex: (Note)(Accidental?)(Octave)
-    pattern = r'^([A-G])(#|b)?(-?\d+)$'
+    pattern = r"^([A-G])(#|b)?(-?\d+)$"
     match = re.match(pattern, note_name)
 
     if not match:
@@ -208,10 +216,7 @@ def midi_to_note_name(note: int, use_sharps: bool = True) -> str:
     # Convert sharps to flats if requested
     if not use_sharps and "#" in note_letter:
         # Sharp to flat conversion
-        sharp_to_flat = {
-            "C#": "Db", "D#": "Eb", "F#": "Gb",
-            "G#": "Ab", "A#": "Bb"
-        }
+        sharp_to_flat = {"C#": "Db", "D#": "Eb", "F#": "Gb", "G#": "Ab", "A#": "Bb"}
         note_letter = sharp_to_flat.get(note_letter, note_letter)
 
     return f"{note_letter}{octave}"
@@ -257,7 +262,9 @@ def get_note_range(start_note: str, end_note: str) -> list[int]:
     end = note_name_to_midi(end_note)
 
     if start > end:
-        raise ValueError(f"Start note '{start_note}' is higher than end note '{end_note}'")
+        raise ValueError(
+            f"Start note '{start_note}' is higher than end note '{end_note}'"
+        )
 
     return list(range(start, end + 1))
 
@@ -283,4 +290,3 @@ def transpose(note: int, semitones: int) -> int:
 
     transposed = note + semitones
     return max(0, min(127, transposed))
-

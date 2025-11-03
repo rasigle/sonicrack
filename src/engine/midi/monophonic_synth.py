@@ -67,9 +67,7 @@ class MonophonicSynth:
     """
 
     def __init__(
-        self,
-        voice_factory: Callable[[], Any],
-        sample_rate: int = DEFAULT_SAMPLE_RATE
+        self, voice_factory: Callable[[], Any], sample_rate: int = DEFAULT_SAMPLE_RATE
     ):
         """Initialize monophonic synthesizer.
 
@@ -130,65 +128,65 @@ class MonophonicSynth:
         osc_found = False
 
         # 1. Chain/common: oscillator attribute (most common pattern)
-        if hasattr(self.voice, 'oscillator'):
-            if hasattr(self.voice.oscillator, 'frequency'):
+        if hasattr(self.voice, "oscillator"):
+            if hasattr(self.voice.oscillator, "frequency"):
                 self.voice.oscillator.frequency = frequency
                 osc_found = True
-                logger.debug(f"Set frequency via voice.oscillator.frequency")
+                logger.debug("Set frequency via voice.oscillator.frequency")
 
         # 2. Alternative: generator attribute
-        elif hasattr(self.voice, 'generator'):
-            if hasattr(self.voice.generator, 'frequency'):
+        elif hasattr(self.voice, "generator"):
+            if hasattr(self.voice.generator, "frequency"):
                 self.voice.generator.frequency = frequency
                 osc_found = True
-                logger.debug(f"Set frequency via voice.generator.frequency")
+                logger.debug("Set frequency via voice.generator.frequency")
 
         # 3. Direct oscillator (no wrapper)
-        elif hasattr(self.voice, 'frequency'):
+        elif hasattr(self.voice, "frequency"):
             self.voice.frequency = frequency
             osc_found = True
-            logger.debug(f"Set frequency via voice.frequency")
+            logger.debug("Set frequency via voice.frequency")
 
         # 4. Search in components (for other structures)
-        elif hasattr(self.voice, 'components'):
+        elif hasattr(self.voice, "components"):
             for comp in self.voice.components:
-                if hasattr(comp, 'frequency'):
+                if hasattr(comp, "frequency"):
                     comp.frequency = frequency
                     osc_found = True
-                    logger.debug(f"Set frequency via component.frequency")
+                    logger.debug("Set frequency via component.frequency")
                     break
 
         if not osc_found:
-            logger.warning(f"Could not find frequency attribute to set")
+            logger.warning("Could not find frequency attribute to set")
 
         # Trigger envelope if voice has it - try multiple paths
         envelope_triggered = False
 
         # 1. Direct trigger methods
-        if hasattr(self.voice, 'trigger_note_on'):
+        if hasattr(self.voice, "trigger_note_on"):
             self.voice.trigger_note_on()
             envelope_triggered = True
             logger.debug("Triggered note on via voice.trigger_note_on()")
 
         # 2. Direct envelope attribute
-        elif hasattr(self.voice, 'envelope'):
-            if hasattr(self.voice.envelope, 'trigger_note_on'):
+        elif hasattr(self.voice, "envelope"):
+            if hasattr(self.voice.envelope, "trigger_note_on"):
                 self.voice.envelope.trigger_note_on()
                 envelope_triggered = True
                 logger.debug("Triggered note on via voice.envelope.trigger_note_on()")
 
         # 3. Search in modifiers (for Chain)
-        elif hasattr(self.voice, 'modifiers'):
+        elif hasattr(self.voice, "modifiers"):
             for modifier in self.voice.modifiers:
                 # Check if modifier has modulator (like ModulatedVolume)
-                if hasattr(modifier, 'modulator'):
-                    if hasattr(modifier.modulator, 'trigger_note_on'):
+                if hasattr(modifier, "modulator"):
+                    if hasattr(modifier.modulator, "trigger_note_on"):
                         modifier.modulator.trigger_note_on()
                         envelope_triggered = True
                         logger.debug("Triggered note on via modifier.modulator")
                         break
                 # Check if modifier itself can be triggered
-                elif hasattr(modifier, 'trigger_note_on'):
+                elif hasattr(modifier, "trigger_note_on"):
                     modifier.trigger_note_on()
                     envelope_triggered = True
                     logger.debug("Triggered note on via modifier")
@@ -220,30 +218,34 @@ class MonophonicSynth:
                 envelope_released = False
 
                 # 1. Direct trigger methods
-                if hasattr(self.voice, 'trigger_note_off'):
+                if hasattr(self.voice, "trigger_note_off"):
                     self.voice.trigger_note_off()
                     envelope_released = True
                     logger.debug("Triggered note off via voice.trigger_note_off()")
 
                 # 2. Direct envelope attribute
-                elif hasattr(self.voice, 'envelope'):
-                    if hasattr(self.voice.envelope, 'trigger_note_off'):
+                elif hasattr(self.voice, "envelope"):
+                    if hasattr(self.voice.envelope, "trigger_note_off"):
                         self.voice.envelope.trigger_note_off()
                         envelope_released = True
-                        logger.debug("Triggered note off via voice.envelope.trigger_note_off()")
+                        logger.debug(
+                            "Triggered note off via voice.envelope.trigger_note_off()"
+                        )
 
                 # 3. Search in modifiers (for Chain)
-                elif hasattr(self.voice, 'modifiers'):
+                elif hasattr(self.voice, "modifiers"):
                     for modifier in self.voice.modifiers:
                         # Check if modifier has modulator (like ModulatedVolume)
-                        if hasattr(modifier, 'modulator'):
-                            if hasattr(modifier.modulator, 'trigger_note_off'):
+                        if hasattr(modifier, "modulator"):
+                            if hasattr(modifier.modulator, "trigger_note_off"):
                                 modifier.modulator.trigger_note_off()
                                 envelope_released = True
-                                logger.debug("Triggered note off via modifier.modulator")
+                                logger.debug(
+                                    "Triggered note off via modifier.modulator"
+                                )
                                 break
                         # Check if modifier itself can be triggered
-                        elif hasattr(modifier, 'trigger_note_off'):
+                        elif hasattr(modifier, "trigger_note_off"):
                             modifier.trigger_note_off()
                             envelope_released = True
                             logger.debug("Triggered note off via modifier")
@@ -302,16 +304,19 @@ class MonophonicSynth:
                 ended = False
 
                 # Check voice.ended
-                if hasattr(self.voice, 'ended') and self.voice.ended:
+                if hasattr(self.voice, "ended") and self.voice.ended:
                     ended = True
                 # Check modifiers for ended state (ModulatedVolume)
-                elif hasattr(self.voice, 'modifiers'):
+                elif hasattr(self.voice, "modifiers"):
                     for modifier in self.voice.modifiers:
-                        if hasattr(modifier, 'modulator'):
-                            if hasattr(modifier.modulator, 'ended') and modifier.modulator.ended:
+                        if hasattr(modifier, "modulator"):
+                            if (
+                                hasattr(modifier.modulator, "ended")
+                                and modifier.modulator.ended
+                            ):
                                 ended = True
                                 break
-                        elif hasattr(modifier, 'ended') and modifier.ended:
+                        elif hasattr(modifier, "ended") and modifier.ended:
                             ended = True
                             break
 
@@ -344,4 +349,3 @@ class MonophonicSynth:
             return f"MonophonicSynth(note={self.current_note}, velocity={self.current_velocity})"
         else:
             return "MonophonicSynth(idle)"
-

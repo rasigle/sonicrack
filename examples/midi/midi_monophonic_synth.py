@@ -39,12 +39,12 @@ except ImportError as e:
 
 # ANSI colors
 class Colors:
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    YELLOW = '\033[93m'
-    CYAN = '\033[96m'
-    BOLD = '\033[1m'
-    ENDC = '\033[0m'
+    GREEN = "\033[92m"
+    RED = "\033[91m"
+    YELLOW = "\033[93m"
+    CYAN = "\033[96m"
+    BOLD = "\033[1m"
+    ENDC = "\033[0m"
 
 
 def create_voice():
@@ -57,11 +57,11 @@ def create_voice():
 
     # Create ADSR envelope
     env = ADSREnvelope(
-        attack_duration=0.05,   # Fast attack
-        decay_duration=0.1,     # Short decay
-        sustain_level=0.7,      # 70% sustain
-        release_duration=0.2,   # Quick release
-        sample_rate=DEFAULT_SAMPLE_RATE
+        attack_duration=0.05,  # Fast attack
+        decay_duration=0.1,  # Short decay
+        sustain_level=0.7,  # 70% sustain
+        release_duration=0.2,  # Quick release
+        sample_rate=DEFAULT_SAMPLE_RATE,
     )
 
     # Chain them together with ModulatedVolume
@@ -73,10 +73,14 @@ def create_voice():
 
 def demo_programmatic():
     """Demo: Play notes programmatically (no MIDI input needed)."""
-    print(f"\n{Colors.BOLD}{Colors.CYAN}=== Monophonic Synth - Programmatic Demo ==={Colors.ENDC}\n")
+    print(
+        f"\n{Colors.BOLD}{Colors.CYAN}=== Monophonic Synth - Programmatic Demo ==={Colors.ENDC}\n"
+    )
 
     if sd is None:
-        print(f"{Colors.RED}sounddevice not installed - skipping audio playback{Colors.ENDC}")
+        print(
+            f"{Colors.RED}sounddevice not installed - skipping audio playback{Colors.ENDC}"
+        )
         return
 
     # Create synth
@@ -123,7 +127,9 @@ def demo_programmatic():
 
 def demo_midi_input():
     """Demo: Use real MIDI input."""
-    print(f"\n{Colors.BOLD}{Colors.CYAN}=== Monophonic Synth - MIDI Input Demo ==={Colors.ENDC}\n")
+    print(
+        f"\n{Colors.BOLD}{Colors.CYAN}=== Monophonic Synth - MIDI Input Demo ==={Colors.ENDC}\n"
+    )
 
     if not MIDO_AVAILABLE:
         print(f"{Colors.RED}mido not installed{Colors.ENDC}")
@@ -208,7 +214,9 @@ def demo_midi_input():
             print(f"{Colors.RED}♪ {note_name:4s} OFF{Colors.ENDC}")
             synth.note_off(msg.note)
 
-    print(f"\n{Colors.BOLD}Listening for MIDI input... (Press Ctrl+C to stop){Colors.ENDC}\n")
+    print(
+        f"\n{Colors.BOLD}Listening for MIDI input... (Press Ctrl+C to stop){Colors.ENDC}\n"
+    )
 
     # Start audio and MIDI
     try:
@@ -216,7 +224,7 @@ def demo_midi_input():
             channels=2,
             samplerate=DEFAULT_SAMPLE_RATE,
             blocksize=1024,
-            callback=audio_callback
+            callback=audio_callback,
         ):
             with MIDIInput(selected_device) as midi:
                 midi.start(on_midi_message)
@@ -260,4 +268,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

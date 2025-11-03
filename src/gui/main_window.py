@@ -419,7 +419,9 @@ class ModularSynthWindow(QMainWindow):
 
         # Check if output module was disconnected
         output_module_class = self.registry.get("Output")
-        if output_module_class and isinstance(end_port.parent_module, output_module_class):
+        if output_module_class and isinstance(
+            end_port.parent_module, output_module_class
+        ):
             # Output was disconnected - stop playback and clear patch
             self.audio_engine.stop_playback()
             self.audio_engine.set_patch(None)
@@ -621,4 +623,5 @@ def is_module_widget(obj: Any) -> bool:
         True if obj is a ModuleWidget, False otherwise
     """
     from src.gui.audio_module_interface import AudioModuleInterface
+
     return isinstance(obj, AudioModuleInterface)

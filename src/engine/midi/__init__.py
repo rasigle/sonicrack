@@ -52,6 +52,7 @@ from src.engine.midi.utils import (
 from src.engine.midi.input import MIDIInput
 from src.engine.midi.file_reader import MIDIFile
 from src.engine.midi.monophonic_synth import MonophonicSynth
+from src.engine.midi.polyphonic_synth import PolyphonicSynth
 
 __all__ = [
     # Messages
@@ -76,5 +77,5 @@ __all__ = [
     "MIDIFile",
     # Synth
     "MonophonicSynth",
+    "PolyphonicSynth",
 ]
-

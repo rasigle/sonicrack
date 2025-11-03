@@ -1,9 +1,8 @@
 """Tests for MIDI file reader."""
 
 import pytest
-from pathlib import Path
 from src.engine.midi.file_reader import MIDIFile, MIDO_AVAILABLE
-from src.engine.midi.messages import NoteOnMessage, NoteOffMessage, ControlChangeMessage
+from src.engine.midi.messages import ControlChangeMessage
 
 # Skip all tests if mido not available
 pytestmark = pytest.mark.skipif(not MIDO_AVAILABLE, reason="mido not installed")
@@ -27,8 +26,10 @@ def sample_midi_file(tmp_path):
     ticks_per_note = 480  # Quarter note at default tempo
 
     for note in notes:
-        track.append(mido.Message('note_on', note=note, velocity=100, time=0))
-        track.append(mido.Message('note_off', note=note, velocity=0, time=ticks_per_note))
+        track.append(mido.Message("note_on", note=note, velocity=100, time=0))
+        track.append(
+            mido.Message("note_off", note=note, velocity=0, time=ticks_per_note)
+        )
 
     # Save to temp file
     filepath = tmp_path / "test.mid"
@@ -104,7 +105,7 @@ class TestMIDIFile:
         types = midi.get_message_types()
 
         assert isinstance(types, dict)
-        assert 'NoteOnMessage' in types or 'NoteOffMessage' in types
+        assert "NoteOnMessage" in types or "NoteOffMessage" in types
 
     def test_get_used_channels(self, sample_midi_file):
         """Test getting used channels."""
@@ -140,8 +141,8 @@ class TestMIDIFile:
         midi = MIDIFile(sample_midi_file)
         repr_str = repr(midi)
 
-        assert 'MIDIFile' in repr_str
-        assert 'test.mid' in repr_str
+        assert "MIDIFile" in repr_str
+        assert "test.mid" in repr_str
 
     def test_len(self, sample_midi_file):
         """Test len() returns message count."""
@@ -167,38 +168,36 @@ class TestMIDIFileWithComplexFile:
         mid.tracks.append(track)
 
         # Add tempo change
-        track.append(mido.MetaMessage('set_tempo', tempo=500000))  # 120 BPM
+        track.append(mido.MetaMessage("set_tempo", tempo=500000))  # 120 BPM
 
         # Add notes on different channels
         for channel in range(2):
             for note in [60, 64, 67]:  # C major chord
-                track.append(mido.Message(
-                    'note_on',
-                    note=note,
-                    velocity=80 + channel * 10,
-                    channel=channel,
-                    time=0
-                ))
+                track.append(
+                    mido.Message(
+                        "note_on",
+                        note=note,
+                        velocity=80 + channel * 10,
+                        channel=channel,
+                        time=0,
+                    )
+                )
 
         # Add note offs
         for channel in range(2):
             for note in [60, 64, 67]:
-                track.append(mido.Message(
-                    'note_off',
-                    note=note,
-                    velocity=0,
-                    channel=channel,
-                    time=480
-                ))
+                track.append(
+                    mido.Message(
+                        "note_off", note=note, velocity=0, channel=channel, time=480
+                    )
+                )
 
         # Add CC message
-        track.append(mido.Message(
-            'control_change',
-            control=7,  # Volume
-            value=100,
-            channel=0,
-            time=0
-        ))
+        track.append(
+            mido.Message(
+                "control_change", control=7, value=100, channel=0, time=0  # Volume
+            )
+        )
 
         filepath = tmp_path / "complex.mid"
         mid.save(str(filepath))
@@ -231,8 +230,7 @@ class TestMIDIFileWithComplexFile:
         midi = MIDIFile(complex_midi_file)
 
         cc_messages = [
-            msg for msg in midi.messages
-            if isinstance(msg, ControlChangeMessage)
+            msg for msg in midi.messages if isinstance(msg, ControlChangeMessage)
         ]
 
         assert len(cc_messages) > 0
@@ -255,8 +253,8 @@ class TestMIDIFileErrors:
         """Test error when mido not available."""
         # Temporarily make MIDO_AVAILABLE False
         import src.engine.midi.file_reader
-        monkeypatch.setattr(src.engine.midi.file_reader, 'MIDO_AVAILABLE', False)
+
+        monkeypatch.setattr(src.engine.midi.file_reader, "MIDO_AVAILABLE", False)
 
         with pytest.raises(RuntimeError, match="mido.*not installed"):
             MIDIFile("dummy.mid")
-

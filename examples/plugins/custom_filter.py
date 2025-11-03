@@ -44,11 +44,15 @@ class SimpleFilter(Modifier):
 
         if input_samples.ndim == 1:
             for i in range(len(input_samples)):
-                output[i] = self.last_output + alpha * (input_samples[i] - self.last_output)
+                output[i] = self.last_output + alpha * (
+                    input_samples[i] - self.last_output
+                )
                 self.last_output = output[i]
         else:
             for i in range(len(input_samples)):
-                output[i] = self.last_output + alpha * (input_samples[i] - self.last_output)
+                output[i] = self.last_output + alpha * (
+                    input_samples[i] - self.last_output
+                )
                 self.last_output = output[i]
 
         return output
@@ -60,7 +64,7 @@ class SimpleFilter(Modifier):
     category="modifier",
     description="A simple low-pass filter with cutoff and resonance controls",
     author="Plugin Example",
-    version="1.0.0"
+    version="1.0.0",
 )
 class SimpleFilterModule(ModuleWidget):
     """Simple filter module - plugin example.
@@ -75,10 +79,7 @@ class SimpleFilterModule(ModuleWidget):
     def __init__(self):
         """Initialize the filter module."""
         super().__init__(
-            "Simple Filter",
-            width=180,
-            height=200,
-            color=QColor(100, 200, 150)
+            "Simple Filter", width=180, height=200, color=QColor(100, 200, 150)
         )
 
         # Add ports
@@ -98,7 +99,9 @@ class SimpleFilterModule(ModuleWidget):
 
         self.resonance_knob = Knob("Resonance", 0.0, 1.0, 0.5)
         self.resonance_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("resonance", self.resonance_knob.get_value())
+            lambda: self.parameter_changed.emit(
+                "resonance", self.resonance_knob.get_value()
+            )
         )
         layout.addWidget(self.resonance_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -138,5 +141,4 @@ class SimpleFilterModule(ModuleWidget):
 # The @register_module decorator above automatically registers this module
 # when this file is imported or loaded as a plugin!
 
-print(f"✅ Plugin loaded: Simple Filter Module")
-
+print("✅ Plugin loaded: Simple Filter Module")

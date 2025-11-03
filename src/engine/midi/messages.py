@@ -27,7 +27,6 @@ CC Numbers:
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -290,4 +289,3 @@ class AftertouchMessage(MIDIMessage):
             Pressure scaled to 0.0-1.0
         """
         return self.pressure / 127.0
-

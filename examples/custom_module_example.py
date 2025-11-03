@@ -121,7 +121,7 @@ class LowPassFilterModule(ModuleWidget):
 
     # === AudioModuleInterface Implementation ===
 
-    def get_module_category(self) -> ModuleCategory:
+    def module_category(self) -> ModuleCategory:
         """Return MODIFIER since this processes audio input.
 
         ModuleType options:
@@ -254,7 +254,7 @@ class ModulatedLowPassFilterModule(ModuleWidget):
 
         # ... setup UI ...
 
-    def get_module_category(self) -> ModuleCategory:
+    def module_category(self) -> ModuleCategory:
         return ModuleCategory.MODIFIER
 
     def get_required_inputs(self) -> List[str]:

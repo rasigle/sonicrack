@@ -18,7 +18,6 @@ class OutputModule(ModuleWidget):
         """Initialize output module."""
         super().__init__(
             "Output",
-            category="output",
             width=140,
             height=120,
             color=QColor(200, 80, 80),
@@ -52,18 +51,19 @@ class OutputModule(ModuleWidget):
         self.input_component = None
 
     # AudioModuleInterface implementation
-    def get_module_category(self) -> ModuleCategory:
+    @property
+    def module_category(self) -> ModuleCategory:
         """Return OUTPUT since this is the terminal node."""
         return ModuleCategory.OUTPUT
 
-    def get_required_inputs(self) -> List[str]:
+    def get_required_inputs(self) -> list[str]:
         """Output requires the In port to be connected."""
         return ["In"]
 
     def create_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[Dict[str, Any]] = None,
+        input_components: Optional[list[Any]] = None,
+        modulation_components: Optional[dict[str, Any]] = None,
     ):
         """Output doesn't create a component, it returns the input component."""
         if input_components and len(input_components) > 0:
@@ -74,11 +74,11 @@ class OutputModule(ModuleWidget):
         """Get the master volume level."""
         return self.volume_knob.get_value()
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get current parameters."""
         return {"master_volume": self.volume_knob.get_value()}
 
-    def set_parameters(self, params: Dict[str, Any]):
+    def set_parameters(self, params: dict[str, Any]):
         """Set parameters from dictionary."""
         if "master_volume" in params:
             self.volume_knob.set_value(params["master_volume"])

@@ -50,7 +50,7 @@ class PatchCompiler:
             # Find output module
             output_module = None
             for module in self.modules:
-                if module.get_module_category() == ModuleCategory.OUTPUT:
+                if module.module_category == ModuleCategory.OUTPUT:
                     output_module = module
                     break
 
@@ -88,7 +88,7 @@ class PatchCompiler:
         if module in self._build_cache:
             return self._build_cache[module]
 
-        module_category = module.get_module_category()
+        module_category = module.module_category
 
         # Handle SOURCE modules (oscillators, envelopes, LFOs)
         if module_category == ModuleCategory.SOURCE:
@@ -248,7 +248,7 @@ class PatchCompiler:
 
         # Check for output module
         has_output = any(
-            m.get_module_category() == ModuleCategory.OUTPUT for m in self.modules
+            m.module_category == ModuleCategory.OUTPUT for m in self.modules
         )
         if not has_output:
             errors.append("No output module in patch")
@@ -267,7 +267,7 @@ class PatchCompiler:
         for module in self.modules:
             if (
                 module not in connected_modules
-                and module.get_module_category() != ModuleCategory.OUTPUT
+                and module.module_category != ModuleCategory.OUTPUT
             ):
                 errors.append(
                     f"Module '{getattr(module, 'module_title', 'Unknown')}' is not connected"

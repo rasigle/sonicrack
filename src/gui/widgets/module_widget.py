@@ -1,13 +1,14 @@
 """Base module widget for the modular synth interface."""
-
-from typing import List, Dict, Any, Optional
-from PyQt6.QtWidgets import QGraphicsWidget, QGraphicsItem
-from PyQt6.QtCore import Qt, QRectF, pyqtSignal
-from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient
+import logging
 from abc import ABCMeta
+from typing import Any
 
-from src.gui.patch_canvas import Port
+from PyQt6.QtCore import Qt, QRectF, pyqtSignal
+from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient, QFont
+from PyQt6.QtWidgets import QGraphicsWidget, QGraphicsItem
+
 from src.gui.audio_module_interface import AudioModuleInterface
+from src.gui.patch_canvas import Port
 
 
 # Create a compatible metaclass that combines QGraphicsWidget's metaclass with ABCMeta
@@ -15,6 +16,10 @@ class ModuleWidgetMeta(type(QGraphicsWidget), ABCMeta):
     """Combined metaclass for QGraphicsWidget and ABC."""
 
     pass
+
+
+MODULE_TYPE_FONT = QFont("Arial", 8, QFont.Weight.Bold)
+MODULE_CATEGORY_FONT = QFont("Arial", 7)
 
 
 class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidgetMeta):
@@ -32,10 +37,9 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
     def __init__(
         self,
         title: str,
-        category: str,
         width: int = 200,
         height: int = 150,
-        color: Optional[QColor] = None,
+        color: QColor | None = None,
     ):
         """Initialize a module widget.
 
@@ -56,8 +60,8 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         self.custom_name = ""
 
         # Ports
-        self.input_ports: List[Port] = []
-        self.output_ports: List[Port] = []
+        self.input_ports: list[Port] = []
+        self.output_ports: list[Port] = []
 
         # Make module movable and selectable
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
@@ -66,7 +70,6 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
 
         # Component reference (for audio engine)
         self.component = None
-        self.component_category = category  # Will be set by subclasses
 
     def boundingRect(self) -> QRectF:
         """Return the bounding rectangle of the module."""
@@ -101,7 +104,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         # Module type (always shown at top)
         type_rect = QRectF(0, 3, self.module_width, 14)
         painter.setPen(QColor(150, 150, 150))
-        font_type = QFont("Arial", 7)
+        font_type = MODULE_TYPE_FONT
         painter.setFont(font_type)
         painter.drawText(type_rect, Qt.AlignmentFlag.AlignCenter, self.module_title)
 
@@ -114,27 +117,27 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
             painter.drawText(name_rect, Qt.AlignmentFlag.AlignCenter, self.custom_name)
 
             # Component type below custom name
-            if self.get_module_category():
+            if self.module_category:
                 comp_rect = QRectF(0, 34, self.module_width, 12)
                 painter.setPen(QColor(130, 130, 130))
-                font_comp = QFont("Arial", 6)
+                font_comp = MODULE_CATEGORY_FONT
                 painter.setFont(font_comp)
                 painter.drawText(
                     comp_rect,
                     Qt.AlignmentFlag.AlignCenter,
-                    f"[{self.component_category}]",
+                    f"[{self.module_category}]",
                 )
         else:
             # No custom name - show component type
-            if self.get_module_category():
+            if self.module_category:
                 comp_rect = QRectF(0, 20, self.module_width, 18)
                 painter.setPen(QColor(200, 200, 200))
-                font_comp = QFont("Arial", 8, QFont.Weight.Bold)
+                font_comp = MODULE_CATEGORY_FONT
                 painter.setFont(font_comp)
                 painter.drawText(
                     comp_rect,
                     Qt.AlignmentFlag.AlignCenter,
-                    f"[{self.component_category}]",
+                    f"({self.module_category})",
                 )
 
         # Draw port labels
@@ -300,7 +303,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         """Handle mouse release."""
         super().mouseReleaseEvent(event)
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get current parameter values.
 
         Returns:
@@ -308,7 +311,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         """
         return {}
 
-    def set_parameters(self, params: Dict[str, Any]):
+    def set_parameters(self, params: dict[str, Any]):
         """Set parameter values.
 
         Args:

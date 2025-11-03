@@ -222,7 +222,7 @@ class PresetBrowserDialog(QDialog):
             self.delete_btn.setEnabled(False)
             self.export_btn.setEnabled(False)
 
-    def _show_details(self, preset: Dict[str, Any]):
+    def _show_details(self, preset: dict[str, Any]):
         """Show preset details.
 
         Args:
@@ -410,7 +410,7 @@ class SavePresetDialog(QDialog):
 
         self.accept()
 
-    def get_metadata(self) -> Dict[str, Any]:
+    def get_metadata(self) -> dict[str, Any]:
         """Get the entered metadata.
 
         Returns:

@@ -33,7 +33,6 @@ class LFOModule(ModuleWidget):
         """Initialize LFO module."""
         super().__init__(
             TITLE,
-            category="oscillator",
             width=220,
             height=200,
             color=QColor(100, 140, 200),
@@ -90,7 +89,8 @@ class LFOModule(ModuleWidget):
         self.create_component()
 
     # AudioModuleInterface implementation
-    def get_module_category(self) -> ModuleCategory:
+    @property
+    def module_category(self) -> ModuleCategory:
         """Return SOURCE since LFOs generate control signals."""
         return ModuleCategory.SOURCE
 
@@ -101,8 +101,8 @@ class LFOModule(ModuleWidget):
 
     def create_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[Dict[str, Any]] = None,
+        input_components: Optional[list[Any]] = None,
+        modulation_components: Optional[dict[str, Any]] = None,
     ):
         """Create the LFO component."""
         wave_type = self.wave_combo.currentText()
@@ -128,7 +128,7 @@ class LFOModule(ModuleWidget):
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get current parameters."""
         return {
             "waveform": self.wave_combo.currentText(),
@@ -137,7 +137,7 @@ class LFOModule(ModuleWidget):
             "phase": self.phase_slider.get_value(),
         }
 
-    def set_parameters(self, params: Dict[str, Any]):
+    def set_parameters(self, params: dict[str, Any]):
         """Set parameters from dictionary."""
         if "waveform" in params:
             index = self.wave_combo.findText(params["waveform"])

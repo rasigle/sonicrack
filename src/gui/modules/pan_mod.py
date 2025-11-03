@@ -20,7 +20,6 @@ class PannerModule(ModuleWidget):
         """Initialize panner module."""
         super().__init__(
             TITLE,
-            category="modifier",
             width=140,
             height=180,
             color=QColor(180, 80, 180),
@@ -56,22 +55,23 @@ class PannerModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    def get_module_category(self) -> ModuleCategory:
+    @property
+    def module_category(self) -> ModuleCategory:
         """Return MODIFIER since this modifies audio input."""
         return ModuleCategory.MODIFIER
 
-    def get_required_inputs(self) -> List[str]:
+    def get_required_inputs(self) -> list[str]:
         """Panner requires the In port to be connected."""
         return ["In"]
 
-    def get_modulation_inputs(self) -> List[str]:
+    def get_modulation_inputs(self) -> list[str]:
         """Panner can optionally use Mod port for modulation."""
         return ["Mod"]
 
     def create_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[Dict[str, Any]] = None,
+        input_components: Optional[list[Any]] = None,
+        modulation_components: Optional[dict[str, Any]] = None,
     ):
         """Create the panner component."""
         pan = self.pan_knob.get_value()
@@ -88,11 +88,11 @@ class PannerModule(ModuleWidget):
 
         return Panner(pan)
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get current parameters."""
         return {"pan": self.pan_knob.get_value()}
 
-    def set_parameters(self, params: Dict[str, Any]):
+    def set_parameters(self, params: dict[str, Any]):
         """Set parameters from dictionary."""
         if "pan" in params:
             self.pan_knob.set_value(params["pan"])

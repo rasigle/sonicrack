@@ -5,19 +5,17 @@ without needing specific knowledge about each module's implementation.
 """
 
 from abc import ABC, abstractmethod
-from enum import Enum
-from typing import List, Dict, Any, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class ModuleCategory(Enum):
+class ModuleCategory(StrEnum):
     """Categorizes modules by their role in the signal chain."""
 
-    SOURCE = "source"  # Oscillators, LFOs, Envelopes - no audio input required
-    MODIFIER = (
-        "modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
-    )
-    MIXER = "mixer"  # Combines multiple audio inputs
-    OUTPUT = "output"  # Terminal node
+    SOURCE = "Source"  # Oscillators, LFOs, Envelopes - no audio input required
+    MODIFIER = "Modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
+    MIXER = "Mixer"  # Combines multiple audio inputs
+    OUTPUT = "Output"  # Terminal node
 
 
 class AudioModuleInterface(ABC):
@@ -27,8 +25,11 @@ class AudioModuleInterface(ABC):
     component should implement this interface.
     """
 
+    module_title: str
+
+    @property
     @abstractmethod
-    def get_module_category(self) -> ModuleCategory:
+    def module_category(self) -> ModuleCategory:
         """Return the category of this module.
 
         Returns:
@@ -39,8 +40,8 @@ class AudioModuleInterface(ABC):
     @abstractmethod
     def create_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[Dict[str, Any]] = None,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
     ) -> Any:
         """Create the audio engine component for this module.
 
@@ -60,7 +61,7 @@ class AudioModuleInterface(ABC):
         """
         pass
 
-    def get_required_inputs(self) -> List[str]:
+    def get_required_inputs(self) -> list[str]:
         """Return list of required input port names.
 
         These are the main audio input ports that must be connected for
@@ -71,7 +72,7 @@ class AudioModuleInterface(ABC):
         """
         return []
 
-    def get_modulation_inputs(self) -> List[str]:
+    def get_modulation_inputs(self) -> list[str]:
         """Return list of optional modulation input port names.
 
         These are control inputs that can modulate parameters
@@ -82,7 +83,7 @@ class AudioModuleInterface(ABC):
         """
         return []
 
-    def validate_connections(self, connections: List[tuple]) -> List[str]:
+    def validate_connections(self, connections: list[tuple]) -> list[str]:
         """Validate module connections.
 
         Override this to add custom validation logic for your module.
@@ -113,7 +114,7 @@ class AudioModuleInterface(ABC):
                 return port
         return None
 
-    def _is_port_connected(self, port, connections: List[tuple]) -> bool:
+    def _is_port_connected(self, port, connections: list[tuple]) -> bool:
         """Helper to check if a port is connected."""
         for start_port, end_port in connections:
             if end_port == port:

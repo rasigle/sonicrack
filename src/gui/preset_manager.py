@@ -39,12 +39,12 @@ class PresetManager:
 
     def save_preset(
         self,
-        modules: List[Any],
-        connections: List[Tuple[Any, Any]],
+        modules: list[Any],
+        connections: list[Tuple[Any, Any]],
         name: str,
         author: str = "",
         description: str = "",
-        tags: List[str] = None,
+        tags: list[str] = None,
         category: str = "User",
     ) -> Optional[Path]:
         """Save a patch as a preset.
@@ -88,7 +88,7 @@ class PresetManager:
                     "custom_name": (
                         module.custom_name if hasattr(module, "custom_name") else ""
                     ),
-                    "component_category": module.get_module_category(),
+                    "component_category": module.module_category,
                     "position": {"x": module.pos().x(), "y": module.pos().y()},
                     "parameters": module.get_parameters(),
                 }
@@ -118,7 +118,7 @@ class PresetManager:
             logger.error(f"Failed to save preset: {e}", exc_info=True)
             return None
 
-    def load_preset(self, filepath: Path) -> Optional[Dict[str, Any]]:
+    def load_preset(self, filepath: Path) -> Optional[dict[str, Any]]:
         """Load a preset from file.
 
         Args:
@@ -138,7 +138,7 @@ class PresetManager:
             logger.error(f"Failed to load preset: {e}", exc_info=True)
             return None
 
-    def list_presets(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_presets(self, category: Optional[str] = None) -> list[dict[str, Any]]:
         """List available presets.
 
         Args:
@@ -187,7 +187,7 @@ class PresetManager:
             logger.error(f"Failed to delete preset: {e}", exc_info=True)
             return False
 
-    def get_categories(self) -> List[str]:
+    def get_categories(self) -> list[str]:
         """Get list of all preset categories.
 
         Returns:

@@ -1,12 +1,11 @@
 from typing import Dict, Any, List, Optional
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QGraphicsProxyWidget
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
 
 from src.engine import WaveAdder
-from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.audio_module_interface import ModuleCategory
+from src.gui.widgets.module_widget import ModuleWidget
 
 TITLE = "Mixer"
 
@@ -20,7 +19,7 @@ class MixerModule(ModuleWidget):
     def __init__(self):
         """Initialize mixer module."""
         super().__init__(
-            TITLE, category="mixer", width=160, height=200, color=QColor(100, 150, 100)
+            TITLE, width=160, height=200, color=QColor(100, 150, 100)
         )
 
         # Add multiple input ports
@@ -38,12 +37,6 @@ class MixerModule(ModuleWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 5, 5, 5)
 
-        # Info label
-        info_label = QLabel("Mixes multiple\ninputs together")
-        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info_label.setStyleSheet("font-size: 9px; color: #ccc;")
-        layout.addWidget(info_label)
-
         self.controls_widget.setLayout(layout)
 
         # Add controls as proxy widget
@@ -56,14 +49,15 @@ class MixerModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    def get_module_category(self) -> ModuleCategory:
+    @property
+    def module_category(self) -> ModuleCategory:
         """Return MIXER since this combines multiple inputs."""
         return ModuleCategory.MIXER
 
     def create_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[Dict[str, Any]] = None,
+        input_components: Optional[list[Any]] = None,
+        modulation_components: Optional[dict[str, Any]] = None,
     ):
         """Create the mixer component."""
         if input_components and len(input_components) > 0:
@@ -73,10 +67,10 @@ class MixerModule(ModuleWidget):
             return WaveAdder(*self.input_components)
         return None
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get current parameters."""
         return {}
 
-    def set_parameters(self, params: Dict[str, Any]):
+    def set_parameters(self, params: dict[str, Any]):
         """Set parameters from dictionary."""
         pass

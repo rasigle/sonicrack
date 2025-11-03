@@ -64,9 +64,9 @@ class PatchBuilder:
             description: Optional description of the patch
         """
         self._source: Any | None = None
-        self._modifiers: List[Modifier] = []
-        self._modulators: Dict[str, Modulator] = {}
-        self._config: Dict[str, Any] = {
+        self._modifiers: list[Modifier] = []
+        self._modulators: dict[str, Modulator] = {}
+        self._config: dict[str, Any] = {
             "version": "1.0",
             "name": name,
             "description": description,
@@ -336,15 +336,15 @@ class PatchBuilder:
         """Get the source oscillator/generator."""
         return self._source
 
-    def get_modifiers(self) -> List[Modifier]:
+    def get_modifiers(self) -> list[Modifier]:
         """Get list of modifiers (effects)."""
         return self._modifiers.copy()
 
-    def get_modulators(self) -> Dict[str, Modulator]:
+    def get_modulators(self) -> dict[str, Modulator]:
         """Get dictionary of modulators."""
         return self._modulators.copy()
 
-    def get_components(self) -> Dict[str, Any]:
+    def get_components(self) -> dict[str, Any]:
         """Get all components of the patch."""
         return {
             "source": self._source,
@@ -355,7 +355,7 @@ class PatchBuilder:
             "sample_rate": self._sample_rate,
         }
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Get the current patch configuration."""
         return self._config.copy()
 
@@ -395,7 +395,7 @@ class PatchBuilder:
 
         return "\n".join(lines)
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Get a summary of patch characteristics."""
         oscillators = 0
         modulators = 0

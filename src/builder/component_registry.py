@@ -67,7 +67,7 @@ class ComponentDescriptor:
     name: str
     category: ComponentCategory
     factory: Type | Callable
-    config_params: List[str]
+    config_params: list[str]
     description: str = ""
     method_name: Optional[str] = None
     builder_handler: Optional[Callable] = None
@@ -98,7 +98,7 @@ class ComponentDescriptor:
         """
         return self.factory(*args, **kwargs)
 
-    def to_config(self, *args, **kwargs) -> Dict[str, Any]:
+    def to_config(self, *args, **kwargs) -> dict[str, Any]:
         """Convert component parameters to config dictionary.
 
         Args:
@@ -121,7 +121,7 @@ class ComponentDescriptor:
 
         return config
 
-    def from_config(self, config: Dict[str, Any]) -> Any:
+    def from_config(self, config: dict[str, Any]) -> Any:
         """Create instance from configuration dictionary.
 
         Args:
@@ -163,8 +163,8 @@ class ComponentRegistry:
 
     def __init__(self):
         """Initialize empty registry."""
-        self._components: Dict[str, ComponentDescriptor] = {}
-        self._categories: Dict[ComponentCategory, List[str]] = {
+        self._components: dict[str, ComponentDescriptor] = {}
+        self._categories: dict[ComponentCategory, list[str]] = {
             cat: [] for cat in ComponentCategory
         }
 
@@ -203,7 +203,7 @@ class ComponentRegistry:
         """
         return self._components.get(name)
 
-    def get_by_category(self, category: ComponentCategory) -> List[ComponentDescriptor]:
+    def get_by_category(self, category: ComponentCategory) -> list[ComponentDescriptor]:
         """Get all components in a category.
 
         Args:
@@ -214,7 +214,7 @@ class ComponentRegistry:
         """
         return [self._components[name] for name in self._categories[category]]
 
-    def list_components(self) -> List[str]:
+    def list_components(self) -> list[str]:
         """List all registered component names.
 
         Returns:
@@ -222,7 +222,7 @@ class ComponentRegistry:
         """
         return list(self._components.keys())
 
-    def create_from_config(self, config: Dict[str, Any], **extra_kwargs) -> Any:
+    def create_from_config(self, config: dict[str, Any], **extra_kwargs) -> Any:
         """Create component instance from configuration.
 
         Args:
@@ -248,7 +248,7 @@ class ComponentRegistry:
 
         return descriptor.from_config(merged_config)
 
-    def to_config(self, name: str, *args, **kwargs) -> Dict[str, Any]:
+    def to_config(self, name: str, *args, **kwargs) -> dict[str, Any]:
         """Convert component parameters to config.
 
         Args:
@@ -284,7 +284,7 @@ def register_component(
     name: str,
     category: str | ComponentCategory,
     factory: Type | Callable,
-    config_params: List[str],
+    config_params: list[str],
     description: str = "",
     **kwargs,
 ) -> ComponentDescriptor:

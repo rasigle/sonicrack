@@ -19,7 +19,6 @@ class SimpleVolumeModule(ModuleWidget):
         """Initialize simple volume module."""
         super().__init__(
             TITLE,
-            category="modifier",
             width=140,
             height=150,
             color=QColor(160, 100, 60),
@@ -52,28 +51,29 @@ class SimpleVolumeModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    def get_module_category(self) -> ModuleCategory:
+    @property
+    def module_category(self) -> ModuleCategory:
         """Return MODIFIER since this modifies audio input."""
         return ModuleCategory.MODIFIER
 
-    def get_required_inputs(self) -> List[str]:
+    def get_required_inputs(self) -> list[str]:
         """Volume requires the In port to be connected."""
         return ["In"]
 
     def create_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[Dict[str, Any]] = None,
+        input_components: Optional[list[Any]] = None,
+        modulation_components: Optional[dict[str, Any]] = None,
     ):
         """Create the volume component."""
         volume = self.volume_knob.get_value()
         return Volume(volume)
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get current parameters."""
         return {"volume": self.volume_knob.get_value()}
 
-    def set_parameters(self, params: Dict[str, Any]):
+    def set_parameters(self, params: dict[str, Any]):
         """Set parameters from dictionary."""
         if "volume" in params:
             self.volume_knob.set_value(params["volume"])

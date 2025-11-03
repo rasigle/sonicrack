@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple, List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem
 from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal
 from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath
@@ -100,7 +100,7 @@ class Cable(QGraphicsItem):
     Cables route audio signals between module outputs and inputs.
     """
 
-    def __init__(self, start_port: Port, end_port: Optional[Port] = None):
+    def __init__(self, start_port: Port, end_port: Port | None = None):
         """Initialize a cable.
 
         Args:
@@ -110,7 +110,7 @@ class Cable(QGraphicsItem):
         super().__init__()
         self.start_port = start_port
         self.end_port = end_port
-        self.temp_end_pos: Optional[QPointF] = None
+        self.temp_end_pos: QPointF | None = None
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setZValue(-1)  # Draw cables behind modules
@@ -217,8 +217,8 @@ class PatchCanvas(QGraphicsView):
         self.setBackgroundBrush(QColor(45, 45, 48))
 
         # Cable dragging state
-        self.dragging_cable: Optional[Cable] = None
-        self.drag_start_port: Optional[Port] = None
+        self.dragging_cable: Cable | None = None
+        self.drag_start_port: Port | None = None
 
     def mousePressEvent(self, event):
         """Handle mouse press for cable creation."""
@@ -303,7 +303,7 @@ class PatchCanvas(QGraphicsView):
 
         super().keyPressEvent(event)
 
-    def add_module(self, module: ModuleWidget, pos: Optional[QPointF] = None):
+    def add_module(self, module: ModuleWidget, pos: QPointF | None = None):
         """Add a module to the canvas.
 
         Args:
@@ -318,7 +318,7 @@ class PatchCanvas(QGraphicsView):
             center = self.mapToScene(self.viewport().rect().center())
             module.setPos(center)
 
-    def get_connections(self) -> List[Tuple[Port, Port]]:
+    def get_connections(self) -> list[tuple[Port, Port]]:
         """Get all cable connections in the canvas.
 
         Returns:

@@ -18,7 +18,6 @@ class ADSRModule(ModuleWidget):
         """Initialize ADSR module."""
         super().__init__(
             TITLE,
-            category="envelope",
             width=220,
             height=200,
             color=QColor(120, 180, 80),
@@ -80,14 +79,15 @@ class ADSRModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    def get_module_category(self) -> ModuleCategory:
+    @property
+    def module_category(self) -> ModuleCategory:
         """Return SOURCE since envelopes generate control signals."""
         return ModuleCategory.SOURCE
 
     def create_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[Dict[str, Any]] = None,
+        input_components: Optional[list[Any]] = None,
+        modulation_components: Optional[dict[str, Any]] = None,
     ):
         """Create the ADSR component."""
         return ADSREnvelope(
@@ -97,7 +97,7 @@ class ADSRModule(ModuleWidget):
             release_duration=self.release_knob.get_value(),
         )
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get current parameters."""
         return {
             "attack_duration": self.attack_knob.get_value(),
@@ -106,7 +106,7 @@ class ADSRModule(ModuleWidget):
             "release_duration": self.release_knob.get_value(),
         }
 
-    def set_parameters(self, params: Dict[str, Any]):
+    def set_parameters(self, params: dict[str, Any]):
         """Set parameters from dictionary."""
         if "attack_duration" in params:
             self.attack_knob.set_value(params["attack_duration"])

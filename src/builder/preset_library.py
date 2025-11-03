@@ -53,7 +53,7 @@ class PresetLibrary:
         self.preset_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Initialized preset library at {self.preset_dir}")
 
-    def list_presets(self, category: Optional[str] = None) -> List[str]:
+    def list_presets(self, category: Optional[str] = None) -> list[str]:
         """List available builder.
 
         Args:
@@ -110,7 +110,7 @@ class PresetLibrary:
         builder: "PatchBuilder",
         name: Optional[str] = None,
         category: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Save a patch as a preset.
 
@@ -179,7 +179,7 @@ class PresetLibrary:
         else:
             logger.warning(f"Preset '{name}' not found")
 
-    def get_categories(self) -> List[str]:
+    def get_categories(self) -> list[str]:
         """Get list of preset categories.
 
         Returns:

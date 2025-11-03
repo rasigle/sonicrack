@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
 
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob
+from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "Output"
 
@@ -38,6 +39,22 @@ class OutputModule(ModuleWidget):
         self.proxy.setPos(0, 42)
 
         self.input_component = None
+
+    # AudioModuleInterface implementation
+    def get_module_category(self) -> ModuleCategory:
+        """Return OUTPUT since this is the terminal node."""
+        return ModuleCategory.OUTPUT
+
+    def get_required_inputs(self) -> List[str]:
+        """Output requires the In port to be connected."""
+        return ["In"]
+
+    def create_component(self, input_components: Optional[List[Any]] = None,
+                        modulation_components: Optional[Dict[str, Any]] = None):
+        """Output doesn't create a component, it returns the input component."""
+        if input_components and len(input_components) > 0:
+            return input_components[0]
+        return self.input_component
 
     def get_master_volume(self) -> float:
         """Get the master volume level."""

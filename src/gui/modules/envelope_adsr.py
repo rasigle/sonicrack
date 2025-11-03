@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGraphicsProxyWidget
@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGraphicsProxyWid
 from src.engine import ADSREnvelope
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob
+from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "ADSR Envelope"
 class ADSRModule(ModuleWidget):
@@ -58,7 +59,13 @@ class ADSRModule(ModuleWidget):
 
         self.component = self.create_component()
 
-    def create_component(self):
+    # AudioModuleInterface implementation
+    def get_module_category(self) -> ModuleCategory:
+        """Return SOURCE since envelopes generate control signals."""
+        return ModuleCategory.SOURCE
+
+    def create_component(self, input_components: Optional[List[Any]] = None,
+                        modulation_components: Optional[Dict[str, Any]] = None):
         """Create the ADSR component."""
         return ADSREnvelope(
             attack_duration=self.attack_knob.get_value(),

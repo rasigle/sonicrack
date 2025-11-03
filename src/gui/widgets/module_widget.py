@@ -4,15 +4,25 @@ from typing import List, Dict, Any, Optional
 from PyQt6.QtWidgets import QGraphicsWidget, QGraphicsItem
 from PyQt6.QtCore import Qt, QRectF, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient
+from abc import ABCMeta
 
 from src.gui.patch_canvas import Port
+from src.gui.audio_module_interface import AudioModuleInterface
 
 
-class ModuleWidget(QGraphicsWidget):
+# Create a compatible metaclass that combines QGraphicsWidget's metaclass with ABCMeta
+class ModuleWidgetMeta(type(QGraphicsWidget), ABCMeta):
+    """Combined metaclass for QGraphicsWidget and ABC."""
+    pass
+
+
+class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidgetMeta):
     """Base class for all modular synth modules.
 
     Each module represents an audio component (oscillator, envelope, etc.)
     with visual controls and connection ports.
+
+    Implements AudioModuleInterface to enable generic patch compilation.
     """
 
     # Signals
@@ -103,7 +113,7 @@ class ModuleWidget(QGraphicsWidget):
             painter.drawText(name_rect, Qt.AlignmentFlag.AlignCenter, self.custom_name)
 
             # Component type below custom name
-            if self.component_category:
+            if self.get_module_category():
                 comp_rect = QRectF(0, 34, self.module_width, 12)
                 painter.setPen(QColor(130, 130, 130))
                 font_comp = QFont("Arial", 6)
@@ -111,7 +121,7 @@ class ModuleWidget(QGraphicsWidget):
                 painter.drawText(comp_rect, Qt.AlignmentFlag.AlignCenter, f"[{self.component_category}]")
         else:
             # No custom name - show component type
-            if self.component_category:
+            if self.get_module_category():
                 comp_rect = QRectF(0, 20, self.module_width, 18)
                 painter.setPen(QColor(200, 200, 200))
                 font_comp = QFont("Arial", 8, QFont.Weight.Bold)
@@ -294,16 +304,6 @@ class ModuleWidget(QGraphicsWidget):
         """
         pass
 
-    def create_component(self):
-        """Create the audio engine component for this module.
-
-        This should be overridden by subclasses to create the appropriate
-        audio component (oscillator, envelope, etc.).
-
-        Returns:
-            The created audio component
-        """
-        raise NotImplementedError("Subclasses must implement create_component()")
 
     def update_component(self):
         """Update the audio component with current parameter values."""

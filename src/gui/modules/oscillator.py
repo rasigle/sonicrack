@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, \
@@ -8,6 +8,7 @@ from src.engine import SineOscillator, SquareOscillator, SawtoothOscillator, \
     TriangleOscillator
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob, HSlider
+from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "Oscillator"
 
@@ -71,12 +72,18 @@ class OscillatorModule(ModuleWidget):
 
         self.component = self.create_component()
 
+    # AudioModuleInterface implementation
+    def get_module_category(self) -> ModuleCategory:
+        """Return SOURCE since oscillators generate audio."""
+        return ModuleCategory.SOURCE
+
     def _on_wave_changed(self, wave_type: str):
         """Handle waveform type change."""
         self.create_component()
         self.parameter_changed.emit("waveform", wave_type)
 
-    def create_component(self):
+    def create_component(self, input_components: Optional[List[Any]] = None,
+                        modulation_components: Optional[Dict[str, Any]] = None):
         """Create the oscillator component."""
         wave_type = self.wave_combo.currentText()
         freq = self.freq_knob.get_value()

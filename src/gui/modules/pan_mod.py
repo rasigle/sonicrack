@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
 from src.engine import ModulatedPanner, Panner
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob
+from src.gui.audio_module_interface import ModuleCategory
 
 
 TITLE = "Panner (Mod)"
@@ -45,12 +46,33 @@ class PannerModule(ModuleWidget):
 
         self.component = self.create_component()
 
-    def create_component(self):
+    # AudioModuleInterface implementation
+    def get_module_category(self) -> ModuleCategory:
+        """Return MODIFIER since this modifies audio input."""
+        return ModuleCategory.MODIFIER
+
+    def get_required_inputs(self) -> List[str]:
+        """Panner requires the In port to be connected."""
+        return ["In"]
+
+    def get_modulation_inputs(self) -> List[str]:
+        """Panner can optionally use Mod port for modulation."""
+        return ["Mod"]
+
+    def create_component(self, input_components: Optional[List[Any]] = None,
+                        modulation_components: Optional[Dict[str, Any]] = None):
         """Create the panner component."""
         pan = self.pan_knob.get_value()
 
-        if self.modulator_component:
-            return ModulatedPanner(self.modulator_component)
+        # Check if modulation is provided
+        mod_comp = None
+        if modulation_components and "Mod" in modulation_components:
+            mod_comp = modulation_components["Mod"]
+        elif self.modulator_component:
+            mod_comp = self.modulator_component
+
+        if mod_comp:
+            return ModulatedPanner(mod_comp)
 
         return Panner(pan)
 

@@ -1,12 +1,13 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
 
-from engine import Panner
+from src.engine import Panner
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob
+from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "Panner"
 
@@ -41,7 +42,17 @@ class SimplePannerModule(ModuleWidget):
 
         self.component = self.create_component()
 
-    def create_component(self):
+    # AudioModuleInterface implementation
+    def get_module_category(self) -> ModuleCategory:
+        """Return MODIFIER since this modifies audio input."""
+        return ModuleCategory.MODIFIER
+
+    def get_required_inputs(self) -> List[str]:
+        """Panner requires the In port to be connected."""
+        return ["In"]
+
+    def create_component(self, input_components: Optional[List[Any]] = None,
+                        modulation_components: Optional[Dict[str, Any]] = None):
         """Create the panner component."""
         pan = self.pan_knob.get_value()
         return Panner(pan)

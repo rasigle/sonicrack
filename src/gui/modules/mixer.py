@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QGraphicsProxyWidget
 
 from src.engine import WaveAdder
 from src.gui.widgets.module_widget import ModuleWidget
+from src.gui.audio_module_interface import ModuleCategory
 
 TITLE = "Mixer"
 
@@ -51,12 +52,17 @@ class MixerModule(ModuleWidget):
 
         self.component = self.create_component()
 
-    def create_component(self):
-        """Create the mixer component.
+    # AudioModuleInterface implementation
+    def get_module_category(self) -> ModuleCategory:
+        """Return MIXER since this combines multiple inputs."""
+        return ModuleCategory.MIXER
 
-        Note: This will be created by the patch compiler which has access
-        to the actual connected input components.
-        """
+    def create_component(self, input_components: Optional[List[Any]] = None,
+                        modulation_components: Optional[Dict[str, Any]] = None):
+        """Create the mixer component."""
+        if input_components and len(input_components) > 0:
+            return WaveAdder(*input_components)
+        # Fallback for old code path
         if self.input_components and len(self.input_components) > 0:
             return WaveAdder(*self.input_components)
         return None

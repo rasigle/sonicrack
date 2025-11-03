@@ -1,16 +1,12 @@
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
 
 from src.engine import ModulatedPanner, Panner
-from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.widgets import Knob
 from src.gui.audio_module_interface import ModuleCategory
-
-
-TITLE = "Panner (Mod)"
+from src.gui.widgets import Knob
+from src.gui.widgets.module_widget import ModuleWidget
 
 
 class PannerModule(ModuleWidget):
@@ -19,7 +15,6 @@ class PannerModule(ModuleWidget):
     def __init__(self):
         """Initialize panner module."""
         super().__init__(
-            TITLE,
             width=140,
             height=180,
             color=QColor(180, 80, 180),
@@ -30,11 +25,9 @@ class PannerModule(ModuleWidget):
         self.mod_port = self.add_input_port("Mod")
         self.out_port = self.add_output_port("Out")
 
-        # Create control widget
-        self.controls_widget = QWidget()
-        self.controls_widget.setStyleSheet("background: transparent;")
-        layout = QVBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
+        # Use helper methods for UI construction
+        self.controls_widget = self._create_controls_container()
+        layout = self._create_standard_layout()
 
         # Pan knob
         self.pan_knob = Knob("Pan", -1.0, 1.0, 0.0)
@@ -44,17 +37,21 @@ class PannerModule(ModuleWidget):
         layout.addWidget(self.pan_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.controls_widget.setLayout(layout)
+        self.proxy = self._add_controls_to_module(self.controls_widget)
 
-        # Add controls as proxy widget
-        self.proxy = QGraphicsProxyWidget(self)
-        self.proxy.setWidget(self.controls_widget)
-        self.proxy.setPos(0, 42)
+        # Register parameters for automatic get/set
+        self.register_parameter("pan", self.pan_knob)
 
         self.modulator_component = None
 
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
+    @property
+    def module_title(self) -> str:
+        """Return the module title."""
+        return "Panner (Mod)"
+
     @property
     def module_category(self) -> ModuleCategory:
         """Return MODIFIER since this modifies audio input."""
@@ -87,12 +84,3 @@ class PannerModule(ModuleWidget):
             return ModulatedPanner(mod_comp)
 
         return Panner(pan)
-
-    def get_parameters(self) -> dict[str, Any]:
-        """Get current parameters."""
-        return {"pan": self.pan_knob.get_value()}
-
-    def set_parameters(self, params: dict[str, Any]):
-        """Set parameters from dictionary."""
-        if "pan" in params:
-            self.pan_knob.set_value(params["pan"])

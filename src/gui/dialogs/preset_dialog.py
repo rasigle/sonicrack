@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -242,6 +242,7 @@ class PresetBrowserDialog(QDialog):
         if created != "-":
             # Format date nicely
             from datetime import datetime
+
             dt = datetime.fromisoformat(created)
             created = dt.strftime("%Y-%m-%d %H:%M")
         self.created_label.setText(f"<b>Created:</b> {created}")

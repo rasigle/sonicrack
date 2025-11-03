@@ -13,7 +13,9 @@ class ModuleCategory(StrEnum):
     """Categorizes modules by their role in the signal chain."""
 
     SOURCE = "Source"  # Oscillators, LFOs, Envelopes - no audio input required
-    MODIFIER = "Modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
+    MODIFIER = (
+        "Modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
+    )
     MIXER = "Mixer"  # Combines multiple audio inputs
     OUTPUT = "Output"  # Terminal node
 
@@ -23,14 +25,28 @@ class AudioModuleInterface(ABC):
 
     Any module that can be placed on the canvas and compiled into an audio
     component should implement this interface.
+
+    Attributes:
+        custom_name (str): Optional custom name for the module instance.
     """
 
-    module_title: str
+    custom_name: str = ""
+
+    @property
+    @abstractmethod
+    def module_title(self) -> str:
+        """Return the type of the module.
+
+        Returns:
+            A string representing the module type (e.g. "Oscillator", "Volume",
+            "Mixer").
+        """
+        pass
 
     @property
     @abstractmethod
     def module_category(self) -> ModuleCategory:
-        """Return the category of this module.
+        """Return the category of this module (e.g. source, output, modulator, ...).
 
         Returns:
             The ModuleType enum indicating the module's role
@@ -82,6 +98,23 @@ class AudioModuleInterface(ABC):
             List of modulation port names
         """
         return []
+
+    def set_custom_name(self, name: str):
+        """Set a custom name for this module instance.
+
+        Args:
+            name: Custom name to display
+        """
+        self.custom_name = name
+        self.update()  # Trigger repaint
+
+    def get_custom_name(self) -> str:
+        """Get the custom name for this module.
+
+        Returns:
+            Custom name, or empty string if not set
+        """
+        return self.custom_name
 
     def validate_connections(self, connections: list[tuple]) -> list[str]:
         """Validate module connections.

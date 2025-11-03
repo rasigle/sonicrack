@@ -3,7 +3,7 @@
 from typing import Optional
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt, QPointF, pyqtSignal, QRectF
-from PyQt6.QtGui import QPainter, QPen, QColor, QBrush, QConicalGradient, QFont
+from PyQt6.QtGui import QPainter, QPen, QColor, QFont
 
 
 class Knob(QWidget):

@@ -1,13 +1,10 @@
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
 
 from src.engine import WaveAdder
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.widgets.module_widget import ModuleWidget
-
-TITLE = "Mixer"
 
 
 class MixerModule(ModuleWidget):
@@ -18,9 +15,7 @@ class MixerModule(ModuleWidget):
 
     def __init__(self):
         """Initialize mixer module."""
-        super().__init__(
-            TITLE, width=160, height=200, color=QColor(100, 150, 100)
-        )
+        super().__init__(width=160, height=200, color=QColor(100, 150, 100))
 
         # Add multiple input ports
         self.in1_port = self.add_input_port("In 1")
@@ -31,24 +26,22 @@ class MixerModule(ModuleWidget):
         # Add output port
         self.out_port = self.add_output_port("Out")
 
-        # Create control widget
-        self.controls_widget = QWidget()
-        self.controls_widget.setStyleSheet("background: transparent;")
-        layout = QVBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
-
+        # Use helper methods for UI construction (no controls needed for mixer)
+        self.controls_widget = self._create_controls_container()
+        layout = self._create_standard_layout()
         self.controls_widget.setLayout(layout)
-
-        # Add controls as proxy widget
-        self.proxy = QGraphicsProxyWidget(self)
-        self.proxy.setWidget(self.controls_widget)
-        self.proxy.setPos(0, 42)
+        self.proxy = self._add_controls_to_module(self.controls_widget)
 
         self.input_components = []  # Will be populated by patch compiler
 
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
+    @property
+    def module_title(self) -> str:
+        """Return the module title."""
+        return "Mixer"
+
     @property
     def module_category(self) -> ModuleCategory:
         """Return MIXER since this combines multiple inputs."""
@@ -66,11 +59,3 @@ class MixerModule(ModuleWidget):
         if self.input_components and len(self.input_components) > 0:
             return WaveAdder(*self.input_components)
         return None
-
-    def get_parameters(self) -> dict[str, Any]:
-        """Get current parameters."""
-        return {}
-
-    def set_parameters(self, params: dict[str, Any]):
-        """Set parameters from dictionary."""
-        pass

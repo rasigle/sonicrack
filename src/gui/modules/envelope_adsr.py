@@ -1,14 +1,12 @@
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGraphicsProxyWidget
+from PyQt6.QtWidgets import QHBoxLayout
 
 from src.engine import ADSREnvelope
-from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.widgets import Knob
 from src.gui.audio_module_interface import ModuleCategory
-
-TITLE = "ADSR Envelope"
+from src.gui.widgets import Knob
+from src.gui.widgets.module_widget import ModuleWidget
 
 
 class ADSRModule(ModuleWidget):
@@ -17,7 +15,6 @@ class ADSRModule(ModuleWidget):
     def __init__(self):
         """Initialize ADSR module."""
         super().__init__(
-            TITLE,
             width=220,
             height=200,
             color=QColor(120, 180, 80),
@@ -26,11 +23,9 @@ class ADSRModule(ModuleWidget):
         # Add output port
         self.out_port = self.add_output_port("Out")
 
-        # Create control widget
-        self.controls_widget = QWidget()
-        self.controls_widget.setStyleSheet("background: transparent;")
-        layout = QVBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
+        # Use helper methods for UI construction
+        self.controls_widget = self._create_controls_container()
+        layout = self._create_standard_layout()
 
         # ADSR controls
         knobs_layout = QHBoxLayout()
@@ -70,15 +65,22 @@ class ADSRModule(ModuleWidget):
         layout.addLayout(knobs_layout2)
 
         self.controls_widget.setLayout(layout)
+        self.proxy = self._add_controls_to_module(self.controls_widget)
 
-        # Add controls as proxy widget - position below title bar
-        self.proxy = QGraphicsProxyWidget(self)
-        self.proxy.setWidget(self.controls_widget)
-        self.proxy.setPos(0, 42)
+        # Register parameters for automatic get/set
+        self.register_parameter("attack_duration", self.attack_knob)
+        self.register_parameter("decay_duration", self.decay_knob)
+        self.register_parameter("sustain_level", self.sustain_knob)
+        self.register_parameter("release_duration", self.release_knob)
 
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
+    @property
+    def module_title(self) -> str:
+        """Return the module title."""
+        return "ADSR Envelope"
+
     @property
     def module_category(self) -> ModuleCategory:
         """Return SOURCE since envelopes generate control signals."""
@@ -96,23 +98,3 @@ class ADSRModule(ModuleWidget):
             sustain_level=self.sustain_knob.get_value(),
             release_duration=self.release_knob.get_value(),
         )
-
-    def get_parameters(self) -> dict[str, Any]:
-        """Get current parameters."""
-        return {
-            "attack_duration": self.attack_knob.get_value(),
-            "decay_duration": self.decay_knob.get_value(),
-            "sustain_level": self.sustain_knob.get_value(),
-            "release_duration": self.release_knob.get_value(),
-        }
-
-    def set_parameters(self, params: dict[str, Any]):
-        """Set parameters from dictionary."""
-        if "attack_duration" in params:
-            self.attack_knob.set_value(params["attack_duration"])
-        if "decay_duration" in params:
-            self.decay_knob.set_value(params["decay_duration"])
-        if "sustain_level" in params:
-            self.sustain_knob.set_value(params["sustain_level"])
-        if "release_duration" in params:
-            self.release_knob.set_value(params["release_duration"])

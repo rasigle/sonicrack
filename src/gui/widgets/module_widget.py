@@ -1,12 +1,19 @@
 """Base module widget for the modular synth interface."""
-import logging
+
 from abc import ABCMeta
 from typing import Any
 
 from PyQt6.QtCore import Qt, QRectF, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient, QFont
-from PyQt6.QtWidgets import QGraphicsWidget, QGraphicsItem
+from PyQt6.QtWidgets import (
+    QGraphicsWidget,
+    QGraphicsItem,
+    QWidget,
+    QVBoxLayout,
+    QGraphicsProxyWidget,
+)
 
+from gui.audio_module_interface import ModuleCategory
 from src.gui.audio_module_interface import AudioModuleInterface
 from src.gui.patch_canvas import Port
 
@@ -18,6 +25,7 @@ class ModuleWidgetMeta(type(QGraphicsWidget), ABCMeta):
     pass
 
 
+# Visual constants
 MODULE_TYPE_FONT = QFont("Arial", 8, QFont.Weight.Bold)
 MODULE_CATEGORY_FONT = QFont("Arial", 7)
 
@@ -31,12 +39,28 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
     Implements AudioModuleInterface to enable generic patch compilation.
     """
 
+    # === Visual Constants ===
+    TITLE_BAR_HEIGHT = 42
+    TITLE_BAR_HEIGHT_WITH_NAME = 50
+    BORDER_RADIUS = 8
+    SELECTION_BORDER_WIDTH = 3
+    NORMAL_BORDER_WIDTH = 2
+
+    # Colors
+    COLOR_SELECTION_BORDER = QColor(255, 200, 0)
+    COLOR_NORMAL_BORDER = QColor(30, 30, 30)
+    COLOR_TITLE_BAR_BG = QColor(30, 30, 30, 200)
+    COLOR_MODULE_TYPE = QColor(150, 150, 150)
+    COLOR_CUSTOM_NAME = QColor(255, 255, 100)
+    COLOR_CATEGORY = QColor(130, 130, 130)
+    COLOR_CATEGORY_NO_NAME = QColor(200, 200, 200)
+    COLOR_PORT_LABEL = QColor(220, 220, 220)
+
     # Signals
     parameter_changed = pyqtSignal(str, object)  # (param_name, value)
 
     def __init__(
         self,
-        title: str,
         width: int = 200,
         height: int = 150,
         color: QColor | None = None,
@@ -44,32 +68,188 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         """Initialize a module widget.
 
         Args:
-            title: Display title of the module
             width: Width of the module
             height: Height of the module
             color: Accent color for the module
         """
         super().__init__()
 
-        self.module_title = title
         self.module_width = width
         self.module_height = height
         self.module_color = color or QColor(80, 120, 180)
 
-        # Custom name (user can set this)
+        # FIX: Initialize missing attributes
         self.custom_name = ""
+        self.component = None
 
         # Ports
         self.input_ports: list[Port] = []
         self.output_ports: list[Port] = []
+
+        # Parameter registry for automatic get/set (widget, getter, setter)
+        self._parameters: dict[str, tuple[Any, str, str]] = {}
 
         # Make module movable and selectable
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
 
-        # Component reference (for audio engine)
-        self.component = None
+    # === UI Construction Helpers ===
+    @staticmethod
+    def _create_controls_container() -> QWidget:
+        """Create the standard controls container widget.
+
+        This creates a transparent QWidget ready to have a layout added.
+        Reduces boilerplate in module implementations.
+
+        Returns:
+            Configured QWidget ready for layout
+
+        Example:
+            ```python
+            self.controls_widget = self._create_controls_container()
+            layout = self._create_standard_layout()
+            # ... add widgets to layout ...
+            self.controls_widget.setLayout(layout)
+            self.proxy = self._add_controls_to_module(self.controls_widget)
+            ```
+        """
+        widget = QWidget()
+        widget.setStyleSheet("background: transparent;")
+        return widget
+
+    def _add_controls_to_module(self, controls_widget: QWidget) -> QGraphicsProxyWidget:
+        """Add controls widget to the module as a proxy.
+
+        This handles the boilerplate of creating a QGraphicsProxyWidget and
+        positioning it below the title bar.
+
+        Args:
+            controls_widget: The widget containing controls
+
+        Returns:
+            The proxy widget (for further customization if needed)
+
+        Example:
+            ```python
+            self.proxy = self._add_controls_to_module(self.controls_widget)
+            ```
+        """
+        proxy = QGraphicsProxyWidget(self)
+        proxy.setWidget(controls_widget)
+        proxy.setPos(0, self.TITLE_BAR_HEIGHT)
+        return proxy
+
+    @staticmethod
+    def _create_standard_layout(spacing: int = 5) -> QVBoxLayout:
+        """Create a standard vertical layout with default margins.
+
+        Args:
+            spacing: Spacing between widgets (default: 5)
+
+        Returns:
+            Configured layout
+
+        Example:
+            ```python
+            layout = self._create_standard_layout()
+            layout.addWidget(self.knob1)
+            layout.addWidget(self.knob2)
+            ```
+        """
+        layout = QVBoxLayout()
+        layout.setContentsMargins(spacing, spacing, spacing, spacing)
+        layout.setSpacing(spacing)
+        return layout
+
+    # === Parameter Management ===
+
+    def register_parameter(
+        self,
+        name: str,
+        widget: Any,
+        getter: str = "get_value",
+        setter: str = "set_value",
+    ):
+        """Register a parameter for automatic get/set in presets.
+
+        This allows automatic parameter management without needing to override
+        get_parameters() and set_parameters() in every module.
+
+        Args:
+            name: Parameter name for presets
+            widget: Widget with value (Knob, Slider, ComboBox, etc.)
+            getter: Method name to get value (default: "get_value")
+            setter: Method name to set value (default: "set_value")
+
+        Example:
+            ```python
+            self.freq_knob = Knob("Freq", 20, 2000, 440)
+            self.register_parameter("frequency", self.freq_knob)
+
+            # Now get_parameters() and set_parameters() work automatically!
+            ```
+        """
+        self._parameters[name] = (widget, getter, setter)
+
+    def get_parameters(self) -> dict[str, Any]:
+        """Get all registered parameters automatically.
+
+        Override this if you need custom parameter handling,
+        or use register_parameter() for automatic handling.
+
+        Returns:
+            Dictionary of parameter names to values
+        """
+        params = {}
+        for name, (widget, getter, _) in self._parameters.items():
+            if hasattr(widget, getter):
+                params[name] = getattr(widget, getter)()
+        return params
+
+    def set_parameters(self, params: dict[str, Any]):
+        """Set all registered parameters automatically.
+
+        Override this if you need custom parameter handling,
+        or use register_parameter() for automatic handling.
+
+        Args:
+            params: Dictionary of parameter names to values
+        """
+        for name, value in params.items():
+            if name in self._parameters:
+                widget, _, setter = self._parameters[name]
+                if hasattr(widget, setter):
+                    getattr(widget, setter)(value)
+
+    # === Naming ===
+
+    def set_custom_name(self, name: str):
+        """Set a custom name for this module instance.
+
+        Args:
+            name: Custom name to display
+        """
+        self.custom_name = name
+        self.update()  # Trigger repaint
+
+    def get_custom_name(self) -> str:
+        """Get the custom name for this module.
+
+        Returns:
+            Custom name, or empty string if not set
+        """
+        return self.custom_name
+
+    def get_display_name(self) -> str:
+        """Get the name to display (custom name or module title).
+
+        Returns:
+            Name to display
+        """
+        return self.custom_name if self.custom_name else self.module_title
+
+    # === Port Management ===
 
     def boundingRect(self) -> QRectF:
         """Return the bounding rectangle of the module."""
@@ -201,30 +381,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
             y = output_spacing * (i + 1)
             port.setPos(self.module_width + port.radius, y)
 
-    def set_custom_name(self, name: str):
-        """Set a custom name for this module instance.
-
-        Args:
-            name: Custom name to display
-        """
-        self.custom_name = name
-        self.update()  # Trigger repaint
-
-    def get_custom_name(self) -> str:
-        """Get the custom name for this module.
-
-        Returns:
-            Custom name, or empty string if not set
-        """
-        return self.custom_name
-
-    def get_display_name(self) -> str:
-        """Get the name to display (custom name or module title).
-
-        Returns:
-            Name to display
-        """
-        return self.custom_name if self.custom_name else self.module_title
+    # === Event Handling ===
 
     def contextMenuEvent(self, event):
         """Handle right-click context menu."""
@@ -288,7 +445,8 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
                 else None
             )
 
-            # If we clicked directly on the module (not on child controls), enable dragging
+            # If we clicked directly on the module (not on child controls), enable
+            # dragging
             if child_item == self:
                 self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
 
@@ -303,24 +461,23 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         """Handle mouse release."""
         super().mouseReleaseEvent(event)
 
-    def get_parameters(self) -> dict[str, Any]:
-        """Get current parameter values.
-
-        Returns:
-            Dictionary of parameter names to values
-        """
-        return {}
-
-    def set_parameters(self, params: dict[str, Any]):
-        """Set parameter values.
-
-        Args:
-            params: Dictionary of parameter names to values
-        """
-        pass
-
     def update_component(self):
         """Update the audio component with current parameter values."""
         if self.component:
             # Subclasses should implement parameter updates
             pass
+
+    def create_component(
+        self,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
+    ) -> Any:
+        raise NotImplementedError
+
+    @property
+    def module_category(self) -> ModuleCategory:
+        raise NotImplementedError()
+
+    @property
+    def module_title(self) -> str:
+        raise NotImplementedError()

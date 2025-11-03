@@ -1,13 +1,10 @@
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QComboBox,
-    QGraphicsProxyWidget,
 )
 
 from src.engine import (
@@ -16,11 +13,9 @@ from src.engine import (
     SawtoothOscillator,
     TriangleOscillator,
 )
-from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.widgets import Knob, HSlider
 from src.gui.audio_module_interface import ModuleCategory
-
-TITLE = "LFO"
+from src.gui.widgets import Knob, HSlider
+from src.gui.widgets.module_widget import ModuleWidget
 
 
 class LFOModule(ModuleWidget):
@@ -32,7 +27,6 @@ class LFOModule(ModuleWidget):
     def __init__(self):
         """Initialize LFO module."""
         super().__init__(
-            TITLE,
             width=220,
             height=200,
             color=QColor(100, 140, 200),
@@ -41,11 +35,9 @@ class LFOModule(ModuleWidget):
         # Add output port
         self.out_port = self.add_output_port("Out")
 
-        # Create control widget
-        self.controls_widget = QWidget()
-        self.controls_widget.setStyleSheet("background: transparent;")
-        layout = QVBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
+        # Use helper methods for UI construction
+        self.controls_widget = self._create_controls_container()
+        layout = self._create_standard_layout()
 
         # Waveform selector
         wave_layout = QHBoxLayout()
@@ -80,15 +72,24 @@ class LFOModule(ModuleWidget):
         layout.addWidget(self.phase_slider)
 
         self.controls_widget.setLayout(layout)
+        self.proxy = self._add_controls_to_module(self.controls_widget)
 
-        # Add controls as proxy widget
-        self.proxy = QGraphicsProxyWidget(self)
-        self.proxy.setWidget(self.controls_widget)
-        self.proxy.setPos(0, 42)
+        # Register parameters for automatic get/set
+        self.register_parameter(
+            "waveform", self.wave_combo, getter="currentText", setter="setCurrentText"
+        )
+        self.register_parameter("frequency", self.freq_knob)
+        self.register_parameter("amplitude", self.amp_knob)
+        self.register_parameter("phase", self.phase_slider)
 
-        self.create_component()
+        self.component = self.create_component()
 
     # AudioModuleInterface implementation
+    @property
+    def module_title(self) -> str:
+        """Return the module title."""
+        return "LFO"
+
     @property
     def module_category(self) -> ModuleCategory:
         """Return SOURCE since LFOs generate control signals."""
@@ -127,25 +128,3 @@ class LFOModule(ModuleWidget):
                 freq, amplitude=amp, phase=phase, wave_range=(-1, 1)
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")
-
-    def get_parameters(self) -> dict[str, Any]:
-        """Get current parameters."""
-        return {
-            "waveform": self.wave_combo.currentText(),
-            "frequency": self.freq_knob.get_value(),
-            "amplitude": self.amp_knob.get_value(),
-            "phase": self.phase_slider.get_value(),
-        }
-
-    def set_parameters(self, params: dict[str, Any]):
-        """Set parameters from dictionary."""
-        if "waveform" in params:
-            index = self.wave_combo.findText(params["waveform"])
-            if index >= 0:
-                self.wave_combo.setCurrentIndex(index)
-        if "frequency" in params:
-            self.freq_knob.set_value(params["frequency"])
-        if "amplitude" in params:
-            self.amp_knob.set_value(params["amplitude"])
-        if "phase" in params:
-            self.phase_slider.set_value(params["phase"])

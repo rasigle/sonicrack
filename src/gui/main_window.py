@@ -313,6 +313,7 @@ class ModularSynthWindow(QMainWindow):
         modules = [
             item for item in self.patch_canvas.scene.items() if is_module_widget(item)
         ]
+        logger.info(modules)
         connections = self.patch_canvas.get_connections()
 
         if not modules:
@@ -615,4 +616,10 @@ def is_module_widget(obj: Any) -> bool:
     Returns:
         True if obj is a ModuleWidget, False otherwise
     """
-    return hasattr(obj, "component_category")
+
+    logger.info(obj)
+    logger.info(type(obj))
+    from src.gui.audio_module_interface import AudioModuleInterface
+
+    logger.info(isinstance(obj, AudioModuleInterface))
+    return isinstance(obj, AudioModuleInterface)

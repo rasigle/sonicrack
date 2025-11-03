@@ -148,7 +148,8 @@ class PatchCompiler:
             required_inputs = module.get_required_inputs()
             if not required_inputs:
                 logger.warning(
-                    f"Modifier module '{module.module_title}' has no required inputs defined"
+                    f"Modifier module '{module.module_title}' has no required inputs "
+                    f"defined"
                 )
                 return None
 
@@ -157,7 +158,8 @@ class PatchCompiler:
             main_input_port = self._find_port_by_name(module, main_input_name)
             if not main_input_port:
                 logger.warning(
-                    f"Modifier module '{module.module_title}' missing port '{main_input_name}'"
+                    f"Modifier module '{module.module_title}' missing port "
+                    f"'{main_input_name}'"
                 )
                 return None
 
@@ -270,14 +272,15 @@ class PatchCompiler:
                 and module.module_category != ModuleCategory.OUTPUT
             ):
                 errors.append(
-                    f"Module '{getattr(module, 'module_title', 'Unknown')}' is not connected"
+                    f"Module '{getattr(module, 'module_title', 'Unknown')}' is not "
+                    f"connected"
                 )
 
         # Check for invalid connections
         for start_port, end_port in self.connections:
             if start_port.port_type != "output":
-                errors.append(f"Invalid connection: source port is not an output")
+                errors.append("Invalid connection: source port is not an output")
             if end_port.port_type != "input":
-                errors.append(f"Invalid connection: destination port is not an input")
+                errors.append("Invalid connection: destination port is not an input")
 
         return errors

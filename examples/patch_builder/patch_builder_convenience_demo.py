@@ -14,8 +14,8 @@ patch = (
     .sine(1000, amplitude=0.8)
     .adsr(0.1, 0.2, 0.7, 0.3)
     .volume(0.5)
-    .pan(0.3)
-    .clip(-0.9, 0.9)
+    .panner(0.3)
+    .clipper(-0.9, 0.9)
 )
 
 # Display patch description

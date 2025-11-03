@@ -95,7 +95,7 @@ def example_2_library_management():
         .sawtooth(880, amplitude=0.8)  # A5
         .adsr(0.05, 0.2, 0.6, 0.3)
         .volume(0.6)
-        .clip(-0.8, 0.8)
+        .clipper(-0.8, 0.8)
     )
     library.save(lead_patch, category="leads")
     print("   ✓ Saved: Bright Lead (leads category)")
@@ -107,7 +107,7 @@ def example_2_library_management():
         .sine(220, amplitude=0.6)  # A3
         .adsr(2.0, 1.5, 0.7, 3.0)
         .volume(0.4)
-        .pan(0.0)
+        .panner(0.0)
     )
     library.save(pad_patch, category="pads")
     print("   ✓ Saved: Warm Pad (pads category)")
@@ -118,7 +118,7 @@ def example_2_library_management():
         .set_description("Rising sweep effect")
         .square(100, amplitude=0.7)
         .volume(0.5)
-        .pan(-0.3)
+        .panner(-0.3)
     )
     library.save(fx_patch, category="fx")
     print("   ✓ Saved: Sweep FX (fx category)")
@@ -214,8 +214,8 @@ def example_5_patch_inspection():
         .sawtooth(440, amplitude=0.7)
         .adsr(0.1, 0.3, 0.6, 0.5)
         .volume(0.6)
-        .pan(0.2)
-        .clip(-0.7, 0.7)
+        .panner(0.2)
+        .clipper(-0.7, 0.7)
     )
 
     # Get full description
@@ -265,7 +265,7 @@ def example_6_metadata_and_organization():
         .sine(440, amplitude=0.75)
         .adsr(0.02, 0.5, 0.3, 0.8)
         .volume(0.65)
-        .clip(-0.85, 0.85)
+        .clipper(-0.85, 0.85)
     )
 
     # Save with additional metadata
@@ -375,7 +375,7 @@ def example_8_advanced_patches():
         .set_description("Fundamental with added harmonics")
         .sawtooth(55, amplitude=0.8)  # Rich in harmonics
         .adsr(0.01, 0.15, 0.7, 0.25)
-        .clip(-0.9, 0.9)
+        .clipper(-0.9, 0.9)
         .volume(0.65)
     )
 
@@ -442,7 +442,7 @@ def example_10_export_import():
         .triangle(330, amplitude=0.75)
         .adsr(0.08, 0.25, 0.65, 0.35)
         .volume(0.6)
-        .pan(0.1)
+        .panner(0.1)
     )
 
     # Save to library

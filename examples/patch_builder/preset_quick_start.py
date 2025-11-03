@@ -24,7 +24,7 @@ def main():
         .sine(440, amplitude=0.8)
         .adsr(0.1, 0.2, 0.7, 0.3)
         .volume(0.6)
-        .pan(0.0)
+        .panner(0.0)
     )
 
     print(my_patch.describe())

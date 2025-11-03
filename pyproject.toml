@@ -11,24 +11,19 @@ dependencies = [
     "numpy>=2.2.6",
     "scipy",
     "sounddevice>=0.5.2",
-    "pyaudio",
     "librosa>=0.11.0",
-    "ipywidgets>=8.1.7",
-    "pandas>=2.3.3",
-]
-
-
-[dependency-groups]
-
-# Additional dependencies for examples and tutorials
-examples = [
     "pyqt6",
+
+    # used in examples
     "pyqtgraph>=0.13.7",
     "notebook>=7.4.7",
     "pynput>=1.8.1",
     "matplotlib>=3.10.7",
+    "pandas>=2.3.3",
+    "pyaudio",
 ]
 
+[dependency-groups]
 
 "dev" = [
     # Linter

@@ -4,8 +4,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QGraphicsProxyWidget
 
-from engine import WaveAdder
-from gui.widgets.module_widget import ModuleWidget
+from src.engine import WaveAdder
+from src.gui.widgets.module_widget import ModuleWidget
 
 TITLE = "Mixer"
 

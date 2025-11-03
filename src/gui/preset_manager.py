@@ -86,7 +86,7 @@ class PresetManager:
                     "id": module_id,
                     "type": module.module_title,
                     "custom_name": module.custom_name if hasattr(module, 'custom_name') else "",
-                    "component_type": module.component_category if hasattr(module, 'component_type') else "",
+                    "component_category": module.component_category if hasattr(module, 'component_category') else "",
                     "position": {
                         "x": module.pos().x(),
                         "y": module.pos().y()

@@ -3,9 +3,9 @@ from typing import Dict, Any
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGraphicsProxyWidget
 
-from engine import ADSREnvelope
-from gui.widgets.module_widget import ModuleWidget
-from gui.widgets import Knob
+from src.engine import ADSREnvelope
+from src.gui.widgets.module_widget import ModuleWidget
+from src.gui.widgets import Knob
 
 TITLE = "ADSR Envelope"
 class ADSRModule(ModuleWidget):

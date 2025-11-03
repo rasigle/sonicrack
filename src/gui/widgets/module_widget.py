@@ -55,7 +55,7 @@ class ModuleWidget(QGraphicsWidget):
 
         # Component reference (for audio engine)
         self.component = None
-        self.component_category = None  # Will be set by subclasses
+        self.component_category = category  # Will be set by subclasses
 
     def boundingRect(self) -> QRectF:
         """Return the bounding rectangle of the module."""
@@ -308,6 +308,5 @@ class ModuleWidget(QGraphicsWidget):
     def update_component(self):
         """Update the audio component with current parameter values."""
         if self.component:
-            params = self.get_parameters()
             # Subclasses should implement parameter updates
             pass

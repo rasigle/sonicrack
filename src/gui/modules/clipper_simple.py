@@ -4,9 +4,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
 
-from engine import Clipper
-from gui.widgets.module_widget import ModuleWidget
-from gui.widgets import Knob
+from src.engine import Clipper
+from src.gui.widgets.module_widget import ModuleWidget
+from src.gui.widgets import Knob
 
 TITLE = "Clipper"
 

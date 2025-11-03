@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal
 from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath
 
 if TYPE_CHECKING:
-    from gui.widgets.module_widget import ModuleWidget
+    from src.gui.widgets.module_widget import ModuleWidget
 
 
 class Port(QGraphicsItem):
@@ -278,7 +278,7 @@ class PatchCanvas(QGraphicsView):
                     item.remove()
 
             # Delete selected modules (and their connected cables)
-            from gui.widgets.module_widget import ModuleWidget
+            from src.gui.widgets.module_widget import ModuleWidget
             for item in selected_items:
                 if isinstance(item, ModuleWidget):
                     # First, remove all cables connected to this module's ports

@@ -348,11 +348,11 @@ class TestPatchBuilderConvenience(unittest.TestCase):
 
         # Should only have oscillator left
         config = builder.get_config()
-        component_types = [c["type"] for c in config["components"]]
-        self.assertIn("sine_oscillator", component_types)
-        self.assertNotIn("volume", component_types)
-        self.assertNotIn("panner", component_types)
-        self.assertNotIn("clipper", component_types)
+        component_categorys = [c["type"] for c in config["components"]]
+        self.assertIn("sine_oscillator", component_categorys)
+        self.assertNotIn("volume", component_categorys)
+        self.assertNotIn("panner", component_categorys)
+        self.assertNotIn("clipper", component_categorys)
 
 
 if __name__ == "__main__":

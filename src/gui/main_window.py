@@ -1,6 +1,7 @@
 """Main window for the modular synthesizer."""
 
 import logging
+from typing import Any
 
 from PyQt6.QtCore import Qt, QTimer, QPointF
 from PyQt6.QtGui import QAction
@@ -10,16 +11,16 @@ from PyQt6.QtWidgets import (
     QGroupBox, QScrollArea, QSplitter, QDialog
 )
 
-from .audio_engine import AudioEngine
-from .dialogs.about_dialog import show_about
-from .modules.module_registry import MODULE_REGISTRY
-from .modules.output import OutputModule
-from .patch_canvas import PatchCanvas
-from .patch_compiler import PatchCompiler
-from gui.dialogs.preset_dialog import PresetBrowserDialog, SavePresetDialog
-from .preset_manager import PresetManager
-from .widgets.spectrum_analyzer import SpectrumAnalyzer
-from .widgets.waveform_display import WaveformDisplay
+from src.gui.audio_engine import AudioEngine
+from src.gui.dialogs.about_dialog import show_about
+from src.gui.module_registry import MODULE_REGISTRY
+from src.gui.modules.output import OutputModule
+from src.gui.patch_canvas import PatchCanvas
+from src.gui.patch_compiler import PatchCompiler
+from src.gui.dialogs.preset_dialog import PresetBrowserDialog, SavePresetDialog
+from src.gui.preset_manager import PresetManager
+from src.gui.widgets.spectrum_analyzer import SpectrumAnalyzer
+from src.gui.widgets.waveform_display import WaveformDisplay
 
 logger = logging.getLogger(__name__)
 
@@ -134,16 +135,6 @@ class ModularSynthWindow(QMainWindow):
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)
         layout.addWidget(scroll)
-
-        # Info panel
-        info_group = QGroupBox("Info")
-        info_layout = QVBoxLayout()
-        self.info_label = QLabel("Click modules to add them\nto the canvas.\n\nDrag cables from outputs\nto inputs to connect.")
-        self.info_label.setWordWrap(True)
-        self.info_label.setStyleSheet("padding: 5px;")
-        info_layout.addWidget(self.info_label)
-        info_group.setLayout(info_layout)
-        layout.addWidget(info_group)
 
         return panel
 
@@ -309,7 +300,7 @@ class ModularSynthWindow(QMainWindow):
         """
         # Get all modules and connections
         modules = [item for item in self.patch_canvas.scene.items()
-                  if hasattr(item, 'component_type')]
+                   if is_module_widget(item)]
         connections = self.patch_canvas.get_connections()
 
         if not modules:
@@ -328,6 +319,7 @@ class ModularSynthWindow(QMainWindow):
                 error_msg = "Patch has errors:\n\n" + "\n".join(f"• {err}" for err in errors)
                 QMessageBox.warning(self, "Compilation Errors", error_msg)
             logger.warning(f"Patch compilation errors: {errors}")
+
             # Clear patch and stop playback on error
             self.audio_engine.set_patch(None)
             return False
@@ -335,6 +327,7 @@ class ModularSynthWindow(QMainWindow):
         # Compile
         patch = self.patch_compiler.compile()
 
+        logging.info(patch)
         if patch:
             self.audio_engine.set_patch(patch)
 
@@ -399,7 +392,7 @@ class ModularSynthWindow(QMainWindow):
         logger.debug(f"Cable disconnected: {start_port.port_name} -> {end_port.port_name}")
 
         # Check if output module was disconnected
-        from .modules.module_registry import OutputModule
+        from src.gui.module_registry import OutputModule
         if isinstance(end_port.parent_module, OutputModule):
             # Output was disconnected - stop playback and clear patch
             self.audio_engine.stop_playback()
@@ -453,7 +446,7 @@ class ModularSynthWindow(QMainWindow):
         """Save the current patch as a preset."""
         # Get all modules and connections
         modules = [item for item in self.patch_canvas.scene.items()
-                  if hasattr(item, 'component_type')]
+                  if hasattr(item, 'component_category')]
         connections = self.patch_canvas.get_connections()
 
         if not modules:
@@ -596,3 +589,15 @@ class ModularSynthWindow(QMainWindow):
         self.audio_engine.cleanup()
         event.accept()
 
+
+
+def is_module_widget(obj: Any) -> bool:
+    """Check if an object is a ModuleWidget.
+
+    Args:
+        obj: Object to check
+
+    Returns:
+        True if obj is a ModuleWidget, False otherwise
+    """
+    return hasattr(obj, "component_category")

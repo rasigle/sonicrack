@@ -4,16 +4,16 @@ This file contains concrete implementations of various audio modules
 that can be placed on the patch canvas.
 """
 
-from gui.modules.clipper_simple import ClipperModule
-from gui.modules.envelope_adsr import ADSRModule
-from gui.modules.lfo import LFOModule
-from gui.modules.mixer import MixerModule
-from gui.modules.oscillator import OscillatorModule
-from gui.modules.output import OutputModule
-from gui.modules.pan_mod import PannerModule
-from gui.modules.pan_simple import SimplePannerModule
-from gui.modules.volume_mod import VolumeModule
-from gui.modules.volume_simple import SimpleVolumeModule
+from src.gui.modules.clipper_simple import ClipperModule
+from src.gui.modules.envelope_adsr import ADSRModule
+from src.gui.modules.lfo import LFOModule
+from src.gui.modules.mixer import MixerModule
+from src.gui.modules.oscillator import OscillatorModule
+from src.gui.modules.output import OutputModule
+from src.gui.modules.pan_mod import PannerModule
+from src.gui.modules.pan_simple import SimplePannerModule
+from src.gui.modules.volume_mod import VolumeModule
+from src.gui.modules.volume_simple import SimpleVolumeModule
 
 # Module registry for easy instantiation
 MODULE_REGISTRY = {

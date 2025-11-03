@@ -4,10 +4,10 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, \
     QGraphicsProxyWidget
 
-from engine import SineOscillator, SquareOscillator, SawtoothOscillator, \
+from src.engine import SineOscillator, SquareOscillator, SawtoothOscillator, \
     TriangleOscillator
-from gui.widgets.module_widget import ModuleWidget
-from gui.widgets import Knob, HSlider
+from src.gui.widgets.module_widget import ModuleWidget
+from src.gui.widgets import Knob, HSlider
 
 TITLE = "LFO"
 

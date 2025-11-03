@@ -9,7 +9,7 @@ synthesis engine, featuring:
 - MIDI support (future)
 """
 
-from .main_window import ModularSynthWindow
+from src.gui.main_window import ModularSynthWindow
 
 __all__ = ["ModularSynthWindow"]
 

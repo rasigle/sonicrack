@@ -40,13 +40,13 @@ class ADSRModule(ModuleWidget):
 
         self.attack_knob = Knob("Attack", 0.001, 5.0, 0.1)
         self.attack_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("attack", self.attack_knob.get_value())
+            lambda: self.parameter_changed.emit("attack_duration", self.attack_knob.get_value())
         )
         knobs_layout.addWidget(self.attack_knob)
 
         self.decay_knob = Knob("Decay", 0.001, 5.0, 0.2)
         self.decay_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("decay", self.decay_knob.get_value())
+            lambda: self.parameter_changed.emit("decay_duration", self.decay_knob.get_value())
         )
         knobs_layout.addWidget(self.decay_knob)
 
@@ -57,7 +57,7 @@ class ADSRModule(ModuleWidget):
         self.sustain_knob = Knob("Sustain", 0.0, 1.0, 0.7)
         self.sustain_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
-                "sustain", self.sustain_knob.get_value()
+                "sustain_level", self.sustain_knob.get_value()
             )
         )
         knobs_layout2.addWidget(self.sustain_knob)
@@ -65,7 +65,7 @@ class ADSRModule(ModuleWidget):
         self.release_knob = Knob("Release", 0.001, 5.0, 0.3)
         self.release_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
-                "release", self.release_knob.get_value()
+                "release_duration", self.release_knob.get_value()
             )
         )
         knobs_layout2.addWidget(self.release_knob)

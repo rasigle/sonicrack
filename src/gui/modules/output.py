@@ -1,6 +1,6 @@
 from typing import Any
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
@@ -18,6 +18,9 @@ class OutputModule(ModuleWidget):
         category=ModuleCategory.OUTPUT,
         description="Audio output with master volume",
     )
+
+    # Special signal for master volume changes (bypasses hot-swapping)
+    master_volume_changed = pyqtSignal(float)
 
     def __init__(self):
         """Initialize output module."""
@@ -37,9 +40,7 @@ class OutputModule(ModuleWidget):
         # Master volume
         self.volume_knob = Knob("Master", 0.0, 1.0, 0.7)
         self.volume_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "master_volume", self.volume_knob.get_value()
-            )
+            lambda: self.master_volume_changed.emit(self.volume_knob.get_value())
         )
         layout.addWidget(self.volume_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 

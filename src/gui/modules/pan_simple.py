@@ -39,7 +39,7 @@ class SimplePannerModule(ModuleWidget):
         # Pan knob
         self.pan_knob = Knob("Pan", -1.0, 1.0, 0.0)
         self.pan_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("pan", self.pan_knob.get_value())
+            lambda: self.parameter_changed.emit("position", self.pan_knob.get_value())
         )
         layout.addWidget(self.pan_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -47,7 +47,7 @@ class SimplePannerModule(ModuleWidget):
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
         # Register parameters for automatic get/set
-        self.register_parameter("pan", self.pan_knob)
+        self.register_parameter("position", self.pan_knob)
 
         self.component = self.create_component()
 

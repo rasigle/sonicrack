@@ -332,6 +332,10 @@ class ModularSynthWindow(QMainWindow):
         # Connect parameter change signal to auto-compile
         module.parameter_changed.connect(self._on_parameter_changed)
 
+        # Special handling for Output module - connect master volume directly
+        if hasattr(module, 'master_volume_changed'):
+            module.master_volume_changed.connect(self.audio_engine.set_master_volume)
+
         self.patch_canvas.add_module(module)
         self.statusbar.showMessage(f"Added {module_name}")
         logger.info(f"Added module: {module_name}")
@@ -498,18 +502,55 @@ class ModularSynthWindow(QMainWindow):
                 self._compile_patch()
 
     def _on_parameter_changed(self, param_name: str, value):
-        """Handle module parameter change.
+        """Handle module parameter change using hot-swapping (no recompile).
+
+        This method implements Strategy 1 (Parameter Hot-Swapping) to eliminate
+        clicking when adjusting parameters. Instead of recompiling the entire
+        patch, it updates the parameter directly in the compiled component.
 
         Args:
             param_name: Name of the changed parameter
             value: New value
         """
         logger.debug(f"Parameter changed: {param_name} = {value}")
-        # Debounce compilation to avoid audio spikes during knob rotation
-        # Wait 100ms after last change before recompiling
-        # Don't update tree since parameter changes don't affect structure
-        self.compile_debounce_timer.stop()
-        self.compile_debounce_timer.start(DEBOUNCE_TIMER_DELAY_MS)
+
+        # Find which module emitted this signal
+        sender_module = self.sender()
+
+        # Validate sender is an AudioModuleInterface
+        from src.gui.audio_module_interface import AudioModuleInterface
+        if isinstance(sender_module, AudioModuleInterface):
+            # Check if module is actually in the compiled patch
+            is_in_patch = sender_module in self.patch_compiler._module_to_component
+
+            if not is_in_patch:
+                # Module is not connected to the audio chain - ignore parameter change
+                logger.debug(
+                    f"Ignoring parameter change for unconnected module: "
+                    f"{sender_module.metadata.title}"
+                )
+                return
+
+            if self.audio_engine.is_playing:
+                # Hot-swap the parameter without recompiling (prevents clicks!)
+                success = self.patch_compiler.update_parameter(
+                    sender_module, param_name, value
+                )
+
+                if success:
+                    logger.debug(f"✓ Hot-swapped {param_name} (no recompile, no click)")
+                else:
+                    # Fallback: debounced recompile if hot-swap fails
+                    logger.warning(
+                        f"Hot-swap failed for {param_name}, falling back to recompile"
+                    )
+                    self.compile_debounce_timer.stop()
+                    self.compile_debounce_timer.start(DEBOUNCE_TIMER_DELAY_MS)
+            else:
+                # Not playing: use debounced recompile
+                # (Debouncing is less critical when not playing)
+                self.compile_debounce_timer.stop()
+                self.compile_debounce_timer.start(DEBOUNCE_TIMER_DELAY_MS)
 
     def _update_visualizations(self):
         """Update waveform and spectrum displays."""
@@ -615,6 +656,10 @@ class ModularSynthWindow(QMainWindow):
 
                 # Connect parameter change signal
                 module.parameter_changed.connect(self._on_parameter_changed)
+
+                # Special handling for Output module - connect master volume directly
+                if hasattr(module, 'master_volume_changed'):
+                    module.master_volume_changed.connect(self.audio_engine.set_master_volume)
 
                 # Restore custom name if present
                 custom_name = module_data.get("custom_name", "")

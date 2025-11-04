@@ -27,6 +27,9 @@ class PatchCompiler:
         self.compiled_patch: Any | None = None
         self._build_cache: dict[AudioModuleInterface, Any] = {}
 
+        # Hot-swapping support: track module → component mapping
+        self._module_to_component: dict[AudioModuleInterface, Any] = {}
+
     def set_patch(
         self, modules: list[AudioModuleInterface], connections: list[tuple[Port, Port]]
     ):
@@ -39,6 +42,7 @@ class PatchCompiler:
         self.modules = modules
         self.connections = connections
         self._build_cache = {}
+        self._module_to_component = {}
 
     def compile(self) -> Any | None:
         """Compile the patch into an audio component.
@@ -73,6 +77,56 @@ class PatchCompiler:
             logger.error(f"Patch compilation failed: {e}", exc_info=True)
             return None
 
+    def update_parameter(self, module: AudioModuleInterface, param_name: str, value) -> bool:
+        """Hot-swap a parameter value without recompiling (eliminates clicks).
+
+        This method updates parameters directly in the compiled audio components,
+        avoiding the need to recreate the entire patch. This prevents phase
+        discontinuities and eliminates clicking when adjusting parameters.
+
+        Args:
+            module: The module widget whose parameter changed
+            param_name: Name of the parameter (e.g., "frequency", "gain_db")
+            value: New parameter value
+
+        Returns:
+            True if parameter was updated successfully, False otherwise
+
+        Example:
+            >>> # User rotates frequency knob
+            >>> compiler.update_parameter(osc_module, "frequency", 880)
+            >>> # Frequency changes instantly without click!
+        """
+        if module not in self._module_to_component:
+            logger.warning(
+                f"Cannot hot-swap parameter: module {module.metadata.title} "
+                f"not found in compiled patch"
+            )
+            return False
+
+        component = self._module_to_component[module]
+
+        # Try to set the parameter directly on the component
+        if hasattr(component, param_name):
+            try:
+                setattr(component, param_name, value)
+                logger.debug(
+                    f"Hot-swapped {param_name}={value} in "
+                    f"{module.metadata.title} → {type(component).__name__}"
+                )
+                return True
+            except Exception as e:
+                logger.error(
+                    f"Failed to hot-swap {param_name} in {module.metadata.title}: {e}"
+                )
+                return False
+        else:
+            logger.warning(
+                f"Component {type(component).__name__} does not have "
+                f"parameter '{param_name}'"
+            )
+            return False
+
     def _build_chain_from_module(self, module: AudioModuleInterface) -> Any | None:
         """Build the audio chain from a module by following connections backwards.
 
@@ -97,6 +151,7 @@ class PatchCompiler:
                 input_components=None, modulation_components=None
             )
             self._build_cache[module] = component
+            self._module_to_component[module] = component  # Track for hot-swapping
             return component
 
         # Handle OUTPUT module
@@ -227,6 +282,7 @@ class PatchCompiler:
             if modifier_component:
                 component = Chain(input_component, modifier_component)
                 self._build_cache[module] = component
+                self._module_to_component[module] = modifier_component  # Track the actual modifier for hot-swapping
                 return component
 
         # Unknown module type

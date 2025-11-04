@@ -36,18 +36,20 @@ class SimpleVolumeModule(ModuleWidget):
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
-        # Volume knob
-        self.volume_knob = Knob("Gain", 0.0, 2.0, 1.0)
-        self.volume_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("volume", self.volume_knob.get_value())
+        # Gain in dB (linear mapping of dB values, since dB is already logarithmic)
+        # Range: -60 dB (very quiet) to +12 dB (boost)
+        # Default: -20 dB (safe for mixing)
+        self.gain_knob = Knob("Gain (dB)", -60, 12, -20, logarithmic=False)
+        self.gain_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("gain_db", self.gain_knob.get_value())
         )
-        layout.addWidget(self.volume_knob, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.gain_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
         # Register parameters for automatic get/set
-        self.register_parameter("volume", self.volume_knob)
+        self.register_parameter("gain_db", self.gain_knob)
 
         self.component = self.create_component()
 
@@ -62,5 +64,5 @@ class SimpleVolumeModule(ModuleWidget):
         modulation_components: dict[str, Any] | None = None,
     ):
         """Create the volume component."""
-        volume = self.volume_knob.get_value()
-        return Volume(volume)
+        gain_db = self.gain_knob.get_value()
+        return Volume(gain_db=gain_db)

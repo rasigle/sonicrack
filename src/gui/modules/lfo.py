@@ -64,11 +64,14 @@ class LFOModule(ModuleWidget):
         )
         knobs_layout.addWidget(self.freq_knob)
 
-        self.amp_knob = Knob("Depth", 0.0, 1.0, 0.5)
-        self.amp_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("amplitude", self.amp_knob.get_value())
+        # Gain in dB (linear mapping of dB values, since dB is already logarithmic)
+        # Range: -60 dB (very quiet) to +12 dB (boost)
+        # Default: -20 dB (safe for mixing)
+        self.depth_knob = Knob("Depth", -60, 12, -20, logarithmic=False)
+        self.depth_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("gain_db", self.depth_knob.get_value())
         )
-        knobs_layout.addWidget(self.amp_knob)
+        knobs_layout.addWidget(self.depth_knob)
 
         layout.addLayout(knobs_layout)
 
@@ -87,7 +90,7 @@ class LFOModule(ModuleWidget):
             "waveform", self.wave_combo, getter="currentText", setter="setCurrentText"
         )
         self.register_parameter("frequency", self.freq_knob)
-        self.register_parameter("amplitude", self.amp_knob)
+        self.register_parameter("gain_db", self.depth_knob)
         self.register_parameter("phase", self.phase_slider)
 
         self.component = self.create_component()
@@ -106,23 +109,23 @@ class LFOModule(ModuleWidget):
         """Create the LFO component."""
         wave_type = self.wave_combo.currentText()
         freq = self.freq_knob.get_value()
-        amp = self.amp_knob.get_value()
+        gain_db = self.depth_knob.get_value()
         phase = self.phase_slider.get_value()
 
         # LFO uses the same oscillators but at lower frequencies
         # and with wave_range set to modulation range (-1 to 1)
         if wave_type == "Sine":
-            return SineOscillator(freq, amplitude=amp, phase=phase, wave_range=(-1, 1))
+            return SineOscillator(freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1))
         if wave_type == "Square":
             return SquareOscillator(
-                freq, amplitude=amp, phase=phase, wave_range=(-1, 1)
+                freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1)
             )
         if wave_type == "Sawtooth":
             return SawtoothOscillator(
-                freq, amplitude=amp, phase=phase, wave_range=(-1, 1)
+                freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1)
             )
         if wave_type == "Triangle":
             return TriangleOscillator(
-                freq, amplitude=amp, phase=phase, wave_range=(-1, 1)
+                freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1)
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")

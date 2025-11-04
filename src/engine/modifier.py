@@ -102,6 +102,14 @@ class Panner(Modifier):
         self._right_gain: float = 0.0
         self._update_gains()
 
+        # Pan smoothing to prevent clicks when changing pan position
+        self._target_left_gain = self._left_gain
+        self._target_right_gain = self._right_gain
+        self._current_left_gain = self._left_gain  # Start at current position
+        self._current_right_gain = self._right_gain  # Start at current position
+        self._smoothing_samples_remaining = 0
+        self._smoothing_duration_samples = 441  # 10ms at 44.1kHz
+
     @property
     def position(self) -> float:
         """float: Current pan position (-1.0 to 1.0)."""
@@ -109,9 +117,13 @@ class Panner(Modifier):
 
     @position.setter
     def position(self, value: float):
-        """Set pan position and update gains."""
+        """Set pan position and update gains with smoothing."""
         self._position = np.clip(value, -1.0, 1.0)
         self._update_gains()
+        # Initiate smooth transition (prevents clicks)
+        self._target_left_gain = self._left_gain
+        self._target_right_gain = self._right_gain
+        self._smoothing_samples_remaining = self._smoothing_duration_samples
 
     def _update_gains(self) -> None:
         """Update left/right gains based on position using constant-power law."""
@@ -138,7 +150,7 @@ class Panner(Modifier):
         return self._left_gain * val, self._right_gain * val
 
     def pan_vectorized(self, samples: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """Apply panning to an array of samples (vectorized).
+        """Apply panning to an array of samples (vectorized with smoothing).
 
         Args:
             samples: Mono input array.
@@ -146,9 +158,52 @@ class Panner(Modifier):
         Returns:
             Tuple of (left, right) stereo arrays (float32).
         """
-        left = (self._left_gain * samples).astype(np.float32)
-        right = (self._right_gain * samples).astype(np.float32)
-        return left, right
+        n = len(samples)
+
+        # Apply pan gains with smoothing if transitioning (prevents clicks!)
+        if self._smoothing_samples_remaining > 0:
+            # Calculate how many samples to smooth in this buffer
+            smooth_count = min(n, self._smoothing_samples_remaining)
+
+            # Create smooth gain envelopes (linear ramp)
+            left_envelope = np.linspace(
+                self._current_left_gain,
+                self._target_left_gain,
+                smooth_count
+            )
+            right_envelope = np.linspace(
+                self._current_right_gain,
+                self._target_right_gain,
+                smooth_count
+            )
+
+            # Apply smoothed gains to first part
+            left = np.zeros(n, dtype=np.float32)
+            right = np.zeros(n, dtype=np.float32)
+            left[:smooth_count] = samples[:smooth_count] * left_envelope
+            right[:smooth_count] = samples[:smooth_count] * right_envelope
+
+            # Apply target gains to rest (if any)
+            if smooth_count < n:
+                left[smooth_count:] = samples[smooth_count:] * self._target_left_gain
+                right[smooth_count:] = samples[smooth_count:] * self._target_right_gain
+
+            # Update state
+            self._smoothing_samples_remaining -= smooth_count
+            if self._smoothing_samples_remaining <= 0:
+                self._current_left_gain = self._target_left_gain
+                self._current_right_gain = self._target_right_gain
+            else:
+                # Update current gain to end of ramp for next buffer
+                self._current_left_gain = left_envelope[-1]
+                self._current_right_gain = right_envelope[-1]
+
+            return left.astype(np.float32), right.astype(np.float32)
+        else:
+            # No smoothing needed - use target gains (which match _left_gain/_right_gain)
+            left = (self._target_left_gain * samples).astype(np.float32)
+            right = (self._target_right_gain * samples).astype(np.float32)
+            return left, right
 
 
 @register_component()
@@ -353,6 +408,12 @@ class Volume(Modifier):
                 raise ValueError(f"amplitude must be non-negative, got {amplitude}")
             self._amplitude = float(amplitude)
 
+        # Amplitude smoothing to prevent clicks when changing gain
+        self._target_amplitude = self._amplitude
+        self._current_amplitude = self._amplitude
+        self._smoothing_samples_remaining = 0
+        self._smoothing_duration_samples = 441  # 10ms at 44.1kHz
+
         logger.debug(f"Volume initialized with amplitude: {self._amplitude}")
 
     @staticmethod
@@ -393,6 +454,9 @@ class Volume(Modifier):
     def amplitude(self, value: float):
         if value < 0:
             raise ValueError(f"amplitude must be non-negative, got {value}")
+        # Initiate smooth transition (prevents clicks)
+        self._target_amplitude = float(value)
+        self._smoothing_samples_remaining = self._smoothing_duration_samples
         self._amplitude = float(value)
 
     @property
@@ -409,7 +473,11 @@ class Volume(Modifier):
 
     @gain_db.setter
     def gain_db(self, value: float):
-        self._amplitude = self.db_to_linear(value)
+        new_amplitude = self.db_to_linear(value)
+        # Initiate smooth transition (prevents clicks)
+        self._target_amplitude = new_amplitude
+        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        self._amplitude = new_amplitude
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray
@@ -451,7 +519,37 @@ class Volume(Modifier):
         Returns:
             Scaled array (float32).
         """
-        return (samples * self._amplitude).astype(np.float32)
+        n = len(samples)
+
+        # Apply amplitude with smoothing if transitioning (prevents clicks!)
+        if self._smoothing_samples_remaining > 0:
+            # Calculate how many samples to smooth in this buffer
+            smooth_count = min(n, self._smoothing_samples_remaining)
+
+            # Create smooth amplitude envelope (linear ramp)
+            amp_envelope = np.linspace(
+                self._current_amplitude,
+                self._target_amplitude,
+                smooth_count
+            )
+
+            # Apply smoothed amplitude to first part
+            result = np.zeros(n, dtype=np.float32)
+            result[:smooth_count] = samples[:smooth_count] * amp_envelope
+
+            # Apply target amplitude to rest (if any)
+            if smooth_count < n:
+                result[smooth_count:] = samples[smooth_count:] * self._target_amplitude
+
+            # Update state
+            self._smoothing_samples_remaining -= smooth_count
+            if self._smoothing_samples_remaining <= 0:
+                self._current_amplitude = self._target_amplitude
+
+            return result.astype(np.float32)
+        else:
+            # No smoothing needed - direct multiplication
+            return (samples * self._amplitude).astype(np.float32)
 
 
 @register_component()

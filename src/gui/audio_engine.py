@@ -44,7 +44,13 @@ class AudioEngine(QObject):
         self.patch: Any | None = None
         self.master_volume: float = 0.7
 
-        # Buffer for visualization
+        # Master volume smoothing to prevent clicks
+        self._target_master_volume = 0.7
+        self._current_master_volume = 0.7
+        self._master_volume_smoothing_samples = 0
+        self._master_volume_smoothing_duration = 441  # 10ms @ 44.1kHz
+
+        # Fade-out parameters
         self.current_buffer: np.ndarray | None = None
 
         # Fade-out state to prevent clicks on stop
@@ -73,12 +79,16 @@ class AudioEngine(QObject):
         logger.debug(f"Patch set: {type(patch).__name__}")
 
     def set_master_volume(self, volume: float):
-        """Set the master output volume.
+        """Set the master output volume with smoothing to prevent clicks.
 
         Args:
             volume: Volume level (0.0 to 1.0)
         """
-        self.master_volume = np.clip(volume, 0.0, 1.0)
+        new_volume = np.clip(volume, 0.0, 1.0)
+        # Trigger smooth transition
+        self._target_master_volume = new_volume
+        self._master_volume_smoothing_samples = self._master_volume_smoothing_duration
+        self.master_volume = new_volume  # Update stored value
 
     def _audio_callback(self, outdata: np.ndarray, frames: int, time_info, status):
         """Audio callback function for sounddevice.
@@ -128,8 +138,38 @@ class AudioEngine(QObject):
                 outdata.fill(0)
                 return
 
-            # Apply master volume
-            stereo = stereo * self.master_volume
+            # Apply master volume with smoothing (prevents clicks!)
+            if self._master_volume_smoothing_samples > 0:
+                # Calculate how many samples to smooth
+                smooth_count = min(frames, self._master_volume_smoothing_samples)
+
+                # Create smooth volume envelope
+                volume_envelope = np.linspace(
+                    self._current_master_volume,
+                    self._target_master_volume,
+                    smooth_count
+                )
+
+                # Apply smoothed volume to first part
+                if stereo.shape[0] >= smooth_count:
+                    stereo[:smooth_count] = stereo[:smooth_count] * volume_envelope[:, np.newaxis]
+
+                    # Apply target volume to rest
+                    if smooth_count < frames:
+                        stereo[smooth_count:] = stereo[smooth_count:] * self._target_master_volume
+                else:
+                    # Buffer smaller than smooth_count
+                    stereo = stereo * volume_envelope[:stereo.shape[0], np.newaxis]
+
+                # Update smoothing state
+                self._master_volume_smoothing_samples -= smooth_count
+                if self._master_volume_smoothing_samples <= 0:
+                    self._current_master_volume = self._target_master_volume
+                else:
+                    self._current_master_volume = volume_envelope[-1]
+            else:
+                # No smoothing - direct multiplication
+                stereo = stereo * self._target_master_volume
 
             # Apply fade-in if starting playback
             if self.is_fading_in and self.fade_in_samples_remaining > 0:
@@ -308,7 +348,7 @@ class AudioEngine(QObject):
                 return None
 
             # Apply master volume and clip
-            stereo = np.clip(stereo * self.master_volume, -1.0, 1.0)
+            stereo = np.clip(stereo * self._target_master_volume, -1.0, 1.0)
 
             return stereo
 
@@ -317,5 +357,22 @@ class AudioEngine(QObject):
             return None
 
     def cleanup(self):
-        """Clean up resources."""
-        self.stop_playback()
+        """Clean up resources with graceful fade-out."""
+        if self.is_playing:
+            # Initiate fade-out
+            self.is_fading_out = True
+            self.fade_out_samples_remaining = self.fade_out_total_samples
+            self.post_fade_silence = False
+
+            logger.info("Cleanup: Fading out audio...")
+
+            # Wait for fade-out to complete (blocking is OK during cleanup)
+            import time
+            fade_duration_sec = (self.fade_out_duration_ms + 100) / 1000.0
+            time.sleep(fade_duration_sec)
+
+            # Now stop immediately
+            self._finalize_stop()
+        else:
+            # Not playing, just clean up
+            self.stop_playback()

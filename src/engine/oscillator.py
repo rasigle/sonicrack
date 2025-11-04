@@ -163,6 +163,12 @@ class Oscillator(Generator):
         self._a = self._amp
         self._p = self._phase
 
+        # Amplitude smoothing to prevent clicks when changing gain
+        self._target_amplitude = self._amp
+        self._current_amplitude = self._amp
+        self._smoothing_samples_remaining = 0
+        self._smoothing_duration_samples = int(0.010 * sample_rate)  # 10ms smooth
+
         # Pre-compute wave_range conversion
         self._needs_range_conversion: bool = False
         self._range_scale: float = 1.0
@@ -285,7 +291,10 @@ class Oscillator(Generator):
 
     @amplitude.setter
     def amplitude(self, value):
-        self._a = value
+        # Initiate smooth transition to new amplitude (prevents clicks)
+        self._target_amplitude = value
+        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        self._a = value  # Update stored value
         self._post_amp_set()
 
     @property
@@ -317,7 +326,11 @@ class Oscillator(Generator):
 
     @gain_db.setter
     def gain_db(self, value: float):
-        self._a = self.db_to_linear(value)
+        new_amplitude = self.db_to_linear(value)
+        # Initiate smooth transition to new amplitude (prevents clicks)
+        self._target_amplitude = new_amplitude
+        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        self._a = new_amplitude  # Update stored value
         self._post_amp_set()
 
     @property
@@ -553,8 +566,33 @@ class SawtoothOscillator(Oscillator):
         if self._needs_range_conversion:
             val = val * self._range_scale + self._range_offset
 
-        # Scale by amplitude
-        samples = val * self._a
+        # Apply amplitude with smoothing if transitioning (prevents clicks!)
+        if self._smoothing_samples_remaining > 0:
+            # Calculate how many samples to smooth in this buffer
+            smooth_count = min(n, self._smoothing_samples_remaining)
+
+            # Create smooth amplitude envelope (linear ramp)
+            amp_envelope = np.linspace(
+                self._current_amplitude,
+                self._target_amplitude,
+                smooth_count
+            )
+
+            # Apply smoothed amplitude to first part
+            samples = np.zeros(n, dtype=np.float32)
+            samples[:smooth_count] = val[:smooth_count] * amp_envelope
+
+            # Apply target amplitude to rest (if any)
+            if smooth_count < n:
+                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
+
+            # Update state
+            self._smoothing_samples_remaining -= smooth_count
+            if self._smoothing_samples_remaining <= 0:
+                self._current_amplitude = self._target_amplitude
+        else:
+            # No smoothing needed - direct multiplication
+            samples = val * self._a
 
         # Update internal state
         self._i += n
@@ -614,8 +652,33 @@ class TriangleOscillator(SawtoothOscillator):
         if self._needs_range_conversion:
             val = val * self._range_scale + self._range_offset
 
-        # Scale by amplitude
-        samples = val * self._a
+        # Apply amplitude with smoothing if transitioning (prevents clicks!)
+        if self._smoothing_samples_remaining > 0:
+            # Calculate how many samples to smooth in this buffer
+            smooth_count = min(n, self._smoothing_samples_remaining)
+
+            # Create smooth amplitude envelope (linear ramp)
+            amp_envelope = np.linspace(
+                self._current_amplitude,
+                self._target_amplitude,
+                smooth_count
+            )
+
+            # Apply smoothed amplitude to first part
+            samples = np.zeros(n, dtype=np.float32)
+            samples[:smooth_count] = val[:smooth_count] * amp_envelope
+
+            # Apply target amplitude to rest (if any)
+            if smooth_count < n:
+                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
+
+            # Update state
+            self._smoothing_samples_remaining -= smooth_count
+            if self._smoothing_samples_remaining <= 0:
+                self._current_amplitude = self._target_amplitude
+        else:
+            # No smoothing needed - direct multiplication
+            samples = val * self._a
 
         # Update internal state
         self._i += n
@@ -685,8 +748,33 @@ class SineOscillator(Oscillator):
         if self._needs_range_conversion:
             val = val * self._range_scale + self._range_offset
 
-        # Scale by amplitude
-        samples = val * self._a
+        # Apply amplitude with smoothing if transitioning (prevents clicks!)
+        if self._smoothing_samples_remaining > 0:
+            # Calculate how many samples to smooth in this buffer
+            smooth_count = min(n, self._smoothing_samples_remaining)
+
+            # Create smooth amplitude envelope (linear ramp)
+            amp_envelope = np.linspace(
+                self._current_amplitude,
+                self._target_amplitude,
+                smooth_count
+            )
+
+            # Apply smoothed amplitude to first part
+            samples = np.zeros(n, dtype=np.float32)
+            samples[:smooth_count] = val[:smooth_count] * amp_envelope
+
+            # Apply target amplitude to rest (if any)
+            if smooth_count < n:
+                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
+
+            # Update state
+            self._smoothing_samples_remaining -= smooth_count
+            if self._smoothing_samples_remaining <= 0:
+                self._current_amplitude = self._target_amplitude
+        else:
+            # No smoothing needed - direct multiplication
+            samples = val * self._a
 
         # Update internal state with phase wrapping
         self._i = (self._i + self._step * n) % (2 * np.pi)
@@ -773,8 +861,33 @@ class SquareOscillator(SineOscillator):
             sine_vals < self.threshold, self._wave_range[0], self._wave_range[1]
         )
 
-        # Scale by amplitude
-        samples = val * self._a
+        # Apply amplitude with smoothing if transitioning (prevents clicks!)
+        if self._smoothing_samples_remaining > 0:
+            # Calculate how many samples to smooth in this buffer
+            smooth_count = min(n, self._smoothing_samples_remaining)
+
+            # Create smooth amplitude envelope (linear ramp)
+            amp_envelope = np.linspace(
+                self._current_amplitude,
+                self._target_amplitude,
+                smooth_count
+            )
+
+            # Apply smoothed amplitude to first part
+            samples = np.zeros(n, dtype=np.float32)
+            samples[:smooth_count] = val[:smooth_count] * amp_envelope
+
+            # Apply target amplitude to rest (if any)
+            if smooth_count < n:
+                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
+
+            # Update state
+            self._smoothing_samples_remaining -= smooth_count
+            if self._smoothing_samples_remaining <= 0:
+                self._current_amplitude = self._target_amplitude
+        else:
+            # No smoothing needed - direct multiplication
+            samples = val * self._a
 
         # Update internal state with phase wrapping
         self._i = (self._i + self._step * n) % (2 * np.pi)

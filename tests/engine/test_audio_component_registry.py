@@ -10,60 +10,11 @@ Tests cover:
 
 import unittest
 
-from src.engine.audio_component import ComponentDescriptor, ComponentCategory
+from src.engine.audio_component import ComponentCategory
 from src.engine.audio_component_registry import audio_registry, register_component
 
 
-class TestComponentDescriptor(unittest.TestCase):
-    """Tests for ComponentDescriptor."""
-
-    def test_descriptor_creation(self):
-        """Test creating a component descriptor."""
-        descriptor = ComponentDescriptor(
-            name="test_component",
-            category=ComponentCategory.OSCILLATOR,
-            config_params=["param1", "param2"],
-            description="Test component",
-        )
-
-        self.assertEqual(descriptor.name, "test_component")
-        self.assertEqual(descriptor.category, ComponentCategory.OSCILLATOR)
-        self.assertEqual(descriptor.config_params, ["param1", "param2"])
-        self.assertEqual(descriptor.description, "Test component")
-
-    def test_to_config(self):
-        """Test converting to config dictionary."""
-        descriptor = ComponentDescriptor(
-            name="test_component",
-            category=ComponentCategory.OSCILLATOR,
-            config_params=["frequency", "amplitude"],
-        )
-
-        config = descriptor.to_config(440, amplitude=0.8)
-
-        self.assertEqual(config["name"], "test_component")
-        self.assertEqual(config["category"], "oscillator")
-        self.assertEqual(config["frequency"], 440)
-        self.assertEqual(config["amplitude"], 0.8)
-
-    def test_to_config_with_kwargs(self):
-        """Test config generation with keyword arguments."""
-        descriptor = ComponentDescriptor(
-            name="test",
-            category=ComponentCategory.OSCILLATOR,
-            config_params=["frequency", "amplitude", "phase"],
-        )
-
-        config = descriptor.to_config(frequency=440, amplitude=0.5, phase=90)
-
-        self.assertEqual(config["name"], "test")
-        self.assertEqual(config["category"], "oscillator")
-        self.assertEqual(config["frequency"], 440)
-        self.assertEqual(config["amplitude"], 0.5)
-        self.assertEqual(config["phase"], 90)
-
-
-class TestComponentRegistry(unittest.TestCase):
+class TestAudioComponentRegistry(unittest.TestCase):
     """Tests for ComponentRegistry."""
 
     def test_register_component(self):
@@ -108,7 +59,7 @@ class TestComponentRegistry(unittest.TestCase):
         self.assertIn("Volume", modifiers)
 
 
-class TestGlobalRegistry(unittest.TestCase):
+class TestGlobalAudioRegistry(unittest.TestCase):
     """Tests for global registry instance."""
 
     def test_global_registry_exists(self):
@@ -116,8 +67,9 @@ class TestGlobalRegistry(unittest.TestCase):
         self.assertIsNotNone(audio_registry)
         # Just verify it has the expected methods
         self.assertTrue(hasattr(audio_registry, "get"))
-        self.assertTrue(hasattr(audio_registry, "list_all"))
+        self.assertTrue(hasattr(audio_registry, "list_components"))
         self.assertTrue(hasattr(audio_registry, "list_by_category"))
+        self.assertTrue(hasattr(audio_registry, "count"))
 
     def test_register_component_helper(self):
         """Test register_component helper function."""

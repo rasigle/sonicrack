@@ -1,15 +1,11 @@
 """Unit tests for filter module."""
 
 import unittest
+
 import numpy as np
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from src.engine.filter import butter, apply_filter
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.filter import butter, apply_filter
 
 
 class TestCreateButterFilter(unittest.TestCase):

@@ -1,12 +1,8 @@
 """Unit tests for modulators (ADSR envelopes)."""
 
-import sys
 import unittest
-from pathlib import Path
 
 import numpy as np
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.engine.modulator import ADSREnvelope, getadsr
 

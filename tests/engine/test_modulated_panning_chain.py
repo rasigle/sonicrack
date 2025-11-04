@@ -1,16 +1,13 @@
 """Test for modulated panning in Chain (vectorized mode)."""
 
 import unittest
+
 import numpy as np
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from src.engine.oscillator import SineOscillator
+from src.engine.composer import Chain
 from src.engine.modifier import ModulatedPanner
 from src.engine.modulator import ADSREnvelope
-from src.engine.composer import Chain
+from src.engine.oscillator import SineOscillator
 
 
 class TestModulatedPanningInChain(unittest.TestCase):

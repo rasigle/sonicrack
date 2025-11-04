@@ -1,13 +1,10 @@
 """Unit tests for noise generators."""
 
 import unittest
+
 import numpy as np
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
+from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.noise import (
     white_noise,
     pink_noise,
@@ -18,7 +15,6 @@ from src.engine.noise import (
     grey_noise,
     sample_hold_noise,
 )
-from src.constants import DEFAULT_SAMPLE_RATE
 
 
 class TestWhiteNoise(unittest.TestCase):

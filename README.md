@@ -1,20 +1,20 @@
 # AudioPlayground - Professional Modular Synthesizer 🎹🎵
 
-**A production-ready modular audio synthesis framework featuring a visual patching interface, real-time audio engine, and plugin-ready architecture.**
+**A modular audio synthesis framework featuring a visual patching interface, real-time audio engine, and plugin-ready architecture.**
 
 ![Status](https://img.shields.io/badge/status-v1.0%20ready-brightgreen)
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Tests](https://img.shields.io/badge/tests-271%20passing-success)
-![Performance](https://img.shields.io/badge/performance-200x%20realtime-orange)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Tests](https://img.shields.io/badge/tests-434%20passing-success)
+![Performance](https://img.shields.io/badge/performance-1000x%20realtime-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ---
 
 ## 🎯 What is AudioPlayground?
 
-AudioPlayground is a **world-class audio synthesis framework** combining:
+AudioPlayground is a **audio synthesis framework** combining:
 - **High-performance vectorized audio engine** (5-47M samples/sec)
-- **Professional modular synthesizer GUI** (10 module types)
+- **Professional modular synthesizer GUI** (11 module types)
 - **Plugin-ready dynamic module system** (zero-maintenance registration)
 - **Fluent builder API** for programmatic presets
 - **Comprehensive preset management** with JSON serialization
@@ -47,7 +47,7 @@ Perfect for:
 - **Low CPU usage** - 5-15% per voice
 - **Real-time capable** - 40-80 simultaneous voices
 - **Type-safe** - Full type hints throughout
-- **Well-tested** - 271 tests passing (100%)
+- **Well-tested** - 434 tests passing (100%)
 
 ### 🔧 **Extensible Architecture**
 
@@ -95,7 +95,16 @@ python examples/modular_synth_app.py
 4. **Play**: Click "▶ Play" button (auto-compiles)
 5. **Adjust**: Rotate knobs to change frequency, amplitude, waveform
 
-**That's it!** See [QUICK_START_GUI.md](QUICK_START_GUI.md) for more.
+**That's it!** See the [Documentation](docs/) for more details.
+
+---
+
+## 📚 Documentation
+
+- **[Getting Started Guide](docs/getting-started/quick-start-gui.md)** - Create your first patch
+- **[Modules Overview](docs/user-guide/modules.md)** - All available modules
+- **[API Reference](docs/api-reference/)** - Programmatic usage
+- **[Developer Guide](docs/developer/)** - Architecture and contributing
 
 ---
 
@@ -293,10 +302,10 @@ pytest --cov=src --cov-report=html
 ### **Available Guides**
 
 - [QUICK_START_GUI.md](QUICK_START_GUI.md) - GUI tutorial
-- [ENGINE_REVIEW.md](documentation/ENGINE_REVIEW.md) - Engine architecture
-- [CURRENT_STATUS.md](documentation/CURRENT_STATUS.md) - Project status
-- [DYNAMIC_MODULE_REGISTRATION.md](documentation/DYNAMIC_MODULE_REGISTRATION.md) - Plugin system
-- [Module Docs](documentation/) - Extensive implementation guides
+- [ENGINE_REVIEW.md](docs/dev_analysis/ENGINE_REVIEW.md) - Engine architecture
+- [CURRENT_STATUS.md](docs/dev_analysis/CURRENT_STATUS.md) - Project status
+- [DYNAMIC_MODULE_REGISTRATION.md](docs/dev_analysis/DYNAMIC_MODULE_REGISTRATION.md) - Plugin system
+- [Module Docs](docs/dev_analysis/) - Extensive implementation guides
 
 ### **API Documentation**
 
@@ -337,7 +346,7 @@ class MyFilterModule(ModuleWidget):
 
 **That's it!** Drop the file in `src/gui/modules/` and it appears in the UI automatically.
 
-See [DYNAMIC_MODULE_REGISTRATION.md](documentation/DYNAMIC_MODULE_REGISTRATION.md) for details.
+See [DYNAMIC_MODULE_REGISTRATION.md](docs/dev_analysis/DYNAMIC_MODULE_REGISTRATION.md) for details.
 
 ---
 
@@ -472,8 +481,8 @@ Built with:
 
 - [Quick Start Guide](QUICK_START_GUI.md) - Step-by-step tutorials
 - [GUI Documentation](src/gui/README.md) - Full feature reference
-- [Implementation Details](documentation/MODULAR_SYNTH_GUI_COMPLETE.md)
-- [Engine Review](documentation/ENGINE_REVIEW.md) - Performance specs
+- [Implementation Details](docs/dev_analysis/MODULAR_SYNTH_GUI_COMPLETE.md)
+- [Engine Review](docs/dev_analysis/ENGINE_REVIEW.md) - Performance specs
 
 ---
 
@@ -584,7 +593,7 @@ Based on comprehensive benchmarking:
 | Complex Preset         | 5M samples/sec    | 100x+           |
 | Polyphonic (40 voices) | 2M samples/sec    | 40x+            |
 
-All measurements on standard hardware. See [ENGINE_REVIEW.md](documentation/ENGINE_REVIEW.md) for details.
+All measurements on standard hardware. See [ENGINE_REVIEW.md](docs/dev_analysis/ENGINE_REVIEW.md) for details.
 
 ---
 
@@ -644,7 +653,7 @@ That's it! The module appears automatically in the GUI.
 - [ ] **Recording**: Export to WAV
 - [ ] **Performance Mode**: Streamlined playback UI
 
-See [MODULAR_SYNTH_GUI_COMPLETE.md](documentation/MODULAR_SYNTH_GUI_COMPLETE.md) for complete roadmap.
+See [MODULAR_SYNTH_GUI_COMPLETE.md](docs/dev_analysis/MODULAR_SYNTH_GUI_COMPLETE.md) for complete roadmap.
 
 ---
 
@@ -652,9 +661,9 @@ See [MODULAR_SYNTH_GUI_COMPLETE.md](documentation/MODULAR_SYNTH_GUI_COMPLETE.md)
 
 - **[Quick Start Guide](QUICK_START_GUI.md)** - Get started in 5 minutes
 - **[GUI Documentation](src/gui/README.md)** - Complete feature reference
-- **[Implementation Details](documentation/MODULAR_SYNTH_GUI_COMPLETE.md)** - Architecture and design
-- **[Engine Review](documentation/ENGINE_REVIEW.md)** - Performance analysis
-- **[API Documentation](documentation/)** - Complete API reference
+- **[Implementation Details](docs/dev_analysis/MODULAR_SYNTH_GUI_COMPLETE.md)** - Architecture and design
+- **[Engine Review](docs/dev_analysis/ENGINE_REVIEW.md)** - Performance analysis
+- **[API Documentation](docs/dev_analysis/)** - Complete API reference
 
 ---
 

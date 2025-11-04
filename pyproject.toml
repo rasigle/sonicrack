@@ -1,11 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "synthplay"
+name = "audioplayground"
+dynamic = ["version"]
 authors = [
     {name = "Rainer Sigle", email = "rainer.sigle@live.de"}
 ]
-description = "Just a playground for creating sounds with Python"
+description = "Professional modular audio synthesis framework with visual patching interface and high-performance engine"
+readme = "README.md"
+license = {text = "MIT"}
+keywords = ["audio", "synthesis", "modular", "synthesizer", "music", "sound-design", "dsp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Sound Synthesis",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 
-version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.2.6",
@@ -15,6 +34,7 @@ dependencies = [
     "python-rtmidi>=1.5.8", # Midi I/O
     "librosa>=0.11.0", # Audio analysis
     "pyqt6", # GUI library
+
     # used in examples
     "pyqtgraph>=0.13.7",
     "notebook>=7.4.7",
@@ -42,7 +62,6 @@ dependencies = [
 ]
 
 
-
 [tool.ruff]
 
 line-length = 88
@@ -59,3 +78,10 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.setuptools.dynamic]
+version = {attr = "_version.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

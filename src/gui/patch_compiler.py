@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from src.engine.composer import Chain
+from src.engine.composer import Chain, WaveAdder
 from src.gui.audio_module_interface import ModuleCategory, AudioModuleInterface
 from src.gui.patch_canvas import Port
 
@@ -101,20 +101,37 @@ class PatchCompiler:
 
         # Handle OUTPUT module
         if module_category == ModuleCategory.OUTPUT:
-            # Get the input connection
+            # Get the input connection(s)
             input_port = self._find_port_by_name(module, "In")
             if not input_port:
                 logger.warning("Output module has no In port")
                 return None
 
-            input_conn = self._find_connection_to_port(input_port)
-            if not input_conn:
+            # Check for multiple connections (needs mixing)
+            all_input_connections = self._find_all_connections_to_port(input_port)
+
+            if not all_input_connections:
                 logger.warning("Output module has no input connection")
                 return None
 
-            # Build the input component
-            source_module = input_conn.parent_module
-            component = self._build_chain_from_module(source_module)
+            # Build all input components
+            input_components = []
+            for input_conn in all_input_connections:
+                source_module = input_conn.parent_module
+                input_component = self._build_chain_from_module(source_module)
+                if input_component:
+                    input_components.append(input_component)
+
+            if not input_components:
+                logger.warning("Output module has no valid input components")
+                return None
+
+            # If multiple inputs, create a mixer to combine them
+            if len(input_components) > 1:
+                component = WaveAdder(*input_components)
+            else:
+                component = input_components[0]
+
             self._build_cache[module] = component
             return component
 
@@ -131,9 +148,7 @@ class PatchCompiler:
                         input_components.append(input_component)
 
             if not input_components:
-                logger.warning(
-                    f"Mixer module '{name}' has no input connections."
-                )
+                logger.warning(f"Mixer module '{name}' has no input connections.")
                 return None
 
             # Create the mixer component
@@ -162,18 +177,31 @@ class PatchCompiler:
                 )
                 return None
 
-            input_conn = self._find_connection_to_port(main_input_port)
-            if not input_conn:
+            # Check for multiple connections to this input (needs mixing)
+            all_input_connections = self._find_all_connections_to_port(main_input_port)
+
+            if not all_input_connections:
                 logger.warning(
                     f"Modifier module '{name}' has no input connection"
                 )
                 return None
 
-            # Build the input component
-            input_module = input_conn.parent_module
-            input_component = self._build_chain_from_module(input_module)
-            if not input_component:
+            # Build all input components
+            input_components = []
+            for input_conn in all_input_connections:
+                input_module = input_conn.parent_module
+                input_component = self._build_chain_from_module(input_module)
+                if input_component:
+                    input_components.append(input_component)
+
+            if not input_components:
                 return None
+
+            # If multiple inputs, create a mixer to combine them
+            if len(input_components) > 1:
+                input_component = WaveAdder(*input_components)
+            else:
+                input_component = input_components[0]
 
             # Collect modulation components
             modulation_components = {}
@@ -205,9 +233,8 @@ class PatchCompiler:
         logger.warning(f"Unknown module type: {module_category}")
         return None
 
-    def _find_port_by_name(
-        self, module: AudioModuleInterface, port_name: str
-    ) -> Port | None:
+    @staticmethod
+    def _find_port_by_name(module: AudioModuleInterface, port_name: str) -> Port | None:
         """Find a port by name in a module.
 
         Args:
@@ -238,6 +265,24 @@ class PatchCompiler:
             if end_port == port:
                 return start_port
         return None
+
+    def _find_all_connections_to_port(self, port: Port) -> list[Port]:
+        """Find ALL source ports connected to the given input port.
+
+        This is important when multiple outputs connect to a single input -
+        all signals should be mixed together.
+
+        Args:
+            port: The input port to find connections for
+
+        Returns:
+            List of source (output) ports connected to this input
+        """
+        connections = []
+        for start_port, end_port in self.connections:
+            if end_port == port:
+                connections.append(start_port)
+        return connections
 
     def _detect_cycles(self) -> list[str]:
         """Detect cycles (infinite loops) in the patch connection graph.
@@ -303,7 +348,10 @@ class PatchCompiler:
 
         return errors
 
-    def _get_signal_path_modules(self, output_module: AudioModuleInterface) -> set[AudioModuleInterface]:
+    def _get_signal_path_modules(
+            self,
+            output_module: AudioModuleInterface
+    ) -> set[AudioModuleInterface]:
         """Get all modules that are part of the signal path to the output.
 
         Args:
@@ -391,7 +439,6 @@ class PatchCompiler:
                     f"Invalid self-connection in module '{module_name}': "
                     f"output cannot connect to own input"
                 )
-
         return errors
 
     def build_patch_tree(self) -> dict[str, Any]:

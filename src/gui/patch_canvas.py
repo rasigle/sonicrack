@@ -291,6 +291,7 @@ class PatchCanvas(QGraphicsView):
 
     cable_connected = pyqtSignal(Port, Port)  # Emitted when a cable is connected
     cable_disconnected = pyqtSignal(Port, Port)  # Emitted when a cable is disconnected
+    module_deleted = pyqtSignal(object)  # Emitted when a module is deleted
 
     def __init__(self, parent=None):
         """Initialize the patch canvas."""
@@ -475,6 +476,9 @@ class PatchCanvas(QGraphicsView):
                                 cable.start_port, cable.end_port
                             )
                         cable.remove()
+
+                    # Emit signal that module is being deleted
+                    self.module_deleted.emit(item)
 
                     # Remove the module itself
                     self.scene.removeItem(item)

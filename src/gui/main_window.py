@@ -28,7 +28,7 @@ from src.gui.module_registry import initialize_modules
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
 from src.gui.preset_manager import PresetManager
-from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH
+from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH, DEBOUNCE_TIMER_DELAY_MS
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets.spectrum_analyzer import SpectrumAnalyzer
 from src.gui.widgets.tree_analyzer import TreeAnalyzer
@@ -299,6 +299,7 @@ class ModularSynthWindow(QMainWindow):
         # Patch canvas signals
         self.patch_canvas.cable_connected.connect(self._on_cable_connected)
         self.patch_canvas.cable_disconnected.connect(self._on_cable_disconnected)
+        self.patch_canvas.module_deleted.connect(self._on_module_deleted)
 
     def _add_module(self, module_name: str):
         """Add a module to the canvas.
@@ -476,6 +477,26 @@ class ModularSynthWindow(QMainWindow):
         # Auto-compile when connection changes
         self._compile_patch()
 
+    def _on_module_deleted(self, module):
+        """Handle module deletion.
+
+        Args:
+            module: The module that was deleted
+        """
+        logger.info(f"Module deleted: {module.metadata.title}")
+
+        # If Output module was deleted, stop playback immediately
+        if module.metadata.category == ModuleCategory.OUTPUT:
+            self.audio_engine.stop_playback()
+            self.audio_engine.set_patch(None)
+            logger.info("Output module deleted - playback stopped")
+        else:
+            # For other modules, check if we're playing
+            if self.audio_engine.is_playing:
+                # Recompile to update the patch
+                # If compilation fails (e.g., no output), it will handle stopping
+                self._compile_patch()
+
     def _on_parameter_changed(self, param_name: str, value):
         """Handle module parameter change.
 
@@ -488,7 +509,7 @@ class ModularSynthWindow(QMainWindow):
         # Wait 100ms after last change before recompiling
         # Don't update tree since parameter changes don't affect structure
         self.compile_debounce_timer.stop()
-        self.compile_debounce_timer.start(100)  # 100ms delay
+        self.compile_debounce_timer.start(DEBOUNCE_TIMER_DELAY_MS)
 
     def _update_visualizations(self):
         """Update waveform and spectrum displays."""

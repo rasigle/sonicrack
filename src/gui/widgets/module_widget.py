@@ -99,46 +99,6 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
 
-    # === Metadata Properties ===
-    @property
-    def module_title(self) -> str:
-        """Return the module title/name.
-
-        Subclasses should override this to provide the display name.
-        """
-        raise NotImplementedError()
-
-    @property
-    def module_category(self) -> ModuleCategory:
-        """Return the module category.
-
-        Subclasses should override this to provide the correct category.
-        """
-        raise NotImplementedError()
-
-    @property
-    def module_description(self) -> str:
-        """Return a description of what this module does.
-
-        Subclasses can override this to provide helpful tooltips/documentation.
-        """
-        return ""
-
-    @property
-    def module_version(self) -> str:
-        """Return the module version.
-
-        Subclasses can override this for versioning.
-        """
-        return "1.0.0"
-
-    @property
-    def module_author(self) -> str:
-        """Return the module author.
-
-        Subclasses can override this to credit the author.
-        """
-        return ""
 
     # === UI Construction Helpers ===
     @staticmethod
@@ -293,7 +253,8 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         Returns:
             Name to display
         """
-        return self.custom_name if self.custom_name else self.module_title
+        metadata = self.metadata
+        return self.custom_name if self.custom_name else metadata.title
 
     # === Port Management ===
 
@@ -327,12 +288,13 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
 
         from PyQt6.QtGui import QFont
 
+        title = self.metadata.title
         # Module type (always shown at top)
         type_rect = QRectF(0, 3, self.module_width, 14)
         painter.setPen(QColor(150, 150, 150))
         font_type = MODULE_TYPE_FONT
         painter.setFont(font_type)
-        painter.drawText(type_rect, Qt.AlignmentFlag.AlignCenter, self.module_title)
+        painter.drawText(type_rect, Qt.AlignmentFlag.AlignCenter, title)
 
         # Custom name (if set, shown prominently)
         if self.custom_name:
@@ -343,7 +305,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
             painter.drawText(name_rect, Qt.AlignmentFlag.AlignCenter, self.custom_name)
 
             # Component type below custom name
-            if self.module_category:
+            if self.metadata.category:
                 comp_rect = QRectF(0, 34, self.module_width, 12)
                 painter.setPen(QColor(130, 130, 130))
                 font_comp = MODULE_CATEGORY_FONT
@@ -351,11 +313,11 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
                 painter.drawText(
                     comp_rect,
                     Qt.AlignmentFlag.AlignCenter,
-                    f"[{self.module_category}]",
+                    f"[{self.metadata.category.value}]",
                 )
         else:
             # No custom name - show component type
-            if self.module_category:
+            if self.metadata.category:
                 comp_rect = QRectF(0, 20, self.module_width, 18)
                 painter.setPen(QColor(200, 200, 200))
                 font_comp = MODULE_CATEGORY_FONT
@@ -363,7 +325,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
                 painter.drawText(
                     comp_rect,
                     Qt.AlignmentFlag.AlignCenter,
-                    f"({self.module_category})",
+                    f"({self.metadata.category.value})",
                 )
 
         # Draw port labels

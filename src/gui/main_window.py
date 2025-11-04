@@ -495,7 +495,7 @@ class ModularSynthWindow(QMainWindow):
         modules = [
             item
             for item in self.patch_canvas.scene.items()
-            if hasattr(item, "component_category")
+            if hasattr(item, "module_category")
         ]
         connections = self.patch_canvas.get_connections()
 
@@ -558,35 +558,34 @@ class ModularSynthWindow(QMainWindow):
                 module_type = module_data["type"]
                 module_id = module_data["id"]
 
-                module_class = self.registry.get(module_type)
-                if module_class:
-                    # Create module
-                    module = module_class()
+                module_class = self.registry.get(module_type, strict=True)
 
-                    # Connect parameter change signal
-                    module.parameter_changed.connect(self._on_parameter_changed)
+                # Create module
+                module = module_class()
 
-                    # Restore custom name if present
-                    custom_name = module_data.get("custom_name", "")
-                    if custom_name:
-                        module.set_custom_name(custom_name)
+                # Connect parameter change signal
+                module.parameter_changed.connect(self._on_parameter_changed)
 
-                    # Set position
-                    pos_data = module_data.get("position", {})
-                    x = pos_data.get("x", 0)
-                    y = pos_data.get("y", 0)
+                # Restore custom name if present
+                custom_name = module_data.get("custom_name", "")
+                if custom_name:
+                    module.set_custom_name(custom_name)
 
-                    # Add to canvas
-                    self.patch_canvas.add_module(module, QPointF(x, y))
+                # Set position
+                pos_data = module_data.get("position", {})
+                x = pos_data.get("x", 0)
+                y = pos_data.get("y", 0)
 
-                    # Set parameters
-                    params = module_data.get("parameters", {})
-                    module.set_parameters(params)
+                # Add to canvas
+                self.patch_canvas.add_module(module, QPointF(x, y))
 
-                    # Store in map
-                    module_map[module_id] = module
-                else:
-                    logger.warning(f"Unknown module type: {module_type}")
+                # Set parameters
+                params = module_data.get("parameters", {})
+                module.set_parameters(params)
+
+                # Store in map
+                module_map[module_id] = module
+
 
             # Create connections
             for conn_data in preset_data.get("connections", []):

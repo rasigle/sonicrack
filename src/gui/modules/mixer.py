@@ -3,7 +3,7 @@ from typing import Any
 from PyQt6.QtGui import QColor
 
 from src.engine import WaveAdder
-from src.gui.audio_module_interface import ModuleCategory
+from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.module_registry import register_module
 
@@ -14,6 +14,12 @@ class MixerModule(ModuleWidget):
 
     Uses WaveAdder to mix multiple inputs together (averages them).
     """
+
+    metadata = ModuleMetadata(
+        title="Mixer",
+        category=ModuleCategory.MIXER,
+        description="4-channel audio mixer",
+    )
 
     def __init__(self):
         """Initialize mixer module."""
@@ -39,21 +45,6 @@ class MixerModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    @property
-    def module_title(self) -> str:
-        """Return the module title."""
-        return "Mixer"
-
-    @property
-    def module_description(self) -> str:
-        """Return module description."""
-        return "4-channel audio mixer"
-
-    @property
-    def module_category(self) -> ModuleCategory:
-        """Return MIXER since this combines multiple inputs."""
-        return ModuleCategory.MIXER
-
     def create_component(
         self,
         input_components: list[Any] | None = None,

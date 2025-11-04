@@ -3,7 +3,7 @@ from typing import Any
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from src.gui.audio_module_interface import ModuleCategory
+from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.module_registry import register_module
@@ -12,6 +12,12 @@ from src.gui.module_registry import register_module
 @register_module()
 class OutputModule(ModuleWidget):
     """Output module (sink for audio)."""
+
+    metadata = ModuleMetadata(
+        title="Output",
+        category=ModuleCategory.OUTPUT,
+        description="Audio output with master volume",
+    )
 
     def __init__(self):
         """Initialize output module."""
@@ -46,21 +52,6 @@ class OutputModule(ModuleWidget):
         self.input_component = None
 
     # AudioModuleInterface implementation
-    @property
-    def module_title(self) -> str:
-        """Return the module title."""
-        return "Output"
-
-    @property
-    def module_description(self) -> str:
-        """Return module description."""
-        return "Audio output with master volume"
-
-    @property
-    def module_category(self) -> ModuleCategory:
-        """Return OUTPUT since this is the terminal node."""
-        return ModuleCategory.OUTPUT
-
     def get_required_inputs(self) -> list[str]:
         """Output requires the In port to be connected."""
         return ["In"]

@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QComboBox
 
+from gui.audio_module_interface import ModuleMetadata
 from src.engine.noise import NoiseGenerator
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.widgets import Knob
@@ -26,6 +27,13 @@ class NoiseModule(ModuleWidget):
     - Velvet: Sparse random impulses
     - Sample & Hold: Stepped random values
     """
+
+    metadata = ModuleMetadata(
+        title="Noise",
+        category=ModuleCategory.SOURCE,
+        description="Multi-type noise generator (White, Pink, Brown, Blue, Grey, "
+                    "Velvet, Sample & Hold"
+    )
 
     def __init__(self):
         """Initialize noise module."""
@@ -72,23 +80,6 @@ class NoiseModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    @property
-    def module_title(self) -> str:
-        """Return the module title."""
-        return "Noise"
-
-    @property
-    def module_description(self) -> str:
-        """Return module description."""
-        return (
-            "Multi-type noise generator (White, Pink, Brown, Blue, Grey, Velvet, S&H)"
-        )
-
-    @property
-    def module_category(self) -> ModuleCategory:
-        """Return SOURCE since noise generators generate audio."""
-        return ModuleCategory.SOURCE
-
     def _on_type_changed(self, noise_type: str):
         """Handle noise type change."""
         self.component = self.create_component()

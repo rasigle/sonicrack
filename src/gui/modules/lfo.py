@@ -13,7 +13,7 @@ from src.engine import (
     SawtoothOscillator,
     TriangleOscillator,
 )
-from src.gui.audio_module_interface import ModuleCategory
+from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob, HSlider
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.module_registry import register_module
@@ -25,6 +25,12 @@ class LFOModule(ModuleWidget):
 
     Similar to Oscillator but optimized for modulation (0.01 Hz - 20 Hz).
     """
+
+    metadata = ModuleMetadata(
+        title="LFO",
+        category=ModuleCategory.SOURCE,
+        description="Low-frequency oscillator for modulation",
+    )
 
     def __init__(self):
         """Initialize LFO module."""
@@ -87,21 +93,6 @@ class LFOModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    @property
-    def module_title(self) -> str:
-        """Return the module title."""
-        return "LFO"
-
-    @property
-    def module_description(self) -> str:
-        """Return module description."""
-        return "Low-frequency oscillator for modulation"
-
-    @property
-    def module_category(self) -> ModuleCategory:
-        """Return SOURCE since LFOs generate control signals."""
-        return ModuleCategory.SOURCE
-
     def _on_wave_changed(self, wave_type: str):
         """Handle waveform type change."""
         self.component = self.create_component()

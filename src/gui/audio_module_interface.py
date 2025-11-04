@@ -5,6 +5,7 @@ without needing specific knowledge about each module's implementation.
 """
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
@@ -20,6 +21,23 @@ class ModuleCategory(StrEnum):
     OUTPUT = "Output"  # Terminal node
 
 
+@dataclass
+class ModuleMetadata:
+    """Metadata for audio modules.
+
+    Attributes:
+        title (str): Human-readable title of the module.
+        description (str): Short description of the module's functionality.
+        author (str): Author or creator of the module.
+        version (str): Version string of the module.
+    """
+    title: str
+    category: ModuleCategory
+    description: str = ""
+    author: str = ""
+    version: str = "1.0.0"
+
+
 class AudioModuleInterface(ABC):
     """Base interface for all audio modules in the patch system.
 
@@ -30,28 +48,10 @@ class AudioModuleInterface(ABC):
         custom_name (str): Optional custom name for the module instance.
     """
 
-    custom_name: str = ""
+    metadata: ModuleMetadata
 
-    @property
-    @abstractmethod
-    def module_title(self) -> str:
-        """Return the type of the module.
-
-        Returns:
-            A string representing the module type (e.g. "Oscillator", "Volume",
-            "Mixer").
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def module_category(self) -> ModuleCategory:
-        """Return the category of this module (e.g. source, output, modulator, ...).
-
-        Returns:
-            The ModuleType enum indicating the module's role
-        """
-        pass
+    def __init__(self):
+        self.custom_name: str = ""
 
     @abstractmethod
     def create_component(

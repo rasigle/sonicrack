@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from src.engine import Volume
-from src.gui.audio_module_interface import ModuleCategory
+from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.module_registry import register_module
@@ -13,6 +13,12 @@ from src.gui.module_registry import register_module
 @register_module()
 class SimpleVolumeModule(ModuleWidget):
     """Simple volume/gain module without modulation input."""
+
+    metadata = ModuleMetadata(
+        title="Volume",
+        category=ModuleCategory.MODIFIER,
+        description="Simple volume/gain control",
+    )
 
     def __init__(self):
         """Initialize simple volume module."""
@@ -46,21 +52,6 @@ class SimpleVolumeModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    @property
-    def module_title(self) -> str:
-        """Return the module title."""
-        return "Volume"
-
-    @property
-    def module_description(self) -> str:
-        """Return module description."""
-        return "Simple volume/gain control"
-
-    @property
-    def module_category(self) -> ModuleCategory:
-        """Return MODIFIER since this modifies audio input."""
-        return ModuleCategory.MODIFIER
-
     def get_required_inputs(self) -> list[str]:
         """Volume requires the In port to be connected."""
         return ["In"]

@@ -50,7 +50,7 @@ class PatchCompiler:
             # Find output module
             output_module = None
             for module in self.modules:
-                if module.module_category == ModuleCategory.OUTPUT:
+                if module.metadata.category == ModuleCategory.OUTPUT:
                     output_module = module
                     break
 
@@ -88,7 +88,8 @@ class PatchCompiler:
         if module in self._build_cache:
             return self._build_cache[module]
 
-        module_category = module.module_category
+        module_category = module.metadata.category
+        name = module.metadata.title
 
         # Handle SOURCE modules (oscillators, envelopes, LFOs)
         if module_category == ModuleCategory.SOURCE:
@@ -131,7 +132,7 @@ class PatchCompiler:
 
             if not input_components:
                 logger.warning(
-                    f"Mixer module '{module.module_title}' has no input connections"
+                    f"Mixer module '{name}' has no input connections."
                 )
                 return None
 
@@ -148,8 +149,7 @@ class PatchCompiler:
             required_inputs = module.get_required_inputs()
             if not required_inputs:
                 logger.warning(
-                    f"Modifier module '{module.module_title}' has no required inputs "
-                    f"defined"
+                    f"Modifier module '{name}' has no required inputs defined."
                 )
                 return None
 
@@ -158,15 +158,14 @@ class PatchCompiler:
             main_input_port = self._find_port_by_name(module, main_input_name)
             if not main_input_port:
                 logger.warning(
-                    f"Modifier module '{module.module_title}' missing port "
-                    f"'{main_input_name}'"
+                    f"Modifier module '{name}' missing port '{main_input_name}'."
                 )
                 return None
 
             input_conn = self._find_connection_to_port(main_input_port)
             if not input_conn:
                 logger.warning(
-                    f"Modifier module '{module.module_title}' has no input connection"
+                    f"Modifier module '{name}' has no input connection"
                 )
                 return None
 
@@ -250,7 +249,7 @@ class PatchCompiler:
 
         # Check for output module
         has_output = any(
-            m.module_category == ModuleCategory.OUTPUT for m in self.modules
+            m.metadata.category == ModuleCategory.OUTPUT for m in self.modules if isinstance(m, AudioModuleInterface)
         )
         if not has_output:
             errors.append("No output module in patch")
@@ -269,7 +268,7 @@ class PatchCompiler:
         for module in self.modules:
             if (
                 module not in connected_modules
-                and module.module_category != ModuleCategory.OUTPUT
+                and module.metadata.category != ModuleCategory.OUTPUT
             ):
                 errors.append(
                     f"Module '{getattr(module, 'module_title', 'Unknown')}' is not "
@@ -299,7 +298,7 @@ class PatchCompiler:
         # Find output module as root
         output_module = None
         for module in self.modules:
-            if module.module_category == ModuleCategory.OUTPUT:
+            if module.metadata.category == ModuleCategory.OUTPUT:
                 output_module = module
                 break
 
@@ -348,12 +347,8 @@ class PatchCompiler:
         module_id = id(module)
 
         node = {
-            "name": getattr(module, "module_title", "Unknown"),
-            "type": (
-                module.module_category.value
-                if hasattr(module.module_category, "value")
-                else str(module.module_category)
-            ),
+            "name": module.metadata.title,
+            "type": module.metadata.category.value,
             "id": module_id,
             "inputs": [],
             "modulations": [],

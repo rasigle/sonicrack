@@ -13,7 +13,7 @@ from src.engine import (
     SawtoothOscillator,
     TriangleOscillator,
 )
-from src.gui.audio_module_interface import ModuleCategory
+from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob, HSlider
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.module_registry import register_module
@@ -22,6 +22,12 @@ from src.gui.module_registry import register_module
 @register_module()
 class OscillatorModule(ModuleWidget):
     """Oscillator module with frequency and amplitude controls."""
+
+    metadata = ModuleMetadata(
+        title="Oscillator",
+        category=ModuleCategory.SOURCE,
+        description="Multi-waveform oscillator with frequency and amplitude controls"
+    )
 
     def __init__(self):
         """Initialize oscillator module."""
@@ -84,21 +90,6 @@ class OscillatorModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    @property
-    def module_title(self) -> str:
-        """Return the module title."""
-        return "Oscillator"
-
-    @property
-    def module_description(self) -> str:
-        """Return module description."""
-        return "Multi-waveform oscillator with frequency and amplitude controls"
-
-    @property
-    def module_category(self) -> ModuleCategory:
-        """Return SOURCE since oscillators generate audio."""
-        return ModuleCategory.SOURCE
-
     def _on_wave_changed(self, wave_type: str):
         """Handle waveform type change."""
         self.create_component()

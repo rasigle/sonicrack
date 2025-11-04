@@ -74,69 +74,12 @@ class ModuleRegistry:
 
         # Extract metadata from class properties using property descriptors
         # This avoids instantiation
-        name = module_class.__name__  # Default fallback
-        category = "other"  # Default fallback
-        description = ""
-        version = "1.0.0"
-        author = ""
-
-        # Try to get property values from the class
-        # Properties are descriptors, so we need to get them from __dict__
-        for attr_name in [
-            "module_title",
-            "module_category",
-            "module_description",
-            "module_version",
-            "module_author",
-        ]:
-            # Walk through MRO to find the property
-            for cls in module_class.__mro__:
-                if attr_name in cls.__dict__:
-                    prop = cls.__dict__[attr_name]
-                    if isinstance(prop, property) and prop.fget:
-                        # Get the docstring or try to evaluate simple returns
-                        func = prop.fget
-                        # Check if function has simple return statement
-                        try:
-                            import ast
-
-                            source = inspect.getsource(func)
-                            tree = ast.parse(source)
-                            # Find return statements
-                            for node in ast.walk(tree):
-                                if isinstance(node, ast.Return) and node.value:
-                                    if isinstance(node.value, ast.Constant):
-                                        value = node.value.value
-                                        if attr_name == "module_title":
-                                            name = value
-                                        elif attr_name == "module_category":
-                                            # This will be an enum access, skip for now
-                                            pass
-                                        elif attr_name == "module_description":
-                                            description = value
-                                        elif attr_name == "module_version":
-                                            version = value
-                                        elif attr_name == "module_author":
-                                            author = value
-                                        break
-                                    elif isinstance(node.value, ast.Attribute):
-                                        # Handle ModuleCategory.SOURCE etc
-                                        if attr_name == "module_category":
-                                            if hasattr(node.value, "attr"):
-                                                category_name = node.value.attr
-                                                # Map to lowercase
-                                                category = category_name.lower()
-                        except (OSError, SyntaxError):
-                            # If source parsing fails, use defaults
-                            pass
-                    break
-
-        # Allow overriding extracted metadata
-        name = override_metadata.get("name", name)
-        category = override_metadata.get("category", category)
-        description = override_metadata.get("description", description)
-        version = override_metadata.get("version", version)
-        author = override_metadata.get("author", author)
+        metadata = module_class.metadata
+        name = metadata.title
+        category = metadata.category
+        description = metadata.description
+        version = metadata.version
+        author = metadata.author
 
         # Check for duplicate names
         if name in self._modules:
@@ -168,7 +111,7 @@ class ModuleRegistry:
             },
         }
 
-        logger.info(f"Registered module: {name} ({module_class.__name__})")
+        logger.debug(f"Registered module: {name} ({module_class.__name__})")
 
         return module_class
 
@@ -196,19 +139,31 @@ class ModuleRegistry:
         if name in self._metadata:
             del self._metadata[name]
 
-        logger.info(f"Unregistered module: {name}")
+        logger.debug(f"Unregistered module: {name}")
         return True
 
-    def get(self, name: str) -> Type[ModuleWidget] | None:
+    def get(self, name: str, strict: bool = False) -> Type[ModuleWidget] | None:
         """Get a module class by name.
 
         Args:
             name: Name of the module
+            strict: If True, raise ValueError when module not found.
+                   If False (default), return None when not found.
 
         Returns:
             The module class, or None if not found
+
+        Raises:
+            ValueError: If component not registered and strict=True
         """
-        return self._modules.get(name)
+        module = self._modules.get(name)
+        if module is None and strict:
+            available = ", ".join(sorted(self._modules.keys())[:10])
+            raise ValueError(
+                f"Component '{name}' not registered.\nAvailable components: {available}"
+            )
+
+        return module
 
     def get_all(self) -> dict[str, Type[ModuleWidget]]:
         """Get all registered modules.
@@ -368,7 +323,7 @@ def discover_modules(package_path: str = "src.gui.modules") -> int:
             except Exception as e:
                 logger.error(f"Failed to import {module_name}: {e}")
 
-        logger.info(f"Discovered {count} module files")
+        logger.debug(f"Discovered {count} module files")
         return count
 
     except Exception as e:

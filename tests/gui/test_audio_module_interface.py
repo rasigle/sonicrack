@@ -24,7 +24,7 @@ def test_oscillator_interface(qapp):
     module = OscillatorModule()
 
     # Check module type (property, not method)
-    assert module.module_category == ModuleCategory.SOURCE
+    assert module.metadata.category == ModuleCategory.SOURCE
 
     # Check no required inputs
     assert module.get_required_inputs() == []
@@ -43,7 +43,7 @@ def test_volume_interface(qapp):
     module = VolumeModule()
 
     # Check module type (property, not method)
-    assert module.module_category == ModuleCategory.MODIFIER
+    assert module.metadata.category == ModuleCategory.MODIFIER
 
     # Check required inputs
     assert "In" in module.get_required_inputs()
@@ -75,7 +75,7 @@ def test_mixer_interface(qapp):
     module = MixerModule()
 
     # Check module type (property, not method)
-    assert module.module_category == ModuleCategory.MIXER
+    assert module.metadata.category == ModuleCategory.MIXER
 
     # Check no required inputs (accepts multiple)
     assert module.get_required_inputs() == []
@@ -95,7 +95,7 @@ def test_output_interface(qapp):
     module = OutputModule()
 
     # Check module type (property, not method)
-    assert module.module_category == ModuleCategory.OUTPUT
+    assert module.metadata.category == ModuleCategory.OUTPUT
 
     # Check required inputs
     assert "In" in module.get_required_inputs()

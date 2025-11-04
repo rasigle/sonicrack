@@ -303,6 +303,34 @@ class PatchCompiler:
 
         return errors
 
+    def _get_signal_path_modules(self, output_module: AudioModuleInterface) -> set[AudioModuleInterface]:
+        """Get all modules that are part of the signal path to the output.
+
+        Args:
+            output_module: The output module to trace back from
+
+        Returns:
+            Set of modules in the signal path
+        """
+        signal_path = set()
+
+        def trace_back(module):
+            """Recursively trace back from a module to find all inputs."""
+            if module in signal_path:
+                return  # Already visited
+
+            signal_path.add(module)
+
+            # Find all input connections to this module
+            for input_port in getattr(module, "input_ports", []):
+                input_conn = self._find_connection_to_port(input_port)
+                if input_conn:
+                    source_module = input_conn.parent_module
+                    trace_back(source_module)
+
+        trace_back(output_module)
+        return signal_path
+
     def get_compilation_errors(self) -> list[str]:
         """Get a list of compilation errors/warnings.
 
@@ -312,34 +340,38 @@ class PatchCompiler:
         errors = []
 
         # Check for cycles (infinite loops) first
-        cycle_errors = self._detect_cycles()
-        errors.extend(cycle_errors)
+        errors.extend(self._detect_cycles())
 
         # Check for output module
-        from src.gui.main_window import is_module_widget
         has_output = any(
-            m.metadata.category == ModuleCategory.OUTPUT for m in self.modules if is_module_widget(m)
+            m.metadata.category == ModuleCategory.OUTPUT for m in self.modules
         )
         if not has_output:
-            errors.append("No output module in patch")
+            errors.append("No output module in patch.")
 
-        # Validate each module's connections
-        for module in self.modules:
-            module_errors = module.validate_connections(self.connections)
-            errors.extend(module_errors)
+        # Validate connections only for modules that are part of the signal path
+        # Disconnected modules are allowed and will be ignored during compilation
 
-        # Check for disconnected modules
-        connected_modules = set()
-        for start_port, end_port in self.connections:
-            connected_modules.add(start_port.parent_module)
-            connected_modules.add(end_port.parent_module)
+        # Find all modules that are part of the signal path to output
+        output_module = None
+        for m in self.modules:
+            if m.metadata.category == ModuleCategory.OUTPUT:
+                output_module = m
+                break
 
-        for module in self.modules:
-            if (
-                module not in connected_modules
-                and module.metadata.category != ModuleCategory.OUTPUT
-            ):
-                errors.append(f"Module '{module.metadata.title}' is not connected")
+        if output_module:
+            # Build set of modules in the signal path
+            # Only validate modules that are in the signal path
+            signal_path_modules = self._get_signal_path_modules(output_module)
+        else:
+            # No output module, so validate all modules (for completeness)
+            signal_path_modules = self.modules
+
+        for module in signal_path_modules:
+            errors.extend(module.validate_connections(self.connections))
+
+        # Note: Disconnected modules are intentionally NOT reported as errors
+        # They remain on the canvas but are ignored during compilation
 
         # Check for invalid connections
         for start_port, end_port in self.connections:

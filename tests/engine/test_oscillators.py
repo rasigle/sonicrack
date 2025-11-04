@@ -51,7 +51,7 @@ class TestSineOscillator(TestOscillatorBase):
 
     def setUp(self) -> None:
         """Create a sine oscillator for each test."""
-        self.osc = SineOscillator(frequency=440, amplitude=1.0, sample_rate=44100)
+        self.osc = SineOscillator(frequency=440, amplitude=1.0, gain_db=None, sample_rate=44100)
 
     def test_initialization(self) -> None:
         """Test oscillator initializes with correct parameters."""
@@ -124,7 +124,7 @@ class TestSineOscillator(TestOscillatorBase):
 
     def test_amplitude_scaling(self) -> None:
         """Test amplitude parameter scales output correctly."""
-        osc = SineOscillator(frequency=440, amplitude=0.5)
+        osc = SineOscillator(frequency=440, amplitude=0.5, gain_db=None)
         samples = osc.get_samples_vectorized(1000)
 
         # Max amplitude should be around 0.5
@@ -194,7 +194,7 @@ class TestSawtoothOscillator(TestOscillatorBase):
 
     def setUp(self) -> None:
         """Create a sawtooth oscillator for each test."""
-        self.osc = SawtoothOscillator(frequency=440, amplitude=1.0)
+        self.osc = SawtoothOscillator(frequency=440, amplitude=1.0, gain_db=None)
 
     def test_range(self) -> None:
         """Test sawtooth wave covers full range."""
@@ -206,7 +206,7 @@ class TestSawtoothOscillator(TestOscillatorBase):
 
     def test_linear_ramp(self) -> None:
         """Test sawtooth produces linear ramp within each period."""
-        osc = SawtoothOscillator(frequency=100, sample_rate=44100)
+        osc = SawtoothOscillator(frequency=100, sample_rate=44100, gain_db=None)
         samples = osc.get_samples_vectorized(441)  # ~10 periods
 
         # Check that we have both increasing and decreasing values (resets)
@@ -220,7 +220,7 @@ class TestTriangleOscillator(TestOscillatorBase):
 
     def setUp(self) -> None:
         """Create a triangle oscillator for each test."""
-        self.osc = TriangleOscillator(frequency=440, amplitude=1.0)
+        self.osc = TriangleOscillator(frequency=440, amplitude=1.0, gain_db=None)
 
     def test_range(self) -> None:
         """Test triangle wave covers full range."""

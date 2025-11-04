@@ -520,13 +520,36 @@ class SawtoothOscillator(Oscillator):
         tags=["basic", "oscillator", "sawtooth"],
     )
 
+    def __init__(self, *args, **kwargs):
+        """Initialize sawtooth oscillator."""
+        super().__init__(*args, **kwargs)
+        # Store original phase in degrees for recalculation when frequency changes
+        self._phase_degrees = self._p
+
     def _post_freq_set(self):
         """Update derived period when frequency changes."""
+        old_period = getattr(self, '_period', None)
         self._period = self._sample_rate / self._f
-        self._post_phase_set()
+
+        # Recalculate phase offset from original degrees
+        # Handle backward compatibility - initialize _phase_degrees if missing
+        if not hasattr(self, '_phase_degrees'):
+            self._phase_degrees = 0.0
+        self._p = (self._phase_degrees / 360) * self._period
+
+        # CRITICAL: Adjust internal position to new period to prevent discontinuities
+        # When frequency changes, wrap _i to the new period to maintain phase continuity
+        if old_period is not None and old_period > 0 and self._period > 0:
+            # Scale current position to new period
+            phase_fraction = (self._i % old_period) / old_period
+            self._i = phase_fraction * self._period
 
     def _post_phase_set(self):
         """Convert phase (degrees) to an index offset into the period."""
+        # Ensure _phase_degrees exists (backward compatibility)
+        if not hasattr(self, '_phase_degrees'):
+            self._phase_degrees = 0.0
+        self._phase_degrees = self._p  # Store the degree value
         self._p = (self._p / 360) * self._period
 
     def _initialize_osc(self):

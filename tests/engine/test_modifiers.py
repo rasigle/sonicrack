@@ -1090,7 +1090,7 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
         from src.engine.oscillator import SquareOscillator
 
         # Create chain with ModulatedVolume (the problematic case)
-        osc = SquareOscillator(440, amplitude=0.5, sample_rate=1000)
+        osc = SquareOscillator(440, amplitude=0.5, gain_db=None, sample_rate=1000)
         env = ADSREnvelope(0.1, 0.1, 0.7, 0.1, sample_rate=1000)
         mod_vol = ModulatedVolume(env)
 

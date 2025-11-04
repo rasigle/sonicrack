@@ -8,14 +8,13 @@ echo AudioPlayground - Modular Synthesizer
 echo ================================================
 echo.
 
-cd /d "%~dp0"
+cd "%~dp0"
 
 echo Setting up the environment...
 call .\scripts\environment\uv_check_activate_venv.bat
 
 echo Launching the Modular Synthesizer application...
-cd src
-python modular_synth_app.py
+python -m src.modular_synth_app
 
 if errorlevel 1 (
     echo.

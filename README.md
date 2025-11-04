@@ -1,11 +1,14 @@
-# AudioPlayground - Professional Modular Synthesizer 🎹🎵
+<h1 align="center">AudioPlayground - Modular Synthesizer 🎹🎵</h1>
+
+<p align="center">
+  <img src="resources/icons/icon_512.png" alt="AudioPlayground logo" width="240" />
+</p>
 
 **A modular audio synthesis framework featuring a visual patching interface, real-time audio engine, and plugin-ready architecture.**
 
 ![Status](https://img.shields.io/badge/status-v1.0%20ready-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Tests](https://img.shields.io/badge/tests-434%20passing-success)
-![Performance](https://img.shields.io/badge/performance-1000x%20realtime-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ---
@@ -480,7 +483,7 @@ Built with:
 ### 📚 Comprehensive Documentation
 
 - [Quick Start Guide](QUICK_START_GUI.md) - Step-by-step tutorials
-- [GUI Documentation](src/gui/README.md) - Full feature reference
+- [GUI Documentation](docs/dev_analysis/UI_README.md) - Full feature reference
 - [Implementation Details](docs/dev_analysis/MODULAR_SYNTH_GUI_COMPLETE.md)
 - [Engine Review](docs/dev_analysis/ENGINE_REVIEW.md) - Performance specs
 
@@ -660,7 +663,7 @@ See [MODULAR_SYNTH_GUI_COMPLETE.md](docs/dev_analysis/MODULAR_SYNTH_GUI_COMPLETE
 ## 📝 Documentation
 
 - **[Quick Start Guide](QUICK_START_GUI.md)** - Get started in 5 minutes
-- **[GUI Documentation](src/gui/README.md)** - Complete feature reference
+- **[GUI Documentation](docs/dev_analysis/UI_README.md)** - Complete feature reference
 - **[Implementation Details](docs/dev_analysis/MODULAR_SYNTH_GUI_COMPLETE.md)** - Architecture and design
 - **[Engine Review](docs/dev_analysis/ENGINE_REVIEW.md)** - Performance analysis
 - **[API Documentation](docs/dev_analysis/)** - Complete API reference
@@ -709,4 +712,3 @@ run_modular_synth.bat
 ```
 
 **Enjoy creating sounds!** 🎹🎶✨
-

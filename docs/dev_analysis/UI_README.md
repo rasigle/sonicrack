@@ -8,6 +8,7 @@ A full-featured modular synthesizer with visual patching capabilities, inspired 
 - **Visual Cable Patching**: Drag cables from output ports to input ports, just like a hardware modular synth
 - **Flexible Routing**: Route any output to any compatible input
 - **Real-time Connection**: Connect and disconnect modules on the fly
+- **Automatic Mixing**: Multiple outputs can connect to a single input - they are automatically mixed together
 - **Module Library**: Easy access to all available modules
 
 ### 🎛️ Available Modules
@@ -148,6 +149,18 @@ python examples/modular_synth_app.py
 3. Set Oscillator amplitude to 0.8
 4. Lower Clipper threshold (e.g., 0.3) for more distortion
 5. Play (auto-compiles)
+
+#### Multiple Sources Mixed Together
+1. Add: Oscillator A, Oscillator B, Output
+2. Connect:
+   - Oscillator A [Out] → Output [In]
+   - Oscillator B [Out] → Output [In]  (both to same input!)
+3. Set Oscillator A to 220 Hz (low note)
+4. Set Oscillator B to 440 Hz (high note)
+5. Play (auto-compiles and automatically mixes both signals)
+6. You'll hear both tones playing together!
+
+**Note:** When multiple outputs connect to the same input, they are automatically mixed (summed) together. This allows you to easily combine multiple sound sources without needing a separate mixer module.
 
 ## Keyboard Shortcuts
 

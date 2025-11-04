@@ -14,9 +14,8 @@ class ModuleCategory(StrEnum):
     """Categorizes modules by their role in the signal chain."""
 
     SOURCE = "Source"  # Oscillators, LFOs, Envelopes - no audio input required
-    MODIFIER = (
-        "Modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
-    )
+    MODULATED_SOURCE = "Modulated Source"  # Oscillators with CV inputs (VCO, etc.) - takes CV, outputs audio
+    MODIFIER = "Modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
     MIXER = "Mixer"  # Combines multiple audio inputs
     OUTPUT = "Output"  # Terminal node
 
@@ -129,14 +128,12 @@ class AudioModuleInterface(ABC):
         """
         errors = []
 
-        # Check required inputs are connected
-        for port_name in self.get_required_inputs():
-            port = self._find_port_by_name(port_name)
-            if port and not self._is_port_connected(port, connections):
-                module_name = getattr(self, "module_title", "Unknown Module")
-                errors.append(
-                    f"{module_name}: Required input '{port_name}' is not connected"
-                )
+        # Note: We don't validate required inputs here because the patch compiler
+        # gracefully skips modules with missing inputs during compilation.
+        # This allows for progressive patch building where modules can be connected
+        # to outputs before their inputs are connected.
+
+        # Custom validation can be added by overriding this method in subclasses
 
         return errors
 

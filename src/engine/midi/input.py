@@ -245,15 +245,12 @@ class MIDIInput:
                     msg = self._convert_message(raw_msg)
 
                     if msg is not None:
-                        # Queue message
+                        # Queue message for retrieval via get_messages()
                         self._message_queue.put(msg)
 
-                        # Call callback if provided
-                        if self._callback is not None:
-                            try:
-                                self._callback(msg)
-                            except Exception as e:
-                                logger.error(f"Error in MIDI callback: {e}")
+                        # NOTE: Do NOT call callback directly from this thread!
+                        # Calling GUI code from a background thread causes freezing.
+                        # The callback should be called from the main thread via polling.
 
                 # Small sleep to avoid busy-waiting
                 time.sleep(0.001)  # 1ms

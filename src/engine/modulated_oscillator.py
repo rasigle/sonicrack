@@ -70,6 +70,7 @@ class ModulatedOscillator(Generator):
         category=ComponentCategory.OSCILLATOR,
         description="Oscillator with modulation support (amplitude, frequency, phase)",
         tags=["oscillator", "modulated", "advanced"],
+        config_params=["gain_db", "frequency", "phase"],  # Forwarded to underlying oscillator
     )
 
     def __init__(
@@ -163,6 +164,37 @@ class ModulatedOscillator(Generator):
         ):
             ended.append(self.oscillator.ended)
         return all(ended)
+
+    # Parameter forwarding for hot-swap support
+    @property
+    def gain_db(self) -> float:
+        """Get gain_db from underlying oscillator."""
+        return self.oscillator.gain_db
+
+    @gain_db.setter
+    def gain_db(self, value: float):
+        """Set gain_db on underlying oscillator."""
+        self.oscillator.gain_db = value
+
+    @property
+    def frequency(self) -> float:
+        """Get frequency from underlying oscillator."""
+        return self.oscillator.frequency
+
+    @frequency.setter
+    def frequency(self, value: float):
+        """Set frequency on underlying oscillator."""
+        self.oscillator.frequency = value
+
+    @property
+    def phase(self) -> float:
+        """Get phase from underlying oscillator."""
+        return self.oscillator.phase
+
+    @phase.setter
+    def phase(self, value: float):
+        """Set phase on underlying oscillator."""
+        self.oscillator.phase = value
 
     def __next__(self):
         mod_vals = [next(modulator) for modulator in self.modulators]
@@ -275,6 +307,7 @@ class ModulatedOscillator(Generator):
         # This is the KEY optimization - accumulate phase changes
         phase_increments = 2.0 * np.pi * freqs / sample_rate
         phases = np.cumsum(phase_increments) + self.oscillator._p
+
 
         # Step 4: Generate waveform based on oscillator type
         # Use optimized NumPy operations for each waveform

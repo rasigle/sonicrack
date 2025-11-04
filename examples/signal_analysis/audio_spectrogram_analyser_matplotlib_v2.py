@@ -1,14 +1,25 @@
-"""PyQt6 Audio FFT Analyser"""
+"""PyQt6 Audio FFT Analyser
+
+This is a version 2 of an audio spectrogram analyser application that uses
+Matplotlib for spectrogram rendering instead of pyqtgraph's ImageItem.
+For the spectragram, it uses librosa's specshow for better visualization.
+
+However, performance is war lower than the pyqtgraph version, especially for large
+audio files, due to the overhead of Matplotlib rendering.
+"""
 
 import sys
 import threading
 from pathlib import Path
 
+import librosa
 import numpy as np
 import pyaudio
 import pyqtgraph as pg
 import soundfile as sf
 from PyQt6 import QtWidgets, QtCore, QtGui
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
 
 # Ensure OpenGL if available for performance
 pg.setConfigOptions(useOpenGL=True)
@@ -65,66 +76,86 @@ def compute_spectrogram(data, sr, nfft=2048, hop=None, scale="dB"):
     return S_out, freqs, times
 
 
-class SpectrogramWidget(pg.PlotItem):
+class SpectrogramWidget(FigureCanvasQTAgg):
 
-    def __init__(self):
-        super().__init__(title="Spectrogram")
+    def __init__(self, parent=None, width=8, height=6, dpi=100):
+        # Create figure and axes for embedding
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax = self.fig.add_subplot(111)
+        super().__init__(self.fig)
 
-        self.setLabel(axis="left", text="Frequency [Hz]")
-        self.setLabel(axis="bottom", text="Time [s]")
+        # Store reference to colorbar for updates
+        self.colorbar = None
 
-        self.spec = pg.ImageView(view=self)
-        self.spec.title = "Spectrogram"
-        self.spec.cmap_name = "inferno"
-        self.spec.image_item = self.spec.getImageItem()
-        self.spec.setHistogramLabel("Intensity")
+        # Playback position line
+        self.play_line = None
 
-        self.play_line = pg.InfiniteLine(pos=0, angle=90, pen=pg.mkPen("r", width=2))
-        self.spec.getView().addItem(self.play_line)
+        # Set tight layout for better appearance
+        self.fig.tight_layout()
 
-    def set_spectrogram(self, S, freqs, times, cmap="inferno"):
-        self.spec.setImage(S.T, xvals=times, autoLevels=False)
+    def set_spectrogram(self, y, nfft, sr, cmap="inferno"):
+        """Plot spectrogram using librosa inside the widget."""
+        # Clear previous plot
+        self.ax.clear()
+        if self.colorbar is not None:
+            self.colorbar.remove()
+            self.colorbar = None
 
-        # map the ImageItem to real time (x) and frequency (y) coordinates
-        if len(times) > 0:
-            t0, t1 = float(times[0]), float(times[-1])
-        else:
-            t0, t1 = 0.0, 1.0
-        if freqs is not None and len(freqs) > 0:
-            f0, f1 = float(freqs[0]), float(freqs[-1])
-        else:
-            f0, f1 = 0.0, 1.0
+        # Compute STFT and convert to dB
+        D = librosa.amplitude_to_db(np.abs(librosa.stft(y, n_fft=nfft)), ref=np.max)
 
-        try:
-            rect = QtCore.QRectF(t0, f0, max(1e-9, t1 - t0), max(1e-9, f1 - f0))
-            self.spec.imageItem.setRect(rect)
-        except Exception:
-            pass
+        # Display spectrogram using librosa
+        img = librosa.display.specshow(
+            D,
+            y_axis='log',
+            x_axis='time',
+            sr=sr,
+            ax=self.ax,
+            cmap=cmap
+        )
 
-        # ensure the image fills the view (don't manually set a tiny rect)
-        view = self.spec.getView()
-        view.setAspectLocked(False)
-        try:
-            view.setRange(xRange=(t0, t1), yRange=(f0, f1), padding=0.0)
-        except Exception:
-            view.autoRange()
+        # Add colorbar
+        self.colorbar = self.fig.colorbar(img, ax=self.ax, format="%+2.f dB")
 
-        self.set_colormap(cmap)
-        self.spec.getView().enableAutoRange()
-        self.update_play_line(0.0)
+        # Set labels
+        self.ax.set_ylabel('Frequency [Hz]')
+        self.ax.set_xlabel('Time [s]')
+        self.ax.set_title('Spectrogram')
+
+        # Re-add playback line if it exists
+        if self.play_line is not None:
+            x_pos = self.play_line.get_xdata()[0]
+            self.play_line = self.ax.axvline(x=x_pos, color='red', linewidth=2, alpha=0.7)
+
+        # Adjust layout and redraw
+        self.fig.tight_layout()
+        self.draw()
 
     def update_play_line(self, time_sec):
-        self.play_line.setPos(time_sec)
+        """Update the playback position line.
+
+        Args:
+            time_sec: Current playback time in seconds
+        """
+        if self.play_line is None:
+            # Create the line
+            self.play_line = self.ax.axvline(x=time_sec, color='red', linewidth=2, alpha=0.7)
+        else:
+            # Update existing line position
+            self.play_line.set_xdata([time_sec, time_sec])
+
+        self.draw_idle()  # Use draw_idle for better performance during updates
 
     def reset_view(self):
-        self.spec.getView().autoRange()
+        """Reset the view to auto-range."""
+        self.ax.autoscale()
+        self.draw()
 
     def set_colormap(self, cmap_name):
-        try:
-            cmap_obj = pg.colormap.get(cmap_name)
-            self.spec.setColorMap(cmap_obj)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Colormap '{cmap_name}' not found.")
+        """Update the colormap of the current spectrogram."""
+        # This would require re-plotting with the new colormap
+        # For now, just store it for next set_spectrogram call
+        pass
 
 
 class FFTAnalyserWindow(QtWidgets.QMainWindow):
@@ -250,7 +281,7 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         right_layout = QtWidgets.QVBoxLayout(right_frame)
 
         self.spec_widget = SpectrogramWidget()
-        right_layout.addWidget(self.spec_widget.spec)
+        right_layout.addWidget(self.spec_widget)
         splitter.addWidget(right_frame)
 
         # Adjust splitter stretch: spectrogram bigger
@@ -278,6 +309,11 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         self.ui_timer = QtCore.QTimer()
         self.ui_timer.setInterval(100)
         self.ui_timer.timeout.connect(self._ui_timer_tick)
+
+        # Spectrogram playback line update timer (less frequent)
+        self.spec_line_timer = QtCore.QTimer()
+        self.spec_line_timer.setInterval(200)  # Update every 200ms instead of every frame
+        self.spec_line_timer.timeout.connect(self._update_spec_playback_line)
 
         # connect controls
         self.fft_size_spin.valueChanged.connect(self._spec_nfft_changed)
@@ -358,12 +394,7 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
 
         nfft = int(self.fft_size_spin.currentData())
         cmap = self.spec_colormap_combo.currentText()
-        scale = self.spec_scale_combo.currentText()
-        S, freqs, times = compute_spectrogram(
-            self.data, self.sr, nfft=nfft, hop=nfft // 4, scale=scale.lower()
-        )
-
-        self.spec_widget.set_spectrogram(S, freqs, times, cmap=cmap)
+        self.spec_widget.set_spectrogram(self.data, nfft=nfft, sr=self.sr, cmap=cmap)
 
     # PyAudio callback
     def _pyaudio_callback(self, in_data, frame_count, time_info, status):
@@ -422,6 +453,7 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
             self.play_button.setText("⏸ Pause")
             self.stream.start_stream()
             self.ui_timer.start()
+            self.spec_line_timer.start()
         except Exception as e:
             self.status.showMessage(f"Failed to start playback: {e}", 6000)
 
@@ -429,6 +461,7 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         self.is_playing = False
         self.play_button.setText("▶ Play")
         self.ui_timer.stop()
+        self.spec_line_timer.stop()
         if self.stream is not None:
             try:
                 self.stream.stop_stream()
@@ -472,7 +505,7 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         with self.stream_lock:
             self.play_pos = max(0, min(len(self.data), new_pos))
 
-        self.spec_widget.update_play_line(self.play_pos / self.sr)
+        #self.spec_widget.update_play_line(self.play_pos / self.sr)
         self._update_time_label_from_slider()
 
         # if playing, the callback will pick up the new play_pos immediately
@@ -517,7 +550,7 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         self.update_display()
 
         # update spectrogram play line (time in seconds)
-        self.spec_widget.update_play_line(self.play_pos / self.sr)
+        #self.spec_widget.update_play_line(self.play_pos / self.sr)
 
         # stop if finished
         if self.stream is None:
@@ -528,6 +561,13 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         except OSError as e:
             self.status.showMessage(f"Audio stream error: {e}", 6000)
             self.stop_playback()
+
+    def _update_spec_playback_line(self):
+        """Update spectrogram playback line position (called less frequently than UI timer)."""
+        if self.data is None or self.sr is None:
+            return
+        # Update spectrogram play line (time in seconds)
+        self.spec_widget.update_play_line(self.play_pos / self.sr)
 
     # Controls handlers
     def _volume_changed(self, v):

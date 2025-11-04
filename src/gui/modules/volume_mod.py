@@ -80,7 +80,17 @@ class VolumeModule(ModuleWidget):
             mod_comp = self.modulator_component
 
         if mod_comp:
+            # Visual feedback: Disable gain knob when modulation is connected
+            self.gain_knob.setEnabled(False)
+            self.gain_knob.setStyleSheet("opacity: 0.5;")
+            self.gain_knob.setToolTip("Volume controlled by Mod input (CV)")
+
             return ModulatedVolume(mod_comp)
+
+        # No modulation - enable gain knob
+        self.gain_knob.setEnabled(True)
+        self.gain_knob.setStyleSheet("")
+        self.gain_knob.setToolTip("Manual volume control (dB)")
 
         gain_db = self.gain_knob.get_value()
         return Volume(gain_db=gain_db)

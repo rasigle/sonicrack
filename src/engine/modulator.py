@@ -136,8 +136,10 @@ class ADSREnvelope(Generator):
         self._update_phase_samples()
 
         # Vectorization state tracking
-        self._phase = "attack"  # Current phase: 'attack', 'decay', 'sustain', 'release'
+        # Start in idle/ended state, not attack! (prevents spurious triggers)
+        self._phase = "idle"  # Current phase: 'idle', 'attack', 'decay', 'sustain', 'release'
         self._phase_position = 0  # Position within current phase (in samples)
+        self.ended = True  # Start in ended state
 
     def _update_phase_samples(self):
         """Update pre-computed phase sample counts.
@@ -240,14 +242,26 @@ class ADSREnvelope(Generator):
             yield val
 
     def __iter__(self):
-        self.val = 0
-        self.ended = False
-        self.stepper = self._get_ads_stepper()
-        self._phase = "attack"
+        # Only initialize stepper if not in idle state
+        # This prevents spurious triggers when creating iterator
+        if self._phase != "idle":
+            self.val = 0
+            self.ended = False
+            self.stepper = self._get_ads_stepper()
+            self._phase = "attack"
         self._phase_position = 0
         return self
 
     def __next__(self):
+        # Handle idle state
+        if self._phase == "idle":
+            self.val = 0.0
+            return 0.0
+
+        # Ensure stepper exists
+        if self.stepper is None:
+            self.stepper = self._get_ads_stepper()
+
         self.val = next(self.stepper)
         self._phase_position += 1
 
@@ -271,6 +285,7 @@ class ADSREnvelope(Generator):
         """Trigger note on - resets envelope to attack phase.
 
         This is an alias for resetting the envelope, compatible with MIDI note on.
+        Transitions from idle state to attack phase.
         """
         self.ended = False
         self._phase = "attack"
@@ -345,6 +360,12 @@ class ADSREnvelope(Generator):
 
         # Process samples through current and subsequent phases
         while remaining > 0 and not self.ended:
+
+            if self._phase == "idle":
+                # Idle phase: output zeros until triggered
+                samples[idx : idx + remaining] = 0.0
+                self.val = 0.0
+                break  # Stay in idle, don't advance
 
             if self._phase == "attack":
                 # Attack phase: 0 -> 1

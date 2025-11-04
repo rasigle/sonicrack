@@ -481,7 +481,9 @@ class ModularSynthWindow(QMainWindow):
             self.audio_engine.set_patch(None)
             logger.info("Output disconnected - playback stopped")
 
-        # Auto-compile when connection changes
+        # Automatically recompile patch to update visual feedback (knob states, etc.)
+        # This ensures that knobs re-enable immediately when CV inputs are disconnected
+        logger.info("Cable disconnected - auto-recompiling patch to update UI state")
         self._compile_patch()
 
     def _on_module_deleted(self, module):

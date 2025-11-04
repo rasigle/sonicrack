@@ -154,6 +154,38 @@ class PatchCompiler:
             self._module_to_component[module] = component  # Track for hot-swapping
             return component
 
+        # Handle MODULATED_SOURCE modules (VCO, etc. - generators with CV inputs)
+        if module_category == ModuleCategory.MODULATED_SOURCE:
+            # Get input components (CV signals like frequency)
+            required_inputs = module.get_required_inputs()
+            input_components = []
+
+            for input_name in required_inputs:
+                input_port = self._find_port_by_name(module, input_name)
+                if input_port:
+                    input_conn = self._find_connection_to_port(input_port)
+                    if input_conn:
+                        input_module = input_conn.parent_module
+                        source_port_name = input_conn.port_name
+
+                        # Get the specific component for this output port
+                        if hasattr(input_module, 'get_output_component'):
+                            input_component = input_module.get_output_component(source_port_name)
+                        else:
+                            input_component = self._build_chain_from_module(input_module)
+
+                        if input_component:
+                            input_components.append(input_component)
+
+            # Create component with CV inputs (no Chain wrapper - VCO returns final component)
+            component = module.create_component(
+                input_components=input_components if input_components else None,
+                modulation_components=None
+            )
+            self._build_cache[module] = component
+            self._module_to_component[module] = component
+            return component
+
         # Handle OUTPUT module
         if module_category == ModuleCategory.OUTPUT:
             # Get the input connection(s)
@@ -164,21 +196,40 @@ class PatchCompiler:
 
             # Check for multiple connections (needs mixing)
             all_input_connections = self._find_all_connections_to_port(input_port)
-
             if not all_input_connections:
                 logger.warning("Output module has no input connection")
                 return None
 
             # Build all input components
             input_components = []
+            skipped_modules = []
             for input_conn in all_input_connections:
                 source_module = input_conn.parent_module
-                input_component = self._build_chain_from_module(source_module)
+                source_port_name = input_conn.port_name
+
+                # Check if source module has multiple outputs
+                if hasattr(source_module, 'get_output_component'):
+                    # Get the specific component for this output port
+                    input_component = source_module.get_output_component(source_port_name)
+                else:
+                    # Build the entire chain from the source module
+                    input_component = self._build_chain_from_module(source_module)
+
                 if input_component:
                     input_components.append(input_component)
+                else:
+                    # Track skipped modules for better error reporting
+                    skipped_modules.append(source_module.metadata.title)
+
+            # Log skipped modules
+            if skipped_modules:
+                logger.info(
+                    f"Output: Skipped {len(skipped_modules)} module(s) with missing inputs: "
+                    f"{', '.join(skipped_modules)}"
+                )
 
             if not input_components:
-                logger.warning("Output module has no valid input components")
+                logger.warning("Output module has no valid input components (all inputs skipped or disconnected)")
                 return None
 
             # If multiple inputs, create a mixer to combine them
@@ -218,8 +269,8 @@ class PatchCompiler:
             # Get required input(s)
             required_inputs = module.get_required_inputs()
             if not required_inputs:
-                logger.warning(
-                    f"Modifier module '{name}' has no required inputs defined."
+                logger.debug(
+                    f"Modifier module '{name}' has no required inputs defined - skipping"
                 )
                 return None
 
@@ -227,8 +278,8 @@ class PatchCompiler:
             main_input_name = required_inputs[0]
             main_input_port = self._find_port_by_name(module, main_input_name)
             if not main_input_port:
-                logger.warning(
-                    f"Modifier module '{name}' missing port '{main_input_name}'."
+                logger.debug(
+                    f"Modifier module '{name}' missing port '{main_input_name}' - skipping"
                 )
                 return None
 
@@ -236,8 +287,10 @@ class PatchCompiler:
             all_input_connections = self._find_all_connections_to_port(main_input_port)
 
             if not all_input_connections:
-                logger.warning(
-                    f"Modifier module '{name}' has no input connection"
+                # No input connection - skip this module gracefully
+                # This allows modules to be connected to output without causing errors
+                logger.debug(
+                    f"Modifier module '{name}' has no input connection - skipping in signal chain"
                 )
                 return None
 
@@ -245,7 +298,16 @@ class PatchCompiler:
             input_components = []
             for input_conn in all_input_connections:
                 input_module = input_conn.parent_module
-                input_component = self._build_chain_from_module(input_module)
+                source_port_name = input_conn.port_name
+
+                # Check if source module has multiple outputs
+                if hasattr(input_module, 'get_output_component'):
+                    # Get the specific component for this output port
+                    input_component = input_module.get_output_component(source_port_name)
+                else:
+                    # Build the entire chain from the source module
+                    input_component = self._build_chain_from_module(input_module)
+
                 if input_component:
                     input_components.append(input_component)
 
@@ -266,7 +328,16 @@ class PatchCompiler:
                     mod_conn = self._find_connection_to_port(mod_port)
                     if mod_conn:
                         mod_module = mod_conn.parent_module
-                        mod_component = self._build_chain_from_module(mod_module)
+                        source_port_name = mod_conn.port_name
+
+                        # Check if source module has multiple outputs
+                        if hasattr(mod_module, 'get_output_component'):
+                            # Get the specific component for this output port
+                            mod_component = mod_module.get_output_component(source_port_name)
+                        else:
+                            # Build the entire chain from the source module
+                            mod_component = self._build_chain_from_module(mod_module)
+
                         if mod_component:
                             modulation_components[mod_port_name] = mod_component
 

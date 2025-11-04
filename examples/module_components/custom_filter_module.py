@@ -109,24 +109,6 @@ class SimpleFilterModule(ModuleWidget):
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
-    @property
-    def module_category(self) -> ModuleCategory:
-        """Return MODIFIER since this modifies audio input."""
-        return ModuleCategory.MODIFIER
-
-    @property
-    def module_description(self) -> str:
-        """Return a description of the plugin."""
-        return "A simple low-pass filter module plugin example."
-
-    @property
-    def module_author(self) -> str:
-        return "Plugin Example"
-
-    @property
-    def module_version(self):
-        return "1.0.0"
-
     def get_required_inputs(self) -> List[str]:
         """Filter requires the In port to be connected."""
         return ["In"]

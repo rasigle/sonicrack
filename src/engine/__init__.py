@@ -106,6 +106,7 @@ from src.engine.composer import (
 from src.engine.filter import (
     butter,
     apply_filter,
+    ButterworthFilter
 )
 
 # Modifiers
@@ -140,6 +141,7 @@ from src.engine.noise import (
     velvet_noise,
     grey_noise,
     sample_hold_noise,
+    NoiseGenerator
 )
 
 # Oscillators
@@ -190,6 +192,7 @@ __all__ = [
     # Filters
     "butter",
     "apply_filter",
+    "ButterworthFilter",
     # Noise
     "white_noise",
     "pink_noise",
@@ -199,4 +202,5 @@ __all__ = [
     "velvet_noise",
     "grey_noise",
     "sample_hold_noise",
+    "NoiseGenerator"
 ]

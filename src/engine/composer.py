@@ -171,11 +171,7 @@ class Chain(Composer):
                 f"The given oscillator must implement the iterator protocol "
                 f"(`__iter__` and `__next__`). Given: {type(oscillator).__name__}"
             )
-        if not all([isinstance(m, Modifier) for m in modifiers]):
-            raise TypeError(
-                f"All given modifiers should be instances of Modifier. "
-                f"Given: {[type(mod).__name__ for mod in modifiers]}"
-            )
+
         self.oscillator: Oscillator | ModulatedOscillator = oscillator
         self.modifiers = modifiers
 

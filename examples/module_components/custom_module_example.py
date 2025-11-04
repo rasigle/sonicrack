@@ -121,17 +121,6 @@ class LowPassFilterModule(ModuleWidget):
 
     # === AudioModuleInterface Implementation ===
 
-    def module_category(self) -> ModuleCategory:
-        """Return MODIFIER since this processes audio input.
-
-        ModuleType options:
-        - SOURCE: Generates audio (oscillators, envelopes)
-        - MODIFIER: Processes audio (filters, effects)
-        - MIXER: Combines multiple audio streams
-        - OUTPUT: Terminal node
-        """
-        return ModuleCategory.MODIFIER
-
     def get_required_inputs(self) -> List[str]:
         """Return list of required input port names.
 
@@ -253,10 +242,6 @@ class ModulatedLowPassFilterModule(ModuleWidget):
         self.out_port = self.add_output_port("Out")
 
         # ... setup UI ...
-
-    def module_category(self) -> ModuleCategory:
-        return ModuleCategory.MODIFIER
-
     def get_required_inputs(self) -> List[str]:
         return ["In"]  # Audio input is required
 

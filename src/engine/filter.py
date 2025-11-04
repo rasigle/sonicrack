@@ -37,8 +37,197 @@ Note:
 """
 
 import numpy as np
-from scipy.signal import filtfilt
+from scipy.signal import filtfilt, butter as scipy_butter, lfilter, lfilter_zi
 
+from src.engine.modifier import Modifier
+from src.engine.audio_component_registry import register_component
+from src.engine.audio_component import ComponentDescriptor, ComponentCategory
+from src.constants import DEFAULT_SAMPLE_RATE
+
+
+@register_component()
+class ButterworthFilter(Modifier):
+    """Butterworth IIR filter for frequency-domain audio processing.
+
+    This filter provides low-pass, high-pass, and band-pass filtering with
+    optimized performance for real-time audio processing. Uses scipy's IIR
+    filter implementation with stateful processing for iterator mode.
+
+    Args:
+        cutoff: Cutoff frequency in Hz. For band-pass, use tuple (low, high).
+        order: Filter order (higher = steeper rolloff, default: 4).
+        filter_type: Filter type - "low", "high", or "band".
+        sample_rate: Sample rate in Hz (default: 44100).
+
+    Example:
+        >>> # Low-pass filter at 1kHz
+        >>> lpf = ButterworthFilter(cutoff=1000, filter_type="low")
+        >>> filtered = lpf.scale_vectorized(audio_samples)
+        >>>
+        >>> # Band-pass filter 200-2000 Hz
+        >>> bpf = ButterworthFilter(cutoff=(200, 2000), filter_type="band")
+    """
+
+    descriptor = ComponentDescriptor(
+        name="ButterworthFilter",
+        category=ComponentCategory.MODIFIER,
+        config_params=["cutoff", "order", "filter_type", "sample_rate"],
+        description="Butterworth IIR filter (low-pass, high-pass, band-pass)",
+        tags=["filter", "frequency", "butterworth", "iir"],
+    )
+
+    def __init__(
+        self,
+        cutoff: float | tuple[float, float] = 1000.0,
+        order: int = 4,
+        filter_type: str = "low",
+        sample_rate: int = DEFAULT_SAMPLE_RATE,
+    ):
+        """Initialize Butterworth filter.
+
+        Args:
+            cutoff: Cutoff frequency/frequencies in Hz
+            order: Filter order (1-10 recommended)
+            filter_type: "low", "high", or "band"
+            sample_rate: Sample rate in Hz
+        """
+        super().__init__()
+
+        self.sample_rate = sample_rate
+        self._cutoff = cutoff
+        self._order = order
+        self._filter_type = filter_type
+
+        # Validate filter type
+        if filter_type not in ("low", "high", "band"):
+            raise ValueError(
+                f"filter_type must be 'low', 'high', or 'band', got '{filter_type}'"
+            )
+
+        # Validate cutoff for band-pass
+        if filter_type == "band":
+            if not isinstance(cutoff, (tuple, list)) or len(cutoff) != 2:
+                raise ValueError(
+                    "For band-pass filter, cutoff must be tuple (low_freq, high_freq)"
+                )
+            if cutoff[0] >= cutoff[1]:
+                raise ValueError(
+                    f"Low cutoff ({cutoff[0]}) must be less than high cutoff ({cutoff[1]})"
+                )
+
+        # Design filter coefficients
+        self._b, self._a = self._design_filter()
+
+        # Initialize filter state for stateful processing (iterator mode)
+        self._zi = lfilter_zi(self._b, self._a)
+        self._filter_state = self._zi.copy()
+
+    def _design_filter(self) -> tuple[np.ndarray, np.ndarray]:
+        """Design Butterworth filter coefficients.
+
+        Returns:
+            Tuple of (b, a) filter coefficients
+        """
+        nyq = 0.5 * self.sample_rate
+
+        if isinstance(self._cutoff, (list, tuple)):
+            # Band-pass filter
+            wn = [c / nyq for c in self._cutoff]
+        else:
+            # Low-pass or high-pass
+            wn = self._cutoff / nyq
+
+        b, a = scipy_butter(self._order, wn, btype=self._filter_type, analog=False)
+        return b, a
+
+    def __iter__(self):
+        """Initialize iterator - reset filter state."""
+        self._filter_state = self._zi.copy()
+        return self
+
+    def __next__(self):
+        """Not used - filter requires buffered processing."""
+        raise NotImplementedError(
+            "ButterworthFilter requires vectorized processing. "
+            "Use scale_vectorized() instead of iterator mode."
+        )
+
+    def __call__(self, val: float | tuple[float, ...]) -> float | tuple[float, ...]:
+        """Apply filter to single sample (stateful for iterator chains).
+
+        Note: This is less efficient than vectorized processing.
+        Use scale_vectorized() for batch processing.
+
+        Args:
+            val: Input sample (mono or stereo tuple)
+
+        Returns:
+            Filtered sample
+        """
+        # Handle stereo
+        if isinstance(val, tuple):
+            return tuple(self(v) for v in val)
+
+        # Apply filter with state
+        filtered, self._filter_state = lfilter(
+            self._b, self._a, [val], zi=self._filter_state
+        )
+        return float(filtered[0])
+
+    def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
+        """Apply filter to array of samples (optimized vectorized version).
+
+        This is the recommended method for processing audio buffers as it's
+        much faster than sample-by-sample processing.
+
+        Args:
+            samples: Input samples as numpy array
+
+        Returns:
+            Filtered samples (same shape as input)
+        """
+        if samples.size == 0:
+            return samples
+
+        # Use lfilter for one-pass filtering (faster than filtfilt)
+        # For offline processing, filtfilt gives zero-phase but is 2x slower
+        filtered = lfilter(self._b, self._a, samples)
+
+        return filtered.astype(np.float32)
+
+    @property
+    def cutoff(self) -> float | tuple[float, float]:
+        """Get cutoff frequency/frequencies."""
+        return self._cutoff
+
+    @cutoff.setter
+    def cutoff(self, value: float | tuple[float, float]):
+        """Set cutoff frequency and redesign filter."""
+        self._cutoff = value
+        self._b, self._a = self._design_filter()
+        self._zi = lfilter_zi(self._b, self._a)
+        self._filter_state = self._zi.copy()
+
+    @property
+    def order(self) -> int:
+        """Get filter order."""
+        return self._order
+
+    @order.setter
+    def order(self, value: int):
+        """Set filter order and redesign filter."""
+        self._order = value
+        self._b, self._a = self._design_filter()
+        self._zi = lfilter_zi(self._b, self._a)
+        self._filter_state = self._zi.copy()
+
+    @property
+    def filter_type(self) -> str:
+        """Get filter type."""
+        return self._filter_type
+
+
+# Utility functions for standalone use
 
 def butter(order, cutoff, fs, btype="low"):
     """

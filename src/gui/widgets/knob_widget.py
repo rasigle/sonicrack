@@ -1,5 +1,6 @@
 """Rotary knob widget for parameter control."""
 
+import math
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt, QPointF, pyqtSignal, QRectF
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
@@ -19,6 +20,7 @@ class Knob(QWidget):
         min_value: float = 0.0,
         max_value: float = 1.0,
         default_value: float | None = None,
+        logarithmic: bool = False,
         parent: QWidget | None = None,
     ):
         """Initialize the knob.
@@ -28,6 +30,7 @@ class Knob(QWidget):
             min_value: Minimum value
             max_value: Maximum value
             default_value: Default value (defaults to min_value)
+            logarithmic: If True, use logarithmic scaling (useful for frequency)
             parent: Parent widget
         """
         super().__init__(parent)
@@ -35,6 +38,7 @@ class Knob(QWidget):
         self.label = label
         self.min_value = min_value
         self.max_value = max_value
+        self.logarithmic = logarithmic
         self._value = default_value if default_value is not None else min_value
 
         # Visual properties
@@ -65,15 +69,66 @@ class Knob(QWidget):
             self.update()
             self.value_changed.emit(self.get_normalized_value())
 
-    def get_normalized_value(self) -> float:
-        """Get the normalized value (0.0 to 1.0)."""
+    def _value_to_normalized(self, value: float) -> float:
+        """Convert a value to normalized (0.0-1.0) considering logarithmic scaling.
+
+        Args:
+            value: The actual value
+
+        Returns:
+            Normalized value (0.0-1.0)
+        """
         if self.max_value == self.min_value:
             return 0.0
-        return (self._value - self.min_value) / (self.max_value - self.min_value)
+
+        if self.logarithmic:
+            # Ensure we don't take log of zero or negative numbers
+            if self.min_value <= 0:
+                # Shift values to be positive for log calculation
+                min_log = 0
+                max_log = math.log10(self.max_value - self.min_value + 1)
+                val_log = math.log10(value - self.min_value + 1)
+            else:
+                min_log = math.log10(self.min_value)
+                max_log = math.log10(self.max_value)
+                val_log = math.log10(value)
+
+            return (val_log - min_log) / (max_log - min_log)
+        else:
+            return (value - self.min_value) / (self.max_value - self.min_value)
+
+    def _normalized_to_value(self, norm_value: float) -> float:
+        """Convert normalized value (0.0-1.0) to actual value considering logarithmic scaling.
+
+        Args:
+            norm_value: Normalized value (0.0-1.0)
+
+        Returns:
+            Actual value
+        """
+        if self.logarithmic:
+            # Ensure we don't take log of zero or negative numbers
+            if self.min_value <= 0:
+                # Shift values to be positive for log calculation
+                min_log = 0
+                max_log = math.log10(self.max_value - self.min_value + 1)
+                val_log = min_log + norm_value * (max_log - min_log)
+                return (10 ** val_log) - 1 + self.min_value
+            else:
+                min_log = math.log10(self.min_value)
+                max_log = math.log10(self.max_value)
+                val_log = min_log + norm_value * (max_log - min_log)
+                return 10 ** val_log
+        else:
+            return self.min_value + norm_value * (self.max_value - self.min_value)
+
+    def get_normalized_value(self) -> float:
+        """Get the normalized value (0.0 to 1.0)."""
+        return self._value_to_normalized(self._value)
 
     def set_normalized_value(self, norm_value: float):
         """Set the value using a normalized value (0.0 to 1.0)."""
-        value = self.min_value + norm_value * (self.max_value - self.min_value)
+        value = self._normalized_to_value(norm_value)
         self.set_value(value)
 
     def paintEvent(self, event):
@@ -121,7 +176,6 @@ class Knob(QWidget):
         painter.drawArc(value_arc_rect, int(self.min_angle * 16), int(arc_span * 16))
 
         # Draw indicator pointer (from center to edge)
-        import math
 
         angle_rad = math.radians(current_angle)
 
@@ -193,10 +247,18 @@ class Knob(QWidget):
             # Use the larger delta for more responsive control
             delta = delta_y if abs(delta_y) > abs(delta_x) else delta_x
 
-            # Improved sensitivity - finer control
-            sensitivity = (self.max_value - self.min_value) / 200.0
-            new_value = self._value + delta * sensitivity
-            self.set_value(new_value)
+            if self.logarithmic:
+                # For logarithmic scale, adjust in normalized space for consistent feel
+                norm_value = self.get_normalized_value()
+                norm_delta = delta / 200.0  # Normalized delta
+                new_norm_value = max(0.0, min(1.0, norm_value + norm_delta))
+                new_value = self._normalized_to_value(new_norm_value)
+                self.set_value(new_value)
+            else:
+                # Linear sensitivity
+                sensitivity = (self.max_value - self.min_value) / 200.0
+                new_value = self._value + delta * sensitivity
+                self.set_value(new_value)
 
             self.last_y = event.pos().y()
             self.last_x = event.pos().x()
@@ -215,10 +277,19 @@ class Knob(QWidget):
     def wheelEvent(self, event):
         """Handle mouse wheel for fine adjustment."""
         delta = event.angleDelta().y()
-        # Fine adjustment with mouse wheel
-        sensitivity = (self.max_value - self.min_value) / 2000.0
-        new_value = self._value + delta * sensitivity
-        self.set_value(new_value)
+
+        if self.logarithmic:
+            # For logarithmic scale, adjust in normalized space
+            norm_value = self.get_normalized_value()
+            norm_delta = delta / 2000.0  # Finer adjustment
+            new_norm_value = max(0.0, min(1.0, norm_value + norm_delta))
+            new_value = self._normalized_to_value(new_norm_value)
+            self.set_value(new_value)
+        else:
+            # Linear fine adjustment
+            sensitivity = (self.max_value - self.min_value) / 2000.0
+            new_value = self._value + delta * sensitivity
+            self.set_value(new_value)
         event.accept()
 
     def enterEvent(self, event):

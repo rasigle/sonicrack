@@ -140,10 +140,10 @@ class Chain(Composer):
     """
 
     descriptor = ComponentDescriptor(
-        name = "Chain",
+        name="Chain",
         category=ComponentCategory.COMPOSER,
         description="Chains a generator with multiple modifiers in sequence.",
-        tags=["composer", "chain"]
+        tags=["composer", "chain"],
     )
 
     def __init__(self, oscillator, *modifiers):
@@ -292,6 +292,7 @@ class Chain(Composer):
 
         return samples.astype(np.float32)
 
+
 @register_component()
 class WaveAdder(Composer):
     """Component that returns the mean of the output of multiple generators.
@@ -303,7 +304,7 @@ class WaveAdder(Composer):
         name="WaveAdder",
         category=ComponentCategory.COMPOSER,
         description="Adds the output of multiple generators together.",
-        tags=["composer", "wave_adder"]
+        tags=["composer", "wave_adder"],
     )
 
     def __init__(self, *generators, stereo: bool = False):

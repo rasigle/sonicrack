@@ -1,7 +1,8 @@
 """MIDI file reader for playback and analysis.
 
-This module provides MIDI file reading and playback functionality using the mido library.
-It can parse MIDI files, extract notes and events, and provide timeline-based playback.
+This module provides MIDI file reading and playback functionality using the mido
+library. It can parse MIDI files, extract notes and events, and provide timeline-based
+playback.
 
 Example:
     >>> from src.engine.midi import MIDIFile

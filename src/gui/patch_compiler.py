@@ -386,4 +386,3 @@ class PatchCompiler:
                     node["inputs"].append(port_info)
 
         return node
-

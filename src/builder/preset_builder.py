@@ -69,8 +69,9 @@ class PresetNode:
         lines = []
 
         # Format parameters
-        param_str = ", ".join(f"{k}={v}" for k, v in self.params.items()
-                             if k not in ['sample_rate'])
+        param_str = ", ".join(
+            f"{k}={v}" for k, v in self.params.items() if k not in ["sample_rate"]
+        )
 
         # Create node line with tree structure
         if indent == 0:
@@ -142,16 +143,29 @@ class PresetBuilder:
 
         for comp_name, component in audio_registry.components.items():
             descriptor = component.descriptor
-            method_name = descriptor.fluent_api_name if descriptor.fluent_api_name else comp_name
+            method_name = (
+                descriptor.fluent_api_name if descriptor.fluent_api_name else comp_name
+            )
 
             # Create appropriate method based on category
             if descriptor.category == ComponentCategory.OSCILLATOR:
-                self._component_methods[method_name] = lambda *args, cn=comp_name, **kwargs: self._add_oscillator(cn, *args, **kwargs)
+                self._component_methods[method_name] = (
+                    lambda *args, cn=comp_name, **kwargs: self._add_oscillator(
+                        cn, *args, **kwargs
+                    )
+                )
             elif descriptor.category == ComponentCategory.MODIFIER:
-                self._component_methods[method_name] = lambda *args, cn=comp_name, **kwargs: self._add_modifier(cn, *args, **kwargs)
+                self._component_methods[method_name] = (
+                    lambda *args, cn=comp_name, **kwargs: self._add_modifier(
+                        cn, *args, **kwargs
+                    )
+                )
             elif descriptor.category == ComponentCategory.MODULATOR:
-                self._component_methods[method_name] = lambda *args, cn=comp_name, **kwargs: self._add_modulator(cn, *args, **kwargs)
-
+                self._component_methods[method_name] = (
+                    lambda *args, cn=comp_name, **kwargs: self._add_modulator(
+                        cn, *args, **kwargs
+                    )
+                )
 
         logger.debug(f"Pre-generated {len(self._component_methods)} component methods")
 
@@ -272,8 +286,8 @@ class PresetBuilder:
         modulator = component_class(*args, **kwargs)
 
         # Wrap source with ModulatedOscillator if we have an oscillator
-        if self._source and hasattr(self._source, 'frequency'):
-            mod_osc_class = audio_registry.get('ModulatedOscillator')
+        if self._source and hasattr(self._source, "frequency"):
+            mod_osc_class = audio_registry.get("ModulatedOscillator")
             if mod_osc_class:
                 if target == "amplitude":
                     self._source = mod_osc_class(
@@ -290,7 +304,7 @@ class PresetBuilder:
 
         # Build params dict for tree
         params = component_class.descriptor.to_config(*args, **kwargs)
-        params['target'] = target
+        params["target"] = target
 
         # Add to tree
         node = PresetNode(comp_name, modulator, params)
@@ -298,7 +312,6 @@ class PresetBuilder:
 
         logger.debug(f"Added {comp_name} modulator: target={target}")
         return self
-
 
     # ========================================================================
     # Metadata Methods
@@ -351,10 +364,10 @@ class PresetBuilder:
         """
         # Check if source is a ModulatedOscillator and extract modulator
         modulators = {}
-        if self._source and hasattr(self._source, 'modulators'):
+        if self._source and hasattr(self._source, "modulators"):
             # Try to extract modulators from ModulatedOscillator
             for i, mod in enumerate(self._source.modulators):
-                key = f"amplitude_mod" if i == 0 else f"modulator_{i}"
+                key = "amplitude_mod" if i == 0 else f"modulator_{i}"
                 modulators[key] = mod
         return modulators
 
@@ -408,17 +421,17 @@ class PresetBuilder:
         """
         if isinstance(value_or_modulator, (int, float)):
             # Direct amplitude modification
-            if self._source and hasattr(self._source, 'amplitude'):
+            if self._source and hasattr(self._source, "amplitude"):
                 self._source.amplitude = value_or_modulator
                 # Update tree params
                 for node in self._component_tree.children:
-                    if hasattr(node.component, 'amplitude'):
-                        node.params['amplitude'] = value_or_modulator
+                    if hasattr(node.component, "amplitude"):
+                        node.params["amplitude"] = value_or_modulator
         else:
             # Modulator-based modification
             modulator = value_or_modulator
-            if self._source and hasattr(self._source, 'frequency'):
-                mod_osc_desc = audio_registry.get('ModulatedOscillator')
+            if self._source and hasattr(self._source, "frequency"):
+                mod_osc_desc = audio_registry.get("ModulatedOscillator")
                 if mod_osc_desc:
                     self._source = mod_osc_desc.create_instance(
                         self._source, modulator, amp_mod=lambda base, mod: base * mod
@@ -437,17 +450,17 @@ class PresetBuilder:
         """
         if isinstance(value_or_modulator, (int, float)):
             # Direct frequency modification
-            if self._source and hasattr(self._source, 'frequency'):
+            if self._source and hasattr(self._source, "frequency"):
                 self._source.frequency = value_or_modulator
                 # Update tree params
                 for node in self._component_tree.children:
-                    if hasattr(node.component, 'frequency'):
-                        node.params['frequency'] = value_or_modulator
+                    if hasattr(node.component, "frequency"):
+                        node.params["frequency"] = value_or_modulator
         else:
             # Modulator-based modification
             modulator = value_or_modulator
-            if self._source and hasattr(self._source, 'frequency'):
-                mod_osc_desc = audio_registry.get('ModulatedOscillator')
+            if self._source and hasattr(self._source, "frequency"):
+                mod_osc_desc = audio_registry.get("ModulatedOscillator")
                 if mod_osc_desc:
                     self._source = mod_osc_desc.create_instance(
                         self._source, modulator, freq_mod=lambda base, mod: base * mod
@@ -516,7 +529,7 @@ class PresetBuilder:
 
         # Handle multiple oscillators - use WaveAdder
         if isinstance(self._source, list):
-            wave_adder_class = audio_registry.get('WaveAdder')
+            wave_adder_class = audio_registry.get("WaveAdder")
             if wave_adder_class:
                 source = wave_adder_class(*self._source)
                 logger.debug(f"Built WaveAdder with {len(self._source)} oscillators")
@@ -528,12 +541,14 @@ class PresetBuilder:
 
         # Apply modifiers in chain
         if self._modifiers:
-            chain_class = audio_registry.get('Chain')
+            chain_class = audio_registry.get("Chain")
             if chain_class:
                 result = chain_class(source, *self._modifiers)
                 logger.debug(f"Built Chain with {len(self._modifiers)} modifiers")
             else:
-                logger.warning("Chain not registered, returning source without modifiers")
+                logger.warning(
+                    "Chain not registered, returning source without modifiers"
+                )
                 result = source
         else:
             result = source
@@ -619,8 +634,10 @@ class PresetBuilder:
 
         # Remove modifier nodes from tree
         self._component_tree.children = [
-            node for node in self._component_tree.children
-            if audio_registry.get(node.component_type).descriptor.category != ComponentCategory.MODIFIER
+            node
+            for node in self._component_tree.children
+            if audio_registry.get(node.component_type).descriptor.category
+            != ComponentCategory.MODIFIER
         ]
 
         logger.debug("Cleared all effects")
@@ -641,11 +658,14 @@ class PresetBuilder:
             comp_name = component["name"]
             component_class = audio_registry.get(comp_name, strict=True)
             descriptor = component_class.descriptor
-            method_name = descriptor.fluent_api_name if descriptor.fluent_api_name else comp_name
+            method_name = (
+                descriptor.fluent_api_name if descriptor.fluent_api_name else comp_name
+            )
 
             # Extract only actual component parameters (exclude metadata)
             params = {
-                k: v for k, v in component.items()
+                k: v
+                for k, v in component.items()
                 if k not in ["name", "category", "description"]
                 and descriptor.config_params
                 and k in descriptor.config_params
@@ -656,7 +676,9 @@ class PresetBuilder:
             if method:
                 method(**params)
             else:
-                logger.warning(f"Method '{method_name}' not found for component '{comp_name}'")
+                logger.warning(
+                    f"Method '{method_name}' not found for component '{comp_name}'"
+                )
 
         return new_builder
 
@@ -708,11 +730,14 @@ class PresetBuilder:
             comp_type = component["name"]
             component_class = audio_registry.get(comp_type, strict=True)
             descriptor = component_class.descriptor
-            method_name = descriptor.fluent_api_name if descriptor.fluent_api_name else comp_type
+            method_name = (
+                descriptor.fluent_api_name if descriptor.fluent_api_name else comp_type
+            )
 
             # Extract only actual component parameters (exclude metadata)
             params = {
-                k: v for k, v in component.items()
+                k: v
+                for k, v in component.items()
                 if k not in ["name", "category", "description"]
                 and descriptor.config_params
                 and k in descriptor.config_params
@@ -723,7 +748,9 @@ class PresetBuilder:
             if method:
                 method(**params)
             else:
-                logger.warning(f"Method '{method_name}' not found for component '{comp_type}'")
+                logger.warning(
+                    f"Method '{method_name}' not found for component '{comp_type}'"
+                )
 
         logger.info(f"Loaded preset from {filepath}")
         return builder

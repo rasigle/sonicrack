@@ -38,7 +38,7 @@ Note:
     during audio generation.
 """
 
-from abc import abstractmethod, ABC
+from abc import abstractmethod
 
 import numpy as np
 
@@ -351,7 +351,7 @@ class SawtoothOscillator(Oscillator):
         description="Sawtooth wave oscillator",
         fluent_api_name="sawtooth",
         config_params=["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
-        tags=["basic", "oscillator", "sawtooth"]
+        tags=["basic", "oscillator", "sawtooth"],
     )
 
     def _post_freq_set(self):
@@ -423,7 +423,7 @@ class TriangleOscillator(SawtoothOscillator):
         description="Triangle wave oscillator",
         tags=["basic", "oscillator", "triangle"],
         fluent_api_name="triangle",
-        config_params = ["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
     )
 
     def __next__(self):
@@ -484,7 +484,7 @@ class SineOscillator(Oscillator):
         description="Pure sine wave oscillator",
         tags=["basic", "oscillator", "sine"],
         fluent_api_name="sine",
-        config_params = ["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
     )
 
     def _post_freq_set(self):
@@ -555,7 +555,7 @@ class SquareOscillator(SineOscillator):
         description="Square wave oscillator",
         tags=["basic", "oscillator", "square"],
         fluent_api_name="square",
-        config_params = ["frequency", "amplitude", "phase", "sample_rate", "wave_range"]
+        config_params=["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
     )
 
     def __init__(

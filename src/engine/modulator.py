@@ -63,7 +63,7 @@ class Modulator(Generator):
         description="Base class for modulators",
         tags=["modulator", "base"],
         config_params=["sample_rate"],
-        fluent_api_name="modulator"
+        fluent_api_name="modulator",
     )
 
     def __init__(self, sample_rate: float = DEFAULT_SAMPLE_RATE):
@@ -88,8 +88,14 @@ class ADSREnvelope(Generator):
         category=ComponentCategory.MODULATOR,
         description="ADSR envelope generator",
         tags=["envelope", "modulator", "adsr"],
-        config_params=["attack_duration", "decay_duration", "sustain_level", "release_duration", "sample_rate"],
-        fluent_api_name="adsr"
+        config_params=[
+            "attack_duration",
+            "decay_duration",
+            "sustain_level",
+            "release_duration",
+            "sample_rate",
+        ],
+        fluent_api_name="adsr",
     )
 
     def __init__(

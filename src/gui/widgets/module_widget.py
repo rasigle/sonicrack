@@ -106,7 +106,15 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
 
         Subclasses should override this to provide the display name.
         """
-        return "Module"
+        raise NotImplementedError()
+
+    @property
+    def module_category(self) -> ModuleCategory:
+        """Return the module category.
+
+        Subclasses should override this to provide the correct category.
+        """
+        raise NotImplementedError()
 
     @property
     def module_description(self) -> str:
@@ -511,11 +519,3 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         modulation_components: dict[str, Any] | None = None,
     ) -> Any:
         raise NotImplementedError
-
-    @property
-    def module_category(self) -> ModuleCategory:
-        raise NotImplementedError()
-
-    @property
-    def module_title(self) -> str:
-        raise NotImplementedError()

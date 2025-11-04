@@ -126,7 +126,7 @@ class ModuleRegistry:
                                                 category_name = node.value.attr
                                                 # Map to lowercase
                                                 category = category_name.lower()
-                        except:
+                        except (OSError, SyntaxError):
                             # If source parsing fails, use defaults
                             pass
                     break
@@ -141,7 +141,8 @@ class ModuleRegistry:
         # Check for duplicate names
         if name in self._modules:
             logger.warning(
-                f"Module '{name}' already registered, overwriting with {module_class.__name__}"
+                f"Module '{name}' already registered, overwriting with "
+                f"{module_class.__name__}"
             )
 
         # Register the module
@@ -289,7 +290,8 @@ def register_module(**override_metadata) -> Callable:
     """Decorator to register a module class.
 
     This decorator automatically registers the module when the class is defined.
-    Metadata is extracted from the module's properties (module_title, module_category, etc.)
+    Metadata is extracted from the module's properties (module_title, module_category,
+    etc.)
 
     Args:
         **override_metadata: Optional metadata to override extracted values

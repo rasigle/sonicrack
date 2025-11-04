@@ -41,7 +41,6 @@ from src.utils.logging_config import get_engine_logger
 logger = get_engine_logger("modifier")
 
 
-
 class Modifier(AudioComponent):
     """Base for components that modify signals (effects, filters)."""
 
@@ -79,7 +78,7 @@ class Panner(Modifier):
         config_params=["position"],
         description="Stereo panner with constant-power panning law",
         fluent_api_name="panner",
-        tags = ["modifier", "panner", "stereo"]
+        tags=["modifier", "panner", "stereo"],
     )
 
     def __init__(self, position: float = 0.0) -> None:
@@ -152,7 +151,6 @@ class Panner(Modifier):
         return left, right
 
 
-
 @register_component()
 class ModulatedPanner(Panner):
     """Panner with modulated pan position.
@@ -176,13 +174,13 @@ class ModulatedPanner(Panner):
         >>> chain = Chain(SineOscillator(440), panner)
         >>> samples = chain.get_samples(1000)
     """
+
     descriptor = ComponentDescriptor(
         name="Panner (Mod)",
         category=ComponentCategory.MODIFIER,
         description="Stereo panner with modulated position",
         fluent_api_name="panner (mod)",
-        tags=["modifier", "panner", "modulated", "stereo"]
-
+        tags=["modifier", "panner", "modulated", "stereo"],
     )
 
     def __init__(self, modulator: Any) -> None:
@@ -280,13 +278,14 @@ class Volume(Modifier):
     Attributes:
         amplitude: Current amplitude multiplier.
     """
+
     descriptor = ComponentDescriptor(
         name="Volume",
         category=ComponentCategory.MODIFIER,
         description="Volume control modifier",
         fluent_api_name="volume",
         config_params=["amplitude"],
-        tags=["modifier", "volume", "amplitude"]
+        tags=["modifier", "volume", "amplitude"],
     )
 
     def __init__(self, amplitude: float = 1.0) -> None:
@@ -363,7 +362,7 @@ class ModulatedVolume(Volume):
         category=ComponentCategory.MODIFIER,
         description="Volume control modifier",
         fluent_api_name="volume (mod)",
-        tags=["modifier", "volume", "amplitude"]
+        tags=["modifier", "volume", "amplitude"],
     )
 
     def __init__(self, modulator):
@@ -449,14 +448,14 @@ class Frequency(Modifier):
     Attributes:
         frequency: Current frequency multiplier.
     """
+
     descriptor = ComponentDescriptor(
         name="Frequency",
         category=ComponentCategory.MODIFIER,
         description="Frequency scaling modifier",
         fluent_api_name="frequency",
-        tags=["modifier", "frequency"]
+        tags=["modifier", "frequency"],
     )
-
 
     def __init__(self, frequency: float = 1.0):
         """Initialize frequency modifier.
@@ -527,7 +526,7 @@ class ModulatedFrequency(Frequency):
         category=ComponentCategory.MODIFIER,
         description="Frequency scaling modifier",
         fluent_api_name="frequency (mod)",
-        tags=["modifier", "frequency"]
+        tags=["modifier", "frequency"],
     )
 
     def __init__(self, modulator):
@@ -615,7 +614,7 @@ class Clipper(Modifier):
         description="Audio clipper/limiter",
         config_params=["wave_range"],
         fluent_api_name="clipper",
-        tags=["modifier", "clipper", "limiter"]
+        tags=["modifier", "clipper", "limiter"],
     )
 
     def __init__(self, wave_range: tuple[float, float] = (-1.0, 1.0)):

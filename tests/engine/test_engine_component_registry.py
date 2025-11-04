@@ -108,7 +108,6 @@ class TestComponentRegistry(unittest.TestCase):
         self.assertIn("Volume", modifiers)
 
 
-
 class TestGlobalRegistry(unittest.TestCase):
     """Tests for global registry instance."""
 
@@ -116,9 +115,9 @@ class TestGlobalRegistry(unittest.TestCase):
         """Test that global registry instance exists."""
         self.assertIsNotNone(audio_registry)
         # Just verify it has the expected methods
-        self.assertTrue(hasattr(audio_registry, 'get'))
-        self.assertTrue(hasattr(audio_registry, 'list_all'))
-        self.assertTrue(hasattr(audio_registry, 'list_by_category'))
+        self.assertTrue(hasattr(audio_registry, "get"))
+        self.assertTrue(hasattr(audio_registry, "list_all"))
+        self.assertTrue(hasattr(audio_registry, "list_by_category"))
 
     def test_register_component_helper(self):
         """Test register_component helper function."""

@@ -178,12 +178,10 @@ def demo_midi_input():
     synth = MonophonicSynth(create_voice)
 
     # Audio stream for real-time playback
-    stream_buffer = np.zeros(1024, dtype=np.float32)
-    buffer_pos = 0
+    _ = np.zeros(1024, dtype=np.float32)
 
     def audio_callback(outdata, frames, time_info, status):
         """Audio callback for real-time playback."""
-        nonlocal buffer_pos
 
         # Generate samples from synth
         samples = synth.get_samples(frames)

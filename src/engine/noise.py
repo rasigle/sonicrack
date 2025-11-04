@@ -731,8 +731,12 @@ class NoiseGenerator(Generator):
         tags=["oscillator", "noise", "modulation", "synthesis"],
     )
 
-    def __init__(self, noise_type: str = "White", amplitude: float = 0.5,
-                 sample_rate: int | float = DEFAULT_SAMPLE_RATE):
+    def __init__(
+        self,
+        noise_type: str = "White",
+        amplitude: float = 0.5,
+        sample_rate: int | float = DEFAULT_SAMPLE_RATE,
+    ):
         """Initialize noise generator.
 
         Args:

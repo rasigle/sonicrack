@@ -145,9 +145,7 @@ class TestControlChangeMessage:
 
     def test_init(self):
         """Test initialization."""
-        msg = ControlChangeMessage(
-            timestamp=0.0, controller=7, value=100, channel=0
-        )
+        msg = ControlChangeMessage(timestamp=0.0, controller=7, value=100, channel=0)
         assert msg.timestamp == 0.0
         assert msg.controller == 7
         assert msg.value == 100
@@ -315,4 +313,3 @@ class TestAftertouchMessage:
 
         msg = AftertouchMessage(timestamp=0.0, pressure=64)
         assert abs(msg.normalize_pressure() - 0.504) < 0.01
-

@@ -124,7 +124,8 @@ class MonophonicSynth:
 
         # Set oscillator frequency - try multiple paths
         # NOTE: Don't check hasattr(voice, 'frequency') first because Chain.__getattr__
-        # proxies it but Chain.__setattr__ doesn't, so setting would create a new attribute
+        # proxies it but Chain.__setattr__ doesn't, so setting would create a new
+        # attribute
         osc_found = False
 
         # 1. Chain/common: oscillator attribute (most common pattern)
@@ -346,6 +347,9 @@ class MonophonicSynth:
     def __repr__(self) -> str:
         """String representation."""
         if self.is_playing:
-            return f"MonophonicSynth(note={self.current_note}, velocity={self.current_velocity})"
+            return (
+                f"MonophonicSynth(note={self.current_note}, "
+                f"velocity={self.current_velocity})"
+            )
         else:
             return "MonophonicSynth(idle)"

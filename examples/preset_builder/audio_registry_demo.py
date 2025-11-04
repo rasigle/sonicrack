@@ -11,7 +11,12 @@ import numpy as np
 
 from builder import PresetBuilder, ComponentCategory
 from constants import DEFAULT_SAMPLE_RATE
-from engine import Oscillator, Modifier, register_component, audio_registry, ComponentDescriptor
+from engine import (
+    Oscillator,
+    Modifier,
+    audio_registry,
+    ComponentDescriptor,
+)
 
 
 def example_1_basic_usage():
@@ -68,7 +73,7 @@ def example_2_custom_oscillator():
             category=ComponentCategory.OSCILLATOR,
             config_params=["amplitude", "sample_rate"],
             description="White noise generator",
-            fluent_api_name="my_custom_noise"
+            fluent_api_name="my_custom_noise",
         )
 
         def __init__(
@@ -89,7 +94,6 @@ def example_2_custom_oscillator():
         def get_samples_vectorized(self, n: int) -> np.ndarray:
             """Generate n samples of white noise."""
             return self._a * (2 * np.random.random(n) - 1)
-
 
     # Register it with the system
     audio_registry.register(NoiseOscillator)
@@ -126,7 +130,7 @@ def example_3_custom_effect():
             category=ComponentCategory.MODIFIER,
             config_params=["drive", "mix"],
             description="Soft clipping distortion/overdrive",
-            fluent_api_name="distortion"
+            fluent_api_name="distortion",
         )
 
         def __init__(self, drive: float = 2.0, mix: float = 1.0):
@@ -257,7 +261,7 @@ def example_6_plugin_system():
             category=ComponentCategory.OSCILLATOR,
             config_params=["frequency", "voices", "detune", "sample_rate"],
             description="Supersaw oscillator with multiple detuned voices",
-            fluent_api_name="supersaw"
+            fluent_api_name="supersaw",
         )
 
         def __init__(
@@ -299,7 +303,7 @@ def example_6_plugin_system():
             category=ComponentCategory.MODIFIER,
             config_params=["cutoff", "resonance"],
             description="Resonant low-pass filter",
-            fluent_api_name="resonant_filter"
+            fluent_api_name="resonant_filter",
         )
 
         def __init__(self, cutoff: float = 1000, resonance: float = 0.5):

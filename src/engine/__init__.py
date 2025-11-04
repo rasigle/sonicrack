@@ -87,7 +87,7 @@ License: See LICENSE file
 from src.engine.audio_component import (
     AudioComponent,
     ComponentCategory,
-    ComponentDescriptor
+    ComponentDescriptor,
 )
 from src.engine.audio_component_registry import (
     AudioComponentRegistry,

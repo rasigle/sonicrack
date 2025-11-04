@@ -114,7 +114,8 @@ class MIDIInput:
         """Open a MIDI input device.
 
         Args:
-            device_name: Name of device to open. If None, uses constructor value or first available.
+            device_name: Name of device to open. If None, uses constructor value or
+                first available.
 
         Raises:
             IOError: If device cannot be opened

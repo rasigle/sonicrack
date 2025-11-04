@@ -16,7 +16,11 @@ from __future__ import annotations
 import inspect
 from typing import Any, Type, Callable
 
-from src.engine.audio_component import ComponentCategory, AudioComponent, ComponentDescriptor
+from src.engine.audio_component import (
+    ComponentCategory,
+    AudioComponent,
+    ComponentDescriptor,
+)
 from src.utils.logging_config import get_logger
 
 logger = get_logger("audio.component_registry")
@@ -45,17 +49,14 @@ class AudioComponentRegistry:
 
         # Import all engine modules to trigger decorator registration
         try:
-            from src.engine import oscillator
-            from src.engine import modulator
-            from src.engine import modifier
-            from src.engine import composer
-            from src.engine import modulated_oscillator
-            from src.engine import noise
+
             logger.debug("Auto-loaded engine components into registry")
         except Exception as e:
             logger.error(f"Failed to auto-load engine components: {e}")
 
-    def register(self, component_class: Type[AudioComponent], override: bool = False) -> None:
+    def register(
+        self, component_class: Type[AudioComponent], override: bool = False
+    ) -> None:
         """Register a component descriptor.
 
         Args:
@@ -63,12 +64,15 @@ class AudioComponentRegistry:
             override: Allow overriding existing registration
 
         Raises:
-            TypeError: If component_class is not a valid class or doesn't inherit from AudioComponent
+            TypeError: If component_class is not a valid class or doesn't inherit from
+                AudioComponent
             AttributeError: If component_class doesn't have a descriptor attribute
         """
         # Validate module class
         if not inspect.isclass(component_class):
-            raise TypeError(f"component_class must be a class, got {type(component_class)}")
+            raise TypeError(
+                f"component_class must be a class, got {type(component_class)}"
+            )
 
         if not issubclass(component_class, AudioComponent):
             raise TypeError(
@@ -77,7 +81,7 @@ class AudioComponentRegistry:
             )
 
         # Check for descriptor attribute
-        if not hasattr(component_class, 'descriptor'):
+        if not hasattr(component_class, "descriptor"):
             raise AttributeError(
                 f"Component class {component_class.__name__} must have a 'descriptor' "
                 f"class attribute with ComponentDescriptor metadata"
@@ -177,7 +181,8 @@ class AudioComponentRegistry:
         """
         self._ensure_initialized()
         return [
-            name for name, component in self._components.items()
+            name
+            for name, component in self._components.items()
             if component.descriptor.category == category
         ]
 
@@ -201,7 +206,7 @@ class AudioComponentRegistry:
             "=== Audio Component Registry ===",
             f"Total components: {len(self._components)}",
             f"Initialized: {self._initialized}",
-            ""
+            "",
         ]
 
         # Group by category
@@ -252,8 +257,9 @@ def _class_name_to_component_name(class_name: str) -> str:
         Component name (e.g., "sine_oscillator")
     """
     import re
-    name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', class_name)
-    name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name)
+
+    name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", class_name)
+    name = re.sub("([a-z0-9])([A-Z])", r"\1_\2", name)
     return name.lower()
 
 
@@ -271,7 +277,7 @@ def _extract_parameter_names(cls: Type) -> list[str]:
         return [
             param_name
             for param_name in sig.parameters.keys()
-            if param_name not in ('self', 'args', 'kwargs')
+            if param_name not in ("self", "args", "kwargs")
         ]
     except Exception as e:
         logger.warning(f"Could not extract parameters from {cls.__name__}: {e}")
@@ -305,7 +311,7 @@ def register_component(override: bool = False) -> Callable:
 
     def decorator(cls: Type[AudioComponent]) -> Type[AudioComponent]:
         # Validate that the class has a descriptor
-        if not hasattr(cls, 'descriptor'):
+        if not hasattr(cls, "descriptor"):
             logger.error(
                 f"Cannot register {cls.__name__}: missing 'descriptor' class attribute"
             )

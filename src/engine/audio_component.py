@@ -34,6 +34,7 @@ class ComponentDescriptor:
         serializer: Optional custom serializer function
         deserializer: Optional custom deserializer function
     """
+
     name: str
     category: ComponentCategory
     description: str = ""
@@ -42,7 +43,6 @@ class ComponentDescriptor:
     fluent_api_name: str | None = None
     serializer: Callable | None = None
     deserializer: Callable | None = None
-
 
     def to_config(self, *args, **kwargs) -> dict[str, Any]:
         """Convert the given component configuration parameters to dictionary.
@@ -90,7 +90,6 @@ class AudioComponent(ABC):
     component_name: str
     descriptor: ComponentDescriptor
 
-
     @classmethod
     def from_config(cls: Type[T], config: dict[str, Any]) -> T:
         """Creates an audio component instance from given configuration dictionary.
@@ -117,4 +116,3 @@ class Generator(AudioComponent):
 
     def __init__(self, sample_rate: float = DEFAULT_SAMPLE_RATE):
         self.sample_rate = sample_rate
-

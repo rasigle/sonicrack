@@ -69,11 +69,12 @@ class ModulatedOscillator(Generator):
         name="ModulatedOscillator",
         category=ComponentCategory.OSCILLATOR,
         description="Oscillator with modulation support (amplitude, frequency, phase)",
-        tags=["oscillator", "modulated", "advanced"]
+        tags=["oscillator", "modulated", "advanced"],
     )
 
-    def __init__(self, oscillator, *modulators, amp_mod=None, freq_mod=None,
-                 phase_mod=None):
+    def __init__(
+        self, oscillator, *modulators, amp_mod=None, freq_mod=None, phase_mod=None
+    ):
         """Initialize the ModulatedOscillator.
 
         Args:

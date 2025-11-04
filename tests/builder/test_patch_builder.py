@@ -137,7 +137,10 @@ class TestPatchBuilder(unittest.TestCase):
     def test_get_config(self):
         """Test getting configuration dictionary."""
         builder = (
-            PresetBuilder().sine(440, amplitude=0.8).adsr(0.1, 0.2, 0.7, 0.3).volume(0.5)
+            PresetBuilder()
+            .sine(440, amplitude=0.8)
+            .adsr(0.1, 0.2, 0.7, 0.3)
+            .volume(0.5)
         )
 
         config = builder.get_config()

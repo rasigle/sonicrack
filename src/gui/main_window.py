@@ -1,8 +1,6 @@
 """Main window for the modular synthesizer."""
 
 import logging
-from pathlib import Path
-from typing import Any
 
 from PyQt6.QtCore import Qt, QTimer, QPointF
 from PyQt6.QtGui import QAction, QIcon
@@ -29,18 +27,13 @@ from src.gui.module_registry import initialize_modules
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
 from src.gui.preset_manager import PresetManager
+from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets.spectrum_analyzer import SpectrumAnalyzer
 from src.gui.widgets.tree_analyzer import TreeAnalyzer
 from src.gui.widgets.waveform_display import WaveformDisplay
 
 logger = logging.getLogger(__name__)
-
-
-RESOURCES_PATH = Path(__file__).parent.parent.parent / 'resources'
-APP_ICON_NAME = 'icon.png'
-APP_ICON_PATH = RESOURCES_PATH / "icons" / APP_ICON_NAME
-APP_TITLE = "AudioPlayground - Modular Synthesizer"
 
 
 class ModularSynthWindow(QMainWindow):
@@ -647,7 +640,7 @@ class ModularSynthWindow(QMainWindow):
         event.accept()
 
 
-def is_module_widget(obj: Any) -> bool:
+def is_module_widget(obj: QWidget) -> bool:
     """Check if an object is a ModuleWidget.
 
     Args:

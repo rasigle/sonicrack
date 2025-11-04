@@ -3,6 +3,11 @@
 This module defines global constants for sample rates, buffer sizes,
 and other audio-related values.
 """
+from pathlib import Path
+
+# Standard library paths
+RESOURCES_PATH = Path(__file__).parent.parent / 'resources'
+SPLASH_PATH = Path(RESOURCES_PATH) / 'splash' / 'splash.png'
 
 # Sample rate constants
 DEFAULT_SAMPLE_RATE = 44100  # CD quality

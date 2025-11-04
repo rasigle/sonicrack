@@ -7,26 +7,13 @@ Usage:
     python modular_synth_app.py
 """
 
-import logging
 import sys
-from pathlib import Path
 
 from PyQt6.QtWidgets import QApplication
 
+from src.constants import SPLASH_PATH
 from src.gui.main_window import ModularSynthWindow
-
-RESOURCES_DIR = Path(__file__).parent.parent / 'resources'
-
-
-def setup_logging():
-    """Setup logging configuration."""
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-        ],
-    )
+from src.utils import setup_logging
 
 
 def activate_ui_exception_logging():
@@ -56,9 +43,8 @@ def main():
     from PyQt6.QtGui import QPixmap
     from PyQt6.QtCore import Qt
 
-    splash_path = Path(RESOURCES_DIR) / 'splash' / 'splash.png'
-    if splash_path.exists():
-        splash_pixmap = QPixmap(str(splash_path))
+    if SPLASH_PATH.exists():
+        splash_pixmap = QPixmap(str(SPLASH_PATH))
         splash = QSplashScreen(splash_pixmap, Qt.WindowType.WindowStaysOnTopHint)
         splash.show()
         app.processEvents()

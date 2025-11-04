@@ -111,8 +111,12 @@ class Cable(QGraphicsItem):
         self.start_port = start_port
         self.end_port = end_port
         self.temp_end_pos: QPointF | None = None
+        self.is_hovered = False  # Track hover state
 
+        # Make cable selectable and interactive
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
+        self.setAcceptHoverEvents(True)
+        self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton)
         self.setZValue(-1)  # Draw cables behind modules
 
         if start_port:
@@ -173,13 +177,54 @@ class Cable(QGraphicsItem):
 
         path.cubicTo(ctrl1, ctrl2, end)
 
-        # Cable color
-        color = QColor(255, 200, 0) if self.isSelected() else QColor(100, 100, 100)
-        pen = QPen(color, 3)
+        # Cable color based on selection and hover state
+        if self.isSelected():
+            color = QColor(255, 200, 0)  # Yellow when selected
+            width = 4
+        elif self.is_hovered:
+            color = QColor(150, 150, 150)  # Lighter gray when hovered
+            width = 4
+        else:
+            color = QColor(100, 100, 100)  # Normal gray
+            width = 3
+
+        pen = QPen(color, width)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
 
         painter.setPen(pen)
         painter.drawPath(path)
+
+    def shape(self) -> QPainterPath:
+        """Return the shape for collision detection (wider than visual cable)."""
+        if not self.start_port:
+            path = QPainterPath()
+            return path
+
+        start = self.mapFromScene(self.start_port.get_scene_pos())
+        if self.end_port:
+            end = self.mapFromScene(self.end_port.get_scene_pos())
+        elif self.temp_end_pos:
+            end = self.mapFromScene(self.temp_end_pos)
+        else:
+            path = QPainterPath()
+            return path
+
+        # Create path with same curve as visual
+        path = QPainterPath()
+        path.moveTo(start)
+
+        ctrl_offset = abs(end.x() - start.x()) * 0.5
+        ctrl1 = QPointF(start.x() + ctrl_offset, start.y())
+        ctrl2 = QPointF(end.x() - ctrl_offset, end.y())
+        path.cubicTo(ctrl1, ctrl2, end)
+
+        # Create wider stroke for easier clicking (15 pixels wide for better interaction)
+        from PyQt6.QtGui import QPainterPathStroker
+        stroker = QPainterPathStroker()
+        stroker.setWidth(15)  # Increased from 10 to 15 for easier clicking
+        stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
+        stroker.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        return stroker.createStroke(path)
 
     def remove(self):
         """Remove this cable from the scene and disconnect from ports."""
@@ -189,6 +234,53 @@ class Cable(QGraphicsItem):
             self.end_port.remove_cable(self)
         if self.scene():
             self.scene().removeItem(self)
+
+    def hoverEnterEvent(self, event):
+        """Handle mouse hover enter."""
+        self.is_hovered = True
+        self.update()
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        """Handle mouse hover leave."""
+        self.is_hovered = False
+        self.update()
+        super().hoverLeaveEvent(event)
+
+    def contextMenuEvent(self, event):
+        """Handle right-click context menu."""
+        from PyQt6.QtWidgets import QMenu
+        from PyQt6.QtGui import QAction
+
+        # Select this cable to highlight it visually
+        self.setSelected(True)
+
+        # Create context menu
+        menu = QMenu()
+
+        # Add delete action
+        delete_action = QAction("Delete Connection", menu)
+        delete_action.triggered.connect(self._on_delete_requested)
+        menu.addAction(delete_action)
+
+        # Show menu at cursor position
+        # Get the view to show the menu
+        if self.scene() and self.scene().views():
+            view = self.scene().views()[0]
+            menu.exec(view.mapToGlobal(view.mapFromScene(event.scenePos())))
+
+        event.accept()
+
+    def _on_delete_requested(self):
+        """Handle delete request from context menu."""
+        # Emit disconnection signal if we're in a PatchCanvas
+        if self.scene() and isinstance(self.scene().parent(), PatchCanvas):
+            canvas = self.scene().parent()
+            if self.start_port and self.end_port:
+                canvas.cable_disconnected.emit(self.start_port, self.end_port)
+
+        # Remove the cable
+        self.remove()
 
 
 class PatchCanvas(QGraphicsView):
@@ -251,9 +343,37 @@ class PatchCanvas(QGraphicsView):
             item = self.itemAt(event.pos())
 
             if isinstance(item, Port) and item.port_type == "input":
-                # Valid connection
-                self.dragging_cable.set_end_port(item)
-                self.cable_connected.emit(self.drag_start_port, item)
+                # Check if trying to connect to the same module
+                if item.parent_module == self.drag_start_port.parent_module:
+                    # Self-connection not allowed - show error
+                    from PyQt6.QtWidgets import QMessageBox
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Connection",
+                        "Cannot connect a module's output to its own input.\n\n"
+                        "Self-connections would create an infinite feedback loop."
+                    )
+                    # Remove the invalid cable
+                    self.dragging_cable.remove()
+                else:
+                    # Check if this connection would create a cycle
+                    cycle_info = self._would_create_cycle(self.drag_start_port, item)
+                    if cycle_info:
+                        # Connection would create a cycle - show error
+                        from PyQt6.QtWidgets import QMessageBox
+                        QMessageBox.warning(
+                            self,
+                            "Infinite Loop Detected",
+                            f"This connection would create an infinite feedback loop:\n\n"
+                            f"{cycle_info}\n\n"
+                            f"Please check your connections and avoid creating cycles."
+                        )
+                        # Remove the invalid cable
+                        self.dragging_cable.remove()
+                    else:
+                        # Valid connection
+                        self.dragging_cable.set_end_port(item)
+                        self.cable_connected.emit(self.drag_start_port, item)
             else:
                 # Invalid connection, remove cable
                 self.dragging_cable.remove()
@@ -264,6 +384,67 @@ class PatchCanvas(QGraphicsView):
             return
 
         super().mouseReleaseEvent(event)
+
+    def _would_create_cycle(self, start_port: Port, end_port: Port) -> str | None:
+        """Check if adding a connection would create a cycle.
+
+        Args:
+            start_port: The output port (source)
+            end_port: The input port (destination)
+
+        Returns:
+            String describing the cycle if one would be created, None otherwise
+        """
+        source_module = start_port.parent_module
+        dest_module = end_port.parent_module
+
+        # Build graph of existing connections
+        graph = {}  # module -> list of modules it connects to
+
+        # Get all existing cables from the scene
+        for item in self.scene.items():
+            if isinstance(item, Cable) and item.start_port and item.end_port:
+                src = item.start_port.parent_module
+                dst = item.end_port.parent_module
+                if src not in graph:
+                    graph[src] = []
+                graph[src].append(dst)
+
+        # Add the proposed connection temporarily
+        if source_module not in graph:
+            graph[source_module] = []
+        graph[source_module].append(dest_module)
+
+        # Check if this creates a cycle using DFS
+        visited = set()
+        rec_stack = set()
+        path = []
+
+        def dfs(module, current_path):
+            """Depth-first search to detect cycles."""
+            visited.add(module)
+            rec_stack.add(module)
+            current_path.append(module)
+
+            for neighbor in graph.get(module, []):
+                if neighbor not in visited:
+                    cycle = dfs(neighbor, current_path)
+                    if cycle:
+                        return cycle
+                elif neighbor in rec_stack:
+                    # Found a cycle! Build description
+                    cycle_start = current_path.index(neighbor)
+                    cycle_modules = current_path[cycle_start:] + [neighbor]
+                    cycle_names = [m.metadata.title for m in cycle_modules]
+                    return ' → '.join(cycle_names)
+
+            current_path.pop()
+            rec_stack.remove(module)
+            return None
+
+        # Check for cycles starting from the source module
+        cycle_description = dfs(source_module, [])
+        return cycle_description
 
     def keyPressEvent(self, event):
         """Handle key press for deleting cables and modules."""

@@ -53,7 +53,7 @@ class AudioEngine(QObject):
         """
         self.patch = patch
 
-        logger.info(f"Patch set: {type(patch).__name__}")
+        logger.debug(f"Patch set: {type(patch).__name__}")
 
     def set_master_volume(self, volume: float):
         """Set the master output volume.

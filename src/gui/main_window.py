@@ -1,10 +1,11 @@
 """Main window for the modular synthesizer."""
 
 import logging
+from pathlib import Path
 from typing import Any
 
 from PyQt6.QtCore import Qt, QTimer, QPointF
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -28,11 +29,18 @@ from src.gui.module_registry import initialize_modules
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
 from src.gui.preset_manager import PresetManager
+from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets.spectrum_analyzer import SpectrumAnalyzer
 from src.gui.widgets.tree_analyzer import TreeAnalyzer
 from src.gui.widgets.waveform_display import WaveformDisplay
 
 logger = logging.getLogger(__name__)
+
+
+RESOURCES_PATH = Path(__file__).parent.parent.parent / 'resources'
+APP_ICON_NAME = 'icon.png'
+APP_ICON_PATH = RESOURCES_PATH / "icons" / APP_ICON_NAME
+APP_TITLE = "AudioPlayground - Modular Synthesizer"
 
 
 class ModularSynthWindow(QMainWindow):
@@ -53,8 +61,14 @@ class ModularSynthWindow(QMainWindow):
         # Initialize the module registry with all built-in modules
         self.registry = initialize_modules()
 
-        self.setWindowTitle("AudioPlayground - Modular Synthesizer")
+        self.setWindowTitle(APP_TITLE)
         self.setGeometry(100, 100, 1400, 900)
+
+        # Set application icon
+        if not APP_ICON_PATH.exists():
+            logger.warning(f"App icon not found at {APP_ICON_PATH}")
+        else:
+            self.setWindowIcon(QIcon(str(APP_ICON_PATH)))
 
         # Core components
         self.audio_engine = AudioEngine()
@@ -64,7 +78,8 @@ class ModularSynthWindow(QMainWindow):
         # Debounce timer for parameter changes (avoid audio spikes)
         self.compile_debounce_timer = QTimer()
         self.compile_debounce_timer.setSingleShot(True)
-        self.compile_debounce_timer.timeout.connect(lambda: self._compile_patch())
+        # Don't update tree for parameter changes - only for structure changes
+        self.compile_debounce_timer.timeout.connect(lambda: self._compile_patch(update_tree=False))
 
         # UI setup
         self._setup_ui()
@@ -261,7 +276,7 @@ class ModularSynthWindow(QMainWindow):
         help_menu = menubar.addMenu("&Help")
 
         about_action = QAction("&About", self)
-        about_action.triggered.connect(show_about)
+        about_action.triggered.connect(lambda: show_about(self))
         help_menu.addAction(about_action)
 
     def _setup_toolbar(self):
@@ -313,11 +328,13 @@ class ModularSynthWindow(QMainWindow):
         else:
             logger.error(f"Module not found: {module_name}")
 
-    def _compile_patch(self, show_messages: bool = False) -> bool:
+    def _compile_patch(self, show_messages: bool = False, update_tree: bool = True) -> bool:
         """Compile the current patch automatically.
 
         Args:
             show_messages: If True, show message boxes for errors/success
+            update_tree: If True, update the tree visualization
+                (only needed for structure changes)
 
         Returns:
             True if compilation succeeded, False otherwise
@@ -357,14 +374,13 @@ class ModularSynthWindow(QMainWindow):
 
         # Compile
         patch = self.patch_compiler.compile()
-
-        logging.info(patch)
         if patch:
             self.audio_engine.set_patch(patch)
 
-            # Update tree analyzer with patch structure
-            tree_data = self.patch_compiler.build_patch_tree()
-            self.tree_analyzer.update_tree(tree_data)
+            # Update tree analyzer with patch structure (only when structure changes)
+            if update_tree:
+                tree_data = self.patch_compiler.build_patch_tree()
+                self.tree_analyzer.update_tree(tree_data)
 
             # Get master volume from output module
             output_module_class = self.registry.get("Output")
@@ -377,7 +393,7 @@ class ModularSynthWindow(QMainWindow):
             if show_messages:
                 QMessageBox.information(self, "Success", "Patch compiled successfully!")
             self.statusbar.showMessage("Patch compiled and ready")
-            logger.info("Patch compiled successfully")
+            logger.debug("Patch compiled successfully")
             return True
         else:
             # Clear tree on compilation failure
@@ -458,6 +474,7 @@ class ModularSynthWindow(QMainWindow):
         logger.debug(f"Parameter changed: {param_name} = {value}")
         # Debounce compilation to avoid audio spikes during knob rotation
         # Wait 100ms after last change before recompiling
+        # Don't update tree since parameter changes don't affect structure
         self.compile_debounce_timer.stop()
         self.compile_debounce_timer.start(100)  # 100ms delay
 
@@ -495,7 +512,7 @@ class ModularSynthWindow(QMainWindow):
         modules = [
             item
             for item in self.patch_canvas.scene.items()
-            if hasattr(item, "module_category")
+            if isinstance(item, ModuleWidget)
         ]
         connections = self.patch_canvas.get_connections()
 

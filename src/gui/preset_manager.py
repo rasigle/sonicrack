@@ -10,6 +10,8 @@ from typing import Any
 from pathlib import Path
 from datetime import datetime
 
+from src.gui.audio_module_interface import ModuleMetadata
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,13 +84,12 @@ class PresetManager:
 
             # Serialize modules
             for module_id, module in zip(module_ids.values(), modules):
+                metadata: ModuleMetadata = module.metadata
                 module_data = {
                     "id": module_id,
-                    "type": module.module_title,
-                    "custom_name": (
-                        module.custom_name if hasattr(module, "custom_name") else ""
-                    ),
-                    "module_category": module.module_category,
+                    "type": metadata.title,
+                    "custom_name": module.custom_name,
+                    "module_category": metadata.category,
                     "position": {"x": module.pos().x(), "y": module.pos().y()},
                     "parameters": module.get_parameters(),
                 }

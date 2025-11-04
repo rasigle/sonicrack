@@ -45,13 +45,6 @@ class ModuleRegistry:
     ) -> Type[ModuleWidget]:
         """Register a module class.
 
-        Metadata is automatically extracted from the module class properties:
-        - name: from module_title property
-        - category: from module_category property
-        - description: from module_description property
-        - version: from module_version property
-        - author: from module_author property
-
         Args:
             module_class: The module class to register
             **override_metadata: Optional metadata to override extracted values
@@ -245,8 +238,6 @@ def register_module(**override_metadata) -> Callable:
     """Decorator to register a module class.
 
     This decorator automatically registers the module when the class is defined.
-    Metadata is extracted from the module's properties (module_title, module_category,
-    etc.)
 
     Args:
         **override_metadata: Optional metadata to override extracted values
@@ -260,13 +251,6 @@ def register_module(**override_metadata) -> Callable:
         # Simple usage - metadata from class properties
         @register_module()
         class MyOscillator(ModuleWidget):
-            @property
-            def module_title(self):
-                return "My Oscillator"
-
-            @property
-            def module_category(self):
-                return ModuleCategory.SOURCE
 
         # With overrides
         @register_module(author="Your Name")

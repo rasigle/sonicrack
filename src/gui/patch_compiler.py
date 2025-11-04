@@ -65,7 +65,7 @@ class PatchCompiler:
                 logger.error("Failed to build signal chain")
                 return None
 
-            logger.info(f"Patch compiled successfully: {type(component).__name__}")
+            logger.debug(f"Patch compiled successfully: {type(component).__name__}")
             self.compiled_patch = component
             return component
 
@@ -239,6 +239,70 @@ class PatchCompiler:
                 return start_port
         return None
 
+    def _detect_cycles(self) -> list[str]:
+        """Detect cycles (infinite loops) in the patch connection graph.
+
+        Returns:
+            List of error messages describing any cycles found
+        """
+        errors = []
+
+        # Build adjacency list for the connection graph
+        graph = {}  # module -> list of modules it connects to
+        for start_port, end_port in self.connections:
+            source_module = start_port.parent_module
+            dest_module = end_port.parent_module
+
+            if source_module not in graph:
+                graph[source_module] = []
+            graph[source_module].append(dest_module)
+
+        # Track visited modules and recursion stack for cycle detection
+        visited = set()
+        rec_stack = set()
+
+        def dfs(module, path):
+            """Depth-first search to detect cycles."""
+            visited.add(module)
+            rec_stack.add(module)
+            path.append(module)
+
+            # Check all neighbors
+            for neighbor in graph.get(module, []):
+                if neighbor not in visited:
+                    # Continue DFS
+                    if dfs(neighbor, path):
+                        return True
+                elif neighbor in rec_stack:
+                    # Found a cycle! The neighbor is already in our recursion stack
+                    # Build the cycle description from where neighbor first appears in path
+                    try:
+                        cycle_start_idx = path.index(neighbor)
+                        cycle_modules = path[cycle_start_idx:] + [neighbor]
+                        cycle_names = [m.metadata.title for m in cycle_modules]
+                        errors.append(
+                            f"Infinite loop detected: {' → '.join(cycle_names)}\n"
+                            f"This creates a feedback loop that cannot be compiled."
+                        )
+                    except ValueError:
+                        # Neighbor not in path (shouldn't happen, but be safe)
+                        errors.append(
+                            f"Infinite loop detected involving module '{neighbor.metadata.title}'\n"
+                            f"This creates a feedback loop that cannot be compiled."
+                        )
+                    return True
+
+            path.pop()
+            rec_stack.remove(module)
+            return False
+
+        # Check each module as a potential cycle starting point
+        for module in graph.keys():
+            if module not in visited:
+                dfs(module, [])
+
+        return errors
+
     def get_compilation_errors(self) -> list[str]:
         """Get a list of compilation errors/warnings.
 
@@ -247,9 +311,14 @@ class PatchCompiler:
         """
         errors = []
 
+        # Check for cycles (infinite loops) first
+        cycle_errors = self._detect_cycles()
+        errors.extend(cycle_errors)
+
         # Check for output module
+        from src.gui.main_window import is_module_widget
         has_output = any(
-            m.metadata.category == ModuleCategory.OUTPUT for m in self.modules if isinstance(m, AudioModuleInterface)
+            m.metadata.category == ModuleCategory.OUTPUT for m in self.modules if is_module_widget(m)
         )
         if not has_output:
             errors.append("No output module in patch")
@@ -270,10 +339,7 @@ class PatchCompiler:
                 module not in connected_modules
                 and module.metadata.category != ModuleCategory.OUTPUT
             ):
-                errors.append(
-                    f"Module '{getattr(module, 'module_title', 'Unknown')}' is not "
-                    f"connected"
-                )
+                errors.append(f"Module '{module.metadata.title}' is not connected")
 
         # Check for invalid connections
         for start_port, end_port in self.connections:
@@ -281,6 +347,18 @@ class PatchCompiler:
                 errors.append("Invalid connection: source port is not an output")
             if end_port.port_type != "input":
                 errors.append("Invalid connection: destination port is not an input")
+
+            # Check for self-connections
+            if start_port.parent_module == end_port.parent_module:
+                module_name = getattr(start_port.parent_module, 'metadata', None)
+                if module_name:
+                    module_name = module_name.title
+                else:
+                    module_name = "Unknown"
+                errors.append(
+                    f"Invalid self-connection in module '{module_name}': "
+                    f"output cannot connect to own input"
+                )
 
         return errors
 

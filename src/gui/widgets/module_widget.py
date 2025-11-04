@@ -262,6 +262,16 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         """Return the bounding rectangle of the module."""
         return QRectF(0, 0, self.module_width, self.module_height)
 
+    def shape(self):
+        """Return the shape for collision detection.
+
+        This ensures the entire module area is clickable and draggable.
+        """
+        from PyQt6.QtGui import QPainterPath
+        path = QPainterPath()
+        path.addRect(self.boundingRect())
+        return path
+
     def paint(self, painter: QPainter, option, widget=None):
         """Paint the module."""
         rect = self.boundingRect()

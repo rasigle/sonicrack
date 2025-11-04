@@ -335,6 +335,9 @@ class ModularSynthWindow(QMainWindow):
         # Special handling for Output module - connect master volume directly
         if hasattr(module, 'master_volume_changed'):
             module.master_volume_changed.connect(self.audio_engine.set_master_volume)
+            # Emit initial volume to sync audio engine (use QTimer to ensure connections are ready)
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(0, module._on_volume_changed)
 
         self.patch_canvas.add_module(module)
         self.statusbar.showMessage(f"Added {module_name}")
@@ -531,7 +534,11 @@ class ModularSynthWindow(QMainWindow):
                 )
                 return
 
-            if self.audio_engine.is_playing:
+            # Some parameters require full recompilation (can't be hot-swapped)
+            # e.g., waveform type changes create a different oscillator class
+            requires_recompile = param_name in ["waveform"]
+
+            if self.audio_engine.is_playing and not requires_recompile:
                 # Hot-swap the parameter without recompiling (prevents clicks!)
                 success = self.patch_compiler.update_parameter(
                     sender_module, param_name, value
@@ -547,7 +554,7 @@ class ModularSynthWindow(QMainWindow):
                     self.compile_debounce_timer.stop()
                     self.compile_debounce_timer.start(DEBOUNCE_TIMER_DELAY_MS)
             else:
-                # Not playing: use debounced recompile
+                # Not playing OR requires recompile: use debounced recompile
                 # (Debouncing is less critical when not playing)
                 self.compile_debounce_timer.stop()
                 self.compile_debounce_timer.start(DEBOUNCE_TIMER_DELAY_MS)
@@ -660,6 +667,9 @@ class ModularSynthWindow(QMainWindow):
                 # Special handling for Output module - connect master volume directly
                 if hasattr(module, 'master_volume_changed'):
                     module.master_volume_changed.connect(self.audio_engine.set_master_volume)
+                    # Emit initial volume to sync audio engine (use QTimer to ensure connections are ready)
+                    from PyQt6.QtCore import QTimer
+                    QTimer.singleShot(0, module._on_volume_changed)
 
                 # Restore custom name if present
                 custom_name = module_data.get("custom_name", "")

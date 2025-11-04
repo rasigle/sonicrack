@@ -511,6 +511,17 @@ class PatchCanvas(QGraphicsView):
                 connections.append((item.start_port, item.end_port))
         return connections
 
+    def get_modules(self) -> list[ModuleWidget]:
+        """Get all modules currently on the canvas.
+
+        Returns:
+            List of ModuleWidget instances
+        """
+        from src.gui.widgets.module_widget import ModuleWidget
+        return [
+            item for item in self.scene.items() if isinstance(item, ModuleWidget)
+        ]
+
     def clear_all(self):
         """Clear all modules and cables from the canvas."""
         self.scene.clear()

@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.gui.audio_engine import AudioEngine
+from src.gui.audio_module_interface import ModuleCategory
 from src.gui.dialogs.about_dialog import show_about
 from src.gui.dialogs.preset_dialog import PresetBrowserDialog, SavePresetDialog
 from src.gui.module_registry import initialize_modules
@@ -305,21 +306,37 @@ class ModularSynthWindow(QMainWindow):
         Args:
             module_name: Name of the module type to add
         """
-        module_class = self.registry.get(module_name)
-        if module_class:
-            module = module_class()
+        module_class = self.registry.get(module_name, strict=True)
 
-            # Connect parameter change signal to auto-compile
-            module.parameter_changed.connect(self._on_parameter_changed)
+        # Check if trying to add an Output module when one already exists
+        if module_class.metadata.category == ModuleCategory.OUTPUT:
+            # Check if an Output module already exists
+            for module in self.patch_canvas.get_modules():
+                if module.metadata.category == ModuleCategory.OUTPUT:
+                    QMessageBox.warning(
+                        self,
+                        "Output Already Exists",
+                        "Only one Output module is allowed per patch.\n\n"
+                        "The Output module represents your audio device (speakers/DAC). "
+                        "Multiple outputs would cause conflicts.\n\n"
+                        "Connect multiple audio sources to the existing Output module instead."
+                    )
+                    self.statusbar.showMessage("Cannot add multiple Output modules")
+                    logger.warning("Attempted to add multiple Output modules")
+                    return
 
-            self.patch_canvas.add_module(module)
-            self.statusbar.showMessage(f"Added {module_name}")
-            logger.info(f"Added module: {module_name}")
+        # Initialize with default parameters
+        module = module_class()
 
-            # Auto-compile when module is added
-            self._compile_patch()
-        else:
-            logger.error(f"Module not found: {module_name}")
+        # Connect parameter change signal to auto-compile
+        module.parameter_changed.connect(self._on_parameter_changed)
+
+        self.patch_canvas.add_module(module)
+        self.statusbar.showMessage(f"Added {module_name}")
+        logger.info(f"Added module: {module_name}")
+
+        # Auto-compile when module is added
+        self._compile_patch()
 
     def _compile_patch(self, show_messages: bool = False, update_tree: bool = True) -> bool:
         """Compile the current patch automatically.
@@ -332,12 +349,8 @@ class ModularSynthWindow(QMainWindow):
         Returns:
             True if compilation succeeded, False otherwise
         """
-        # Get all modules and connections
-        modules = [
-            item for item in self.patch_canvas.scene.items() if is_module_widget(item)
-        ]
-        connections = self.patch_canvas.get_connections()
-
+        # Get all modules
+        modules = self.patch_canvas.get_modules()
         if not modules:
             if show_messages:
                 QMessageBox.warning(
@@ -346,6 +359,12 @@ class ModularSynthWindow(QMainWindow):
             # Clear patch and stop playback
             self.audio_engine.set_patch(None)
             self.tree_analyzer.clear()
+            return False
+
+        # Get all connections
+        connections = self.patch_canvas.get_connections()
+        if not connections:
+            self.audio_engine.set_patch(None)
             return False
 
         # Check for errors

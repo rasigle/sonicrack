@@ -11,6 +11,8 @@ from src.constants import DEFAULT_SAMPLE_RATE
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_FADEOUT_DURATION_MS = 50  # Default fade-out duration in milliseconds
+
 
 class AudioEngine(QObject):
     """Audio engine for real-time synthesis and playback.
@@ -44,6 +46,21 @@ class AudioEngine(QObject):
 
         # Buffer for visualization
         self.current_buffer: np.ndarray | None = None
+
+        # Fade-out state to prevent clicks on stop
+        self.is_fading_out: bool = False
+        self.fade_out_samples_remaining: int = 0
+        self.fade_out_duration_ms: float = DEFAULT_FADEOUT_DURATION_MS  # 50 ms default
+        self.fade_out_total_samples: int = int(self.sample_rate * self.fade_out_duration_ms / 1000)
+
+        # Fade-in state to prevent clicks on start
+        self.is_fading_in: bool = False
+        self.fade_in_samples_remaining: int = 0
+        self.fade_in_duration_ms: float = 10  # 10ms fade-in (shorter than fade-out)
+        self.fade_in_total_samples: int = int(self.sample_rate * self.fade_in_duration_ms / 1000)
+
+        # Track if we're in post-fade silence mode
+        self.post_fade_silence: bool = False
 
     def set_patch(self, patch: Any):
         """Set the audio patch to play.
@@ -81,6 +98,11 @@ class AudioEngine(QObject):
                 outdata.fill(0)
                 return
 
+            # If in post-fade silence mode, just output silence
+            if self.post_fade_silence:
+                outdata.fill(0)
+                return
+
             # Generate samples from patch
             samples = self.patch.get_samples(frames)
 
@@ -108,6 +130,54 @@ class AudioEngine(QObject):
 
             # Apply master volume
             stereo = stereo * self.master_volume
+
+            # Apply fade-in if starting playback
+            if self.is_fading_in and self.fade_in_samples_remaining > 0:
+                # Calculate how many samples to fade in this buffer
+                fade_samples = min(frames, self.fade_in_samples_remaining)
+
+                # Create fade-in curve (linear)
+                fade_start = 1.0 - (self.fade_in_samples_remaining / self.fade_in_total_samples)
+                fade_end = 1.0 - (max(0, self.fade_in_samples_remaining - fade_samples) / self.fade_in_total_samples)
+                fade_curve = np.linspace(fade_start, fade_end, fade_samples)
+
+                # Apply fade to the samples
+                stereo[:fade_samples] *= fade_curve[:, np.newaxis]
+
+                self.fade_in_samples_remaining -= fade_samples
+
+                # If fade-in complete, disable it
+                if self.fade_in_samples_remaining <= 0:
+                    self.is_fading_in = False
+
+            # Apply fade-out if stopping playback
+            if self.is_fading_out and self.fade_out_samples_remaining > 0:
+                # Calculate how many samples to fade in this buffer
+                fade_samples = min(frames, self.fade_out_samples_remaining)
+
+                # Create fade-out curve (linear for simplicity, could use exponential)
+                fade_curve = np.linspace(
+                    self.fade_out_samples_remaining / self.fade_out_total_samples,
+                    max(0.0, (self.fade_out_samples_remaining - fade_samples) / self.fade_out_total_samples),
+                    fade_samples
+                )
+
+                # Apply fade to the samples
+                stereo[:fade_samples] *= fade_curve[:, np.newaxis]
+
+                # Remaining samples after fade are silent
+                if fade_samples < frames:
+                    stereo[fade_samples:] = 0
+
+                self.fade_out_samples_remaining -= fade_samples
+
+                # If fade-out complete, enter post-fade silence mode
+                if self.fade_out_samples_remaining <= 0:
+                    self.is_fading_out = False
+                    self.post_fade_silence = True
+                    # Fill rest with silence
+                    if fade_samples < frames:
+                        stereo[fade_samples:] = 0
 
             # Clip to valid range
             stereo = np.clip(stereo, -1.0, 1.0)
@@ -144,6 +214,11 @@ class AudioEngine(QObject):
             if hasattr(self.patch, "reset"):
                 self.patch.reset()
 
+            # Enable fade-in to prevent startup click
+            self.is_fading_in = True
+            self.fade_in_samples_remaining = self.fade_in_total_samples
+            self.post_fade_silence = False  # Ensure we're not in silence mode
+
             # Open audio stream
             self.stream = sd.OutputStream(
                 samplerate=self.sample_rate,
@@ -163,22 +238,47 @@ class AudioEngine(QObject):
             self.error_occurred.emit(f"Failed to start playback: {e}")
 
     def stop_playback(self):
-        """Stop audio playback."""
+        """Stop audio playback with fade-out to prevent clicks."""
         if not self.is_playing:
             return
 
         try:
+            # Initiate fade-out instead of immediate stop
+            self.is_fading_out = True
+            self.fade_out_samples_remaining = self.fade_out_total_samples
+            self.post_fade_silence = False
+
+            logger.info(f"Stopping playback  ({self.fade_out_duration_ms}ms fade-out...)")
+
+            # Schedule the actual stream stop after fade-out completes
+            # Use a timer to avoid blocking the GUI thread
+            from PyQt6.QtCore import QTimer
+
+            # Wait for fade + extra buffer time for safety
+            fade_duration_ms = int(self.fade_out_duration_ms + 100)  # 50ms fade + 100ms buffer
+            QTimer.singleShot(fade_duration_ms, self._finalize_stop)
+
+        except Exception as e:
+            logger.error(f"Failed to stop playback: {e}", exc_info=True)
+            self._finalize_stop()  # Ensure cleanup happens
+
+    def _finalize_stop(self):
+        """Finalize playback stop after fade-out completes."""
+        try:
+            # Now actually stop the stream
             if self.stream:
                 self.stream.stop()
                 self.stream.close()
                 self.stream = None
 
             self.is_playing = False
+            self.is_fading_out = False
+            self.post_fade_silence = False
             self.playback_stopped.emit()
             logger.info("Playback stopped")
 
         except Exception as e:
-            logger.error(f"Failed to stop playback: {e}", exc_info=True)
+            logger.error(f"Failed to finalize stop: {e}", exc_info=True)
 
     def generate_samples(self, num_samples: int) -> np.ndarray | None:
         """Generate samples from the patch without playback.

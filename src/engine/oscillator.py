@@ -15,17 +15,28 @@ Classes:
 Functions:
     synth: Convenience function to generate complete waveforms.
 
-Example:
-    >>> # Create and use an oscillator
-    >>> osc = SineOscillator(frequency=440, amplitude=1.0, phase=0.0)
-    >>> samples = osc.get_samples_vectorized(1000)  # Fast vectorized generation
-    >>>
-    >>> # Change parameters at runtime
-    >>> osc.frequency = 880
-    >>> more_samples = osc.get_samples(500)
-    >>>
-    >>> # Use convenience function
-    >>> wave = synth(frequency=440, dur=1.0, stype="sine")
+Amplitude Control:
+    Oscillators support both linear amplitude and decibel (dB) gain control:
+
+    - **amplitude** (linear): Direct multiplier (0.0 to 1.0+)
+      Example: amplitude=0.5 means output is halved
+
+    - **gain_db** (decibels): Professional audio standard
+      Example: gain_db=-6 means -6 dB reduction (≈half amplitude)
+
+    - **wave_range**: Advanced feature for non-standard output ranges
+      Default is (-1, 1) for audio. Rarely needed except for:
+        * Control signals (e.g., 0 to 1 for LFO)
+        * Legacy algorithm compatibility
+        * Scientific applications
+
+    How they work together:
+    1. Waveform is generated in wave_range (default: -1 to 1)
+    2. Converted to standard range if wave_range != (-1, 1)
+    3. Multiplied by amplitude (determined from gain_db or amplitude parameter)
+
+    Priority: gain_db > amplitude if both specified
+    Default: gain_db=-20.0 (safe for mixing multiple sources)
 
 Performance:
     - Iterator mode: Flexible but slower, suitable for small buffers
@@ -48,29 +59,75 @@ from src.engine.audio_component_registry import register_component, ComponentCat
 
 
 class Oscillator(Generator):
-    """Base class for all signal generators.
+    """Base class for all signal generators with professional gain control.
 
-    The oscillator is initialized with fixed initial values but exposes properties to
-    modify the running parameters without reconstructing the instance.
+    The oscillator supports both linear amplitude and decibel (dB) gain control,
+    with runtime parameter modification without reconstructing the instance.
+
+    **Amplitude vs. Gain (dB):**
+
+    - Use **gain_db** for audio work (professional standard)
+      * 0 dB = unity gain (no change)
+      * -6 dB = half amplitude
+      * -20 dB = 1/10 amplitude (safe default for mixing)
+
+    - Use **amplitude** for direct linear control
+      * 1.0 = full amplitude
+      * 0.5 = half amplitude
+      * 0.1 = 1/10 amplitude
+
+    **If both gain_db and amplitude are specified:**
+    gain_db takes priority. A warning is logged if they don't match.
+
+    **wave_range explained:**
+    Controls the raw waveform output range before amplitude scaling.
+    Default (-1, 1) is correct for audio. Only change for special cases:
+
+    - (0, 1): Unipolar signal (e.g., for modulation)
+    - (0, 10): VCV Rack style control voltage
+    - Custom ranges for specific algorithms
+
+    Flow: raw_waveform → range_conversion → amplitude_scaling → output
 
     Args:
         frequency: Initial frequency in Hz.
-        amplitude: Initial amplitude. Defaults to 1.
+        amplitude: Linear amplitude (0.0 to 1.0+). Default: 1.0
+            Note: Ignored if gain_db is specified.
+        gain_db: Gain in decibels. Default: -20.0 (safe for mixing)
+            Overrides amplitude if provided.
+            Set to None to use amplitude parameter instead.
         phase: Initial phase in degrees. Defaults to 0.0.
         sample_rate: Samples per second. Defaults to `DEFAULT_SAMPLE_RATE`.
         wave_range: Tuple specifying value range (min, max) of raw waveform before
             amplitude scaling. Defaults to (-1, 1).
+            Advanced feature - most users should leave as default.
+        gain_db: Current gain in dB (settable).
+        wave_range: Current wave range (settable).
 
     Attributes:
         sample_rate: Samples per second (public alias).
-        _i: internal time/index state.
-        _step: internal step for phase progression (implementation-specific).
+        frequency: Current frequency in Hz (settable).
+        amplitude: Current linear amplitude (settable).
+
+
+    Example:
+        >>> # Create oscillator with dB control (recommended)
+        >>> osc = SineOscillator(frequency=440, gain_db=-20)
+        >>> osc.gain_db = -12  # Increase by 8 dB
+        >>>
+        >>> # Or use linear amplitude
+        >>> osc2 = SineOscillator(frequency=880, amplitude=0.5, gain_db=None)
+        >>> osc2.amplitude = 0.8  # Increase amplitude
+        >>>
+        >>> # Both specified - gain_db takes priority
+        >>> osc3 = SineOscillator(gain_db=-6, amplitude=0.3)  # Uses -6 dB (≈0.5)
     """
 
     def __init__(
         self,
         frequency: float = 440,
-        amplitude: float = 1,
+        amplitude: float = 1.0,
+        gain_db: float | None = -20.0,
         phase: float = 0.0,
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
@@ -78,17 +135,32 @@ class Oscillator(Generator):
         super().__init__(sample_rate=sample_rate)
 
         self._freq = frequency
-        self._amp = amplitude
         self._phase = phase
         self._sample_rate = sample_rate
         self._wave_range = wave_range
+
+        # Handle amplitude vs gain_db priority
+        if gain_db is not None:
+            self._amp = self.db_to_linear(gain_db)
+            # Warn if amplitude doesn't match gain_db
+            if amplitude != 1.0:  # Only warn if user explicitly set amplitude
+                expected_amp = self.db_to_linear(gain_db)
+                if abs(amplitude - expected_amp) > 0.01:
+                    import logging
+                    logging.warning(
+                        f"Both gain_db={gain_db} and amplitude={amplitude} specified. "
+                        f"Using gain_db (-20.0 dB = {expected_amp:.3f} linear). "
+                        f"To use amplitude, set gain_db=None."
+                    )
+        else:
+            self._amp = amplitude
 
         self._i = 0
         self._step = 0
 
         # Properties that can be changed
         self._f = frequency
-        self._a = amplitude
+        self._a = self._amp
         self._p = self._phase
 
         # Pre-compute wave_range conversion
@@ -98,6 +170,48 @@ class Oscillator(Generator):
         self._update_range_conversion()
 
         iter(self)
+
+    @staticmethod
+    def db_to_linear(db: float) -> float:
+        """Convert decibels to linear amplitude.
+
+        Standard audio conversion using the formula: amplitude = 10^(dB/20)
+
+        Args:
+            db: Gain in decibels
+
+        Returns:
+            Linear amplitude
+
+        Examples:
+            >>> Oscillator.db_to_linear(0)    # 1.0 (unity gain)
+            >>> Oscillator.db_to_linear(-6)   # ~0.5 (half amplitude)
+            >>> Oscillator.db_to_linear(-20)  # 0.1 (1/10 amplitude)
+            >>> Oscillator.db_to_linear(6)    # ~2.0 (double amplitude)
+        """
+        return 10 ** (db / 20.0)
+
+    @staticmethod
+    def linear_to_db(linear: float) -> float:
+        """Convert linear amplitude to decibels.
+
+        Standard audio conversion using the formula: dB = 20 * log10(amplitude)
+
+        Args:
+            linear: Linear amplitude (must be > 0)
+
+        Returns:
+            Gain in decibels (-inf for zero or negative)
+
+        Examples:
+            >>> Oscillator.linear_to_db(1.0)   # 0 dB (unity gain)
+            >>> Oscillator.linear_to_db(0.5)   # ~-6 dB (half amplitude)
+            >>> Oscillator.linear_to_db(0.1)   # -20 dB (1/10 amplitude)
+            >>> Oscillator.linear_to_db(0.0)   # -inf (silence)
+        """
+        if linear <= 0:
+            return float('-inf')
+        return 20 * np.log10(linear)
 
     @property
     def init_freq(self):
@@ -155,16 +269,55 @@ class Oscillator(Generator):
 
     @property
     def amplitude(self):
-        """float: Current amplitude.
+        """float: Current amplitude (linear scale).
+
+        For audio work, consider using the gain_db property instead,
+        as decibels are the professional standard for gain control.
 
         Setting this property updates implementation-specific internal state
         by calling `_post_amp_set`.
+
+        Example:
+            >>> osc.amplitude = 0.5  # Half amplitude
+            >>> osc.amplitude = 1.0  # Unity gain
         """
         return self._a
 
     @amplitude.setter
     def amplitude(self, value):
         self._a = value
+        self._post_amp_set()
+
+    @property
+    def gain_db(self) -> float:
+        """float: Current gain in decibels (professional audio standard).
+
+        This property provides decibel-based gain control, which is the
+        standard in professional audio work. Use this for intuitive control
+        of relative levels.
+
+        Setting this property updates the internal amplitude using the
+        conversion: amplitude = 10^(dB/20)
+
+        Common dB values:
+            0 dB = unity gain (amplitude = 1.0)
+            -3 dB = half power (amplitude ≈ 0.707)
+            -6 dB = half amplitude (amplitude = 0.5)
+            -12 dB = quarter amplitude (amplitude = 0.25)
+            -20 dB = 1/10 amplitude (amplitude = 0.1)
+            +6 dB = double amplitude (amplitude = 2.0)
+
+        Example:
+            >>> osc.gain_db = -20  # Safe default for mixing
+            >>> osc.gain_db = 0    # Unity gain
+            >>> osc.gain_db += 6   # Increase by 6 dB (double amplitude)
+            >>> print(osc.gain_db)  # Current gain in dB
+        """
+        return self.linear_to_db(self._a)
+
+    @gain_db.setter
+    def gain_db(self, value: float):
+        self._a = self.db_to_linear(value)
         self._post_amp_set()
 
     @property
@@ -350,7 +503,7 @@ class SawtoothOscillator(Oscillator):
         category=ComponentCategory.OSCILLATOR,
         description="Sawtooth wave oscillator",
         fluent_api_name="sawtooth",
-        config_params=["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=["frequency", "gain_db", "amplitude", "phase", "sample_rate", "wave_range"],
         tags=["basic", "oscillator", "sawtooth"],
     )
 
@@ -423,7 +576,7 @@ class TriangleOscillator(SawtoothOscillator):
         description="Triangle wave oscillator",
         tags=["basic", "oscillator", "triangle"],
         fluent_api_name="triangle",
-        config_params=["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=["frequency", "gain_db", "amplitude", "phase", "sample_rate", "wave_range"],
     )
 
     def __next__(self):
@@ -484,7 +637,7 @@ class SineOscillator(Oscillator):
         description="Pure sine wave oscillator",
         tags=["basic", "oscillator", "sine"],
         fluent_api_name="sine",
-        config_params=["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=["frequency", "gain_db", "amplitude", "phase", "sample_rate", "wave_range"],
     )
 
     def _post_freq_set(self):
@@ -555,29 +708,38 @@ class SquareOscillator(SineOscillator):
         description="Square wave oscillator",
         tags=["basic", "oscillator", "square"],
         fluent_api_name="square",
-        config_params=["frequency", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=["frequency", "gain_db", "amplitude", "phase", "sample_rate", "wave_range"],
     )
 
     def __init__(
         self,
-        frequency=440,
-        amplitude=1,
-        phase=0,
-        sample_rate=DEFAULT_SAMPLE_RATE,
-        wave_range=(-1, 1),
+        frequency: float = 440,
+        amplitude: float = 1.0,
+        gain_db: float | None = -20.0,
+        phase: float = 0.0,
+        sample_rate: int | float = DEFAULT_SAMPLE_RATE,
+        wave_range: tuple[float, float] = (-1, 1),
         threshold=0,
     ):
         """Construct a square oscillator.
 
         Args:
-            frequency: Frequency in Hz.
-            amplitude: Amplitude multiplier.
-            phase: Phase in degrees.
-            sample_rate: Sample rate in samples/sec.
-            wave_range: Output raw range before amplitude scaling.
+            frequency: Initial frequency in Hz.
+            amplitude: Linear amplitude (0.0 to 1.0+). Default: 1.0
+                Note: Ignored if gain_db is specified.
+            gain_db: Gain in decibels. Default: -20.0 (safe for mixing)
+                Overrides amplitude if provided.
+                Set to None to use amplitude parameter instead.
+            phase: Initial phase in degrees. Defaults to 0.0.
+            sample_rate: Samples per second. Defaults to `DEFAULT_SAMPLE_RATE`.
+            wave_range: Tuple specifying value range (min, max) of raw waveform before
+                amplitude scaling. Defaults to (-1, 1).
+                Advanced feature - most users should leave as default.
+            gain_db: Current gain in dB (settable).
+            wave_range: Current wave range (settable).
             threshold: Threshold used on sine reference to decide polarity.
         """
-        super().__init__(frequency, amplitude, phase, sample_rate, wave_range)
+        super().__init__(frequency, amplitude, gain_db, phase, sample_rate, wave_range)
         self.threshold = threshold
 
     def __next__(self):
@@ -642,6 +804,10 @@ def synth(
     Returns:
         np.ndarray: Array of samples.
     """
+    if dur <= 0:
+        raise ValueError("Duration must be positive.")
+    if frequency < 0:
+        raise ValueError("Frequency must be non-negative.")
 
     n_samples = int(dur * sr)
 

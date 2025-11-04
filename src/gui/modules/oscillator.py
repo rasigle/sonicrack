@@ -21,12 +21,12 @@ from src.gui.module_registry import register_module
 
 @register_module()
 class OscillatorModule(ModuleWidget):
-    """Oscillator module with frequency and amplitude controls."""
+    """Oscillator module with frequency and gain controls."""
 
     metadata = ModuleMetadata(
         title="Oscillator",
         category=ModuleCategory.SOURCE,
-        description="Multi-waveform oscillator with frequency and amplitude controls"
+        description="Multi-waveform oscillator with frequency and gain controls"
     )
 
     def __init__(self):
@@ -61,11 +61,14 @@ class OscillatorModule(ModuleWidget):
         )
         knobs_layout.addWidget(self.freq_knob)
 
-        self.amp_knob = Knob("Amplitude", 0.0, 1.0, 0.5)
-        self.amp_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("amplitude", self.amp_knob.get_value())
+        # Gain in dB (linear mapping of dB values, since dB is already logarithmic)
+        # Range: -60 dB (very quiet) to +12 dB (boost)
+        # Default: -20 dB (safe for mixing)
+        self.gain_knob = Knob("Gain (dB)", -60, 12, -20, logarithmic=False)
+        self.gain_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("gain_db", self.gain_knob.get_value())
         )
-        knobs_layout.addWidget(self.amp_knob)
+        knobs_layout.addWidget(self.gain_knob)
 
         layout.addLayout(knobs_layout)
 
@@ -84,7 +87,7 @@ class OscillatorModule(ModuleWidget):
             "waveform", self.wave_combo, getter="currentText", setter="setCurrentText"
         )
         self.register_parameter("frequency", self.freq_knob)
-        self.register_parameter("amplitude", self.amp_knob)
+        self.register_parameter("gain_db", self.gain_knob)
         self.register_parameter("phase", self.phase_slider)
 
         self.component = self.create_component()
@@ -103,16 +106,16 @@ class OscillatorModule(ModuleWidget):
         """Create the oscillator component."""
         wave_type = self.wave_combo.currentText()
         freq = self.freq_knob.get_value()
-        amp = self.amp_knob.get_value()
+        gain_db = self.gain_knob.get_value()
         phase = self.phase_slider.get_value()
 
         if wave_type == "Sine":
-            return SineOscillator(freq, amplitude=amp, phase=phase)
+            return SineOscillator(freq, gain_db=gain_db, phase=phase)
         elif wave_type == "Square":
-            return SquareOscillator(freq, amplitude=amp, phase=phase)
+            return SquareOscillator(freq, gain_db=gain_db, phase=phase)
         elif wave_type == "Sawtooth":
-            return SawtoothOscillator(freq, amplitude=amp, phase=phase)
+            return SawtoothOscillator(freq, gain_db=gain_db, phase=phase)
         elif wave_type == "Triangle":
-            return TriangleOscillator(freq, amplitude=amp, phase=phase)
+            return TriangleOscillator(freq, gain_db=gain_db, phase=phase)
 
         raise ValueError(f"Unknown waveform type: {wave_type}")

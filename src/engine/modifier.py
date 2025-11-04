@@ -268,47 +268,148 @@ class ModulatedPanner(Panner):
 
 @register_component()
 class Volume(Modifier):
-    """Scales the input values by amplitude multiplier.
+    """Volume control modifier with support for linear and dB gain.
 
-    Can be used to increase or decrease the amplitude of signals.
+    Scales the input signal by an amplitude multiplier. Supports both
+    linear amplitude control and professional decibel (dB) gain control.
+
+    **Amplitude vs. Gain (dB):**
+
+    - Use **gain_db** for audio work (professional standard)
+      * 0 dB = unity gain (no change)
+      * -6 dB = half amplitude
+      * -20 dB = 1/10 amplitude
+      * -∞ dB = silence
+
+    - Use **amplitude** for direct linear control
+      * 1.0 = unity gain (no change)
+      * 0.5 = half amplitude
+      * 0.0 = silence
+
+    **If both gain_db and amplitude are specified:**
+    gain_db takes priority. A warning is logged if they don't match.
 
     Args:
-        amplitude: Amplitude multiplier. 1.0=no change, 0.0=silence. Defaults to 1.0.
+        amplitude: Linear amplitude multiplier. Default: 1.0
+            Note: Ignored if gain_db is specified.
+        gain_db: Gain in decibels. Default: None (uses amplitude)
+            Overrides amplitude if provided.
 
     Attributes:
-        amplitude: Current amplitude multiplier.
+        amplitude: Current amplitude multiplier (settable).
+        gain_db: Current gain in dB (settable).
+
+    Example:
+        >>> # Using dB control (recommended for audio)
+        >>> vol = Volume(gain_db=-6)  # -6 dB reduction
+        >>> vol.gain_db = 0  # Unity gain
+        >>>
+        >>> # Using linear amplitude
+        >>> vol2 = Volume(amplitude=0.5)  # Half amplitude
+        >>> vol2.amplitude = 1.0  # Full amplitude
     """
 
     descriptor = ComponentDescriptor(
         name="Volume",
         category=ComponentCategory.MODIFIER,
-        description="Volume control modifier",
+        description="Volume control modifier with dB support",
         fluent_api_name="volume",
-        config_params=["amplitude"],
-        tags=["modifier", "volume", "amplitude"],
+        config_params=["amplitude", "gain_db"],
+        tags=["modifier", "gain_db", "volume", "amplitude", "gain", "db"],
     )
 
-    def __init__(self, amplitude: float = 1.0) -> None:
+    def __init__(self, amplitude: float = 1.0, gain_db: float | None = None) -> None:
         """Initialize volume modifier.
 
         Args:
-            amplitude: Sets the amplitude multiplier for the
-                input signal (1 : no change, 0 : no output).
+            amplitude: Amplitude multiplier (1.0 = no change, 0.0 = silence).
+                Ignored if gain_db is specified.
+            gain_db: Gain in decibels (0 dB = no change, -∞ dB = silence).
+                Overrides amplitude if provided.
 
         Raises:
             TypeError: If amplitude is not a number.
             ValueError: If amplitude is negative.
         """
-        # Input validation
-        if not isinstance(amplitude, (int, float, np.number)):
-            raise TypeError(
-                f"amplitude must be a number, got {type(amplitude).__name__}"
-            )
-        if amplitude < 0:
-            raise ValueError(f"amplitude must be non-negative, got {amplitude}")
+        # Handle amplitude vs gain_db priority
+        if gain_db is not None:
+            self._amplitude = self.db_to_linear(gain_db)
+            # Warn if amplitude doesn't match gain_db
+            if amplitude != 1.0:  # Only warn if user explicitly set amplitude
+                expected_amp = self.db_to_linear(gain_db)
+                if abs(amplitude - expected_amp) > 0.01:
+                    logger.warning(
+                        f"Both gain_db={gain_db} and amplitude={amplitude} specified. "
+                        f"Using gain_db ({gain_db} dB = {expected_amp:.3f} linear). "
+                        f"To use amplitude, set gain_db=None."
+                    )
+        else:
+            # Input validation for amplitude
+            if not isinstance(amplitude, (int, float, np.number)):
+                raise TypeError(
+                    f"amplitude must be a number, got {type(amplitude).__name__}"
+                )
+            if amplitude < 0:
+                raise ValueError(f"amplitude must be non-negative, got {amplitude}")
+            self._amplitude = float(amplitude)
 
-        self.amplitude: float = amplitude
-        logger.debug(f"Volume initialized with amplitude: {amplitude}")
+        logger.debug(f"Volume initialized with amplitude: {self._amplitude}")
+
+    @staticmethod
+    def db_to_linear(db: float) -> float:
+        """Convert decibels to linear amplitude.
+
+        Args:
+            db: Gain in decibels
+
+        Returns:
+            Linear amplitude
+        """
+        return 10 ** (db / 20.0)
+
+    @staticmethod
+    def linear_to_db(linear: float) -> float:
+        """Convert linear amplitude to decibels.
+
+        Args:
+            linear: Linear amplitude (must be > 0)
+
+        Returns:
+            Gain in decibels (-inf for zero)
+        """
+        if linear <= 0:
+            return float('-inf')
+        return 20 * np.log10(linear)
+
+    @property
+    def amplitude(self) -> float:
+        """float: Current amplitude multiplier (linear scale).
+
+        For audio work, consider using the gain_db property instead.
+        """
+        return self._amplitude
+
+    @amplitude.setter
+    def amplitude(self, value: float):
+        if value < 0:
+            raise ValueError(f"amplitude must be non-negative, got {value}")
+        self._amplitude = float(value)
+
+    @property
+    def gain_db(self) -> float:
+        """float: Current gain in decibels (professional audio standard).
+
+        Common dB values:
+            0 dB = unity gain (no change)
+            -6 dB = half amplitude
+            -20 dB = 1/10 amplitude
+            -∞ dB = silence
+        """
+        return self.linear_to_db(self._amplitude)
+
+    @gain_db.setter
+    def gain_db(self, value: float):
+        self._amplitude = self.db_to_linear(value)
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray
@@ -326,14 +427,14 @@ class Volume(Modifier):
         """
         # Optimize: check array first (most common in vectorized code)
         if isinstance(val, np.ndarray):
-            return val * self.amplitude
+            return val * self._amplitude
 
         if isinstance(val, Iterable):
-            return tuple(v * self.amplitude for v in val)
+            return tuple(v * self._amplitude for v in val)
 
         # Accept int, float, and numpy number types
         if isinstance(val, (int, float, np.number)):
-            return val * self.amplitude
+            return val * self._amplitude
 
         logger.error(f"Invalid input type for Volume: {type(val)}")
         raise TypeError(
@@ -350,19 +451,46 @@ class Volume(Modifier):
         Returns:
             Scaled array (float32).
         """
-        return (samples * self.amplitude).astype(np.float32)
+        return (samples * self._amplitude).astype(np.float32)
 
 
 @register_component()
 class ModulatedVolume(Volume):
-    """Same as the volume component but the internal `amp` is set by a modulator."""
+    """Volume control with time-varying modulation (tremolo, auto-gain, etc.).
+
+    This component inherits all dB and amplitude control from Volume,
+    but the amplitude is dynamically controlled by a modulator component
+    (e.g., LFO, envelope) for time-varying effects.
+
+    **Inherited features from Volume:**
+    - gain_db property (professional dB control)
+    - amplitude property (linear control)
+    - db_to_linear() / linear_to_db() utilities
+
+    **Modulation:**
+    The modulator's output directly sets the amplitude value, creating
+    effects like tremolo (LFO modulation) or envelope shaping (ADSR).
+
+    Args:
+        modulator: Generator that produces amplitude values (0.0 to max).
+            Examples: LFO for tremolo, ADSR for envelope shaping.
+
+    Example:
+        >>> # Tremolo effect with LFO
+        >>> lfo = SineOscillator(frequency=5, amplitude=0.5, gain_db=None)
+        >>> tremolo = ModulatedVolume(lfo)
+        >>>
+        >>> # Envelope shaping
+        >>> env = ADSR(attack=0.1, decay=0.2, sustain=0.7, release=0.3)
+        >>> shaped = ModulatedVolume(env)
+    """
 
     descriptor = ComponentDescriptor(
         name="Volume (Mod)",
         category=ComponentCategory.MODIFIER,
-        description="Volume control modifier",
+        description="Time-varying volume control with modulation support",
         fluent_api_name="volume (mod)",
-        tags=["modifier", "volume", "amplitude"],
+        tags=["modifier", "volume", "amplitude", "modulation", "tremolo", "envelope"],
     )
 
     def __init__(self, modulator):
@@ -386,6 +514,7 @@ class ModulatedVolume(Volume):
 
         super().__init__(0.0)
         self.modulator = modulator
+
         # Auto-initialize the modulator to avoid common errors
         iter(self.modulator)
         logger.debug("ModulatedVolume initialized and modulator started")

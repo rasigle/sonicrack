@@ -4,20 +4,47 @@ This interface allows the patch compiler to work with any module type
 without needing specific knowledge about each module's implementation.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+
+from src.engine import AudioComponent
 
 
 class ModuleCategory(StrEnum):
-    """Categorizes modules by their role in the signal chain."""
+    """Categorizes modules by their role in the signal chain.
 
-    SOURCE = "Source"  # Oscillators, LFOs, Envelopes - no audio input required
-    MODULATED_SOURCE = "Modulated Source"  # Oscillators with CV inputs (VCO, etc.) - takes CV, outputs audio
-    MODIFIER = "Modifier"  # Volume, Pan, Clipper - single audio input + optional modulation
-    MIXER = "Mixer"  # Combines multiple audio inputs
-    OUTPUT = "Output"  # Terminal node
+    Attributes:
+        SOURCE: Represents modules that generate audio signals without requiring
+            any input (e.g., Oscillators, LFOs, Envelopes).
+        MODULATED_SOURCE: Represents modules that generate audio signals but
+            require control voltage (CV) inputs for modulation
+            (e.g., Voltage-Controlled Oscillators).
+        MODIFIER: Represents modules that modify an audio signal,
+            typically with one audio input and optional modulation inputs
+            (e.g., Volume, Pan, Clipper).
+        MIXER: Represents modules that combine multiple audio inputs into
+            a single output.
+        OUTPUT: Represents terminal modules that act as the final node
+            in the signal chain (e.g., speakers, audio output).
+    """
+
+    # Oscillators, LFOs, Envelopes - no audio input required
+    SOURCE = "Source"
+
+    # Oscillators with CV inputs (VCO, etc.) - takes CV, outputs audio
+    MODULATED_SOURCE = "Modulated Source"
+
+    # Volume, Pan, Clipper - single audio input + optional modulation
+    MODIFIER = "Modifier"
+
+    # Combines multiple audio inputs
+    MIXER = "Mixer"
+
+    # Terminal node
+    OUTPUT = "Output"
 
 
 @dataclass
@@ -30,6 +57,7 @@ class ModuleMetadata:
         author (str): Author or creator of the module.
         version (str): Version string of the module.
     """
+
     title: str
     category: ModuleCategory
     description: str = ""
@@ -37,11 +65,15 @@ class ModuleMetadata:
     version: str = "1.0.0"
 
 
-class AudioModuleInterface(ABC):
-    """Base interface for all audio modules in the patch system.
+class AudioModule(ABC):
+    """Base interface for all audio modules in the ui patch system.
 
     Any module that can be placed on the canvas and compiled into an audio
     component should implement this interface.
+
+    An AudioModule represents the configuration and parameters of a module
+    as set by the user in the GUI. The actual audio processing logic is handled
+    by the AudioComponent created by the `create_engine_component()` method.
 
     Attributes:
         custom_name (str): Optional custom name for the module instance.
@@ -53,18 +85,19 @@ class AudioModuleInterface(ABC):
         self.custom_name: str = ""
 
     @abstractmethod
-    def create_component(
+    def create_engine_component(
         self,
-        input_components: list[Any] | None = None,
-        modulation_components: dict[str, Any] | None = None,
-    ) -> Any:
-        """Create the audio engine component for this module.
+        input_components: list[AudioComponent] | None = None,
+        modulation_components: dict[str, AudioComponent] | None = None,
+    ) -> AudioComponent:
+        """Create the corresponding audio engine component for this module.
 
         This is called by the patch compiler to instantiate the actual
         audio processing component based on the module's current parameters.
 
         Args:
-            input_components: List of compiled audio components from input connections.
+            input_components: List of compiled audio components from input
+                connections.
                 For SOURCE modules, this is None.
                 For MODIFIER modules, this contains exactly one component.
                 For MIXER modules, this contains multiple components.
@@ -105,7 +138,6 @@ class AudioModuleInterface(ABC):
             name: Custom name to display
         """
         self.custom_name = name
-        self.update()  # Trigger repaint
 
     def get_custom_name(self) -> str:
         """Get the custom name for this module.
@@ -135,6 +167,9 @@ class AudioModuleInterface(ABC):
 
         # Custom validation can be added by overriding this method in subclasses
 
+        # Custom validation could be that a module is connected with an
+        # incompatible one.
+
         return errors
 
     def _find_port_by_name(self, port_name: str):
@@ -144,7 +179,8 @@ class AudioModuleInterface(ABC):
                 return port
         return None
 
-    def _is_port_connected(self, port, connections: list[tuple]) -> bool:
+    @staticmethod
+    def _is_port_connected(port, connections: list[tuple]) -> bool:
         """Helper to check if a port is connected."""
         for start_port, end_port in connections:
             if end_port == port:

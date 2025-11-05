@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem
+
 from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal
 from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath
+from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem
 
 if TYPE_CHECKING:
+    from src.gui.audio_module_interface import ModuleCategory
+    from src.gui.modules.output import OutputModule
     from src.gui.widgets.module_widget import ModuleWidget
 
 
@@ -116,7 +119,9 @@ class Cable(QGraphicsItem):
         # Make cable selectable and interactive
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setAcceptHoverEvents(True)
-        self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton)
+        self.setAcceptedMouseButtons(
+            Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
+        )
         self.setZValue(-1)  # Draw cables behind modules
 
         if start_port:
@@ -218,8 +223,10 @@ class Cable(QGraphicsItem):
         ctrl2 = QPointF(end.x() - ctrl_offset, end.y())
         path.cubicTo(ctrl1, ctrl2, end)
 
-        # Create wider stroke for easier clicking (15 pixels wide for better interaction)
+        # Create wider stroke for easier clicking (15 pixels wide for better
+        # interaction)
         from PyQt6.QtGui import QPainterPathStroker
+
         stroker = QPainterPathStroker()
         stroker.setWidth(15)  # Increased from 10 to 15 for easier clicking
         stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
@@ -348,11 +355,12 @@ class PatchCanvas(QGraphicsView):
                 if item.parent_module == self.drag_start_port.parent_module:
                     # Self-connection not allowed - show error
                     from PyQt6.QtWidgets import QMessageBox
+
                     QMessageBox.warning(
                         self,
                         "Invalid Connection",
                         "Cannot connect a module's output to its own input.\n\n"
-                        "Self-connections would create an infinite feedback loop."
+                        "Self-connections would create an infinite feedback loop.",
                     )
                     # Remove the invalid cable
                     self.dragging_cable.remove()
@@ -362,12 +370,12 @@ class PatchCanvas(QGraphicsView):
                     if cycle_info:
                         # Connection would create a cycle - show error
                         from PyQt6.QtWidgets import QMessageBox
+
                         QMessageBox.warning(
                             self,
-                            "Infinite Loop Detected",
-                            f"This connection would create an infinite feedback loop:\n\n"
-                            f"{cycle_info}\n\n"
-                            f"Please check your connections and avoid creating cycles."
+                            "Infinite Loop Detected. This connection would create an "
+                            "infinite feedback loop:\n\n{cycle_info}\n\n"
+                            "Please check your connections and avoid creating cycles.",
                         )
                         # Remove the invalid cable
                         self.dragging_cable.remove()
@@ -419,7 +427,6 @@ class PatchCanvas(QGraphicsView):
         # Check if this creates a cycle using DFS
         visited = set()
         rec_stack = set()
-        path = []
 
         def dfs(module, current_path):
             """Depth-first search to detect cycles."""
@@ -437,7 +444,7 @@ class PatchCanvas(QGraphicsView):
                     cycle_start = current_path.index(neighbor)
                     cycle_modules = current_path[cycle_start:] + [neighbor]
                     cycle_names = [m.metadata.title for m in cycle_modules]
-                    return ' → '.join(cycle_names)
+                    return " → ".join(cycle_names)
 
             current_path.pop()
             rec_stack.remove(module)
@@ -522,9 +529,34 @@ class PatchCanvas(QGraphicsView):
             List of ModuleWidget instances
         """
         from src.gui.widgets.module_widget import ModuleWidget
+
+        return [item for item in self.scene.items() if isinstance(item, ModuleWidget)]
+
+    def get_modules_by_category(self, category: ModuleCategory) -> list[ModuleWidget]:
+        """Get all modules of a specific category currently on the canvas.
+
+        Args:
+            category: The ModuleCategory to filter by
+
+        Returns:
+            List of ModuleWidget instances in the specified category
+        """
         return [
-            item for item in self.scene.items() if isinstance(item, ModuleWidget)
+            item for item in self.get_modules() if item.metadata.category == category
         ]
+
+    def get_output_module(self) -> OutputModule | None:
+        """Get the output module on the canvas, if any.
+
+        Returns:
+            The OutputModule instance, or None if not found
+        """
+        from src.gui.modules.output import OutputModule
+
+        for module in self.get_modules():
+            if isinstance(module, OutputModule):
+                return module
+        return None
 
     def clear_all(self):
         """Clear all modules and cables from the canvas."""

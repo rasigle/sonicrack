@@ -106,4 +106,3 @@ class CVVelocityOutput(AudioComponent):
     def __next__(self):
         """Return next CV value (constant)."""
         return self.cv_converter.velocity
-

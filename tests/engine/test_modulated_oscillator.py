@@ -167,7 +167,7 @@ class TestTriggerRelease(unittest.TestCase):
 
         # After sufficient release time, should be ended
         # Check if envelope modulator has ended property and it's true
-        if hasattr(env, 'ended'):
+        if hasattr(env, "ended"):
             # If envelope supports ended, it should be true after release completes
             # Note: The envelope may not be "ended" in the traditional sense as it
             # continues to output the sustain level, so we just verify samples were

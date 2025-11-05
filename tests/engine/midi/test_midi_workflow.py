@@ -4,7 +4,6 @@ This test verifies that the MIDI Input → Oscillator (Freq Mod) → ADSR workfl
 works correctly.
 """
 
-import pytest
 import numpy as np
 
 from src.engine.midi import MIDIToCV, NoteOnMessage, NoteOffMessage
@@ -53,7 +52,7 @@ class TestMIDIWorkflow:
             attack_duration=0.1,
             decay_duration=0.1,
             sustain_level=0.7,
-            release_duration=0.2
+            release_duration=0.2,
         )
 
         # Wrap with gate trigger
@@ -61,7 +60,7 @@ class TestMIDIWorkflow:
 
         # Initially gate is 0
         assert cv.gate == 0.0
-        samples1 = gate_adsr.get_samples(10)
+        gate_adsr.get_samples(10)
         # Should be 0 or very small (no note triggered)
 
         # Trigger note on
@@ -92,8 +91,10 @@ class TestMIDIWorkflow:
 
         # Create oscillator with frequency modulation
         base_osc = SineOscillator(440)
+
         def freq_mod_func(base, cv_freq):
             return cv_freq
+
         mod_osc = ModulatedOscillator(base_osc, freq_output, freq_mod=freq_mod_func)
 
         # Create ADSR with gate trigger
@@ -101,7 +102,7 @@ class TestMIDIWorkflow:
             attack_duration=0.01,
             decay_duration=0.05,
             sustain_level=0.7,
-            release_duration=0.1
+            release_duration=0.1,
         )
         gate_adsr = GateTriggeredADSR(adsr, gate_output)
 
@@ -136,4 +137,3 @@ class TestMIDIWorkflow:
         first_half = np.mean(np.abs(output[:500]))
         second_half = np.mean(np.abs(output[500:]))
         assert first_half > second_half  # Fading out
-

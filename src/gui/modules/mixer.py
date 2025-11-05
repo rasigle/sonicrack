@@ -42,10 +42,10 @@ class MixerModule(ModuleWidget):
 
         self.input_components = []  # Will be populated by patch compiler
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,

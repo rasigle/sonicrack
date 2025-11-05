@@ -35,7 +35,6 @@ from src.engine.midi.messages import (
     ControlChangeMessage,
     PitchBendMessage,
 )
-from src.engine.midi.utils import midi_to_frequency
 from src.constants import DEFAULT_SAMPLE_RATE
 
 logger = logging.getLogger(__name__)
@@ -194,4 +193,3 @@ class MIDIToCV(AudioComponent):
         self.pitch_bend = 0.0
         self.current_note = None
         logger.debug("MIDIToCV reset")
-

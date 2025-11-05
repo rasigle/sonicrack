@@ -15,7 +15,6 @@ from PyQt6.QtCore import Qt
 
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob
-from src.gui.audio_module_interface import ModuleCategory
 from src.gui.module_registry import register_module
 from src.engine.modifier import Modifier
 import numpy as np
@@ -106,14 +105,14 @@ class SimpleFilterModule(ModuleWidget):
         self.register_parameter("cutoff", self.cutoff_knob)
         self.register_parameter("resonance", self.resonance_knob)
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> List[str]:
         """Filter requires the In port to be connected."""
         return ["In"]
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: Optional[List[Any]] = None,
         modulation_components: Optional[dict[str, Any]] = None,

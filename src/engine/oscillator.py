@@ -147,6 +147,7 @@ class Oscillator(Generator):
                 expected_amp = self.db_to_linear(gain_db)
                 if abs(amplitude - expected_amp) > 0.01:
                     import logging
+
                     logging.warning(
                         f"Both gain_db={gain_db} and amplitude={amplitude} specified. "
                         f"Using gain_db (-20.0 dB = {expected_amp:.3f} linear). "
@@ -216,7 +217,7 @@ class Oscillator(Generator):
             >>> Oscillator.linear_to_db(0.0)   # -inf (silence)
         """
         if linear <= 0:
-            return float('-inf')
+            return float("-inf")
         return 20 * np.log10(linear)
 
     @property
@@ -516,7 +517,14 @@ class SawtoothOscillator(Oscillator):
         category=ComponentCategory.OSCILLATOR,
         description="Sawtooth wave oscillator",
         fluent_api_name="sawtooth",
-        config_params=["frequency", "gain_db", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=[
+            "frequency",
+            "gain_db",
+            "amplitude",
+            "phase",
+            "sample_rate",
+            "wave_range",
+        ],
         tags=["basic", "oscillator", "sawtooth"],
     )
 
@@ -528,12 +536,12 @@ class SawtoothOscillator(Oscillator):
 
     def _post_freq_set(self):
         """Update derived period when frequency changes."""
-        old_period = getattr(self, '_period', None)
+        old_period = getattr(self, "_period", None)
         self._period = self._sample_rate / self._f
 
         # Recalculate phase offset from original degrees
         # Handle backward compatibility - initialize _phase_degrees if missing
-        if not hasattr(self, '_phase_degrees'):
+        if not hasattr(self, "_phase_degrees"):
             self._phase_degrees = 0.0
         self._p = (self._phase_degrees / 360) * self._period
 
@@ -547,7 +555,7 @@ class SawtoothOscillator(Oscillator):
     def _post_phase_set(self):
         """Convert phase (degrees) to an index offset into the period."""
         # Ensure _phase_degrees exists (backward compatibility)
-        if not hasattr(self, '_phase_degrees'):
+        if not hasattr(self, "_phase_degrees"):
             self._phase_degrees = 0.0
         self._phase_degrees = self._p  # Store the degree value
         self._p = (self._p / 360) * self._period
@@ -596,9 +604,7 @@ class SawtoothOscillator(Oscillator):
 
             # Create smooth amplitude envelope (linear ramp)
             amp_envelope = np.linspace(
-                self._current_amplitude,
-                self._target_amplitude,
-                smooth_count
+                self._current_amplitude, self._target_amplitude, smooth_count
             )
 
             # Apply smoothed amplitude to first part
@@ -637,7 +643,14 @@ class TriangleOscillator(SawtoothOscillator):
         description="Triangle wave oscillator",
         tags=["basic", "oscillator", "triangle"],
         fluent_api_name="triangle",
-        config_params=["frequency", "gain_db", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=[
+            "frequency",
+            "gain_db",
+            "amplitude",
+            "phase",
+            "sample_rate",
+            "wave_range",
+        ],
     )
 
     def __next__(self):
@@ -682,9 +695,7 @@ class TriangleOscillator(SawtoothOscillator):
 
             # Create smooth amplitude envelope (linear ramp)
             amp_envelope = np.linspace(
-                self._current_amplitude,
-                self._target_amplitude,
-                smooth_count
+                self._current_amplitude, self._target_amplitude, smooth_count
             )
 
             # Apply smoothed amplitude to first part
@@ -723,7 +734,14 @@ class SineOscillator(Oscillator):
         description="Pure sine wave oscillator",
         tags=["basic", "oscillator", "sine"],
         fluent_api_name="sine",
-        config_params=["frequency", "gain_db", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=[
+            "frequency",
+            "gain_db",
+            "amplitude",
+            "phase",
+            "sample_rate",
+            "wave_range",
+        ],
     )
 
     def _post_freq_set(self):
@@ -778,9 +796,7 @@ class SineOscillator(Oscillator):
 
             # Create smooth amplitude envelope (linear ramp)
             amp_envelope = np.linspace(
-                self._current_amplitude,
-                self._target_amplitude,
-                smooth_count
+                self._current_amplitude, self._target_amplitude, smooth_count
             )
 
             # Apply smoothed amplitude to first part
@@ -819,7 +835,14 @@ class SquareOscillator(SineOscillator):
         description="Square wave oscillator",
         tags=["basic", "oscillator", "square"],
         fluent_api_name="square",
-        config_params=["frequency", "gain_db", "amplitude", "phase", "sample_rate", "wave_range"],
+        config_params=[
+            "frequency",
+            "gain_db",
+            "amplitude",
+            "phase",
+            "sample_rate",
+            "wave_range",
+        ],
     )
 
     def __init__(
@@ -891,9 +914,7 @@ class SquareOscillator(SineOscillator):
 
             # Create smooth amplitude envelope (linear ramp)
             amp_envelope = np.linspace(
-                self._current_amplitude,
-                self._target_amplitude,
-                smooth_count
+                self._current_amplitude, self._target_amplitude, smooth_count
             )
 
             # Apply smoothed amplitude to first part

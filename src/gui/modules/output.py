@@ -63,7 +63,6 @@ class OutputModule(ModuleWidget):
 
         self.input_component = None
 
-
     @staticmethod
     def db_to_linear(db: float) -> float:
         """Convert decibels to linear amplitude.
@@ -102,13 +101,12 @@ class OutputModule(ModuleWidget):
         linear_value = self.db_to_linear(db_value)
         self.master_volume_changed.emit(linear_value)
 
-
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
         """Output requires the In port to be connected."""
         return ["In"]
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,

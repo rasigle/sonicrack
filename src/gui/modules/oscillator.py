@@ -26,7 +26,7 @@ class OscillatorModule(ModuleWidget):
     metadata = ModuleMetadata(
         title="Oscillator",
         category=ModuleCategory.SOURCE,
-        description="Multi-waveform oscillator with frequency and gain controls"
+        description="Multi-waveform oscillator with frequency and gain controls",
     )
 
     def __init__(self):
@@ -90,15 +90,15 @@ class OscillatorModule(ModuleWidget):
         self.register_parameter("gain_db", self.gain_knob)
         self.register_parameter("phase", self.phase_slider)
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
     def _on_wave_changed(self, wave_type: str):
         """Handle waveform type change."""
-        self.create_component()
+        self.create_engine_component()
         self.parameter_changed.emit("waveform", wave_type)
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,

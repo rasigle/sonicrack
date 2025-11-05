@@ -15,12 +15,12 @@ from PyQt6.QtWidgets import (
     QGraphicsProxyWidget,
 )
 
-from src.gui.audio_module_interface import AudioModuleInterface
+from src.gui.audio_module_interface import AudioModule
 from src.gui.patch_canvas import Port
 
 
 if TYPE_CHECKING:
-    from src.gui.audio_module_interface import ModuleCategory
+    pass
 
 
 # Create a compatible metaclass that combines QGraphicsWidget's metaclass with ABCMeta
@@ -35,7 +35,7 @@ MODULE_TYPE_FONT = QFont("Arial", 8, QFont.Weight.Bold)
 MODULE_CATEGORY_FONT = QFont("Arial", 7)
 
 
-class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidgetMeta):
+class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
     """Base class for all modular synth modules.
 
     Each module represents an audio component (oscillator, envelope, etc.)
@@ -98,7 +98,6 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
-
 
     # === UI Construction Helpers ===
     @staticmethod
@@ -268,6 +267,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
         This ensures the entire module area is clickable and draggable.
         """
         from PyQt6.QtGui import QPainterPath
+
         path = QPainterPath()
         path.addRect(self.boundingRect())
         return path
@@ -485,7 +485,7 @@ class ModuleWidget(QGraphicsWidget, AudioModuleInterface, metaclass=ModuleWidget
             # Subclasses should implement parameter updates
             pass
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,

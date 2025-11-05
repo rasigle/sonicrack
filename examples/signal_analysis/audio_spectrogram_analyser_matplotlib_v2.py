@@ -106,26 +106,23 @@ class SpectrogramWidget(FigureCanvasQTAgg):
 
         # Display spectrogram using librosa
         img = librosa.display.specshow(
-            D,
-            y_axis='log',
-            x_axis='time',
-            sr=sr,
-            ax=self.ax,
-            cmap=cmap
+            D, y_axis="log", x_axis="time", sr=sr, ax=self.ax, cmap=cmap
         )
 
         # Add colorbar
         self.colorbar = self.fig.colorbar(img, ax=self.ax, format="%+2.f dB")
 
         # Set labels
-        self.ax.set_ylabel('Frequency [Hz]')
-        self.ax.set_xlabel('Time [s]')
-        self.ax.set_title('Spectrogram')
+        self.ax.set_ylabel("Frequency [Hz]")
+        self.ax.set_xlabel("Time [s]")
+        self.ax.set_title("Spectrogram")
 
         # Re-add playback line if it exists
         if self.play_line is not None:
             x_pos = self.play_line.get_xdata()[0]
-            self.play_line = self.ax.axvline(x=x_pos, color='red', linewidth=2, alpha=0.7)
+            self.play_line = self.ax.axvline(
+                x=x_pos, color="red", linewidth=2, alpha=0.7
+            )
 
         # Adjust layout and redraw
         self.fig.tight_layout()
@@ -139,7 +136,9 @@ class SpectrogramWidget(FigureCanvasQTAgg):
         """
         if self.play_line is None:
             # Create the line
-            self.play_line = self.ax.axvline(x=time_sec, color='red', linewidth=2, alpha=0.7)
+            self.play_line = self.ax.axvline(
+                x=time_sec, color="red", linewidth=2, alpha=0.7
+            )
         else:
             # Update existing line position
             self.play_line.set_xdata([time_sec, time_sec])
@@ -312,7 +311,9 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
 
         # Spectrogram playback line update timer (less frequent)
         self.spec_line_timer = QtCore.QTimer()
-        self.spec_line_timer.setInterval(200)  # Update every 200ms instead of every frame
+        self.spec_line_timer.setInterval(
+            200
+        )  # Update every 200ms instead of every frame
         self.spec_line_timer.timeout.connect(self._update_spec_playback_line)
 
         # connect controls
@@ -505,7 +506,7 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         with self.stream_lock:
             self.play_pos = max(0, min(len(self.data), new_pos))
 
-        #self.spec_widget.update_play_line(self.play_pos / self.sr)
+        # self.spec_widget.update_play_line(self.play_pos / self.sr)
         self._update_time_label_from_slider()
 
         # if playing, the callback will pick up the new play_pos immediately
@@ -550,7 +551,7 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         self.update_display()
 
         # update spectrogram play line (time in seconds)
-        #self.spec_widget.update_play_line(self.play_pos / self.sr)
+        # self.spec_widget.update_play_line(self.play_pos / self.sr)
 
         # stop if finished
         if self.stream is None:

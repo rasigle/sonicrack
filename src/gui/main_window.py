@@ -20,11 +20,13 @@ from PyQt6.QtWidgets import (
     QDialog,
 )
 
+from src.engine import AudioComponent
 from src.gui.audio_engine import AudioEngine
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.dialogs.about_dialog import show_about
 from src.gui.dialogs.preset_dialog import PresetBrowserDialog, SavePresetDialog
 from src.gui.module_registry import initialize_modules
+from src.gui.modules.output import OutputModule
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
 from src.gui.preset_manager import PresetManager
@@ -73,7 +75,9 @@ class ModularSynthWindow(QMainWindow):
         self.compile_debounce_timer = QTimer()
         self.compile_debounce_timer.setSingleShot(True)
         # Don't update tree for parameter changes - only for structure changes
-        self.compile_debounce_timer.timeout.connect(lambda: self._compile_patch(update_tree=False))
+        self.compile_debounce_timer.timeout.connect(
+            lambda: self._compile_patch(update_tree=False)
+        )
 
         # UI setup
         self._setup_ui()
@@ -311,6 +315,7 @@ class ModularSynthWindow(QMainWindow):
 
         # Check if trying to add an Output module when one already exists
         if module_class.metadata.category == ModuleCategory.OUTPUT:
+
             # Check if an Output module already exists
             for module in self.patch_canvas.get_modules():
                 if module.metadata.category == ModuleCategory.OUTPUT:
@@ -318,35 +323,40 @@ class ModularSynthWindow(QMainWindow):
                         self,
                         "Output Already Exists",
                         "Only one Output module is allowed per patch.\n\n"
-                        "The Output module represents your audio device (speakers/DAC). "
-                        "Multiple outputs would cause conflicts.\n\n"
-                        "Connect multiple audio sources to the existing Output module instead."
+                        "The Output module represents your audio device "
+                        "(speakers/DAC). Multiple outputs would cause conflicts.\n\n"
+                        "Connect multiple audio sources to the existing Output module "
+                        "instead.",
                     )
                     self.statusbar.showMessage("Cannot add multiple Output modules")
                     logger.warning("Attempted to add multiple Output modules")
                     return
 
-        # Initialize with default parameters
-        module = module_class()
+        # Initialize the module to add with default parameters
+        module_instance = module_class()
 
         # Connect parameter change signal to auto-compile
-        module.parameter_changed.connect(self._on_parameter_changed)
+        module_instance.parameter_changed.connect(self._on_parameter_changed)
 
         # Special handling for Output module - connect master volume directly
-        if hasattr(module, 'master_volume_changed'):
-            module.master_volume_changed.connect(self.audio_engine.set_master_volume)
-            # Emit initial volume to sync audio engine (use QTimer to ensure connections are ready)
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(0, module._on_volume_changed)
+        if isinstance(module_instance, OutputModule):
+            module_instance.master_volume_changed.connect(
+                self.audio_engine.set_master_volume
+            )
+            # Emit initial volume to sync audio engine (use QTimer to ensure
+            # connections are ready)
+            QTimer.singleShot(0, module_instance._on_volume_changed)
 
-        self.patch_canvas.add_module(module)
+        self.patch_canvas.add_module(module_instance)
         self.statusbar.showMessage(f"Added {module_name}")
         logger.info(f"Added module: {module_name}")
 
         # Auto-compile when module is added
         self._compile_patch()
 
-    def _compile_patch(self, show_messages: bool = False, update_tree: bool = True) -> bool:
+    def _compile_patch(
+        self, show_messages: bool = False, update_tree: bool = True
+    ) -> bool:
         """Compile the current patch automatically.
 
         Args:
@@ -365,19 +375,19 @@ class ModularSynthWindow(QMainWindow):
                     self, "No Modules", "Add some modules to the canvas first!"
                 )
             # Clear patch and stop playback
-            self.audio_engine.set_patch(None)
+            self.audio_engine.clear_audiopath()
             self.tree_analyzer.clear()
             return False
 
         # Get all connections
         connections = self.patch_canvas.get_connections()
         if not connections:
-            self.audio_engine.set_patch(None)
+            self.audio_engine.clear_audiopath()
             return False
 
-        # Check for errors
+        # Define the compile scope and check for errors
         self.patch_compiler.set_patch(modules, connections)
-        errors = self.patch_compiler.get_compilation_errors()
+        errors = self.patch_compiler.get_prevalidation_errors()
 
         if errors:
             if show_messages:
@@ -388,34 +398,13 @@ class ModularSynthWindow(QMainWindow):
             logger.warning(f"Patch compilation errors: {errors}")
 
             # Clear patch and stop playback on error
-            self.audio_engine.set_patch(None)
+            self.audio_engine.clear_audiopath()
             self.tree_analyzer.clear()
             return False
 
-        # Compile
-        patch = self.patch_compiler.compile()
-        if patch:
-            self.audio_engine.set_patch(patch)
-
-            # Update tree analyzer with patch structure (only when structure changes)
-            if update_tree:
-                tree_data = self.patch_compiler.build_patch_tree()
-                self.tree_analyzer.update_tree(tree_data)
-
-            # Get master volume from output module
-            output_module_class = self.registry.get("Output")
-            if output_module_class:
-                for module in modules:
-                    if isinstance(module, output_module_class):
-                        self.audio_engine.set_master_volume(module.get_master_volume())
-                        break
-
-            if show_messages:
-                QMessageBox.information(self, "Success", "Patch compiled successfully!")
-            self.statusbar.showMessage("Patch compiled and ready")
-            logger.debug("Patch compiled successfully")
-            return True
-        else:
+        # Now we are read to compile
+        audio_patch: AudioComponent = self.patch_compiler.compile()
+        if audio_patch is None:
             # Clear tree on compilation failure
             self.tree_analyzer.clear()
 
@@ -425,8 +414,26 @@ class ModularSynthWindow(QMainWindow):
                 )
             logger.error("Patch compilation failed")
             # Clear patch on failure
-            self.audio_engine.set_patch(None)
+            self.audio_engine.clear_audiopath()
             return False
+
+        self.audio_engine.set_audiopatch(audio_patch)
+
+        # Update tree analyzer with patch structure (only when structure changes)
+        if update_tree:
+            tree_data = self.patch_compiler.build_patch_tree()
+            self.tree_analyzer.update_tree(tree_data)
+
+        # Set the master volume from output module
+        output_module = self.patch_canvas.get_output_module()
+        if output_module is not None:
+            self.audio_engine.set_master_volume(output_module.get_master_volume())
+
+        if show_messages:
+            QMessageBox.information(self, "Success", "Patch compiled successfully!")
+        self.statusbar.showMessage("Patch compiled and ready")
+        logger.debug("Patch compiled successfully")
+        return True
 
     def _on_play_clicked(self):
         """Handle play button click."""
@@ -478,7 +485,7 @@ class ModularSynthWindow(QMainWindow):
         ):
             # Output was disconnected - stop playback and clear patch
             self.audio_engine.stop_playback()
-            self.audio_engine.set_patch(None)
+            self.audio_engine.clear_audiopath()
             logger.info("Output disconnected - playback stopped")
 
         # Automatically recompile patch to update visual feedback (knob states, etc.)
@@ -497,7 +504,7 @@ class ModularSynthWindow(QMainWindow):
         # If Output module was deleted, stop playback immediately
         if module.metadata.category == ModuleCategory.OUTPUT:
             self.audio_engine.stop_playback()
-            self.audio_engine.set_patch(None)
+            self.audio_engine.clear_audiopath()
             logger.info("Output module deleted - playback stopped")
         else:
             # For other modules, check if we're playing
@@ -523,8 +530,9 @@ class ModularSynthWindow(QMainWindow):
         sender_module = self.sender()
 
         # Validate sender is an AudioModuleInterface
-        from src.gui.audio_module_interface import AudioModuleInterface
-        if isinstance(sender_module, AudioModuleInterface):
+        from src.gui.audio_module_interface import AudioModule
+
+        if isinstance(sender_module, AudioModule):
             # Check if module is actually in the compiled patch
             is_in_patch = sender_module in self.patch_compiler._module_to_component
 
@@ -583,7 +591,7 @@ class ModularSynthWindow(QMainWindow):
     def _clear_canvas(self):
         """Clear the patch canvas."""
         self.audio_engine.stop_playback()
-        self.audio_engine.set_patch(None)  # Clear compiled patch
+        self.audio_engine.clear_audiopath()
         self.patch_canvas.clear_all()
         self.waveform_display.clear()
         self.spectrum_analyzer.clear()
@@ -666,13 +674,6 @@ class ModularSynthWindow(QMainWindow):
                 # Connect parameter change signal
                 module.parameter_changed.connect(self._on_parameter_changed)
 
-                # Special handling for Output module - connect master volume directly
-                if hasattr(module, 'master_volume_changed'):
-                    module.master_volume_changed.connect(self.audio_engine.set_master_volume)
-                    # Emit initial volume to sync audio engine (use QTimer to ensure connections are ready)
-                    from PyQt6.QtCore import QTimer
-                    QTimer.singleShot(0, module._on_volume_changed)
-
                 # Restore custom name if present
                 custom_name = module_data.get("custom_name", "")
                 if custom_name:
@@ -692,7 +693,6 @@ class ModularSynthWindow(QMainWindow):
 
                 # Store in map
                 module_map[module_id] = module
-
 
             # Create connections
             for conn_data in preset_data.get("connections", []):
@@ -735,17 +735,3 @@ class ModularSynthWindow(QMainWindow):
         """Handle window close event."""
         self.audio_engine.cleanup()
         event.accept()
-
-
-def is_module_widget(obj: QWidget) -> bool:
-    """Check if an object is a ModuleWidget.
-
-    Args:
-        obj: Object to check
-
-    Returns:
-        True if obj is a ModuleWidget, False otherwise
-    """
-    from src.gui.audio_module_interface import AudioModuleInterface
-
-    return isinstance(obj, AudioModuleInterface)

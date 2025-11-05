@@ -250,7 +250,8 @@ class MIDIInput:
 
                         # NOTE: Do NOT call callback directly from this thread!
                         # Calling GUI code from a background thread causes freezing.
-                        # The callback should be called from the main thread via polling.
+                        # The callback should be called from the main thread via
+                        # polling.
 
                 # Small sleep to avoid busy-waiting
                 time.sleep(0.001)  # 1ms

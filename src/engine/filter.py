@@ -112,7 +112,8 @@ class ButterworthFilter(Modifier):
                 )
             if cutoff[0] >= cutoff[1]:
                 raise ValueError(
-                    f"Low cutoff ({cutoff[0]}) must be less than high cutoff ({cutoff[1]})"
+                    f"Low cutoff ({cutoff[0]}) must be less than high cutoff "
+                    f"({cutoff[1]})"
                 )
 
         # Design filter coefficients
@@ -228,6 +229,7 @@ class ButterworthFilter(Modifier):
 
 
 # Utility functions for standalone use
+
 
 def butter(order, cutoff, fs, btype="low"):
     """

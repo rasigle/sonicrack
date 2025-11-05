@@ -89,9 +89,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Gain in dB
         self.gain_knob = Knob("Gain (dB)", -60, 12, -20, logarithmic=False)
         self.gain_knob.setToolTip(
-            "Oscillator gain (dB)\n"
-            "Range: -60 to +12 dB\n"
-            "Default: -20 dB"
+            "Oscillator gain (dB)\n" "Range: -60 to +12 dB\n" "Default: -20 dB"
         )
         self.gain_knob.value_changed.connect(self._on_gain_changed)
         knobs_layout.addWidget(self.gain_knob)
@@ -116,7 +114,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.register_parameter("gain_db", self.gain_knob)
         self.register_parameter("phase", self.phase_slider)
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     def _on_wave_changed(self, wave_type: str):
         """Handle waveform type change."""
@@ -125,6 +123,7 @@ class ModulatedOscillatorModule(ModuleWidget):
     def _on_gain_changed(self):
         """Handle gain knob change."""
         import logging
+
         logger = logging.getLogger(__name__)
         gain_value = self.gain_knob.get_value()
         logger.info(f"VCO Gain changed to {gain_value} dB")
@@ -134,7 +133,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         """Freq input is optional - VCO works as normal oscillator without it."""
         return []  # No required inputs - Freq is optional
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,
@@ -182,15 +181,14 @@ class ModulatedOscillatorModule(ModuleWidget):
 
             # Log for debugging
             import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"VCO: Creating ModulatedOscillator with freq modulation")
-            logger.info(f"VCO: Base freq={base_freq}, Modulator type={type(freq_modulator)}")
 
-            return ModulatedOscillator(
-                osc,
-                freq_modulator,
-                freq_mod=freq_mod_func
+            logger = logging.getLogger(__name__)
+            logger.info("VCO: Creating ModulatedOscillator with freq modulation")
+            logger.info(
+                f"VCO: Base freq={base_freq}, Modulator type={type(freq_modulator)}"
             )
+
+            return ModulatedOscillator(osc, freq_modulator, freq_mod=freq_mod_func)
 
         # No modulation - enable frequency knob
         self.freq_knob.setEnabled(True)
@@ -199,4 +197,3 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         # Return plain oscillator
         return osc
-

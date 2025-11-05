@@ -1,7 +1,9 @@
 """Audio engine for real-time synthesis and playback."""
 
+from __future__ import annotations
+
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
 import sounddevice as sd
@@ -12,6 +14,9 @@ from src.constants import DEFAULT_SAMPLE_RATE
 logger = logging.getLogger(__name__)
 
 DEFAULT_FADEOUT_DURATION_MS = 50  # Default fade-out duration in milliseconds
+
+if TYPE_CHECKING:
+    from src.engine.audio_component import AudioComponent
 
 
 class AudioEngine(QObject):
@@ -57,26 +62,34 @@ class AudioEngine(QObject):
         self.is_fading_out: bool = False
         self.fade_out_samples_remaining: int = 0
         self.fade_out_duration_ms: float = DEFAULT_FADEOUT_DURATION_MS  # 50 ms default
-        self.fade_out_total_samples: int = int(self.sample_rate * self.fade_out_duration_ms / 1000)
+        self.fade_out_total_samples: int = int(
+            self.sample_rate * self.fade_out_duration_ms / 1000
+        )
 
         # Fade-in state to prevent clicks on start
         self.is_fading_in: bool = False
         self.fade_in_samples_remaining: int = 0
         self.fade_in_duration_ms: float = 10  # 10ms fade-in (shorter than fade-out)
-        self.fade_in_total_samples: int = int(self.sample_rate * self.fade_in_duration_ms / 1000)
+        self.fade_in_total_samples: int = int(
+            self.sample_rate * self.fade_in_duration_ms / 1000
+        )
 
         # Track if we're in post-fade silence mode
         self.post_fade_silence: bool = False
 
-    def set_patch(self, patch: Any):
+    def set_audiopatch(self, patch: AudioComponent):
         """Set the audio patch to play.
 
         Args:
             patch: Audio component (oscillator, chain, etc.)
         """
         self.patch = patch
-
         logger.debug(f"Patch set: {type(patch).__name__}")
+
+    def clear_audiopath(self):
+        """Clear the current audio patch."""
+        self.patch = None
+        logger.debug("Patch cleared")
 
     def set_master_volume(self, volume: float):
         """Set the master output volume with smoothing to prevent clicks.
@@ -147,19 +160,23 @@ class AudioEngine(QObject):
                 volume_envelope = np.linspace(
                     self._current_master_volume,
                     self._target_master_volume,
-                    smooth_count
+                    smooth_count,
                 )
 
                 # Apply smoothed volume to first part
                 if stereo.shape[0] >= smooth_count:
-                    stereo[:smooth_count] = stereo[:smooth_count] * volume_envelope[:, np.newaxis]
+                    stereo[:smooth_count] = (
+                        stereo[:smooth_count] * volume_envelope[:, np.newaxis]
+                    )
 
                     # Apply target volume to rest
                     if smooth_count < frames:
-                        stereo[smooth_count:] = stereo[smooth_count:] * self._target_master_volume
+                        stereo[smooth_count:] = (
+                            stereo[smooth_count:] * self._target_master_volume
+                        )
                 else:
                     # Buffer smaller than smooth_count
-                    stereo = stereo * volume_envelope[:stereo.shape[0], np.newaxis]
+                    stereo = stereo * volume_envelope[: stereo.shape[0], np.newaxis]
 
                 # Update smoothing state
                 self._master_volume_smoothing_samples -= smooth_count
@@ -177,8 +194,13 @@ class AudioEngine(QObject):
                 fade_samples = min(frames, self.fade_in_samples_remaining)
 
                 # Create fade-in curve (linear)
-                fade_start = 1.0 - (self.fade_in_samples_remaining / self.fade_in_total_samples)
-                fade_end = 1.0 - (max(0, self.fade_in_samples_remaining - fade_samples) / self.fade_in_total_samples)
+                fade_start = 1.0 - (
+                    self.fade_in_samples_remaining / self.fade_in_total_samples
+                )
+                fade_end = 1.0 - (
+                    max(0, self.fade_in_samples_remaining - fade_samples)
+                    / self.fade_in_total_samples
+                )
                 fade_curve = np.linspace(fade_start, fade_end, fade_samples)
 
                 # Apply fade to the samples
@@ -198,8 +220,12 @@ class AudioEngine(QObject):
                 # Create fade-out curve (linear for simplicity, could use exponential)
                 fade_curve = np.linspace(
                     self.fade_out_samples_remaining / self.fade_out_total_samples,
-                    max(0.0, (self.fade_out_samples_remaining - fade_samples) / self.fade_out_total_samples),
-                    fade_samples
+                    max(
+                        0.0,
+                        (self.fade_out_samples_remaining - fade_samples)
+                        / self.fade_out_total_samples,
+                    ),
+                    fade_samples,
                 )
 
                 # Apply fade to the samples
@@ -288,14 +314,18 @@ class AudioEngine(QObject):
             self.fade_out_samples_remaining = self.fade_out_total_samples
             self.post_fade_silence = False
 
-            logger.info(f"Stopping playback  ({self.fade_out_duration_ms}ms fade-out...)")
+            logger.info(
+                f"Stopping playback  ({self.fade_out_duration_ms}ms fade-out...)"
+            )
 
             # Schedule the actual stream stop after fade-out completes
             # Use a timer to avoid blocking the GUI thread
             from PyQt6.QtCore import QTimer
 
             # Wait for fade + extra buffer time for safety
-            fade_duration_ms = int(self.fade_out_duration_ms + 100)  # 50ms fade + 100ms buffer
+            fade_duration_ms = int(
+                self.fade_out_duration_ms + 100
+            )  # 50ms fade + 100ms buffer
             QTimer.singleShot(fade_duration_ms, self._finalize_stop)
 
         except Exception as e:
@@ -368,6 +398,7 @@ class AudioEngine(QObject):
 
             # Wait for fade-out to complete (blocking is OK during cleanup)
             import time
+
             fade_duration_sec = (self.fade_out_duration_ms + 100) / 1000.0
             time.sleep(fade_duration_sec)
 

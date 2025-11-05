@@ -53,7 +53,7 @@ def main():
         splash.showMessage(
             "Loading modules...",
             Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
-            Qt.GlobalColor.white
+            Qt.GlobalColor.white,
         )
         app.processEvents()
     else:

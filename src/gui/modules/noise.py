@@ -6,12 +6,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QComboBox
 
-from gui.audio_module_interface import ModuleMetadata
 from src.engine.noise import NoiseGenerator
 from src.gui.audio_module_interface import ModuleCategory
+from src.gui.audio_module_interface import ModuleMetadata
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.module_registry import register_module
 
 
 @register_module()
@@ -32,7 +32,7 @@ class NoiseModule(ModuleWidget):
         title="Noise",
         category=ModuleCategory.SOURCE,
         description="Multi-type noise generator (White, Pink, Brown, Blue, Grey, "
-                    "Velvet, Sample & Hold"
+        "Velvet, Sample & Hold",
     )
 
     def __init__(self):
@@ -77,15 +77,15 @@ class NoiseModule(ModuleWidget):
         )
         self.register_parameter("amplitude", self.amp_knob)
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
     def _on_type_changed(self, noise_type: str):
         """Handle noise type change."""
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
         self.parameter_changed.emit("noise_type", noise_type)
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,

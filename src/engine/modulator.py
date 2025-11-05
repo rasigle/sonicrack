@@ -137,7 +137,9 @@ class ADSREnvelope(Generator):
 
         # Vectorization state tracking
         # Start in idle/ended state, not attack! (prevents spurious triggers)
-        self._phase = "idle"  # Current phase: 'idle', 'attack', 'decay', 'sustain', 'release'
+        self._phase = (
+            "idle"  # Current phase: 'idle', 'attack', 'decay', 'sustain', 'release'
+        )
         self._phase_position = 0  # Position within current phase (in samples)
         self.ended = True  # Start in ended state
 

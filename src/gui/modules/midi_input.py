@@ -147,7 +147,6 @@ class MIDIInputModule(ModuleWidget):
         # Initial device refresh
         self._refresh_devices()
 
-
         logger.info("MIDI Input module initialized")
 
     def _refresh_devices(self):
@@ -276,6 +275,7 @@ class MIDIInputModule(ModuleWidget):
         if isinstance(msg, NoteOnMessage):
             if msg.velocity > 0:
                 from src.engine.midi.utils import midi_to_note_name
+
                 note_name = midi_to_note_name(msg.note)
                 self.note_label.setText(f"{note_name} ({msg.note})")
                 self.note_label.setStyleSheet(
@@ -297,7 +297,7 @@ class MIDIInputModule(ModuleWidget):
         """
         self.status_label.setText(status)
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,
@@ -337,4 +337,3 @@ class MIDIInputModule(ModuleWidget):
             self._stop_midi()
         except Exception:
             pass
-

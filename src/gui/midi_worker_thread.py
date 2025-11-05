@@ -58,7 +58,9 @@ class MIDIWorkerThread(QThread):
             while self._running:
                 try:
                     # Poll for messages (this is a blocking operation)
-                    messages = self.midi_input.get_messages(timeout=0.01)  # 10ms timeout
+                    messages = self.midi_input.get_messages(
+                        timeout=0.01
+                    )  # 10ms timeout
 
                     # Emit each message via signal (thread-safe)
                     for msg in messages:
@@ -94,4 +96,3 @@ class MIDIWorkerThread(QThread):
         logger.info("Worker thread: Stop requested")
         self._running = False
         # Thread will exit naturally from the run() loop
-

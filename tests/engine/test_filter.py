@@ -2,7 +2,6 @@
 
 import unittest
 import numpy as np
-from scipy import signal
 
 from src.engine.filter import ButterworthFilter, butter, apply_filter
 from src.constants import DEFAULT_SAMPLE_RATE
@@ -70,7 +69,7 @@ class TestButterworthFilterProcessing(unittest.TestCase):
         filtered = filt.scale_vectorized(signal_in.astype(np.float32))
 
         # Compute FFT to check frequency content
-        fft_in = np.abs(np.fft.rfft(signal_in))
+        _ = np.abs(np.fft.rfft(signal_in))
         fft_out = np.abs(np.fft.rfft(filtered))
         freqs = np.fft.rfftfreq(len(signal_in), 1 / sample_rate)
 
@@ -94,7 +93,9 @@ class TestButterworthFilterProcessing(unittest.TestCase):
         signal_in = np.sin(2 * np.pi * low_freq * t) + np.sin(2 * np.pi * high_freq * t)
 
         # Apply high-pass filter at 500 Hz
-        filt = ButterworthFilter(cutoff=500, order=4, filter_type="high", sample_rate=sample_rate)
+        filt = ButterworthFilter(
+            cutoff=500, order=4, filter_type="high", sample_rate=sample_rate
+        )
         filtered = filt.scale_vectorized(signal_in.astype(np.float32))
 
         # Compute FFT
@@ -126,7 +127,9 @@ class TestButterworthFilterProcessing(unittest.TestCase):
         )
 
         # Apply band-pass filter 200-1000 Hz
-        filt = ButterworthFilter(cutoff=(200, 1000), filter_type="band", sample_rate=sample_rate)
+        filt = ButterworthFilter(
+            cutoff=(200, 1000), filter_type="band", sample_rate=sample_rate
+        )
         filtered = filt.scale_vectorized(signal_in.astype(np.float32))
 
         # Compute FFT
@@ -375,4 +378,3 @@ class TestButterworthFilterEdgeCases(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

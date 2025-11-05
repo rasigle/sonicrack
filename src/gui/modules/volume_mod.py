@@ -54,7 +54,7 @@ class VolumeModule(ModuleWidget):
 
         self.input_component = None
         self.modulator_component = None
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -65,7 +65,7 @@ class VolumeModule(ModuleWidget):
         """Volume can optionally use Mod port for modulation."""
         return ["Mod"]
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,

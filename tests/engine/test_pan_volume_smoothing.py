@@ -22,9 +22,13 @@ def test_panner_smoothing():
 
     # Change pan position (should trigger smoothing)
     panner.position = 1.0  # Hard right
-    print(f"After setting to hard right:")
-    print(f"  Target gains: L={panner._target_left_gain:.3f}, R={panner._target_right_gain:.3f}")
-    print(f"  Current gains: L={panner._current_left_gain:.3f}, R={panner._current_right_gain:.3f}")
+    print("After setting to hard right:")
+    print(
+        f"  Target gains: L={panner._target_left_gain:.3f}, R={panner._target_right_gain:.3f}"
+    )
+    print(
+        f"  Current gains: L={panner._current_left_gain:.3f}, R={panner._current_right_gain:.3f}"
+    )
 
     # Verify smoothing state is active
     assert panner._smoothing_samples_remaining > 0
@@ -42,7 +46,9 @@ def test_panner_smoothing():
     # After smoothing completes, generate more samples to verify target reached
     left3, right3 = panner.pan_vectorized(mono_samples[541:641])
     print(f"After smoothing - L={left3[-1]:.3f}, R={right3[-1]:.3f}")
-    print(f"  Final gains: L={panner._target_left_gain:.3f}, R={panner._target_right_gain:.3f}")
+    print(
+        f"  Final gains: L={panner._target_left_gain:.3f}, R={panner._target_right_gain:.3f}"
+    )
 
     # Now should be at target (hard right: low left, high right)
     # With input of 0.5, hard right should give: left ≈ 0 (0.5 * 0), right ≈ 0.5 (0.5 * 1.0)
@@ -124,7 +130,7 @@ def test_no_clicking_on_rapid_changes():
 
     for pos in positions:
         panner.position = pos
-        left, right = panner.pan_vectorized(samples[sample_idx:sample_idx+400])
+        left, right = panner.pan_vectorized(samples[sample_idx : sample_idx + 400])
         all_left.extend(left)
         all_right.extend(right)
         sample_idx += 400
@@ -153,14 +159,13 @@ def test_no_clicking_on_rapid_changes():
 
 if __name__ == "__main__":
     print("Testing Pan and Volume Smoothing...")
-    print("="*60)
+    print("=" * 60)
 
     test_panner_smoothing()
     test_volume_smoothing()
     test_volume_gain_db_smoothing()
     test_no_clicking_on_rapid_changes()
 
-    print("="*60)
+    print("=" * 60)
     print("All smoothing tests passed! ✅")
     print("\nPan and Volume changes are now click-free!")
-

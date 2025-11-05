@@ -1,10 +1,11 @@
 """Patch compiler - converts visual patch to audio components."""
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
+from engine import AudioComponent
 from src.engine.composer import Chain, WaveAdder
-from src.gui.audio_module_interface import ModuleCategory, AudioModuleInterface
+from src.gui.audio_module_interface import ModuleCategory, AudioModule
 from src.gui.patch_canvas import Port
 
 logger = logging.getLogger(__name__)
@@ -14,24 +15,25 @@ class PatchCompiler:
     """Compiles visual patches into executable audio component graphs.
 
     Takes the modules and connections from the patch canvas and builds
-    a working audio signal chain using the generic AudioModuleInterface.
+    a working audio signal chain using the generic AudioModule interface.
 
     This compiler is extensible - it works with any module that implements
-    the AudioModuleInterface without needing module-specific code.
+    the AudioModule interface.
     """
 
     def __init__(self):
         """Initialize the patch compiler."""
-        self.modules: list[AudioModuleInterface] = []
+        self.modules: list[AudioModule] = []
         self.connections: list[tuple[Port, Port]] = []
-        self.compiled_patch: Any | None = None
-        self._build_cache: dict[AudioModuleInterface, Any] = {}
+
+        self.compiled_patch: AudioComponent | None = None
+        self._build_cache: dict[AudioModule, Any] = {}
 
         # Hot-swapping support: track module → component mapping
-        self._module_to_component: dict[AudioModuleInterface, Any] = {}
+        self._module_to_component: dict[AudioModule, AudioComponent] = {}
 
     def set_patch(
-        self, modules: list[AudioModuleInterface], connections: list[tuple[Port, Port]]
+        self, modules: list[AudioModule], connections: list[tuple[Port, Port]]
     ):
         """Set the patch to compile.
 
@@ -44,12 +46,13 @@ class PatchCompiler:
         self._build_cache = {}
         self._module_to_component = {}
 
-    def compile(self) -> Any | None:
+    def compile(self) -> AudioComponent | None:
         """Compile the patch into an audio component.
 
         Returns:
             The compiled audio component or None if compilation fails
         """
+        self.compiled_patch = None
         try:
             # Find output module
             output_module = None
@@ -64,7 +67,6 @@ class PatchCompiler:
 
             # Build the signal chain backwards from output
             component = self._build_chain_from_module(output_module)
-
             if component is None:
                 logger.error("Failed to build signal chain")
                 return None
@@ -77,7 +79,9 @@ class PatchCompiler:
             logger.error(f"Patch compilation failed: {e}", exc_info=True)
             return None
 
-    def update_parameter(self, module: AudioModuleInterface, param_name: str, value) -> bool:
+    def update_parameter(
+        self, module: AudioModule, param_name: str, value: Any
+    ) -> bool:
         """Hot-swap a parameter value without recompiling (eliminates clicks).
 
         This method updates parameters directly in the compiled audio components,
@@ -94,43 +98,44 @@ class PatchCompiler:
 
         Example:
             >>> # User rotates frequency knob
-            >>> compiler.update_parameter(osc_module, "frequency", 880)
+            >>> compiler.update_parameter(osc_module, "frequency", 880)  # noqa
             >>> # Frequency changes instantly without click!
         """
+        source_module_name = module.metadata.title
         if module not in self._module_to_component:
             logger.warning(
-                f"Cannot hot-swap parameter: module {module.metadata.title} "
-                f"not found in compiled patch"
+                f"Cannot hot-swap parameter: module {source_module_name} "
+                f"not found in compiled patch."
             )
             return False
 
         component = self._module_to_component[module]
-
-        # Try to set the parameter directly on the component
-        if hasattr(component, param_name):
-            try:
-                setattr(component, param_name, value)
-                logger.debug(
-                    f"Hot-swapped {param_name}={value} in "
-                    f"{module.metadata.title} → {type(component).__name__}"
-                )
-                return True
-            except Exception as e:
-                logger.error(
-                    f"Failed to hot-swap {param_name} in {module.metadata.title}: {e}"
-                )
-                return False
-        else:
+        if not hasattr(component, param_name):
             logger.warning(
-                f"Component {type(component).__name__} does not have "
-                f"parameter '{param_name}'"
+                f"Engine component {type(component).__name__} does not have "
+                f"configuration parameter '{param_name}'."
             )
             return False
 
-    def _build_chain_from_module(self, module: AudioModuleInterface) -> Any | None:
+        # Try to set parameter directly on engine component
+        try:
+            setattr(component, param_name, value)
+            logger.debug(
+                f"Hot-swapped {param_name}={value} in "
+                f"{source_module_name} → {type(component).__name__}"
+            )
+            return True
+        except (AttributeError, TypeError, ValueError) as e:
+            logger.error(
+                f"Failed to hot-swap {param_name} in {source_module_name}: {e}",
+                exc_info=True,
+            )
+            return False
+
+    def _build_chain_from_module(self, module: AudioModule) -> AudioComponent | None:
         """Build the audio chain from a module by following connections backwards.
 
-        This method uses the generic AudioModuleInterface to work with any module type.
+        Dispatches to category-specific builders for clean, focused logic.
 
         Args:
             module: The module to build from
@@ -142,226 +147,271 @@ class PatchCompiler:
         if module in self._build_cache:
             return self._build_cache[module]
 
-        module_category = module.metadata.category
-        name = module.metadata.title
+        # Dispatch to category-specific builder
+        category: ModuleCategory = module.metadata.category
+        builders: dict[ModuleCategory, Callable[[Any], AudioComponent | None]] = {
+            ModuleCategory.SOURCE: self._build_source_module,
+            ModuleCategory.MODULATED_SOURCE: self._build_modulated_source_module,
+            ModuleCategory.OUTPUT: self._build_output_module,
+            ModuleCategory.MIXER: self._build_mixer_module,
+            ModuleCategory.MODIFIER: self._build_modifier_module,
+        }
 
-        # Handle SOURCE modules (oscillators, envelopes, LFOs)
-        if module_category == ModuleCategory.SOURCE:
-            component = module.create_component(
-                input_components=None, modulation_components=None
-            )
-            self._build_cache[module] = component
-            self._module_to_component[module] = component  # Track for hot-swapping
-            return component
+        builder = builders.get(category)
+        if not builder:
+            raise ValueError(f"Unknown module category: {category}")
 
-        # Handle MODULATED_SOURCE modules (VCO, etc. - generators with CV inputs)
-        if module_category == ModuleCategory.MODULATED_SOURCE:
-            # Get input components (CV signals like frequency)
-            required_inputs = module.get_required_inputs()
-            input_components = []
+        component = builder(module)
 
-            for input_name in required_inputs:
-                input_port = self._find_port_by_name(module, input_name)
-                if input_port:
-                    input_conn = self._find_connection_to_port(input_port)
-                    if input_conn:
-                        input_module = input_conn.parent_module
-                        source_port_name = input_conn.port_name
+        # Cache and track for hot-swapping (if component was created)
+        if component:
+            self._cache_component(module, component)
 
-                        # Get the specific component for this output port
-                        if hasattr(input_module, 'get_output_component'):
-                            input_component = input_module.get_output_component(source_port_name)
-                        else:
-                            input_component = self._build_chain_from_module(input_module)
+        return component
 
-                        if input_component:
-                            input_components.append(input_component)
+    # === Helper Methods ===
 
-            # Create component with CV inputs (no Chain wrapper - VCO returns final component)
-            component = module.create_component(
-                input_components=input_components if input_components else None,
-                modulation_components=None
-            )
-            self._build_cache[module] = component
-            self._module_to_component[module] = component
-            return component
+    def _cache_component(self, module: AudioModule, component: AudioComponent):
+        """Cache component and track for hot-swapping.
 
-        # Handle OUTPUT module
-        if module_category == ModuleCategory.OUTPUT:
-            # Get the input connection(s)
-            input_port = self._find_port_by_name(module, "In")
-            if not input_port:
-                logger.warning("Output module has no In port")
-                return None
+        Args:
+            module: The module widget
+            component: The compiled audio component
+        """
+        self._build_cache[module] = component
+        self._module_to_component[module] = component
 
-            # Check for multiple connections (needs mixing)
-            all_input_connections = self._find_all_connections_to_port(input_port)
-            if not all_input_connections:
-                logger.warning("Output module has no input connection")
-                return None
+    def _build_component_from_port(self, connection: Port) -> Any | None:
+        """Build component from a connection's source module.
 
-            # Build all input components
-            input_components = []
-            skipped_modules = []
-            for input_conn in all_input_connections:
-                source_module = input_conn.parent_module
-                source_port_name = input_conn.port_name
+        Args:
+            connection: The source (output) port
 
-                # Check if source module has multiple outputs
-                if hasattr(source_module, 'get_output_component'):
-                    # Get the specific component for this output port
-                    input_component = source_module.get_output_component(source_port_name)
-                else:
-                    # Build the entire chain from the source module
-                    input_component = self._build_chain_from_module(source_module)
+        Returns:
+            Built component or None
+        """
+        source_module = connection.parent_module
+        source_port_name = connection.port_name
 
-                if input_component:
-                    input_components.append(input_component)
-                else:
-                    # Track skipped modules for better error reporting
-                    skipped_modules.append(source_module.metadata.title)
+        # Check if source module has multiple outputs
+        if hasattr(source_module, "get_output_component"):
+            return source_module.get_output_component(source_port_name)
+        else:
+            return self._build_chain_from_module(source_module)
 
-            # Log skipped modules
-            if skipped_modules:
-                logger.info(
-                    f"Output: Skipped {len(skipped_modules)} module(s) with missing inputs: "
-                    f"{', '.join(skipped_modules)}"
-                )
+    def _collect_input_components_from_port(
+        self, port: Port, track_skipped: bool = False
+    ) -> tuple[list, list[str]]:
+        """Collect all components connected to a port.
 
-            if not input_components:
-                logger.warning("Output module has no valid input components (all inputs skipped or disconnected)")
-                return None
+        Args:
+            port: The input port to collect from
+            track_skipped: Whether to track skipped module names
 
-            # If multiple inputs, create a mixer to combine them
-            if len(input_components) > 1:
-                component = WaveAdder(*input_components)
-            else:
-                component = input_components[0]
+        Returns:
+            Tuple of (components list, skipped module names list)
+        """
+        all_connections = self._find_all_connections_to_port(port)
+        components = []
+        skipped = []
 
-            self._build_cache[module] = component
-            return component
+        for conn in all_connections:
+            component = self._build_component_from_port(conn)
+            if component:
+                components.append(component)
+            elif track_skipped:
+                skipped.append(conn.parent_module.metadata.title)
 
-        # Handle MIXER modules (combine multiple inputs)
-        if module_category == ModuleCategory.MIXER:
-            # Collect all input components
-            input_components = []
-            for input_port in getattr(module, "input_ports", []):
+        return components, skipped
+
+    def _collect_modulation_components(self, module: AudioModule) -> dict:
+        """Collect modulation components as dictionary.
+
+        Args:
+            module: The module to collect modulations for
+
+        Returns:
+            Dictionary mapping port_name -> component
+        """
+        modulation_components = {}
+
+        for mod_port_name in module.get_modulation_inputs():
+            mod_port = self._find_port_by_name(module, mod_port_name)
+            if mod_port:
+                mod_conn = self._find_connection_to_port(mod_port)
+                if mod_conn:
+                    mod_component = self._build_component_from_port(mod_conn)
+                    if mod_component:
+                        modulation_components[mod_port_name] = mod_component
+
+        return modulation_components
+
+    # === Category-Specific Builders ===
+    def _build_source_module(self, module: AudioModule) -> AudioComponent | None:
+        """Build SOURCE module (oscillators, LFOs, envelopes without CV inputs).
+
+        Args:
+            module: The SOURCE module
+
+        Returns:
+            The audio component
+        """
+        return module.create_engine_component(
+            input_components=None, modulation_components=None
+        )
+
+    def _build_modulated_source_module(
+        self, module: AudioModule
+    ) -> AudioComponent | None:
+        """Build MODULATED_SOURCE module (VCO, ADSR with CV inputs).
+
+        Args:
+            module: The MODULATED_SOURCE module
+
+        Returns:
+            The audio component
+        """
+        # Collect CV input components (frequency, gate, etc.)
+        input_components = []
+
+        for input_name in module.get_required_inputs():
+            input_port = self._find_port_by_name(module, input_name)
+            if input_port:
                 input_conn = self._find_connection_to_port(input_port)
                 if input_conn:
-                    input_module = input_conn.parent_module
-                    input_component = self._build_chain_from_module(input_module)
-                    if input_component:
-                        input_components.append(input_component)
+                    component = self._build_component_from_port(input_conn)
+                    if component:
+                        input_components.append(component)
 
-            if not input_components:
-                logger.warning(f"Mixer module '{name}' has no input connections.")
-                return None
+        # Create component with CV inputs (no Chain wrapper)
+        return module.create_engine_component(
+            input_components=input_components if input_components else None,
+            modulation_components=None,
+        )
 
-            # Create the mixer component
-            component = module.create_component(
-                input_components=input_components, modulation_components=None
-            )
-            self._build_cache[module] = component
-            return component
+    def _build_output_module(self, module: AudioModule) -> AudioComponent | None:
+        """Build OUTPUT module (terminal node, may mix multiple inputs).
 
-        # Handle MODIFIER modules (volume, panner, clipper, etc.)
-        if module_category == ModuleCategory.MODIFIER:
-            # Get required input(s)
-            required_inputs = module.get_required_inputs()
-            if not required_inputs:
-                logger.debug(
-                    f"Modifier module '{name}' has no required inputs defined - skipping"
-                )
-                return None
+        Args:
+            module: The OUTPUT module
 
-            # Get the main input component
-            main_input_name = required_inputs[0]
-            main_input_port = self._find_port_by_name(module, main_input_name)
-            if not main_input_port:
-                logger.debug(
-                    f"Modifier module '{name}' missing port '{main_input_name}' - skipping"
-                )
-                return None
+        Returns:
+            The audio component (possibly WaveAdder if multiple inputs)
+        """
+        name = module.metadata.title
 
-            # Check for multiple connections to this input (needs mixing)
-            all_input_connections = self._find_all_connections_to_port(main_input_port)
+        # Find the input port
+        input_port = self._find_port_by_name(module, "In")
+        if not input_port:
+            logger.warning(f"{name}: No 'In' port found")
+            return None
 
-            if not all_input_connections:
-                # No input connection - skip this module gracefully
-                # This allows modules to be connected to output without causing errors
-                logger.debug(
-                    f"Modifier module '{name}' has no input connection - skipping in signal chain"
-                )
-                return None
+        # Collect all input components (may be multiple for mixing)
+        components, skipped = self._collect_input_components_from_port(
+            input_port, track_skipped=True
+        )
 
-            # Build all input components
-            input_components = []
-            for input_conn in all_input_connections:
-                input_module = input_conn.parent_module
-                source_port_name = input_conn.port_name
-
-                # Check if source module has multiple outputs
-                if hasattr(input_module, 'get_output_component'):
-                    # Get the specific component for this output port
-                    input_component = input_module.get_output_component(source_port_name)
-                else:
-                    # Build the entire chain from the source module
-                    input_component = self._build_chain_from_module(input_module)
-
-                if input_component:
-                    input_components.append(input_component)
-
-            if not input_components:
-                return None
-
-            # If multiple inputs, create a mixer to combine them
-            if len(input_components) > 1:
-                input_component = WaveAdder(*input_components)
-            else:
-                input_component = input_components[0]
-
-            # Collect modulation components
-            modulation_components = {}
-            for mod_port_name in module.get_modulation_inputs():
-                mod_port = self._find_port_by_name(module, mod_port_name)
-                if mod_port:
-                    mod_conn = self._find_connection_to_port(mod_port)
-                    if mod_conn:
-                        mod_module = mod_conn.parent_module
-                        source_port_name = mod_conn.port_name
-
-                        # Check if source module has multiple outputs
-                        if hasattr(mod_module, 'get_output_component'):
-                            # Get the specific component for this output port
-                            mod_component = mod_module.get_output_component(source_port_name)
-                        else:
-                            # Build the entire chain from the source module
-                            mod_component = self._build_chain_from_module(mod_module)
-
-                        if mod_component:
-                            modulation_components[mod_port_name] = mod_component
-
-            # Create the modifier component
-            modifier_component = module.create_component(
-                input_components=[input_component],
-                modulation_components=(
-                    modulation_components if modulation_components else None
-                ),
+        # Log skipped modules
+        if skipped:
+            logger.info(
+                f"{name}: Skipped {len(skipped)} module(s) with missing inputs: "
+                f"{', '.join(skipped)}"
             )
 
-            # Chain input with modifier
-            if modifier_component:
-                component = Chain(input_component, modifier_component)
-                self._build_cache[module] = component
-                self._module_to_component[module] = modifier_component  # Track the actual modifier for hot-swapping
-                return component
+        if not components:
+            logger.warning(f"{name}: No valid input components")
+            return None
 
-        # Unknown module type
-        logger.warning(f"Unknown module type: {module_category}")
-        return None
+        # Mix multiple inputs or return single input
+        return WaveAdder(*components) if len(components) > 1 else components[0]
+
+    def _build_mixer_module(self, module: AudioModule) -> AudioComponent | None:
+        """Build MIXER module (combines multiple inputs).
+
+        Args:
+            module: The MIXER module
+
+        Returns:
+            The mixer component
+        """
+        name = module.metadata.title
+
+        # Collect all input components
+        input_components = []
+        for input_port in getattr(module, "input_ports", []):
+            input_conn = self._find_connection_to_port(input_port)
+            if input_conn:
+                component = self._build_component_from_port(input_conn)
+                if component:
+                    input_components.append(component)
+
+        if not input_components:
+            logger.debug(f"{name}: No input connections - skipping")
+            return None
+
+        # Create the mixer component
+        return module.create_engine_component(
+            input_components=input_components, modulation_components=None
+        )
+
+    def _build_modifier_module(self, module: AudioModule) -> AudioComponent | None:
+        """Build MODIFIER module (volume, panner, effects).
+
+        Args:
+            module: The MODIFIER module
+
+        Returns:
+            Chain of input -> modifier, or None if no input
+        """
+        name = module.metadata.title
+
+        # Get required inputs
+        required_inputs = module.get_required_inputs()
+        if not required_inputs:
+            logger.debug(f"{name}: No required inputs defined - skipping")
+            return None
+
+        # Get the main input port
+        main_input_name = required_inputs[0]
+        main_input_port = self._find_port_by_name(module, main_input_name)
+        if not main_input_port:
+            logger.debug(f"{name}: Missing port '{main_input_name}' - skipping")
+            return None
+
+        # Collect input components (may be multiple, will be mixed)
+        components, _ = self._collect_input_components_from_port(main_input_port)
+
+        if not components:
+            logger.debug(f"{name}: No input connection - skipping")
+            return None
+
+        # Mix multiple inputs or use single input
+        input_comp = WaveAdder(*components) if len(components) > 1 else components[0]
+
+        # Collect modulation components
+        modulation_components = self._collect_modulation_components(module)
+
+        # Create the modifier component
+        modifier_component = module.create_engine_component(
+            input_components=[input_comp],
+            modulation_components=(
+                modulation_components if modulation_components else None
+            ),
+        )
+
+        if not modifier_component:
+            return None
+
+        # Chain input with modifier
+        component = Chain(input_comp, modifier_component)
+
+        # Track modifier for hot-swapping (not the Chain wrapper)
+        self._module_to_component[module] = modifier_component
+
+        return component
 
     @staticmethod
-    def _find_port_by_name(module: AudioModuleInterface, port_name: str) -> Port | None:
+    def _find_port_by_name(module: AudioModule, port_name: str) -> Port | None:
         """Find a port by name in a module.
 
         Args:
@@ -447,7 +497,8 @@ class PatchCompiler:
                         return True
                 elif neighbor in rec_stack:
                     # Found a cycle! The neighbor is already in our recursion stack
-                    # Build the cycle description from where neighbor first appears in path
+                    # Build the cycle description from where neighbor first appears
+                    # in path
                     try:
                         cycle_start_idx = path.index(neighbor)
                         cycle_modules = path[cycle_start_idx:] + [neighbor]
@@ -459,7 +510,8 @@ class PatchCompiler:
                     except ValueError:
                         # Neighbor not in path (shouldn't happen, but be safe)
                         errors.append(
-                            f"Infinite loop detected involving module '{neighbor.metadata.title}'\n"
+                            f"Infinite loop detected involving module "
+                            f"'{neighbor.metadata.title}'\n"
                             f"This creates a feedback loop that cannot be compiled."
                         )
                     return True
@@ -475,10 +527,7 @@ class PatchCompiler:
 
         return errors
 
-    def _get_signal_path_modules(
-            self,
-            output_module: AudioModuleInterface
-    ) -> set[AudioModuleInterface]:
+    def _get_signal_path_modules(self, output_module: AudioModule) -> set[AudioModule]:
         """Get all modules that are part of the signal path to the output.
 
         Args:
@@ -506,8 +555,9 @@ class PatchCompiler:
         trace_back(output_module)
         return signal_path
 
-    def get_compilation_errors(self) -> list[str]:
-        """Get a list of compilation errors/warnings.
+    def get_prevalidation_errors(self) -> list[str]:
+        """Check the consistency of the patch (cycles, no output, ...) and returns a
+        list of errors/warnings.
 
         Returns:
             List of error messages
@@ -557,7 +607,7 @@ class PatchCompiler:
 
             # Check for self-connections
             if start_port.parent_module == end_port.parent_module:
-                module_name = getattr(start_port.parent_module, 'metadata', None)
+                module_name = getattr(start_port.parent_module, "metadata", None)
                 if module_name:
                     module_name = module_name.title
                 else:
@@ -616,9 +666,7 @@ class PatchCompiler:
             "modulations": [],
         }
 
-    def _build_tree_node(
-        self, module: AudioModuleInterface, visited: set
-    ) -> dict[str, Any]:
+    def _build_tree_node(self, module: AudioModule, visited: set) -> dict[str, Any]:
         """Build a tree node for a module recursively.
 
         Args:

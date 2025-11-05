@@ -54,13 +54,17 @@ class ADSRModule(ModuleWidget):
             "Lower values may cause clicks"
         )
         self.attack_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("attack_duration", self.attack_knob.get_value())
+            lambda: self.parameter_changed.emit(
+                "attack_duration", self.attack_knob.get_value()
+            )
         )
         knobs_layout.addWidget(self.attack_knob)
 
         self.decay_knob = Knob("Decay", 0.001, 5.0, 0.2)
         self.decay_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("decay_duration", self.decay_knob.get_value())
+            lambda: self.parameter_changed.emit(
+                "decay_duration", self.decay_knob.get_value()
+            )
         )
         knobs_layout.addWidget(self.decay_knob)
 
@@ -95,14 +99,14 @@ class ADSRModule(ModuleWidget):
         self.register_parameter("sustain_level", self.sustain_knob)
         self.register_parameter("release_duration", self.release_knob)
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     def get_required_inputs(self) -> list[str]:
         """Gate input is optional - ADSR works without gate triggering."""
         return []  # No required inputs - Gate is optional
 
     # AudioModuleInterface implementation
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,

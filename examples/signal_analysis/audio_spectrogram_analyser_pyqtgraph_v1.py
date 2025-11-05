@@ -281,7 +281,9 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
 
         # Spectrogram playback line update timer (less frequent)
         self.spec_line_timer = QtCore.QTimer()
-        self.spec_line_timer.setInterval(200)  # Update every 200ms instead of every frame
+        self.spec_line_timer.setInterval(
+            200
+        )  # Update every 200ms instead of every frame
         self.spec_line_timer.timeout.connect(self._update_spec_playback_line)
 
         # connect controls

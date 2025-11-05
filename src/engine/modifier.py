@@ -167,14 +167,10 @@ class Panner(Modifier):
 
             # Create smooth gain envelopes (linear ramp)
             left_envelope = np.linspace(
-                self._current_left_gain,
-                self._target_left_gain,
-                smooth_count
+                self._current_left_gain, self._target_left_gain, smooth_count
             )
             right_envelope = np.linspace(
-                self._current_right_gain,
-                self._target_right_gain,
-                smooth_count
+                self._current_right_gain, self._target_right_gain, smooth_count
             )
 
             # Apply smoothed gains to first part
@@ -200,7 +196,8 @@ class Panner(Modifier):
 
             return left.astype(np.float32), right.astype(np.float32)
         else:
-            # No smoothing needed - use target gains (which match _left_gain/_right_gain)
+            # No smoothing needed - use target gains (which match
+            # _left_gain/_right_gain)
             left = (self._target_left_gain * samples).astype(np.float32)
             right = (self._target_right_gain * samples).astype(np.float32)
             return left, right
@@ -259,15 +256,22 @@ class ModulatedPanner(Panner):
             )
 
         super().__init__(position=0.0)
-        self.modulator = modulator
 
-        # Auto-initialize the modulator to avoid common errors
-        iter(self.modulator)
+        # Keep the original modulator object (source) so we can re-create
+        # fresh iterators when needed (some modulators are iterable but not
+        # iterator objects themselves). Also keep an iterator instance that
+        # we advance during normal operation.
+        self._modulator_source = modulator
+        self.modulator = iter(self._modulator_source)
+
         logger.debug("ModulatedPanner initialized and modulator started")
 
     def __iter__(self) -> "ModulatedPanner":
         """Re-initialize modulator for iteration."""
-        iter(self.modulator)
+        # Re-create the iterator from the original source so iteration
+        # always starts fresh. This handles both iterator and iterable
+        # modulator implementations.
+        self.modulator = iter(self._modulator_source)
         return self
 
     def __next__(self) -> float:
@@ -281,20 +285,52 @@ class ModulatedPanner(Panner):
         self.position = mod_value  # Setter clips and updates gains
         return self.position
 
-    def pan_vectorized(
-        self, samples: np.ndarray, num_samples: int
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def __call__(
+        self, val: float | np.ndarray
+    ) -> tuple[float, float] | tuple[np.ndarray, np.ndarray]:
+        """Advance scalar modulators and produce a panned value.
+
+        For scalar calls (single sample), advance the internal iterator once so
+        calling `panner(sample)` advances modulation implicitly. For array
+        inputs, fall back to vectorized path which reads the required number
+        of modulation values.
+        """
+        # Array path: delegate to pan_vectorized which handles vectorized mods
+        if isinstance(val, np.ndarray):
+            return self.pan_vectorized(val)
+
+        # Scalar path: advance modulator once and update position
+        try:
+            mod_value = next(self.modulator)
+        except StopIteration:
+            # Re-create iterator and advance
+            self.modulator = iter(self._modulator_source)
+            mod_value = next(self.modulator)
+        self.position = mod_value
+        return super().__call__(val)
+
+    def pan_vectorized(self, samples: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Apply modulated panning to an array of samples (fully vectorized).
 
         Args:
             samples: Mono input array.
-            num_samples: Number of samples to process.
+            (num_samples is computed internally as len(samples)).
 
         Returns:
             Tuple of (left, right) stereo arrays.
         """
-        # Get modulation values vectorized (50-100x faster than loop!)
-        if hasattr(self.modulator, "get_samples"):
+        num_samples = len(samples)
+
+        # Get modulation values vectorized (50-100x faster than loop!).
+        # Prefer calling `get_samples` on the original source if available
+        # (many modulators implement a high-performance `get_samples`). If not,
+        # fall back to iterating the iterator instance.
+        if hasattr(self._modulator_source, "get_samples"):
+            mod_values = self._modulator_source.get_samples(
+                num_samples, reset=False, mode="vectorized"
+            )
+        elif hasattr(self.modulator, "get_samples"):
+            # iterator might itself expose get_samples
             mod_values = self.modulator.get_samples(
                 num_samples, reset=False, mode="vectorized"
             )
@@ -439,7 +475,7 @@ class Volume(Modifier):
             Gain in decibels (-inf for zero)
         """
         if linear <= 0:
-            return float('-inf')
+            return float("-inf")
         return 20 * np.log10(linear)
 
     @property
@@ -528,9 +564,7 @@ class Volume(Modifier):
 
             # Create smooth amplitude envelope (linear ramp)
             amp_envelope = np.linspace(
-                self._current_amplitude,
-                self._target_amplitude,
-                smooth_count
+                self._current_amplitude, self._target_amplitude, smooth_count
             )
 
             # Apply smoothed amplitude to first part

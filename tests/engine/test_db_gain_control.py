@@ -32,7 +32,7 @@ class TestOscillatorDBControl:
         assert Oscillator.linear_to_db(0.5) == pytest.approx(-6.0, rel=0.1)
         assert Oscillator.linear_to_db(0.1) == pytest.approx(-20.0)
         assert Oscillator.linear_to_db(2.0) == pytest.approx(6.0, rel=0.1)
-        assert Oscillator.linear_to_db(0.0) == float('-inf')
+        assert Oscillator.linear_to_db(0.0) == float("-inf")
 
     def test_gain_db_default(self):
         """Test default gain_db value of -20 dB."""
@@ -71,14 +71,14 @@ class TestOscillatorDBControl:
     def test_warning_on_mismatched_gain_and_amplitude(self, caplog):
         """Test that warning is logged when gain_db and amplitude don't match."""
         with caplog.at_level(logging.WARNING):
-            osc = SineOscillator(gain_db=-6, amplitude=0.3)
+            SineOscillator(gain_db=-6, amplitude=0.3)
             assert "Both gain_db" in caplog.text
             assert "Using gain_db" in caplog.text
 
     def test_no_warning_when_amplitude_is_default(self, caplog):
         """Test no warning when amplitude is at default value."""
         with caplog.at_level(logging.WARNING):
-            osc = SineOscillator(gain_db=-6)  # amplitude defaults to 1.0
+            SineOscillator(gain_db=-6)  # amplitude defaults to 1.0
             # Should not warn because amplitude wasn't explicitly set
             assert "Both gain_db" not in caplog.text
 
@@ -154,7 +154,7 @@ class TestVolumeDBControl:
     def test_volume_warning_on_mismatch(self, caplog):
         """Test Volume logs warning on gain_db/amplitude mismatch."""
         with caplog.at_level(logging.WARNING):
-            vol = Volume(gain_db=-6, amplitude=0.3)
+            Volume(gain_db=-6, amplitude=0.3)
             assert "Both gain_db" in caplog.text
 
 
@@ -164,13 +164,14 @@ class TestModulatedVolumeInheritance:
     def test_modulated_volume_has_gain_db(self):
         """Test ModulatedVolume has gain_db property from parent."""
         from src.engine.oscillator import SineOscillator
+
         lfo = SineOscillator(frequency=5, amplitude=0.5, gain_db=None)
         mod_vol = ModulatedVolume(lfo)
 
         # Should have gain_db property
-        assert hasattr(mod_vol, 'gain_db')
-        assert hasattr(mod_vol, 'db_to_linear')
-        assert hasattr(mod_vol, 'linear_to_db')
+        assert hasattr(mod_vol, "gain_db")
+        assert hasattr(mod_vol, "db_to_linear")
+        assert hasattr(mod_vol, "linear_to_db")
 
 
 class TestWaveRangeWithGainDB:
@@ -183,7 +184,7 @@ class TestWaveRangeWithGainDB:
         osc = SineOscillator(
             frequency=440,
             gain_db=-6,  # Final output halved
-            wave_range=(-1, 1)  # Standard range
+            wave_range=(-1, 1),  # Standard range
         )
         samples = osc.get_samples_vectorized(1000)
 
@@ -222,4 +223,3 @@ class TestBackwardsCompatibility:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

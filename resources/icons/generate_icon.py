@@ -1,8 +1,9 @@
 """Generate AudioPlayground application icon."""
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import os
+
 
 def create_app_icon(size=512):
     """Create a modern, professional icon for AudioPlayground.
@@ -14,7 +15,7 @@ def create_app_icon(size=512):
     - Modern, sleek appearance
     """
     # Create image with dark background
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     # Background - dark rounded square with gradient effect
@@ -28,10 +29,14 @@ def create_app_icon(size=512):
         color = (shade, shade, shade + 10, alpha)
         offset = i * 2
         draw.rounded_rectangle(
-            [bg_rect[0] + offset, bg_rect[1] + offset,
-             bg_rect[2] - offset, bg_rect[3] - offset],
+            [
+                bg_rect[0] + offset,
+                bg_rect[1] + offset,
+                bg_rect[2] - offset,
+                bg_rect[3] - offset,
+            ],
             radius=size // 8,
-            fill=color
+            fill=color,
         )
 
     # Main background
@@ -65,19 +70,28 @@ def create_app_icon(size=512):
         for width_offset in range(3, 0, -1):
             alpha = int(100 + (3 - width_offset) * 50)
             glow_color = (*color, alpha)
-            draw.line([x1, y1, x2, y2], fill=glow_color, width=size // 40 + width_offset * 2)
+            draw.line(
+                [x1, y1, x2, y2], fill=glow_color, width=size // 40 + width_offset * 2
+            )
 
         # Draw connector dots at ends
         dot_size = size // 30
         for x, y in [(x1, y1), (x2, y2)]:
             # Outer glow
-            draw.ellipse([x - dot_size * 1.5, y - dot_size * 1.5,
-                         x + dot_size * 1.5, y + dot_size * 1.5],
-                        fill=(*color, 100))
+            draw.ellipse(
+                [
+                    x - dot_size * 1.5,
+                    y - dot_size * 1.5,
+                    x + dot_size * 1.5,
+                    y + dot_size * 1.5,
+                ],
+                fill=(*color, 100),
+            )
             # Inner dot
-            draw.ellipse([x - dot_size, y - dot_size,
-                         x + dot_size, y + dot_size],
-                        fill=(*color, 255))
+            draw.ellipse(
+                [x - dot_size, y - dot_size, x + dot_size, y + dot_size],
+                fill=(*color, 255),
+            )
 
     # Draw central waveform (sine wave in a circle)
     wave_points = []
@@ -96,57 +110,63 @@ def create_app_icon(size=512):
     # Draw waveform with gradient glow
     for width in [12, 8, 4]:
         alpha = int(255 * (5 - width) / 5)
-        draw.line(wave_points, fill=(100, 200, 255, alpha), width=width, joint='curve')
+        draw.line(wave_points, fill=(100, 200, 255, alpha), width=width, joint="curve")
 
     # Draw center circle with gradient
     inner_radius = size // 12
     for i in range(15):
         r = inner_radius - i
         alpha = int(255 * (15 - i) / 15)
-        draw.ellipse([center_x - r, center_y - r,
-                     center_x + r, center_y + r],
-                    fill=(50, 150, 255, alpha))
+        draw.ellipse(
+            [center_x - r, center_y - r, center_x + r, center_y + r],
+            fill=(50, 150, 255, alpha),
+        )
 
     # Add subtle outer glow
     glow_radius = size // 2 - margin
     for i in range(20):
         r = glow_radius + i * 3
         alpha = int(30 * (20 - i) / 20)
-        draw.ellipse([center_x - r, center_y - r,
-                     center_x + r, center_y + r],
-                    outline=(100, 180, 255, alpha))
+        draw.ellipse(
+            [center_x - r, center_y - r, center_x + r, center_y + r],
+            outline=(100, 180, 255, alpha),
+        )
 
     return img
 
-def save_icon_sizes(base_image, output_dir='.'):
+
+def save_icon_sizes(base_image, output_dir="."):
     """Save icon in multiple sizes for different platforms."""
     os.makedirs(output_dir, exist_ok=True)
 
     sizes = {
-        'icon_16.png': 16,
-        'icon_32.png': 32,
-        'icon_48.png': 48,
-        'icon_64.png': 64,
-        'icon_128.png': 128,
-        'icon_256.png': 256,
-        'icon_512.png': 512,
-        'icon.png': 512,  # Main icon
+        "icon_16.png": 16,
+        "icon_32.png": 32,
+        "icon_48.png": 48,
+        "icon_64.png": 64,
+        "icon_128.png": 128,
+        "icon_256.png": 256,
+        "icon_512.png": 512,
+        "icon.png": 512,  # Main icon
     }
 
     for filename, size in sizes.items():
         resized = base_image.resize((size, size), Image.Resampling.LANCZOS)
         filepath = os.path.join(output_dir, filename)
-        resized.save(filepath, 'PNG')
+        resized.save(filepath, "PNG")
         print(f"✅ Created: {filepath}")
 
     # Create Windows ICO file (multi-resolution)
-    ico_path = os.path.join(output_dir, 'icon.ico')
-    base_image.save(ico_path, format='ICO', sizes=[
-        (16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)
-    ])
+    ico_path = os.path.join(output_dir, "icon.ico")
+    base_image.save(
+        ico_path,
+        format="ICO",
+        sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
+    )
     print(f"✅ Created: {ico_path}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     print("🎨 Generating AudioPlayground icon...")
 
     # Create high-resolution base icon
@@ -162,6 +182,7 @@ if __name__ == '__main__':
     print("  - icon_16.png to icon_512.png (various sizes)")
     print("\nTo use in your app:")
     print("  1. Copy 'resources' folder to your project root")
-    print("  2. In main_window.py, add: self.setWindowIcon(QIcon('resources/icon.png'))")
+    print(
+        "  2. In main_window.py, add: self.setWindowIcon(QIcon('resources/icon.png'))"
+    )
     print("  3. For packaging, reference icon.ico in your build config")
-

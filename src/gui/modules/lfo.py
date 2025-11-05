@@ -93,15 +93,15 @@ class LFOModule(ModuleWidget):
         self.register_parameter("gain_db", self.depth_knob)
         self.register_parameter("phase", self.phase_slider)
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
     def _on_wave_changed(self, wave_type: str):
         """Handle waveform type change."""
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
         self.parameter_changed.emit("waveform", wave_type)
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,
@@ -115,7 +115,9 @@ class LFOModule(ModuleWidget):
         # LFO uses the same oscillators but at lower frequencies
         # and with wave_range set to modulation range (-1 to 1)
         if wave_type == "Sine":
-            return SineOscillator(freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1))
+            return SineOscillator(
+                freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1)
+            )
         if wave_type == "Square":
             return SquareOscillator(
                 freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1)

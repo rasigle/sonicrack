@@ -51,14 +51,14 @@ class ClipperModule(ModuleWidget):
         # Register parameters for automatic get/set
         self.register_parameter("threshold", self.threshold_knob)
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
         """Clipper requires the In port to be connected."""
         return ["In"]
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,

@@ -45,7 +45,8 @@ class GateTriggeredADSR(AudioComponent):
 
         Args:
             adsr_envelope: The ADSR envelope to trigger
-            gate_source: Component that provides gate signal (must have get_samples method)
+            gate_source: Component that provides gate signal
+                (must have get_samples method)
         """
         super().__init__()
         self.adsr = adsr_envelope
@@ -54,32 +55,35 @@ class GateTriggeredADSR(AudioComponent):
         # Initialize previous_gate from current gate state to prevent false triggers
         # Try multiple methods to get initial gate value
         initial_gate = 0.0
-        if hasattr(gate_source, 'cv_converter'):
+        if hasattr(gate_source, "cv_converter"):
             # For CVGateOutput
             initial_gate = gate_source.cv_converter.gate
-        elif hasattr(gate_source, 'gate'):
+        elif hasattr(gate_source, "gate"):
             # For other gate sources with gate property
             initial_gate = gate_source.gate
 
         self.previous_gate = initial_gate
 
-        logger.debug(f"GateTriggeredADSR initialized with initial gate={self.previous_gate}")
+        logger.debug(
+            f"GateTriggeredADSR initialized with initial gate={self.previous_gate}"
+        )
 
     def get_samples(self, num_samples: int, **kwargs) -> np.ndarray:
         """Generate envelope samples, checking gate for triggers.
 
         Args:
             num_samples: Number of samples to generate
-            **kwargs: Additional arguments (ignored, for compatibility with ModulatedVolume)
+            **kwargs: Additional arguments (ignored, for compatibility with
+                ModulatedVolume)
 
         Returns:
             Envelope output (0.0 to 1.0)
         """
         # Get gate signal
-        if hasattr(self.gate_source, 'get_gate_samples'):
+        if hasattr(self.gate_source, "get_gate_samples"):
             # For CV converters with specialized gate method
             gate_samples = self.gate_source.get_gate_samples(num_samples)
-        elif hasattr(self.gate_source, 'get_samples'):
+        elif hasattr(self.gate_source, "get_samples"):
             # For generic audio components
             gate_samples = self.gate_source.get_samples(num_samples)
         else:
@@ -90,16 +94,14 @@ class GateTriggeredADSR(AudioComponent):
         # In a more sophisticated implementation, we'd check each sample
         current_gate = gate_samples[0] if len(gate_samples) > 0 else 0.0
 
-        # Use hysteresis for gate detection to prevent false triggers from noise
-        # Threshold: 0.5 for detection, but require significant change
-        GATE_THRESHOLD = 0.5
-
-        # Detect rising edge (note on) - require transition from clearly low to clearly high
+        # Detect rising edge (note on) - require transition from clearly low to clearly
+        # high
         if self.previous_gate < 0.3 and current_gate > 0.7:
             logger.debug("Gate rising edge detected - triggering note on")
             self.adsr.trigger_note_on()
 
-        # Detect falling edge (note off) - require transition from clearly high to clearly low
+        # Detect falling edge (note off) - require transition from clearly high to
+        # clearly low
         elif self.previous_gate > 0.7 and current_gate < 0.3:
             logger.debug("Gate falling edge detected - triggering note off")
             self.adsr.trigger_note_off()
@@ -115,11 +117,11 @@ class GateTriggeredADSR(AudioComponent):
         self.previous_gate = 0.0
 
         # Initialize gate source iterator if it has __iter__
-        if hasattr(self.gate_source, '__iter__'):
+        if hasattr(self.gate_source, "__iter__"):
             iter(self.gate_source)
 
         # Initialize ADSR iterator
-        if hasattr(self.adsr, '__iter__'):
+        if hasattr(self.adsr, "__iter__"):
             iter(self.adsr)
         return self
 
@@ -130,9 +132,9 @@ class GateTriggeredADSR(AudioComponent):
             Current envelope value (0.0 to 1.0)
         """
         # Get current gate value
-        if hasattr(self.gate_source, '__next__'):
+        if hasattr(self.gate_source, "__next__"):
             current_gate = next(self.gate_source)
-        elif hasattr(self.gate_source, 'gate'):
+        elif hasattr(self.gate_source, "gate"):
             # For CV converters with gate property
             current_gate = self.gate_source.gate
         else:
@@ -152,7 +154,7 @@ class GateTriggeredADSR(AudioComponent):
         self.previous_gate = current_gate
 
         # Get next ADSR value
-        if hasattr(self.adsr, '__next__'):
+        if hasattr(self.adsr, "__next__"):
             return next(self.adsr)
         else:
             # Fallback to get_samples
@@ -212,4 +214,3 @@ class GateTriggeredADSR(AudioComponent):
     def release_duration(self, value: float):
         """Set release duration on underlying ADSR."""
         self.adsr.release_duration = value
-

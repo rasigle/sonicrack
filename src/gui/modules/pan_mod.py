@@ -52,7 +52,7 @@ class PannerModule(ModuleWidget):
 
         self.modulator_component = None
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -63,7 +63,7 @@ class PannerModule(ModuleWidget):
         """Panner can optionally use Mod port for modulation."""
         return ["Mod"]
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,

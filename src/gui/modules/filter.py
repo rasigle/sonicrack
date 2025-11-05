@@ -23,7 +23,7 @@ class FilterModule(ModuleWidget):
     metadata = ModuleMetadata(
         title="Filter",
         category=ModuleCategory.MODIFIER,
-        description="Butterworth filter (low-pass, high-pass, band-pass)"
+        description="Butterworth filter (low-pass, high-pass, band-pass)",
     )
 
     def __init__(self):
@@ -122,9 +122,14 @@ class FilterModule(ModuleWidget):
         self.register_parameter("cutoff", self.cutoff_knob)
         self.register_parameter("high_cutoff", self.high_cutoff_knob)
         self.register_parameter("order", self.order_slider)
-        self.register_parameter("filter_type", self.type_combo, getter="currentText", setter="setCurrentText")
+        self.register_parameter(
+            "filter_type",
+            self.type_combo,
+            getter="currentText",
+            setter="setCurrentText",
+        )
 
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     def _set_high_cutoff_visible(self, visible: bool):
         """Show or hide the high cutoff controls."""
@@ -156,21 +161,21 @@ class FilterModule(ModuleWidget):
         self._set_high_cutoff_visible(is_bandpass)
 
         # Update component and emit signal
-        self.create_component()
+        self.create_engine_component()
         self.parameter_changed.emit("filter_type", filter_type)
 
     def _on_cutoff_changed(self):
         """Handle cutoff frequency change."""
         value = self.cutoff_knob.get_value()
         self.cutoff_value_label.setText(f"{int(value)} Hz")
-        self.create_component()
+        self.create_engine_component()
         self.parameter_changed.emit("cutoff", value)
 
     def _on_high_cutoff_changed(self):
         """Handle high cutoff frequency change (band-pass only)."""
         value = self.high_cutoff_knob.get_value()
         self.high_cutoff_value_label.setText(f"{int(value)} Hz")
-        self.create_component()
+        self.create_engine_component()
         self.parameter_changed.emit("high_cutoff", value)
 
     def _on_order_changed(self, value: float):
@@ -178,7 +183,7 @@ class FilterModule(ModuleWidget):
         # Convert to int since filter order must be an integer
         order_int = int(value)
         self.order_value_label.setText(str(order_int))
-        self.create_component()
+        self.create_engine_component()
         self.parameter_changed.emit("order", order_int)
 
     def get_required_inputs(self) -> list[str]:
@@ -191,7 +196,7 @@ class FilterModule(ModuleWidget):
         """
         return ["In"]
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components=None,
         modulation_components=None,
@@ -243,4 +248,3 @@ class FilterModule(ModuleWidget):
 
         # Otherwise return just the filter (shouldn't happen in normal use)
         return filter_component
-

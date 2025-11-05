@@ -70,7 +70,11 @@ class ModulatedOscillator(Generator):
         category=ComponentCategory.OSCILLATOR,
         description="Oscillator with modulation support (amplitude, frequency, phase)",
         tags=["oscillator", "modulated", "advanced"],
-        config_params=["gain_db", "frequency", "phase"],  # Forwarded to underlying oscillator
+        config_params=[
+            "gain_db",
+            "frequency",
+            "phase",
+        ],  # Forwarded to underlying oscillator
     )
 
     def __init__(
@@ -307,7 +311,6 @@ class ModulatedOscillator(Generator):
         # This is the KEY optimization - accumulate phase changes
         phase_increments = 2.0 * np.pi * freqs / sample_rate
         phases = np.cumsum(phase_increments) + self.oscillator._p
-
 
         # Step 4: Generate waveform based on oscillator type
         # Use optimized NumPy operations for each waveform

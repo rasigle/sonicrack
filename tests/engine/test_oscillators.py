@@ -51,7 +51,9 @@ class TestSineOscillator(TestOscillatorBase):
 
     def setUp(self) -> None:
         """Create a sine oscillator for each test."""
-        self.osc = SineOscillator(frequency=440, amplitude=1.0, gain_db=None, sample_rate=44100)
+        self.osc = SineOscillator(
+            frequency=440, amplitude=1.0, gain_db=None, sample_rate=44100
+        )
 
     def test_initialization(self) -> None:
         """Test oscillator initializes with correct parameters."""

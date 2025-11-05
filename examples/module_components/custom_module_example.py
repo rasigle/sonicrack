@@ -4,6 +4,8 @@ This example shows how to create a low-pass filter module that integrates
 seamlessly with the modular synth GUI using the generic AudioModuleInterface.
 """
 
+from __future__ import annotations
+
 from typing import Dict, Any, List, Optional
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -11,7 +13,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
 
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob
-from src.gui.audio_module_interface import ModuleCategory
 from src.engine import Modifier  # Base class for audio modifiers
 import numpy as np
 
@@ -35,6 +36,9 @@ class LowPassFilter(Modifier):
         # Calculate RC constant
         rc = 1.0 / (2 * np.pi * cutoff_freq)
         self.alpha = 1.0 / (1.0 + rc * sample_rate)
+
+    def __call__(self, val: float | tuple[float, ...]) -> float | tuple[float, ...]:
+        pass
 
     def get_samples_vectorized(self, num_samples: int) -> np.ndarray:
         """Process audio samples through the filter.
@@ -117,7 +121,7 @@ class LowPassFilterModule(ModuleWidget):
         self.proxy.setPos(0, 42)  # Position below title bar
 
         # Create initial component
-        self.component = self.create_component()
+        self.component = self.create_engine_component()
 
     # === AudioModuleInterface Implementation ===
 
@@ -140,7 +144,7 @@ class LowPassFilterModule(ModuleWidget):
         """
         return []
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: Optional[List[Any]] = None,
         modulation_components: Optional[Dict[str, Any]] = None,
@@ -242,13 +246,14 @@ class ModulatedLowPassFilterModule(ModuleWidget):
         self.out_port = self.add_output_port("Out")
 
         # ... setup UI ...
+
     def get_required_inputs(self) -> List[str]:
         return ["In"]  # Audio input is required
 
     def get_modulation_inputs(self) -> List[str]:
         return ["Cutoff Mod"]  # Modulation is optional
 
-    def create_component(
+    def create_engine_component(
         self,
         input_components: Optional[List[Any]] = None,
         modulation_components: Optional[Dict[str, Any]] = None,
@@ -257,13 +262,13 @@ class ModulatedLowPassFilterModule(ModuleWidget):
         base_cutoff = self.cutoff_knob.get_value()
 
         # Check if cutoff modulation is connected
-        if modulation_components and "Cutoff Mod" in modulation_components:
-            # Create modulated version
-            mod_source = modulation_components["Cutoff Mod"]
-            return ModulatedLowPassFilter(mod_source, base_cutoff)
-        else:
-            # Create static version
-            return LowPassFilter(base_cutoff)
+        # if modulation_components and "Cutoff Mod" in modulation_components:
+        #     # Create modulated version
+        #     mod_source = modulation_components["Cutoff Mod"]
+        #     return ModulatedLowPassFilter(mod_source, base_cutoff)
+        # else:
+        # Create static version
+        return LowPassFilter(base_cutoff)
 
 
 # === Summary ===

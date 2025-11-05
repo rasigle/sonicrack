@@ -98,7 +98,8 @@ class Knob(QWidget):
             return (value - self.min_value) / (self.max_value - self.min_value)
 
     def _normalized_to_value(self, norm_value: float) -> float:
-        """Convert normalized value (0.0-1.0) to actual value considering logarithmic scaling.
+        """Convert normalized value (0.0-1.0) to actual value considering logarithmic
+        scaling.
 
         Args:
             norm_value: Normalized value (0.0-1.0)
@@ -113,12 +114,12 @@ class Knob(QWidget):
                 min_log = 0
                 max_log = math.log10(self.max_value - self.min_value + 1)
                 val_log = min_log + norm_value * (max_log - min_log)
-                return (10 ** val_log) - 1 + self.min_value
+                return (10**val_log) - 1 + self.min_value
             else:
                 min_log = math.log10(self.min_value)
                 max_log = math.log10(self.max_value)
                 val_log = min_log + norm_value * (max_log - min_log)
-                return 10 ** val_log
+                return 10**val_log
         else:
             return self.min_value + norm_value * (self.max_value - self.min_value)
 

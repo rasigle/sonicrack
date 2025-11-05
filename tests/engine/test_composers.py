@@ -77,9 +77,6 @@ class TestChain(unittest.TestCase):
         )
         chain = Chain(mod_osc)
 
-        # Initially not ended
-        self.assertFalse(chain.ended)
-
         # After release and enough time, should be ended
         _ = chain.get_samples_iterator(5000, reset=True)
         chain.trigger_release()

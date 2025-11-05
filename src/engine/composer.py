@@ -41,7 +41,6 @@ import numpy as np
 from src.engine.audio_component import AudioComponent, ComponentDescriptor
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component_registry import register_component, ComponentCategory
-from src.engine.modifier import Modifier
 from src.engine.modulated_oscillator import ModulatedOscillator
 from src.engine.oscillator import Oscillator
 
@@ -197,7 +196,7 @@ class Chain(Composer):
                 modifier.trigger_release()
 
     @property
-    def ended(self):
+    def ended(self) -> bool:
         ended = []
         e = "ended"
         if hasattr(self.oscillator, e):

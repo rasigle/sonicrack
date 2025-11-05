@@ -23,9 +23,9 @@ def main():
     window.show()
 
     # Print instructions
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("MIDI Input Module Test")
-    print("="*70)
+    print("=" * 70)
     print("\nTo test the MIDI Input module:")
     print("1. Add a 'MIDI Input' module from the module library")
     print("2. Select your MIDI device from the dropdown")
@@ -46,11 +46,10 @@ def main():
     print("- Current note displayed on MIDI Input module")
     print("- Sound output when you press keys")
     print("- Envelope controlling the volume")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     sys.exit(app.exec())
 
 
 if __name__ == "__main__":
     main()
-

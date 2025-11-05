@@ -65,13 +65,12 @@ def test_master_volume_range_clamping():
 
 if __name__ == "__main__":
     print("Testing Master Volume Smoothing...")
-    print("="*60)
+    print("=" * 60)
 
     test_master_volume_smoothing()
     test_master_volume_no_discontinuity()
     test_master_volume_range_clamping()
 
-    print("="*60)
+    print("=" * 60)
     print("All master volume smoothing tests passed! ✅")
     print("\nMaster volume changes are now click-free!")
-

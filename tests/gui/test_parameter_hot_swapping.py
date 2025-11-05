@@ -58,13 +58,13 @@ def test_hot_swap_frequency():
 
     # Verify phase continuity (phase should not reset)
     # Generate some samples to advance phase
-    samples1 = component.get_samples_vectorized(100)
+    _ = component.get_samples_vectorized(100)
 
     # Hot-swap again
     compiler.update_parameter(module, "frequency", 1320)
 
     # Generate more samples
-    samples2 = component.get_samples_vectorized(100)
+    _ = component.get_samples_vectorized(100)
 
     # Phase should be continuous (no reset to 0)
     # If phase reset, there would be a discontinuity
@@ -119,7 +119,7 @@ def test_hot_swap_module_not_in_mapping():
 
 if __name__ == "__main__":
     print("Testing Parameter Hot-Swapping...")
-    print("="*60)
+    print("=" * 60)
 
     test_hot_swap_frequency()
     print("✓ Frequency hot-swap works")
@@ -133,7 +133,6 @@ if __name__ == "__main__":
     test_hot_swap_module_not_in_mapping()
     print("✓ Unknown module handled correctly")
 
-    print("="*60)
+    print("=" * 60)
     print("All hot-swapping tests passed! ✅")
     print("\nParameter changes will now be click-free during playback!")
-

@@ -3,7 +3,13 @@
 import pytest
 import numpy as np
 
-from src.engine.midi import MIDIToCV, NoteOnMessage, NoteOffMessage, ControlChangeMessage, PitchBendMessage
+from src.engine.midi import (
+    MIDIToCV,
+    NoteOnMessage,
+    NoteOffMessage,
+    ControlChangeMessage,
+    PitchBendMessage,
+)
 from src.engine.midi.utils import midi_to_frequency
 
 
@@ -83,7 +89,6 @@ class TestMIDIToCV:
 
         # Note on middle C
         cv.process_message(NoteOnMessage(0.0, 0, 60, 100))
-        base_freq = cv.frequency
 
         # Pitch bend up 1 semitone (8192 / 2 with ±2 semitone range)
         msg = PitchBendMessage(0.1, 0, value=4096)
@@ -194,4 +199,3 @@ class TestMIDIToCV:
         cv.process_message(NoteOnMessage(0.2, 5, 64, 100))
         assert cv.gate == 1.0
         assert cv.frequency == pytest.approx(midi_to_frequency(64), rel=0.01)
-

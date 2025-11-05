@@ -1,0 +1,44 @@
+"""Math utility functions for audio processing."""
+import numpy as np
+
+
+def db_to_linear(db: float) -> float:
+    """Convert decibels to linear amplitude.
+
+    Standard audio conversion using the formula: amplitude = 10^(dB/20)
+
+    Args:
+        db: Gain in decibels
+
+    Returns:
+        Linear amplitude
+
+    Examples:
+        >>> db_to_linear(0)    # 1.0 (unity gain)
+        >>> db_to_linear(-6)   # ~0.5 (half amplitude)
+        >>> db_to_linear(-20)  # 0.1 (1/10 amplitude)
+        >>> db_to_linear(6)    # ~2.0 (double amplitude)
+    """
+    return 10 ** (db / 20.0)
+
+
+def linear_to_db(linear: float) -> float:
+    """Convert linear amplitude to decibels.
+
+    Standard audio conversion using the formula: dB = 20 * log10(amplitude)
+
+    Args:
+        linear: Linear amplitude (must be > 0)
+
+    Returns:
+        Gain in decibels (-inf for zero or negative)
+
+    Examples:
+        >>> linear_to_db(1.0)   # 0 dB (unity gain)
+        >>> linear_to_db(0.5)   # ~-6 dB (half amplitude)
+        >>> linear_to_db(0.1)   # -20 dB (1/10 amplitude)
+        >>> linear_to_db(0.0)   # -inf (silence)
+    """
+    if linear <= 0:
+        return float("-inf")
+    return 20 * np.log10(linear)

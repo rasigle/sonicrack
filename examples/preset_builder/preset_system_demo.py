@@ -12,7 +12,7 @@ This example showcases the full capabilities of the preset system including:
 - Preset browsing and discovery
 
 The preset system enables musicians and sound designers to:
-1. Build complex presetes programmatically
+1. Build complex presets programmatically
 2. Save and share their creations
 3. Build a personal sound library
 4. Quickly iterate on existing designs
@@ -41,7 +41,7 @@ def example_1_basic_save_load():
     preset = (
         PresetBuilder("Pure Sine")
         .set_description("Simple 440Hz sine wave")
-        .sine(440, amplitude=0.8)
+        .sine(440, amplitude=0.8, gain_db=None)
         .volume(0.6)
     )
 
@@ -81,7 +81,7 @@ def example_2_library_management():
     bass_preset = (
         PresetBuilder("Deep Bass")
         .set_description("Sub bass for electronic music")
-        .sine(55, amplitude=0.9)  # A1
+        .sine(55, amplitude=0.9, gain_db=None)  # A1
         .adsr(0.01, 0.1, 0.8, 0.2)
         .volume(0.7)
     )
@@ -92,7 +92,7 @@ def example_2_library_management():
     lead_preset = (
         PresetBuilder("Bright Lead")
         .set_description("Cutting lead sound")
-        .sawtooth(880, amplitude=0.8)  # A5
+        .sawtooth(880, amplitude=0.8, gain_db=None)  # A5
         .adsr(0.05, 0.2, 0.6, 0.3)
         .volume(0.6)
         .clipper((-0.8, 0.8))
@@ -104,7 +104,7 @@ def example_2_library_management():
     pad_preset = (
         PresetBuilder("Warm Pad")
         .set_description("Atmospheric pad with slow attack")
-        .sine(220, amplitude=0.6)  # A3
+        .sine(220, amplitude=0.6, gain_db=None)  # A3
         .adsr(2.0, 1.5, 0.7, 3.0)
         .volume(0.4)
         .panner(0.0)
@@ -116,7 +116,7 @@ def example_2_library_management():
     fx_preset = (
         PresetBuilder("Sweep FX")
         .set_description("Rising sweep effect")
-        .square(100, amplitude=0.7)
+        .square(100, amplitude=0.7, gain_db=None)
         .volume(0.5)
         .panner(-0.3)
     )
@@ -211,7 +211,7 @@ def example_5_preset_inspection():
     preset = (
         PresetBuilder("Complex Synth")
         .set_description("Multi-stage synthesis example")
-        .sawtooth(440, amplitude=0.7)
+        .sawtooth(440, amplitude=0.7, gain_db=None)
         .adsr(0.1, 0.3, 0.6, 0.5)
         .volume(0.6)
         .panner(0.2)
@@ -262,7 +262,7 @@ def example_6_metadata_and_organization():
     preset = (
         PresetBuilder("Vintage Keys")
         .set_description("Electric piano sound inspired by 1970s Rhodes")
-        .sine(440, amplitude=0.75)
+        .sine(440, amplitude=0.75, gain_db=None)
         .adsr(0.02, 0.5, 0.3, 0.8)
         .volume(0.65)
         .clipper((-0.85, 0.85))
@@ -311,7 +311,7 @@ def example_7_batch_operations():
         preset = (
             PresetBuilder(name)
             .set_description(f"Harmonic {i} of {base_freq}Hz = {freq}Hz")
-            .sine(freq, amplitude=0.8)
+            .sine(freq, amplitude=0.8, gain_db=None)
             .adsr(0.05, 0.2, 0.7, 0.3)
             .volume(0.5)
         )
@@ -359,7 +359,7 @@ def example_8_advanced_presetes():
     preset = (
         PresetBuilder("Detuned Unison")
         .set_description("Three slightly detuned oscillators for richness")
-        .sine(440, amplitude=0.5)  # Center
+        .sine(440, amplitude=0.5, gain_db=None)  # Center
         .adsr(0.1, 0.3, 0.7, 0.4)
         .volume(0.6)
     )
@@ -373,7 +373,7 @@ def example_8_advanced_presetes():
     bass = (
         PresetBuilder("Harmonic Bass")
         .set_description("Fundamental with added harmonics")
-        .sawtooth(55, amplitude=0.8)  # Rich in harmonics
+        .sawtooth(55, amplitude=0.8, gain_db=None)  # Rich in harmonics
         .adsr(0.01, 0.15, 0.7, 0.25)
         .clipper((-0.9, 0.9))
         .volume(0.65)
@@ -439,7 +439,7 @@ def example_10_export_import():
     export_preset = (
         PresetBuilder("Exported Sound")
         .set_description("A preset designed to be shared")
-        .triangle(330, amplitude=0.75)
+        .triangle(330, amplitude=0.75, gain_db=None)
         .adsr(0.08, 0.25, 0.65, 0.35)
         .volume(0.6)
         .panner(0.1)

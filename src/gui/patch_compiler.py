@@ -3,7 +3,7 @@
 import logging
 from typing import Any, Callable
 
-from engine import AudioComponent
+from src.engine.audio_component import AudioComponent
 from src.engine.composer import Chain, WaveAdder
 from src.gui.audio_module_interface import ModuleCategory, AudioModule
 from src.gui.patch_canvas import Port

@@ -28,6 +28,34 @@ class TestPatchBuilder(unittest.TestCase):
         self.assertEqual(len(samples), 1000)
         self.assertTrue(np.all(np.abs(samples) <= 1.0))
 
+    def test_oscillator_gain(self):
+        patch = PresetBuilder().sine(440).build()
+
+        # Should be a SineOscillator, by default gain_db=-20 maps to amplitude ~0.1
+        self.assertIsInstance(patch, SineOscillator)
+        self.assertEqual(patch.gain_db, -20)
+        self.assertEqual(patch.amplitude, 0.1)
+
+        patch = PresetBuilder().sine(440, gain_db=-6.).build()
+        self.assertAlmostEqual(float(patch.gain_db), -6., 8)
+        self.assertAlmostEqual(patch.amplitude, 0.5, 1)
+
+        # Update gain_db after creation
+        patch.gain_db = 0
+        self.assertAlmostEqual(float(patch.gain_db), 0., 8)
+        self.assertAlmostEqual(patch.amplitude, 1.)
+
+
+    def test_oscillator_amplitude(self):
+        patch = PresetBuilder().sine(440, amplitude=0.1).build()
+        self.assertEqual(patch.amplitude, 0.1)
+        self.assertAlmostEqual(patch.gain_db, -20.)
+
+        patch = PresetBuilder().sine(440, amplitude=1.).build()
+        self.assertEqual(patch.amplitude, 1.)
+        self.assertAlmostEqual(patch.gain_db, 0.)
+
+
     def test_oscillator_types(self):
         """Test building patches with different oscillator types."""
         # Sine
@@ -159,11 +187,11 @@ class TestPatchBuilderIntegration(unittest.TestCase):
         # Create patch manually
         from src.engine import SineOscillator, Chain, Volume
 
-        manual_osc = SineOscillator(440, amplitude=0.8)
+        manual_osc = SineOscillator(440, amplitude=0.8, gain_db=None)
         manual_patch = Chain(manual_osc, Volume(0.5))
 
         # Create same patch with builder
-        builder_patch = PresetBuilder().sine(440, amplitude=0.8).volume(0.5).build()
+        builder_patch = PresetBuilder().sine(440, amplitude=0.8, gain_db=None).volume(0.5).build()
 
         # Both should generate similar samples
         manual_samples = manual_patch.get_samples(1000, reset=True)
@@ -258,7 +286,7 @@ class TestPatchBuilderConvenience(unittest.TestCase):
         builder = (
             PresetBuilder("My Lead")
             .set_description("Bright lead sound")
-            .sine(440, amplitude=0.8)
+            .sine(440, amplitude=0.8, gain_db=None)
             .adsr(0.1, 0.2, 0.7, 0.3)
             .volume(0.5)
             .panner(0.3)

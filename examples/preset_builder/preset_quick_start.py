@@ -21,7 +21,7 @@ def main():
     my_patch = (
         PresetBuilder("My First Synth")
         .set_description("A simple lead sound")
-        .sine(440, amplitude=0.8)
+        .sine(440, amplitude=0.8, gain_db=None)
         .adsr(0.1, 0.2, 0.7, 0.3)
         .volume(0.6)
         .panner(0.0)
@@ -68,7 +68,7 @@ def main():
     bass = (
         PresetBuilder("Deep Bass")
         .set_description("Sub bass sound")
-        .sine(55, amplitude=0.9)
+        .sine(55, amplitude=0.9, gain_db=None)
         .adsr(0.01, 0.1, 0.8, 0.2)
         .volume(0.7)
     )
@@ -79,7 +79,7 @@ def main():
     lead = (
         PresetBuilder("Bright Lead")
         .set_description("Lead synth")
-        .sawtooth(880, amplitude=0.8)
+        .sawtooth(880, amplitude=0.8, gain_db=None)
         .adsr(0.05, 0.2, 0.6, 0.3)
         .volume(0.6)
     )

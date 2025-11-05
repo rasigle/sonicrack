@@ -18,22 +18,6 @@ from src.engine.modifier import Volume, ModulatedVolume
 class TestOscillatorDBControl:
     """Test dB control in Oscillator class."""
 
-    def test_db_to_linear_conversion(self):
-        """Test dB to linear amplitude conversion."""
-        assert Oscillator.db_to_linear(0) == pytest.approx(1.0)
-        assert Oscillator.db_to_linear(-6) == pytest.approx(0.5, rel=0.01)
-        assert Oscillator.db_to_linear(-20) == pytest.approx(0.1)
-        assert Oscillator.db_to_linear(6) == pytest.approx(2.0, rel=0.01)
-        assert Oscillator.db_to_linear(-40) == pytest.approx(0.01)
-
-    def test_linear_to_db_conversion(self):
-        """Test linear to dB conversion."""
-        assert Oscillator.linear_to_db(1.0) == pytest.approx(0.0)
-        assert Oscillator.linear_to_db(0.5) == pytest.approx(-6.0, rel=0.1)
-        assert Oscillator.linear_to_db(0.1) == pytest.approx(-20.0)
-        assert Oscillator.linear_to_db(2.0) == pytest.approx(6.0, rel=0.1)
-        assert Oscillator.linear_to_db(0.0) == float("-inf")
-
     def test_gain_db_default(self):
         """Test default gain_db value of -20 dB."""
         osc = SineOscillator()
@@ -170,8 +154,6 @@ class TestModulatedVolumeInheritance:
 
         # Should have gain_db property
         assert hasattr(mod_vol, "gain_db")
-        assert hasattr(mod_vol, "db_to_linear")
-        assert hasattr(mod_vol, "linear_to_db")
 
 
 class TestWaveRangeWithGainDB:

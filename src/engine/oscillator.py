@@ -48,14 +48,16 @@ Note:
     iterator and vectorized modes, enabling seamless parameter changes
     during audio generation.
 """
-
+import logging
 from abc import abstractmethod
 
 import numpy as np
 
-from src.engine.audio_component import Generator, ComponentDescriptor
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.audio_component import Generator, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
+from src.utils.math import db_to_linear, linear_to_db
+from src.utils.utils import track_provided_args
 
 
 class Oscillator(Generator):
@@ -123,6 +125,7 @@ class Oscillator(Generator):
         >>> osc3 = SineOscillator(gain_db=-6, amplitude=0.3)  # Uses -6 dB (≈0.5)
     """
 
+    @track_provided_args
     def __init__(
         self,
         frequency: float = 440,
@@ -131,6 +134,7 @@ class Oscillator(Generator):
         phase: float = 0.0,
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
+        **kwargs
     ):
         super().__init__(sample_rate=sample_rate)
 
@@ -138,35 +142,19 @@ class Oscillator(Generator):
         self._phase = phase
         self._sample_rate = sample_rate
         self._wave_range = wave_range
-
-        # Handle amplitude vs gain_db priority
-        if gain_db is not None:
-            self._amp = self.db_to_linear(gain_db)
-            # Warn if amplitude doesn't match gain_db
-            if amplitude != 1.0:  # Only warn if user explicitly set amplitude
-                expected_amp = self.db_to_linear(gain_db)
-                if abs(amplitude - expected_amp) > 0.01:
-                    import logging
-
-                    logging.warning(
-                        f"Both gain_db={gain_db} and amplitude={amplitude} specified. "
-                        f"Using gain_db (-20.0 dB = {expected_amp:.3f} linear). "
-                        f"To use amplitude, set gain_db=None."
-                    )
-        else:
-            self._amp = amplitude
+        self._initial_amp = self.derive_amplitude_from_init(amplitude, gain_db)
 
         self._i = 0
         self._step = 0
 
         # Properties that can be changed
         self._f = frequency
-        self._a = self._amp
+        self._a = self._initial_amp
         self._p = self._phase
 
         # Amplitude smoothing to prevent clicks when changing gain
-        self._target_amplitude = self._amp
-        self._current_amplitude = self._amp
+        self._target_amplitude = self._initial_amp
+        self._current_amplitude = self._initial_amp
         self._smoothing_samples_remaining = 0
         self._smoothing_duration_samples = int(0.010 * sample_rate)  # 10ms smooth
 
@@ -178,47 +166,37 @@ class Oscillator(Generator):
 
         iter(self)
 
-    @staticmethod
-    def db_to_linear(db: float) -> float:
-        """Convert decibels to linear amplitude.
-
-        Standard audio conversion using the formula: amplitude = 10^(dB/20)
-
-        Args:
-            db: Gain in decibels
-
-        Returns:
-            Linear amplitude
-
-        Examples:
-            >>> Oscillator.db_to_linear(0)    # 1.0 (unity gain)
-            >>> Oscillator.db_to_linear(-6)   # ~0.5 (half amplitude)
-            >>> Oscillator.db_to_linear(-20)  # 0.1 (1/10 amplitude)
-            >>> Oscillator.db_to_linear(6)    # ~2.0 (double amplitude)
+    def derive_amplitude_from_init(self, amplitude: float, gain_db: float) -> float:
         """
-        return 10 ** (db / 20.0)
-
-    @staticmethod
-    def linear_to_db(linear: float) -> float:
-        """Convert linear amplitude to decibels.
-
-        Standard audio conversion using the formula: dB = 20 * log10(amplitude)
-
-        Args:
-            linear: Linear amplitude (must be > 0)
-
-        Returns:
-            Gain in decibels (-inf for zero or negative)
-
-        Examples:
-            >>> Oscillator.linear_to_db(1.0)   # 0 dB (unity gain)
-            >>> Oscillator.linear_to_db(0.5)   # ~-6 dB (half amplitude)
-            >>> Oscillator.linear_to_db(0.1)   # -20 dB (1/10 amplitude)
-            >>> Oscillator.linear_to_db(0.0)   # -inf (silence)
+        Determines the linear amplitude based on __init__ parameters.
+        Priority:
+        1. `gain_db` if it is not None.
+        2. `amplitude` if it is not None.
+        3. Default to `gain_db`'s default value.
+        A warning is issued if both are provided and they conflict.
         """
-        if linear <= 0:
-            return float("-inf")
-        return 20 * np.log10(linear)
+        gain_db_set = 'gain_db' in self._provided_args  # noqa
+        amplitude_set = 'amplitude' in self._provided_args  # noqa
+
+        # If gain_db is explicitly provided and is not None, it takes precedence.
+        if gain_db_set and gain_db is not None:
+            expected_amp = db_to_linear(gain_db)
+            # Warn if amplitude was also set and conflicts with gain_db's value.
+            if amplitude_set and amplitude is not None and not np.isclose(amplitude,
+                                                                          expected_amp):
+                logging.warning(
+                    f"Both gain_db={gain_db} and amplitude={amplitude} were specified. "
+                    f"Using gain_db, which results in an amplitude of {expected_amp:.3f}."
+                )
+            return expected_amp
+
+        # Otherwise, use amplitude if it was provided and is not None.
+        if amplitude_set and amplitude is not None:
+            return amplitude
+
+        # As a fallback, use the default value for gain_db.
+        return db_to_linear(gain_db)
+
 
     @property
     def init_freq(self):
@@ -228,7 +206,7 @@ class Oscillator(Generator):
     @property
     def init_amp(self):
         """float: The initial amplitude supplied at construction."""
-        return self._amp
+        return self._initial_amp
 
     @property
     def init_phase(self):
@@ -285,8 +263,8 @@ class Oscillator(Generator):
         by calling `_post_amp_set`.
 
         Example:
-            >>> osc.amplitude = 0.5  # Half amplitude
-            >>> osc.amplitude = 1.0  # Unity gain
+            >>> osc.amplitude = 0.5  # noqa Half amplitude
+            >>> osc.amplitude = 1.0  # noqa Unity gain
         """
         return self._a
 
@@ -318,16 +296,16 @@ class Oscillator(Generator):
             +6 dB = double amplitude (amplitude = 2.0)
 
         Example:
-            >>> osc.gain_db = -20  # Safe default for mixing
-            >>> osc.gain_db = 0    # Unity gain
-            >>> osc.gain_db += 6   # Increase by 6 dB (double amplitude)
-            >>> print(osc.gain_db)  # Current gain in dB
+            >>> osc.gain_db = -20  # noqa Safe default for mixing
+            >>> osc.gain_db = 0    # noqa Unity gain
+            >>> osc.gain_db += 6   # noqa Increase by 6 dB (double amplitude)
+            >>> print(osc.gain_db)  # noqa Current gain in dB
         """
-        return self.linear_to_db(self._a)
+        return linear_to_db(self._a)
 
     @gain_db.setter
     def gain_db(self, value: float):
-        new_amplitude = self.db_to_linear(value)
+        new_amplitude = db_to_linear(value)
         # Initiate smooth transition to new amplitude (prevents clicks)
         self._target_amplitude = new_amplitude
         self._smoothing_samples_remaining = self._smoothing_duration_samples
@@ -410,7 +388,7 @@ class Oscillator(Generator):
         """
         self.frequency = self._freq
         self.phase = self._phase
-        self.amplitude = self._amp
+        self.amplitude = self._initial_amp
         self._initialize_osc()
         return self
 

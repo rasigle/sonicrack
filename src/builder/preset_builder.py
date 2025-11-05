@@ -426,7 +426,9 @@ class PresetBuilder:
             # Direct amplitude modification - handle both single and multiple oscillators
             if self._source:
                 # Normalize to list for uniform handling
-                sources = self._source if isinstance(self._source, list) else [self._source]
+                sources = (
+                    self._source if isinstance(self._source, list) else [self._source]
+                )
                 for source in sources:
                     if hasattr(source, "amplitude"):
                         source.amplitude = value_or_modulator
@@ -446,7 +448,9 @@ class PresetBuilder:
                         mod_osc_desc = audio_registry.get("ModulatedOscillator")
                         if mod_osc_desc:
                             self._source[0] = mod_osc_desc.create_instance(
-                                self._source[0], modulator, amp_mod=lambda base, mod: base * mod
+                                self._source[0],
+                                modulator,
+                                amp_mod=lambda base, mod: base * mod,
                             )
                 else:
                     # Single oscillator
@@ -454,7 +458,9 @@ class PresetBuilder:
                         mod_osc_desc = audio_registry.get("ModulatedOscillator")
                         if mod_osc_desc:
                             self._source = mod_osc_desc.create_instance(
-                                self._source, modulator, amp_mod=lambda base, mod: base * mod
+                                self._source,
+                                modulator,
+                                amp_mod=lambda base, mod: base * mod,
                             )
         return self
 
@@ -475,7 +481,9 @@ class PresetBuilder:
             # Direct frequency modification - handle both single and multiple oscillators
             if self._source:
                 # Normalize to list for uniform handling
-                sources = self._source if isinstance(self._source, list) else [self._source]
+                sources = (
+                    self._source if isinstance(self._source, list) else [self._source]
+                )
                 for source in sources:
                     if hasattr(source, "frequency"):
                         source.frequency = value_or_modulator
@@ -495,7 +503,9 @@ class PresetBuilder:
                         mod_osc_desc = audio_registry.get("ModulatedOscillator")
                         if mod_osc_desc:
                             self._source[0] = mod_osc_desc.create_instance(
-                                self._source[0], modulator, freq_mod=lambda base, mod: base * mod
+                                self._source[0],
+                                modulator,
+                                freq_mod=lambda base, mod: base * mod,
                             )
                 else:
                     # Single oscillator
@@ -503,15 +513,14 @@ class PresetBuilder:
                         mod_osc_desc = audio_registry.get("ModulatedOscillator")
                         if mod_osc_desc:
                             self._source = mod_osc_desc.create_instance(
-                                self._source, modulator, freq_mod=lambda base, mod: base * mod
+                                self._source,
+                                modulator,
+                                freq_mod=lambda base, mod: base * mod,
                             )
         return self
 
     def modify_oscillator_at(
-        self,
-        index: int,
-        frequency: float | None = None,
-        amplitude: float | None = None
+        self, index: int, frequency: float | None = None, amplitude: float | None = None
     ) -> PresetBuilder:
         """Modify a specific oscillator by index.
 
@@ -555,8 +564,10 @@ class PresetBuilder:
 
         # Update tree params for this specific oscillator
         osc_nodes = [
-            node for node in self._component_tree.children
-            if audio_registry.get(node.component_type).descriptor.category == ComponentCategory.OSCILLATOR
+            node
+            for node in self._component_tree.children
+            if audio_registry.get(node.component_type).descriptor.category
+            == ComponentCategory.OSCILLATOR
         ]
         if index < len(osc_nodes):
             node = osc_nodes[index]
@@ -565,13 +576,15 @@ class PresetBuilder:
             if amplitude is not None:
                 node.params["amplitude"] = amplitude
 
-        logger.debug(f"Modified oscillator {index}: frequency={frequency}, amplitude={amplitude}")
+        logger.debug(
+            f"Modified oscillator {index}: frequency={frequency}, amplitude={amplitude}"
+        )
         return self
 
     def modify_oscillators_with_offsets(
         self,
         frequency_offsets: list[float] | None = None,
-        amplitude_multipliers: list[float] | None = None
+        amplitude_multipliers: list[float] | None = None,
     ) -> PresetBuilder:
         """Modify multiple oscillators with relative offsets.
 
@@ -613,8 +626,10 @@ class PresetBuilder:
 
                     # Update tree
                     osc_nodes = [
-                        node for node in self._component_tree.children
-                        if audio_registry.get(node.component_type).descriptor.category == ComponentCategory.OSCILLATOR
+                        node
+                        for node in self._component_tree.children
+                        if audio_registry.get(node.component_type).descriptor.category
+                        == ComponentCategory.OSCILLATOR
                     ]
                     if i < len(osc_nodes):
                         osc_nodes[i].params["frequency"] = new_freq
@@ -632,8 +647,10 @@ class PresetBuilder:
 
                     # Update tree
                     osc_nodes = [
-                        node for node in self._component_tree.children
-                        if audio_registry.get(node.component_type).descriptor.category == ComponentCategory.OSCILLATOR
+                        node
+                        for node in self._component_tree.children
+                        if audio_registry.get(node.component_type).descriptor.category
+                        == ComponentCategory.OSCILLATOR
                     ]
                     if i < len(osc_nodes):
                         osc_nodes[i].params["amplitude"] = new_amp

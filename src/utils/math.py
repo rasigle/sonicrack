@@ -1,4 +1,5 @@
 """Math utility functions for audio processing."""
+
 import numpy as np
 
 
@@ -42,3 +43,17 @@ def linear_to_db(linear: float) -> float:
     if linear <= 0:
         return float("-inf")
     return 20 * np.log10(linear)
+
+
+def squish_val(val, min_val=0, max_val=1):
+    """Map a value in [-1, 1] to a range [min_val, max_val].
+
+    Args:
+        val (float): Value expected roughly in [-1, 1].
+        min_val (float, optional): Minimum of target range. Defaults to 0.
+        max_val (float, optional): Maximum of target range. Defaults to 1.
+
+    Returns:
+        float: Rescaled value in [min_val, max_val].
+    """
+    return (((val + 1) / 2) * (max_val - min_val)) + min_val

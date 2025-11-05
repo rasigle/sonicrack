@@ -12,9 +12,6 @@ Classes:
     SawtoothOscillator: Generates sawtooth waves.
     TriangleOscillator: Generates triangle waves.
 
-Functions:
-    synth: Convenience function to generate complete waveforms.
-
 Amplitude Control:
     Oscillators support both linear amplitude and decibel (dB) gain control:
 
@@ -41,13 +38,14 @@ Amplitude Control:
 Performance:
     - Iterator mode: Flexible but slower, suitable for small buffers
     - Vectorized mode: 50-85x faster, suitable for production use
-    - Auto mode: Automatically selects best method based on buffer size
+    - Auto mode: Automatically select the best method based on buffer size
 
 Note:
     All oscillators maintain phase continuity when switching between
     iterator and vectorized modes, enabling seamless parameter changes
     during audio generation.
 """
+
 import logging
 from abc import abstractmethod
 
@@ -56,8 +54,11 @@ import numpy as np
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import Generator, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
-from src.utils.math import db_to_linear, linear_to_db
-from src.utils.utils import track_provided_args
+from src.utils.math import db_to_linear, linear_to_db, squish_val
+from src.utils.utils import track_provided_args, filter_provided_args
+
+DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS = 10  # 10 milliseconds
+"""Default duration for amplitude smoothing to prevent clicks"""
 
 
 class Oscillator(Generator):
@@ -134,7 +135,6 @@ class Oscillator(Generator):
         phase: float = 0.0,
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
-        **kwargs
     ):
         super().__init__(sample_rate=sample_rate)
 
@@ -142,7 +142,7 @@ class Oscillator(Generator):
         self._phase = phase
         self._sample_rate = sample_rate
         self._wave_range = wave_range
-        self._initial_amp = self.derive_amplitude_from_init(amplitude, gain_db)
+        self._initial_amp = self._derive_amplitude_from_init(amplitude, gain_db)
 
         self._i = 0
         self._step = 0
@@ -156,7 +156,9 @@ class Oscillator(Generator):
         self._target_amplitude = self._initial_amp
         self._current_amplitude = self._initial_amp
         self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = int(0.010 * sample_rate)  # 10ms smooth
+        self._smoothing_samples_duration_total = int(
+            DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS * sample_rate / 1000
+        )  # default 10ms smooth
 
         # Pre-compute wave_range conversion
         self._needs_range_conversion: bool = False
@@ -165,38 +167,6 @@ class Oscillator(Generator):
         self._update_range_conversion()
 
         iter(self)
-
-    def derive_amplitude_from_init(self, amplitude: float, gain_db: float) -> float:
-        """
-        Determines the linear amplitude based on __init__ parameters.
-        Priority:
-        1. `gain_db` if it is not None.
-        2. `amplitude` if it is not None.
-        3. Default to `gain_db`'s default value.
-        A warning is issued if both are provided and they conflict.
-        """
-        gain_db_set = 'gain_db' in self._provided_args  # noqa
-        amplitude_set = 'amplitude' in self._provided_args  # noqa
-
-        # If gain_db is explicitly provided and is not None, it takes precedence.
-        if gain_db_set and gain_db is not None:
-            expected_amp = db_to_linear(gain_db)
-            # Warn if amplitude was also set and conflicts with gain_db's value.
-            if amplitude_set and amplitude is not None and not np.isclose(amplitude,
-                                                                          expected_amp):
-                logging.warning(
-                    f"Both gain_db={gain_db} and amplitude={amplitude} were specified. "
-                    f"Using gain_db, which results in an amplitude of {expected_amp:.3f}."
-                )
-            return expected_amp
-
-        # Otherwise, use amplitude if it was provided and is not None.
-        if amplitude_set and amplitude is not None:
-            return amplitude
-
-        # As a fallback, use the default value for gain_db.
-        return db_to_linear(gain_db)
-
 
     @property
     def init_freq(self):
@@ -272,7 +242,7 @@ class Oscillator(Generator):
     def amplitude(self, value):
         # Initiate smooth transition to new amplitude (prevents clicks)
         self._target_amplitude = value
-        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        self._smoothing_samples_remaining = self._smoothing_samples_duration_total
         self._a = value  # Update stored value
         self._post_amp_set()
 
@@ -306,9 +276,10 @@ class Oscillator(Generator):
     @gain_db.setter
     def gain_db(self, value: float):
         new_amplitude = db_to_linear(value)
+
         # Initiate smooth transition to new amplitude (prevents clicks)
         self._target_amplitude = new_amplitude
-        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        self._smoothing_samples_remaining = self._smoothing_samples_duration_total
         self._a = new_amplitude  # Update stored value
         self._post_amp_set()
 
@@ -348,19 +319,39 @@ class Oscillator(Generator):
         """
         pass
 
-    @staticmethod
-    def squish_val(val, min_val=0, max_val=1):
-        """Map a value in [-1, 1] to a range [min_val, max_val].
-
-        Args:
-            val (float): Value expected roughly in [-1, 1].
-            min_val (float, optional): Minimum of target range. Defaults to 0.
-            max_val (float, optional): Maximum of target range. Defaults to 1.
-
-        Returns:
-            float: Rescaled value in [min_val, max_val].
+    def _derive_amplitude_from_init(self, amplitude: float, gain_db: float) -> float:
         """
-        return (((val + 1) / 2) * (max_val - min_val)) + min_val
+        Determines the linear amplitude based on __init__ parameters.
+        Priority:
+        1. `gain_db` if it is not None.
+        2. `amplitude` if it is not None.
+        3. Default to `gain_db`'s default value.
+        A warning is issued if both are provided and they conflict.
+        """
+        gain_db_set = "gain_db" in self._provided_args  # noqa
+        amplitude_set = "amplitude" in self._provided_args  # noqa
+
+        # If gain_db is explicitly provided and is not None, it takes precedence.
+        if gain_db_set and gain_db is not None:
+            expected_amp = db_to_linear(gain_db)
+            # Warn if amplitude was also set and conflicts with gain_db's value.
+            if (
+                amplitude_set
+                and amplitude is not None
+                and not np.isclose(amplitude, expected_amp)
+            ):
+                logging.warning(
+                    f"Both gain_db={gain_db} and amplitude={amplitude} were specified. "
+                    f"Using gain_db, which results in an amplitude of {expected_amp:.3f}."
+                )
+            return expected_amp
+
+        # Otherwise, use amplitude if it was provided and is not None.
+        if amplitude_set and amplitude is not None:
+            return amplitude
+
+        # As a fallback, use the default value for gain_db.
+        return db_to_linear(gain_db)
 
     def __next__(self):
         """Return the next sample from the oscillator.
@@ -552,7 +543,7 @@ class SawtoothOscillator(Oscillator):
         val = 2 * (div - np.floor(0.5 + div))
         self._i = self._i + 1
         if self._wave_range != (-1, 1):
-            val = self.squish_val(val, *self._wave_range)
+            val = squish_val(val, *self._wave_range)
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
@@ -642,7 +633,7 @@ class TriangleOscillator(SawtoothOscillator):
         val = (abs(val) - 0.5) * 2
         self._i = self._i + 1
         if self._wave_range != (-1, 1):
-            val = self.squish_val(val, *self._wave_range)
+            val = squish_val(val, *self._wave_range)
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
@@ -748,7 +739,7 @@ class SineOscillator(Oscillator):
             self._i -= 2 * np.pi
 
         if self._wave_range != (-1, 1):
-            val = self.squish_val(val, *self._wave_range)
+            val = squish_val(val, *self._wave_range)
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
@@ -823,6 +814,7 @@ class SquareOscillator(SineOscillator):
         ],
     )
 
+    @track_provided_args
     def __init__(
         self,
         frequency: float = 440,
@@ -831,7 +823,7 @@ class SquareOscillator(SineOscillator):
         phase: float = 0.0,
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
-        threshold=0,
+        threshold: float = 0,
     ):
         """Construct a square oscillator.
 
@@ -851,7 +843,17 @@ class SquareOscillator(SineOscillator):
             wave_range: Current wave range (settable).
             threshold: Threshold used on sine reference to decide polarity.
         """
-        super().__init__(frequency, amplitude, gain_db, phase, sample_rate, wave_range)
+        # Filter to pass only arguments explicitly provided by user
+        kwargs = filter_provided_args(
+            self._provided_args,  # noqa
+            frequency=frequency,
+            amplitude=amplitude,
+            gain_db=gain_db,
+            phase=phase,
+            sample_rate=sample_rate,
+            wave_range=wave_range,
+        )
+        super().__init__(**kwargs)
         self.threshold = threshold
 
     def __next__(self):

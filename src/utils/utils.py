@@ -3,7 +3,7 @@ from functools import wraps
 
 
 def track_provided_args(func):
-    """A decorator to track which arguments were explicitly passed to a method.
+    """A decorator HACK to track which arguments were explicitly passed to a method.
 
     This decorator is intended for use on class `__init__` methods. It inspects
     the arguments passed during instantiation and attaches a `set` named
@@ -68,23 +68,54 @@ def track_provided_args(func):
                     provided_args.remove(param.name)
 
         # Exclude 'self' if it was captured.
-        if 'self' in provided_args:
-            provided_args.remove('self')
+        if "self" in provided_args:
+            provided_args.remove("self")
 
         # Attach the set to the instance.
         instance = None
-        if args and hasattr(args[0], '__dict__'):
+        if args and hasattr(args[0], "__dict__"):
             instance = args[0]
-        elif 'self' in kwargs:
-            instance = kwargs['self']
+        elif "self" in kwargs:
+            instance = kwargs["self"]
 
         if instance:
-            # Always overwrite the set with the arguments from the current call.
-            # This ensures that if __init__ is called multiple times, we only
-            # track the arguments from the most recent call.
-            instance._provided_args = provided_args
+            # Differentiate between a direct __init__ call and a super().__init__() call.
+            # A super() call happens deeper in the call stack.
+            is_super_call = any(
+                frame.function == '__init__' and 'super' in frame.code_context[0]
+                for frame in inspect.stack()[1:5] # Check a few frames up the stack
+            )
+
+            if hasattr(instance, '_provided_args') and is_super_call:
+                # Aggregate args in an inheritance chain (super() call).
+                instance._provided_args.update(provided_args)
+            else:
+                # Overwrite args for a direct call or the first call in a chain.
+                instance._provided_args = provided_args
 
         # Call the original function.
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def filter_provided_args(provided_args: set, **all_kwargs) -> dict:
+    """Filter kwargs to only include arguments that were explicitly provided.
+
+    This helper is used in subclass __init__ methods to avoid passing default
+    values to super().__init__(), which would confuse the argument tracking logic.
+
+    Args:
+        provided_args: Set of argument names that were explicitly provided (from _provided_args)
+        **all_kwargs: All keyword arguments with their values
+
+    Returns:
+        Dictionary containing only the arguments that were explicitly provided
+
+    Example:
+        >>> @track_provided_args
+        >>> def __init__(self, a=1, b=2, c=3):
+        >>>     kwargs = filter_provided_args(self._provided_args, a=a, b=b, c=c)
+        >>>     # If user called with (b=5), kwargs will be {'b': 5}
+    """
+    return {k: v for k, v in all_kwargs.items() if k in provided_args}

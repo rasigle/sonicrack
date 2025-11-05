@@ -33,9 +33,8 @@ class TestOscillatorBase(unittest.TestCase):
         """
         self.assertTrue(np.all(np.abs(samples) <= max_amp + 0.01))
 
-    def assert_arrays_close(
-        self, a: np.ndarray, b: np.ndarray, rtol: float = 1e-5
-    ) -> None:
+    @staticmethod
+    def assert_arrays_close(a: np.ndarray, b: np.ndarray, rtol: float = 1e-5) -> None:
         """Verify two arrays are approximately equal.
 
         Args:

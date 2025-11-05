@@ -8,15 +8,51 @@ Verifies that:
 4. Warnings are logged when both are specified with mismatched values
 """
 
-import pytest
-import numpy as np
 import logging
-from src.engine.oscillator import SineOscillator, Oscillator
+
+import numpy as np
+import pytest
+from _pytest.logging import caplog
+
 from src.engine.modifier import Volume, ModulatedVolume
+from src.engine.oscillator import SineOscillator, SquareOscillator, TriangleOscillator, \
+    SawtoothOscillator
 
 
 class TestOscillatorDBControl:
     """Test dB control in Oscillator class."""
+
+    def test_warnings_from_childclasses(self, caplog):
+
+        with caplog.at_level(logging.WARNING):
+            caplog.clear()
+            SquareOscillator(gain_db=-20) # amplitude default / not explicitly set
+            assert not any(r.levelno == logging.WARNING for r in caplog.records)
+
+        with caplog.at_level(logging.WARNING):
+            caplog.clear()
+            TriangleOscillator(amplitude=0.5)
+            assert not any(r.levelno == logging.WARNING for r in caplog.records)
+        with caplog.at_level(logging.WARNING):
+            caplog.clear()
+            SineOscillator(amplitude=0.5)
+            assert not any(r.levelno == logging.WARNING for r in caplog.records)
+
+        with caplog.at_level(logging.WARNING):
+            caplog.clear()
+            SawtoothOscillator(amplitude=0.5)
+            assert not any(r.levelno == logging.WARNING for r in caplog.records)
+
+        with caplog.at_level(logging.WARNING):
+            caplog.clear()
+            SawtoothOscillator(gain_db=-12)
+            assert not any(r.levelno == logging.WARNING for r in caplog.records)
+
+        with caplog.at_level(logging.WARNING):
+            caplog.clear()
+            SawtoothOscillator(gain_db=-12, amplitude=0.5)
+            assert "Both gain_db" in caplog.text
+
 
     def test_gain_db_default(self):
         """Test default gain_db value of -20 dB."""

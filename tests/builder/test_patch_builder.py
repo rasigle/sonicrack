@@ -36,25 +36,23 @@ class TestPatchBuilder(unittest.TestCase):
         self.assertEqual(patch.gain_db, -20)
         self.assertEqual(patch.amplitude, 0.1)
 
-        patch = PresetBuilder().sine(440, gain_db=-6.).build()
-        self.assertAlmostEqual(float(patch.gain_db), -6., 8)
+        patch = PresetBuilder().sine(440, gain_db=-6.0).build()
+        self.assertAlmostEqual(float(patch.gain_db), -6.0, 8)
         self.assertAlmostEqual(patch.amplitude, 0.5, 1)
 
         # Update gain_db after creation
         patch.gain_db = 0
-        self.assertAlmostEqual(float(patch.gain_db), 0., 8)
-        self.assertAlmostEqual(patch.amplitude, 1.)
-
+        self.assertAlmostEqual(float(patch.gain_db), 0.0, 8)
+        self.assertAlmostEqual(patch.amplitude, 1.0)
 
     def test_oscillator_amplitude(self):
         patch = PresetBuilder().sine(440, amplitude=0.1).build()
         self.assertEqual(patch.amplitude, 0.1)
-        self.assertAlmostEqual(patch.gain_db, -20.)
+        self.assertAlmostEqual(patch.gain_db, -20.0)
 
-        patch = PresetBuilder().sine(440, amplitude=1.).build()
-        self.assertEqual(patch.amplitude, 1.)
-        self.assertAlmostEqual(patch.gain_db, 0.)
-
+        patch = PresetBuilder().sine(440, amplitude=1.0).build()
+        self.assertEqual(patch.amplitude, 1.0)
+        self.assertAlmostEqual(patch.gain_db, 0.0)
 
     def test_oscillator_types(self):
         """Test building patches with different oscillator types."""
@@ -191,7 +189,9 @@ class TestPatchBuilderIntegration(unittest.TestCase):
         manual_patch = Chain(manual_osc, Volume(0.5))
 
         # Create same patch with builder
-        builder_patch = PresetBuilder().sine(440, amplitude=0.8, gain_db=None).volume(0.5).build()
+        builder_patch = (
+            PresetBuilder().sine(440, amplitude=0.8, gain_db=None).volume(0.5).build()
+        )
 
         # Both should generate similar samples
         manual_samples = manual_patch.get_samples(1000, reset=True)

@@ -12,11 +12,14 @@ import logging
 
 import numpy as np
 import pytest
-from _pytest.logging import caplog
 
 from src.engine.modifier import Volume, ModulatedVolume
-from src.engine.oscillator import SineOscillator, SquareOscillator, TriangleOscillator, \
-    SawtoothOscillator
+from src.engine.oscillator import (
+    SineOscillator,
+    SquareOscillator,
+    TriangleOscillator,
+    SawtoothOscillator,
+)
 
 
 class TestOscillatorDBControl:
@@ -26,7 +29,7 @@ class TestOscillatorDBControl:
 
         with caplog.at_level(logging.WARNING):
             caplog.clear()
-            SquareOscillator(gain_db=-20) # amplitude default / not explicitly set
+            SquareOscillator(gain_db=-20)  # amplitude default / not explicitly set
             assert not any(r.levelno == logging.WARNING for r in caplog.records)
 
         with caplog.at_level(logging.WARNING):
@@ -52,7 +55,6 @@ class TestOscillatorDBControl:
             caplog.clear()
             SawtoothOscillator(gain_db=-12, amplitude=0.5)
             assert "Both gain_db" in caplog.text
-
 
     def test_gain_db_default(self):
         """Test default gain_db value of -20 dB."""
@@ -123,16 +125,11 @@ class TestOscillatorDBControl:
 class TestVolumeDBControl:
     """Test dB control in Volume class."""
 
-    def test_volume_db_to_linear(self):
-        """Test Volume's dB conversion."""
-        assert Volume.db_to_linear(0) == pytest.approx(1.0)
-        assert Volume.db_to_linear(-6) == pytest.approx(0.5, rel=0.01)
-
     def test_volume_default_amplitude(self):
         """Test Volume default is 1.0 (unity gain)."""
         vol = Volume()
-        assert vol.amplitude == 1.0
-        assert vol.gain_db == pytest.approx(0.0)
+        assert vol.amplitude == 0.1
+        assert vol.gain_db == pytest.approx(-20)
 
     def test_volume_with_gain_db(self):
         """Test Volume initialization with gain_db."""

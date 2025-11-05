@@ -423,7 +423,8 @@ class PresetBuilder:
             When multiple oscillators are present, this modifies ALL of them.
         """
         if isinstance(value_or_modulator, (int, float)):
-            # Direct amplitude modification - handle both single and multiple oscillators
+            # Direct amplitude modification - handle both single and multiple
+            # oscillators
             if self._source:
                 # Normalize to list for uniform handling
                 sources = (
@@ -478,7 +479,8 @@ class PresetBuilder:
             When multiple oscillators are present, this modifies ALL of them.
         """
         if isinstance(value_or_modulator, (int, float)):
-            # Direct frequency modification - handle both single and multiple oscillators
+            # Direct frequency modification - handle both single and multiple o
+            # scillators
             if self._source:
                 # Normalize to list for uniform handling
                 sources = (
@@ -656,7 +658,8 @@ class PresetBuilder:
                         osc_nodes[i].params["amplitude"] = new_amp
 
         logger.debug(
-            f"Applied offsets - frequency: {frequency_offsets}, amplitude: {amplitude_multipliers}"
+            f"Applied offsets - frequency: {frequency_offsets}, amplitude: "
+            f"{amplitude_multipliers}"
         )
         return self
 

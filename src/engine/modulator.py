@@ -588,6 +588,7 @@ def getadsr(
           to sample counts using `sample_rate`.
     """
     adsr = ADSREnvelope(a, d, sl, r, sample_rate)
+    adsr.trigger_note_on()  # Trigger envelope to start attack phase
     down_len = int(sum([a, d, sd]) * sample_rate)
     up_len = int(r * sample_rate)
     adsr = iter(adsr)

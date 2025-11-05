@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 
+from constants import DEFAULT_GAIN_DB
 from src.engine import (
     SineOscillator,
     SquareOscillator,
@@ -87,7 +88,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         knobs_layout.addWidget(self.freq_knob)
 
         # Gain in dB
-        self.gain_knob = Knob("Gain (dB)", -60, 12, -20, logarithmic=False)
+        self.gain_knob = Knob("Gain (dB)", -60, 12, DEFAULT_GAIN_DB, logarithmic=False)
         self.gain_knob.setToolTip(
             "Oscillator gain (dB)\n" "Range: -60 to +12 dB\n" "Default: -20 dB"
         )

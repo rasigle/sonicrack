@@ -27,6 +27,7 @@ Note:
     Modifiers are designed to be used with the Chain composer but can also
     be used standalone by calling them directly with signal values.
 """
+
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -35,6 +36,7 @@ from typing import Any
 
 import numpy as np
 
+from constants import DEFAULT_GAIN_DB
 from src.engine.audio_component import AudioComponent, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.engine.oscillator import _derive_amplitude_from_init
@@ -64,7 +66,7 @@ def _validate_modulator(modulator: Any) -> None:
 
 
 def _get_modulation_values(
-        modulator_source: Any, modulator_iter: Any, num_samples: int
+    modulator_source: Any, modulator_iter: Any, num_samples: int
 ) -> np.ndarray:
     """Get modulation values for vectorized processing.
 
@@ -83,14 +85,10 @@ def _get_modulation_values(
     """
     # Prefer calling `get_samples` on the original source if available
     if hasattr(modulator_source, "get_samples"):
-        return modulator_source.get_samples(
-            num_samples, reset=False, mode="vectorized"
-        )
+        return modulator_source.get_samples(num_samples, reset=False, mode="vectorized")
     elif hasattr(modulator_iter, "get_samples"):
         # Iterator might itself expose get_samples
-        return modulator_iter.get_samples(
-            num_samples, reset=False, mode="vectorized"
-        )
+        return modulator_iter.get_samples(num_samples, reset=False, mode="vectorized")
     else:
         # Fallback to iterator if vectorization not available
         return np.array(
@@ -99,7 +97,7 @@ def _get_modulation_values(
 
 
 def _get_next_modulation_value(
-        modulator_source: Any, modulator_iter: Any
+    modulator_source: Any, modulator_iter: Any
 ) -> tuple[float, Any]:
     """Get the next modulation value for scalar processing.
 
@@ -456,7 +454,9 @@ class Volume(Modifier):
     )
 
     @track_provided_args
-    def __init__(self, amplitude: float = 1.0, gain_db: float | None = None) -> None:
+    def __init__(
+        self, amplitude: float = 1.0, gain_db: float | None = DEFAULT_GAIN_DB
+    ) -> None:
         """Initialize volume modifier.
 
         Args:
@@ -469,6 +469,14 @@ class Volume(Modifier):
             TypeError: If amplitude is not a number.
             ValueError: If amplitude is negative.
         """
+        # Input validation
+        if amplitude and not isinstance(amplitude, (int, float, np.number)):
+            raise TypeError(f"Amplitude must be number, got {type(amplitude).__name__}")
+        if amplitude and amplitude < 0.0:
+            raise ValueError(f"Amplitude must be non-negative, got {amplitude}")
+        if gain_db and not isinstance(gain_db, (int, float, np.number)):
+            raise TypeError(f"Gain_db must be a number, got {type(gain_db).__name__}")
+
         self._amplitude = _derive_amplitude_from_init(
             self._provided_args, amplitude, gain_db  # noqa
         )
@@ -1019,7 +1027,7 @@ class Clipper(Modifier):
 
 
 def _apply_vectorized_panning(
-        samples: np.ndarray, mod_values: np.ndarray
+    samples: np.ndarray, mod_values: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply constant-power panning using vectorized operations.
 

@@ -52,7 +52,7 @@ class TestAmplitudeModulation(unittest.TestCase):
 
     def test_amp_modulation_affects_output(self) -> None:
         """Test amplitude modulation changes output amplitude."""
-        osc = SineOscillator(frequency=440, amplitude=1.0)
+        osc = SineOscillator(frequency=440, amplitude=1.0, gain_db=None)
         env = ADSREnvelope(
             attack_duration=0.1,
             decay_duration=0.0,
@@ -60,6 +60,7 @@ class TestAmplitudeModulation(unittest.TestCase):
             release_duration=0.0,
             sample_rate=100,
         )
+        env.trigger_note_on()  # Trigger envelope to start attack phase
 
         mod_osc = ModulatedOscillator(
             osc, env, amp_mod=lambda base_amp, env_val: base_amp * env_val
@@ -152,12 +153,13 @@ class TestTriggerRelease(unittest.TestCase):
 
     def test_ended_property(self) -> None:
         """Test ended property reflects modulator state."""
-        osc = SineOscillator(440)
+        osc = SineOscillator(440, gain_db=None)
         env = ADSREnvelope(0.05, 0.05, 0.7, 0.05, sample_rate=1000)
+        env.trigger_note_on()  # Trigger envelope so it's not in ended state
 
         mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
 
-        # Initially not ended
+        # Initially not ended (during attack/decay/sustain)
         self.assertFalse(mod_osc.ended)
 
         # Generate samples and trigger release

@@ -51,7 +51,7 @@ from abc import abstractmethod
 
 import numpy as np
 
-from src.constants import DEFAULT_SAMPLE_RATE
+from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_GAIN_DB
 from src.engine.audio_component import Generator, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.utils.math import db_to_linear, linear_to_db, squish_val
@@ -131,7 +131,7 @@ class Oscillator(Generator):
         self,
         frequency: float = 440,
         amplitude: float = 1.0,
-        gain_db: float | None = -20.0,
+        gain_db: float | None = DEFAULT_GAIN_DB,
         phase: float = 0.0,
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
@@ -787,7 +787,7 @@ class SquareOscillator(SineOscillator):
         self,
         frequency: float = 440,
         amplitude: float = 1.0,
-        gain_db: float | None = -20.0,
+        gain_db: float | None = DEFAULT_GAIN_DB,
         phase: float = 0.0,
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
@@ -969,5 +969,9 @@ def _derive_amplitude_from_init(given_args, amplitude: float, gain_db: float) ->
     if amplitude_set and amplitude is not None:
         return amplitude
 
-    # As a fallback, use the default value for gain_db.
-    return db_to_linear(gain_db)
+    # As a fallback, use the default value for gain_db if it's not None.
+    if gain_db is not None:
+        return db_to_linear(gain_db)
+
+    # If both are None, use a default amplitude of 1.0
+    return 1.0

@@ -79,14 +79,14 @@ def track_provided_args(func):
             instance = kwargs["self"]
 
         if instance:
-            # Differentiate between a direct __init__ call and a super().__init__() call.
-            # A super() call happens deeper in the call stack.
+            # Differentiate between a direct __init__ call and a super().__init__()
+            # call. A super() call happens deeper in the call stack.
             is_super_call = any(
-                frame.function == '__init__' and 'super' in frame.code_context[0]
-                for frame in inspect.stack()[1:5] # Check a few frames up the stack
+                frame.function == "__init__" and "super" in frame.code_context[0]
+                for frame in inspect.stack()[1:5]  # Check a few frames up the stack
             )
 
-            if hasattr(instance, '_provided_args') and is_super_call:
+            if hasattr(instance, "_provided_args") and is_super_call:
                 # Aggregate args in an inheritance chain (super() call).
                 instance._provided_args.update(provided_args)
             else:
@@ -106,7 +106,8 @@ def filter_provided_args(provided_args: set, **all_kwargs) -> dict:
     values to super().__init__(), which would confuse the argument tracking logic.
 
     Args:
-        provided_args: Set of argument names that were explicitly provided (from _provided_args)
+        provided_args: Set of argument names that were explicitly provided
+            (from _provided_args)
         **all_kwargs: All keyword arguments with their values
 
     Returns:

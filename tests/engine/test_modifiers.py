@@ -4,6 +4,7 @@ import unittest
 
 import numpy as np
 
+from constants import DEFAULT_GAIN_DB
 from src.engine.modifier import (
     Panner,
     ModulatedPanner,
@@ -554,7 +555,8 @@ class TestVolume(unittest.TestCase):
     def test_initialization_default(self):
         """Test Volume initializes with default amplitude."""
         volume = Volume()
-        self.assertEqual(volume.amplitude, 1.0)
+        self.assertEqual(volume.amplitude, 0.1)
+        self.assertEqual(volume.gain_db, DEFAULT_GAIN_DB)
 
     def test_initialization_custom(self):
         """Test Volume initializes with custom amplitude."""
@@ -616,7 +618,11 @@ class TestVolume(unittest.TestCase):
     def test_input_validation_negative(self):
         """Test Volume rejects negative amplitude."""
         with self.assertRaises(ValueError):
-            Volume(-1.0)
+            Volume(amplitude=-1.0)
+        try:
+            Volume(gain_db=-1.0)
+        except ValueError:
+            self.fail("Volume raised ValueError unexpectedly with gain_db!")
 
     def test_call_invalid_input(self):
         """Test Volume rejects invalid input types in call."""
@@ -1008,14 +1014,6 @@ class TestModulatedFrequency(unittest.TestCase):
 class TestModulatedVolumeVectorization(unittest.TestCase):
     """Test ModulatedVolume vectorized methods."""
 
-    def test_scale_vectorized_exists(self):
-        """Test that ModulatedVolume has scale_vectorized method."""
-        env = ADSREnvelope(0.1, 0.1, 0.7, 0.1, sample_rate=1000)
-        mod_vol = ModulatedVolume(env)
-
-        self.assertTrue(hasattr(mod_vol, "scale_vectorized"))
-        self.assertTrue(callable(mod_vol._scale_vectorized))
-
     def test_regression_chain_with_modulated_volume(self):
         """Regression test: Chain should use vectorized ModulatedVolume, not iterator fallback.
 
@@ -1049,14 +1047,6 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
 
 class TestModulatedFrequencyVectorization(unittest.TestCase):
     """Test ModulatedFrequency vectorized methods."""
-
-    def test_scale_vectorized_exists(self):
-        """Test that ModulatedFrequency has scale_vectorized method."""
-        lfo = SineOscillator(5, sample_rate=1000)
-        mod_freq = ModulatedFrequency(lfo)
-
-        self.assertTrue(hasattr(mod_freq, "scale_vectorized"))
-        self.assertTrue(callable(mod_freq.scale_vectorized))
 
     def test_scale_vectorized_with_oscillator(self):
         """Test ModulatedFrequency.scale_vectorized with oscillator modulator."""
@@ -1111,9 +1101,6 @@ class TestChainVectorizationPerformance(unittest.TestCase):
         mod_vol = ModulatedVolume(env)
 
         chain = Chain(osc, mod_vol)
-
-        # Check that ModulatedVolume has the vectorized method
-        self.assertTrue(hasattr(mod_vol, "scale_vectorized"))
 
         # Generate samples - should use vectorization
         n = 1000

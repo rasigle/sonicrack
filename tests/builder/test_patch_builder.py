@@ -9,6 +9,7 @@ import unittest
 
 import numpy as np
 
+from constants import DEFAULT_GAIN_DB
 from src.builder import PresetBuilder
 from src.engine.oscillator import SineOscillator
 
@@ -33,7 +34,7 @@ class TestPatchBuilder(unittest.TestCase):
 
         # Should be a SineOscillator, by default gain_db=-20 maps to amplitude ~0.1
         self.assertIsInstance(patch, SineOscillator)
-        self.assertEqual(patch.gain_db, -20)
+        self.assertEqual(patch.gain_db, DEFAULT_GAIN_DB)
         self.assertEqual(patch.amplitude, 0.1)
 
         patch = PresetBuilder().sine(440, gain_db=-6.0).build()
@@ -48,7 +49,7 @@ class TestPatchBuilder(unittest.TestCase):
     def test_oscillator_amplitude(self):
         patch = PresetBuilder().sine(440, amplitude=0.1).build()
         self.assertEqual(patch.amplitude, 0.1)
-        self.assertAlmostEqual(patch.gain_db, -20.0)
+        self.assertAlmostEqual(patch.gain_db, DEFAULT_GAIN_DB)
 
         patch = PresetBuilder().sine(440, amplitude=1.0).build()
         self.assertEqual(patch.amplitude, 1.0)
@@ -101,7 +102,7 @@ class TestPatchBuilder(unittest.TestCase):
 
     def test_with_clip(self):
         """Test adding clipping."""
-        patch = PresetBuilder().sine(440, amplitude=2.0).volume((-0.5, 0.5)).build()
+        patch = PresetBuilder().sine(440, amplitude=2.0).clipper((-0.5, 0.5)).build()
 
         # Generate samples
         samples = patch.get_samples(1000)
@@ -113,6 +114,14 @@ class TestPatchBuilder(unittest.TestCase):
     def test_with_adsr(self):
         """Test adding ADSR envelope."""
         patch = PresetBuilder().sine(440).adsr(0.1, 0.2, 0.7, 0.3).build()
+
+        # Trigger the envelope to start attack phase
+        # The patch is a ModulatedOscillator, modulators is a tuple
+        if hasattr(patch, "modulators") and len(patch.modulators) > 0:
+            # Get the first modulator (the ADSR envelope)
+            envelope = patch.modulators[0]
+            if hasattr(envelope, "trigger_note_on"):
+                envelope.trigger_note_on()
 
         # Generate samples
         samples = patch.get_samples(44100)  # 1 second
@@ -133,7 +142,7 @@ class TestPatchBuilder(unittest.TestCase):
             .adsr(0.1, 0.2, 0.7, 0.3)
             .volume(0.5)
             .panner(0.0)
-            .volume((-0.9, 0.9))
+            .clipper((-0.9, 0.9))
             .build()
         )
 
@@ -379,7 +388,7 @@ class TestPatchBuilderConvenience(unittest.TestCase):
 
     def test_clear_effects(self):
         """Test clearing effects from patch."""
-        builder = PresetBuilder().sine(440).volume(0.5).panner(0.3).volume((-0.9, 0.9))
+        builder = PresetBuilder().sine(440).volume(0.5).panner(0.3).clipper((-0.9, 0.9))
 
         # Clear effects
         builder.clear_effects()

@@ -6,6 +6,7 @@ Run this test while the GUI is running and audio is playing.
 
 import pytest
 
+from constants import DEFAULT_GAIN_DB
 from src.engine.oscillator import SineOscillator
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.patch_compiler import PatchCompiler
@@ -22,7 +23,7 @@ class MockOscillatorModule:
 
     def create_component(self, input_components=None, modulation_components=None):
         """Create a SineOscillator component."""
-        return SineOscillator(frequency=440, gain_db=-20)
+        return SineOscillator(frequency=440, gain_db=DEFAULT_GAIN_DB)
 
     def get_required_inputs(self):
         return []

@@ -3,6 +3,7 @@ from typing import Any
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
+from constants import DEFAULT_GAIN_DB
 from src.engine import Volume
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob
@@ -39,7 +40,7 @@ class SimpleVolumeModule(ModuleWidget):
         # Gain in dB (linear mapping of dB values, since dB is already logarithmic)
         # Range: -60 dB (very quiet) to +12 dB (boost)
         # Default: -20 dB (safe for mixing)
-        self.gain_knob = Knob("Gain (dB)", -60, 12, -20, logarithmic=False)
+        self.gain_knob = Knob("Gain (dB)", -60, 12, DEFAULT_GAIN_DB, logarithmic=False)
         self.gain_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("gain_db", self.gain_knob.get_value())
         )

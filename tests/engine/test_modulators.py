@@ -29,6 +29,7 @@ class TestADSREnvelope(unittest.TestCase):
 
     def test_attack_phase(self) -> None:
         """Test attack phase ramps from 0 to 1."""
+        self.env.trigger_note_on()  # Trigger envelope to start attack phase
         samples = self.env.get_samples_iterator(int(0.1 * 44100), reset=True)
 
         # Should start near 0
@@ -42,6 +43,7 @@ class TestADSREnvelope(unittest.TestCase):
 
     def test_decay_phase(self) -> None:
         """Test decay phase ramps down to sustain level."""
+        self.env.trigger_note_on()  # Trigger envelope
         # Skip attack phase
         attack_samples = int(0.1 * 44100)
         _ = self.env.get_samples_iterator(attack_samples, reset=True)
@@ -55,6 +57,7 @@ class TestADSREnvelope(unittest.TestCase):
 
     def test_sustain_phase(self) -> None:
         """Test sustain phase holds constant level."""
+        self.env.trigger_note_on()  # Trigger envelope
         # Skip to sustain phase
         ads_duration = int((0.1 + 0.2) * 44100)
         _ = self.env.get_samples_iterator(ads_duration, reset=True)
@@ -67,6 +70,7 @@ class TestADSREnvelope(unittest.TestCase):
 
     def test_trigger_release(self) -> None:
         """Test trigger_release initiates release phase."""
+        self.env.trigger_note_on()  # Trigger envelope
         # Get to sustain
         _ = self.env.get_samples_iterator(int(0.5 * 44100), reset=True)
 
@@ -82,6 +86,8 @@ class TestADSREnvelope(unittest.TestCase):
 
     def test_ended_flag(self) -> None:
         """Test ended flag is set after release completes."""
+        self.env.trigger_note_on()  # Trigger envelope
+        # Initially not ended (during attack/decay/sustain)
         self.assertFalse(self.env.ended)
 
         # Go through envelope
@@ -122,6 +128,7 @@ class TestADSREnvelope(unittest.TestCase):
             sustain_level=0.7,
             release_duration=0.0,
         )
+        env.trigger_note_on()  # Trigger envelope
 
         # Should jump directly to sustain
         samples = env.get_samples_iterator(10, reset=True)

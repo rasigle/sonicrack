@@ -153,23 +153,29 @@ class ButterworthFilter(Modifier):
             "Use scale_vectorized() instead of iterator mode."
         )
 
-    def __call__(self, val: float | tuple[float, ...]) -> float | tuple[float, ...]:
-        """Apply filter to single sample (stateful for iterator chains).
+    def __call__(
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
+        """Apply filter to single sample or array.
 
-        Note: This is less efficient than vectorized processing.
-        Use scale_vectorized() for batch processing.
+        For arrays, this delegates to scale_vectorized for optimal performance.
+        For single samples, it uses stateful filtering.
 
         Args:
-            val: Input sample (mono or stereo tuple)
+            val: Input sample (mono float, stereo tuple, or numpy array)
 
         Returns:
-            Filtered sample
+            Filtered sample or array (same type as input)
         """
-        # Handle stereo
+        # Handle numpy arrays (vectorized path)
+        if isinstance(val, np.ndarray):
+            return self.scale_vectorized(val)
+
+        # Handle stereo tuples
         if isinstance(val, tuple):
             return tuple(self(v) for v in val)
 
-        # Apply filter with state
+        # Apply filter with state for single samples
         filtered, self._filter_state = lfilter(
             self._b, self._a, [val], zi=self._filter_state
         )

@@ -50,8 +50,6 @@ class PannerModule(ModuleWidget):
         # Register parameters for automatic get/set
         self.register_parameter("position", self.pan_knob)
 
-        self.modulator_component = None
-
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
@@ -75,8 +73,6 @@ class PannerModule(ModuleWidget):
         mod_comp = None
         if modulation_components and "Mod" in modulation_components:
             mod_comp = modulation_components["Mod"]
-        elif self.modulator_component:
-            mod_comp = self.modulator_component
 
         if mod_comp:
             return ModulatedPanner(mod_comp)

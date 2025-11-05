@@ -52,8 +52,6 @@ class VolumeModule(ModuleWidget):
         # Register parameters for automatic get/set
         self.register_parameter("gain_db", self.gain_knob)
 
-        self.input_component = None
-        self.modulator_component = None
         self.component = self.create_component()
 
     # AudioModuleInterface implementation
@@ -76,8 +74,6 @@ class VolumeModule(ModuleWidget):
         mod_comp = None
         if modulation_components and "Mod" in modulation_components:
             mod_comp = modulation_components["Mod"]
-        elif self.modulator_component:
-            mod_comp = self.modulator_component
 
         if mod_comp:
             return ModulatedVolume(mod_comp)

@@ -486,8 +486,10 @@ class Volume(Modifier):
         """float: Current amplitude multiplier (linear scale).
 
         For audio work, consider using the gain_db property instead.
+
+        Returns the target amplitude (the value you set), not the smoothed value.
         """
-        return self._amplitude
+        return self._target_amplitude
 
     @amplitude.setter
     def amplitude(self, value: float):
@@ -496,7 +498,8 @@ class Volume(Modifier):
         # Initiate smooth transition (prevents clicks)
         self._target_amplitude = float(value)
         self._smoothing_samples_remaining = self._smoothing_duration_samples
-        self._amplitude = float(value)
+        # Don't update _amplitude immediately - let smoothing handle it
+        # self._amplitude = float(value)  # REMOVED - causes hot-swap to fail!
 
     @property
     def gain_db(self) -> float:
@@ -507,8 +510,10 @@ class Volume(Modifier):
             -6 dB = half amplitude
             -20 dB = 1/10 amplitude
             -∞ dB = silence
+
+        Returns the target gain (the value you set), not the smoothed value.
         """
-        return linear_to_db(self._amplitude)
+        return linear_to_db(self._target_amplitude)
 
     @gain_db.setter
     def gain_db(self, value: float):
@@ -516,7 +521,8 @@ class Volume(Modifier):
         # Initiate smooth transition (prevents clicks)
         self._target_amplitude = new_amplitude
         self._smoothing_samples_remaining = self._smoothing_duration_samples
-        self._amplitude = new_amplitude
+        # Don't update _amplitude immediately - let smoothing handle it
+        # self._amplitude = new_amplitude  # REMOVED - causes hot-swap to fail!
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray
@@ -550,6 +556,7 @@ class Volume(Modifier):
                 self._smoothing_samples_remaining -= 1
                 if self._smoothing_samples_remaining <= 0:
                     self._current_amplitude = self._target_amplitude
+                    self._amplitude = self._target_amplitude  # Update _amplitude too!
 
                 return float(result)
             else:
@@ -599,6 +606,7 @@ class Volume(Modifier):
             self._smoothing_samples_remaining -= smooth_count
             if self._smoothing_samples_remaining <= 0:
                 self._current_amplitude = self._target_amplitude
+                self._amplitude = self._target_amplitude  # Update _amplitude too!
 
             return result.astype(np.float32)
         else:

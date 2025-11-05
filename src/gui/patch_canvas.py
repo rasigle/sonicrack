@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 class Port(QGraphicsItem):
     """A connection port on a module (input or output).
 
@@ -528,12 +529,12 @@ class PatchCanvas(QGraphicsView):
         """
         # Validate ports
         if start_port.port_type != "output" or end_port.port_type != "input":
-            logger.warning(f"Invalid port types for cable creation")
+            logger.warning("Invalid port types for cable creation")
             return None
 
         # Check for self-connection
         if start_port.parent_module == end_port.parent_module:
-            logger.warning(f"Cannot create self-connection")
+            logger.warning("Cannot create self-connection")
             return None
 
         # Create and add cable

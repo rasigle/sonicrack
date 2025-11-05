@@ -656,7 +656,9 @@ class TestModulatedVolume(unittest.TestCase):
         # Volume should vary over time during attack phase
         # Check that output values are different (envelope is modulating)
         unique_values = len(np.unique(np.round(result, decimals=3)))
-        self.assertGreater(unique_values, 10, "Volume should change during envelope attack")
+        self.assertGreater(
+            unique_values, 10, "Volume should change during envelope attack"
+        )
 
     def test_initialization_with_envelope(self):
         """Test ModulatedVolume initializes with envelope."""

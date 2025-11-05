@@ -18,7 +18,8 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QScrollArea,
     QSplitter,
-    QDialog, QFileDialog
+    QDialog,
+    QFileDialog,
 )
 
 from src.constants import PRESET_FILE_EXTENSION
@@ -26,8 +27,10 @@ from src.engine import AudioComponent
 from src.gui.audio_engine import AudioEngine
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.dialogs.about_dialog import show_about
-from src.gui.dialogs.preset_library_dialog import LibraryPresetBrowserDialog, \
-    SaveLibraryPresetDialog
+from src.gui.dialogs.preset_library_dialog import (
+    LibraryPresetBrowserDialog,
+    SaveLibraryPresetDialog,
+)
 from src.gui.module_registry import initialize_modules
 from src.gui.modules.output import OutputModule
 from src.gui.patch_canvas import PatchCanvas
@@ -699,9 +702,7 @@ class ModularSynthWindow(QMainWindow):
 
         if not success:
             QMessageBox.critical(
-                self,
-                "Save Error",
-                f"Failed to save patch to:\n{file_path}"
+                self, "Save Error", f"Failed to save patch to:\n{file_path}"
             )
             logger.error(f"Failed to save patch to {file_path}")
             return
@@ -841,7 +842,7 @@ class ModularSynthWindow(QMainWindow):
                 modules=modules,
                 connections=connections,
                 metadata=metadata,
-                save_as_library_preset=True
+                save_as_library_preset=True,
             )
 
             if filepath:
@@ -941,7 +942,9 @@ class ModularSynthWindow(QMainWindow):
 
                 if source_port_obj and target_port_obj:
                     # Create cable connection
-                    self.patch_canvas.create_connection(source_port_obj, target_port_obj)
+                    self.patch_canvas.create_connection(
+                        source_port_obj, target_port_obj
+                    )
                 else:
                     logger.warning(
                         f"Could not find ports: {source_port} or {target_port}"

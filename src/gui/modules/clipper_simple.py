@@ -40,7 +40,8 @@ class ClipperModule(ModuleWidget):
         self.threshold_knob = Knob("Threshold", 0.1, 1.0, 1.0)
         self.threshold_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
-                "threshold", self.threshold_knob.get_value()
+                "wave_range",
+                (-self.threshold_knob.get_value(), self.threshold_knob.get_value()),
             )
         )
         layout.addWidget(self.threshold_knob, alignment=Qt.AlignmentFlag.AlignCenter)

@@ -45,7 +45,7 @@ class PresetManager:
         connections: list[tuple[Any, Any]],
         metadata: dict[str, Any],
         file_path: str | Path | None = None,
-        save_as_library_preset: bool = False
+        save_as_library_preset: bool = False,
     ) -> Path | None:
         """Actually save a patch as a file.
 
@@ -185,9 +185,7 @@ class PresetManager:
 
     @staticmethod
     def _serialize_patch(
-            modules: list[Any],
-            connections: list[tuple[Any, Any]],
-            metadata: dict[str, Any]
+        modules: list[Any], connections: list[tuple[Any, Any]], metadata: dict[str, Any]
     ) -> dict[str, Any]:
         """Serialize a patch to a dictionary structure.
 
@@ -205,10 +203,10 @@ class PresetManager:
         preset_data = {
             "metadata": {
                 "name": metadata.get("name", "Untitled Preset"),
-                "author":  metadata.get("author", ""),
+                "author": metadata.get("author", ""),
                 "description": metadata.get("description", ""),
-                "tags": metadata.get("tags", []) ,
-                "category": metadata.get("category", "User") ,
+                "tags": metadata.get("tags", []),
+                "category": metadata.get("category", "User"),
                 "created": datetime.now().isoformat(),
                 "version": "1.0",
             },
@@ -283,7 +281,6 @@ class PresetManager:
         except Exception as e:
             logger.error(f"Failed to import preset: {e}", exc_info=True)
             return None
-
 
 
 def _sanitize_filename(name: str) -> str:

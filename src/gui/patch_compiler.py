@@ -119,11 +119,21 @@ class PatchCompiler:
 
         # Try to set parameter directly on engine component
         try:
+            # Log before and after values for debugging
+            # old_value = getattr(component, param_name, "N/A")
+            # logger.info(
+            #     f"Hot-swapping {param_name} in {source_module_name} "
+            #     f"(component id={id(component)}): {old_value} → {value}"
+            # )
+
             setattr(component, param_name, value)
-            logger.debug(
-                f"Hot-swapped {param_name}={value} in "
-                f"{source_module_name} → {type(component).__name__}"
-            )
+
+            # Verify the change took effect
+            # new_value = getattr(component, param_name, "N/A")
+            # logger.info(
+            #     f"Hot-swap complete: {param_name} = {new_value} "
+            #     f"(component type={type(component).__name__})"
+            # )
             return True
         except (AttributeError, TypeError, ValueError) as e:
             logger.error(
@@ -163,9 +173,12 @@ class PatchCompiler:
 
         component = builder(module)
 
-        # Cache and track for hot-swapping (if component was created)
-        if component:
+        # Cache component (but NOT for modifiers - they cache internally to avoid Chain wrapper issues)
+        if component and category != ModuleCategory.MODIFIER:
             self._cache_component(module, component)
+        elif component and category == ModuleCategory.MODIFIER:
+            # For modifiers, only cache in build_cache (not module_to_component - that's handled in _build_modifier_module)
+            self._build_cache[module] = component
 
         return component
 
@@ -406,6 +419,10 @@ class PatchCompiler:
         component = Chain(input_comp, modifier_component)
 
         # Track modifier for hot-swapping (not the Chain wrapper)
+        logger.info(
+            f"Storing {name} modifier for hot-swapping: "
+            f"component id={id(modifier_component)}, type={type(modifier_component).__name__}"
+        )
         self._module_to_component[module] = modifier_component
 
         return component

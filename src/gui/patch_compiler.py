@@ -3,6 +3,7 @@
 import logging
 from typing import Any, Callable
 
+from src.engine import CVScaler
 from src.engine.audio_component import AudioComponent
 from src.engine.composer import Chain, WaveAdder
 from src.gui.audio_module_interface import ModuleCategory, AudioModule
@@ -49,7 +50,9 @@ class PatchCompiler:
         # Log all connections for debugging
         logger.info(f"Patch set with {len(connections)} connections:")
         for start_port, end_port in connections:
-            logger.info(f"  {start_port.parent_module.metadata.title}.{start_port.port_name} → {end_port.parent_module.metadata.title}.{end_port.port_name}")
+            logger.info(
+                f"  {start_port.parent_module.metadata.title}.{start_port.port_name} → {end_port.parent_module.metadata.title}.{end_port.port_name}"
+            )
 
     def compile(self) -> AudioComponent | None:
         """Compile the patch into an audio component.
@@ -124,21 +127,7 @@ class PatchCompiler:
 
         # Try to set parameter directly on engine component
         try:
-            # Log before and after values for debugging
-            # old_value = getattr(component, param_name, "N/A")
-            # logger.info(
-            #     f"Hot-swapping {param_name} in {source_module_name} "
-            #     f"(component id={id(component)}): {old_value} → {value}"
-            # )
-
             setattr(component, param_name, value)
-
-            # Verify the change took effect
-            # new_value = getattr(component, param_name, "N/A")
-            # logger.info(
-            #     f"Hot-swap complete: {param_name} = {new_value} "
-            #     f"(component type={type(component).__name__})"
-            # )
             return True
         except (AttributeError, TypeError, ValueError) as e:
             logger.error(
@@ -242,31 +231,126 @@ class PatchCompiler:
 
         return components, skipped
 
+    def _insert_cv_scaler_if_needed(
+        self,
+        mod_component: Any,
+        source_module: AudioModule,
+        target_module: AudioModule,
+        port_name: str,
+    ) -> Any:
+        """Insert CV scaler if source and target ranges don't match.
+
+        Automatically detects CV range mismatches and inserts a CVScaler
+        to convert the signal to the expected range.
+
+        Args:
+            mod_component: The modulation component to potentially wrap
+            source_module: The source module providing CV
+            target_module: The target module receiving CV
+            port_name: Name of the modulation port
+
+        Returns:
+            Either the original component (if ranges match) or a CVScaler
+            wrapping the component (if ranges don't match)
+
+        Example:
+            LFO [-1, 1] → Volume expects [0, 1]
+            Returns: CVScaler(lfo_component, (-1, 1), (0, 1))
+        """
+
+        source_range = None
+        target_range = None
+
+        # Get target's expected CV range
+        if hasattr(target_module, "get_cv_range"):
+            target_range = target_module.get_cv_range(port_name)
+            logger.debug(
+                f"  Target {target_module.metadata.title}.{port_name} expects CV range: {target_range}"
+            )
+
+        # Get source's output range
+        if hasattr(source_module, "get_cv_output_range"):
+            source_range = source_module.get_cv_output_range()
+            logger.debug(
+                f"  Source {source_module.metadata.title} outputs CV range: {source_range}"
+            )
+
+        # Check if we need to insert a scaler
+        if source_range and target_range and source_range != target_range:
+            logger.info(
+                f"CV range mismatch detected: "
+                f"{source_module.metadata.title} outputs {source_range}, "
+                f"but {target_module.metadata.title}.{port_name} expects {target_range}"
+            )
+            logger.info(f"Auto-inserting CVScaler: {source_range} → {target_range}")
+
+            # Create scaler with clamping enabled
+            scaler = CVScaler(
+                mod_component,
+                input_range=source_range,
+                output_range=target_range,
+                clamp=True,
+            )
+
+            logger.debug(
+                f"  CVScaler created (id={id(scaler)}): "
+                f"scale={scaler._scale:.3f}, offset={scaler._offset:.3f}"
+            )
+
+            return scaler
+
+        # No scaling needed
+        if source_range and target_range:
+            logger.debug(f"  CV ranges match {source_range}, no scaling needed")
+
+        return mod_component
+
     def _collect_modulation_components(self, module: AudioModule) -> dict:
         """Collect modulation components as dictionary.
+
+        Automatically inserts CV scalers when the source output range doesn't
+        match the target input range.
 
         Args:
             module: The module to collect modulations for
 
         Returns:
-            Dictionary mapping port_name -> component
+            Dictionary mapping port_name -> component (possibly wrapped in CVScaler)
         """
         modulation_components = {}
 
         for mod_port_name in module.get_modulation_inputs():
             mod_port = self._find_port_by_name(module, mod_port_name)
-            logger.debug(f"Looking for modulation on port '{mod_port_name}': port={mod_port}")
-            if mod_port:
-                mod_conn = self._find_connection_to_port(mod_port)
-                logger.debug(f"  Found connection: {mod_conn}")
-                if mod_conn:
-                    logger.debug(f"  Connection source module: {mod_conn.parent_module.metadata.title if mod_conn.parent_module else 'None'}")
-                    mod_component = self._build_component_from_port(mod_conn)
-                    if mod_component:
-                        modulation_components[mod_port_name] = mod_component
-                        logger.info(f"  Collected modulation '{mod_port_name}': {type(mod_component).__name__} (id={id(mod_component)})")
-                else:
-                    logger.debug(f"  No connection found for port '{mod_port_name}'")
+            logger.debug(f"Checking modulation port '{mod_port_name}'")
+
+            if not mod_port:
+                continue
+
+            mod_conn = self._find_connection_to_port(mod_port)
+            if not mod_conn:
+                logger.debug(f"  No connection found for port '{mod_port_name}'")
+                continue
+
+            source_module = mod_conn.parent_module
+            logger.debug(
+                f"  Found connection from: {source_module.metadata.title if source_module else 'Unknown'}"
+            )
+
+            # Build the modulation component
+            mod_component = self._build_component_from_port(mod_conn)
+            if not mod_component:
+                continue
+
+            # Insert CV scaler if ranges don't match
+            mod_component = self._insert_cv_scaler_if_needed(
+                mod_component, source_module, module, mod_port_name
+            )
+
+            modulation_components[mod_port_name] = mod_component
+            logger.debug(
+                f"  Collected modulation '{mod_port_name}': "
+                f"{type(mod_component).__name__} (id={id(mod_component)})"
+            )
 
         return modulation_components
 

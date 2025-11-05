@@ -60,6 +60,14 @@ class PannerModule(ModulatedModuleBase):
         """Panner requires the In port to be connected."""
         return ["In"]
 
+    def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
+        """Panner expects bipolar CV range [-1, 1] for pan position.
+
+        Returns:
+            (-1.0, 1.0) - bipolar range for pan control
+        """
+        return -1.0, 1.0
+
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
         """Create ModulatedPanner with modulation."""

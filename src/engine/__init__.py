@@ -121,6 +121,14 @@ from src.engine.modifier import (
 # Modulated Oscillator
 from src.engine.modulated_oscillator import ModulatedOscillator
 
+# CV Utilities
+from src.engine.cv_utils import (
+    CVScaler,
+    bipolar_to_unipolar,
+    unipolar_to_bipolar,
+    scale_cv,
+)
+
 # Modulators
 from src.engine.modulator import (
     Modulator,
@@ -187,6 +195,11 @@ __all__ = [
     "ModulatedFrequency",
     "Clipper",
     "ModulatedClipper",
+    # CV Utilities
+    "CVScaler",
+    "bipolar_to_unipolar",
+    "unipolar_to_bipolar",
+    "scale_cv",
     # Filters
     "butter",
     "apply_filter",

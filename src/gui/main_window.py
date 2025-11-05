@@ -510,11 +510,13 @@ class ModularSynthWindow(QMainWindow):
             affected_modules.add(end_port.parent_module)
 
         for module in affected_modules:
-            if hasattr(module, 'update_knob_state'):
+            if hasattr(module, "update_knob_state"):
                 try:
                     module.update_knob_state()
                 except Exception as e:
-                    logger.warning(f"Failed to update knob state for {module.metadata.title}: {e}")
+                    logger.warning(
+                        f"Failed to update knob state for {module.metadata.title}: {e}"
+                    )
 
         # Auto-compile when connection changes
         self._compile_patch()
@@ -537,11 +539,13 @@ class ModularSynthWindow(QMainWindow):
             affected_modules.add(end_port.parent_module)
 
         for module in affected_modules:
-            if hasattr(module, 'update_knob_state'):
+            if hasattr(module, "update_knob_state"):
                 try:
                     module.update_knob_state()
                 except Exception as e:
-                    logger.warning(f"Failed to update knob state for {module.metadata.title}: {e}")
+                    logger.warning(
+                        f"Failed to update knob state for {module.metadata.title}: {e}"
+                    )
 
         # Check if output module was disconnected
         output_module_class = self.registry.get("Output")

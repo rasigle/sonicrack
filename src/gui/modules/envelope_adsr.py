@@ -105,6 +105,14 @@ class ADSRModule(ModuleWidget):
         """Gate input is optional - ADSR works without gate triggering."""
         return []  # No required inputs - Gate is optional
 
+    def get_cv_output_range(self) -> tuple[float, float]:
+        """ADSR envelope outputs unipolar signal [0, 1].
+
+        Returns:
+            (0.0, 1.0) - unipolar output range
+        """
+        return 0.0, 1.0
+
     # AudioModuleInterface implementation
     def create_engine_component(
         self,

@@ -4,6 +4,7 @@ This provides common functionality for modules that have:
 - A main parameter knob
 - A modulation input port
 - Knob that disables when modulation is connected
+- Automatic CV range specification for proper signal scaling
 """
 
 import logging
@@ -20,12 +21,14 @@ class ModulatedModuleBase(ModuleWidget):
     Provides:
     - update_knob_state() - Updates knob enabled state based on connections
     - get_modulation_inputs() - Returns ["Mod"]
+    - get_cv_range() - Returns expected CV range for modulation input
     - Common modulation handling logic
 
     Subclasses must:
     - Set self.control_knob to the main parameter knob
     - Implement create_modulated_component(mod_comp)
     - Implement create_unmodulated_component()
+    - Optionally override get_cv_range() to specify expected CV range
     """
 
     def __init__(self, *args, **kwargs):
@@ -74,6 +77,27 @@ class ModulatedModuleBase(ModuleWidget):
         All modulated modules have a "Mod" port.
         """
         return ["Mod"]
+
+    def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
+        """Get expected CV range for a modulation input.
+
+        This is used by the patch compiler to automatically insert CV scalers
+        when connecting sources with different output ranges.
+
+        Args:
+            port_name: Name of the modulation port
+
+        Returns:
+            Tuple of (min, max) expected CV values
+
+        Default implementation returns (0.0, 1.0) for unipolar modulation.
+        Override in subclasses for different ranges (e.g., Panner uses (-1, 1)).
+
+        Examples:
+            - Volume/Clipper: (0.0, 1.0) - unipolar
+            - Panner: (-1.0, 1.0) - bipolar
+        """
+        return 0.0, 1.0  # Default: unipolar [0, 1]
 
     def create_engine_component(
         self,
@@ -142,4 +166,3 @@ class ModulatedModuleBase(ModuleWidget):
         raise NotImplementedError(
             f"{self.__class__.__name__} must implement create_unmodulated_component()"
         )
-

@@ -102,6 +102,14 @@ class LFOModule(ModuleWidget):
         self.component = self.create_engine_component()
         self.parameter_changed.emit("waveform", wave_type)
 
+    def get_cv_output_range(self) -> tuple[float, float]:
+        """LFO outputs bipolar signal [-1, 1].
+
+        Returns:
+            (-1.0, 1.0) - bipolar output range
+        """
+        return -1.0, 1.0
+
     def create_engine_component(
         self,
         input_components: list[Any] | None = None,

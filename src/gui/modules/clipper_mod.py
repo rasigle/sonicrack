@@ -77,4 +77,3 @@ class ClipperModulatedModule(ModulatedModuleBase):
         """Create simple Clipper without modulation."""
         threshold = self.threshold_knob.get_value()
         return Clipper((-threshold, threshold))
-

@@ -285,12 +285,25 @@ class ModulatedPanner(Panner):
     """Panner with modulated pan position.
 
     Same as Panner but takes a modulator to dynamically set the pan value.
-    The modulator should output values in range [-1, 1] for pan position.
-    This matches the natural output range of oscillators.
+
+    **CV Range:** The modulator should output values in range [-1, 1]:
+    - -1.0 = hard left
+    -  0.0 = center
+    -  1.0 = hard right
+
+    This matches the natural output range of oscillators, so LFOs can be
+    used directly without scaling.
+
+    **Note:** If your CV source outputs a different range (e.g., envelope [0, 1]),
+    use CVScaler to convert it:
+        >>> from src.engine import unipolar_to_bipolar
+        >>> env = ADSREnvelope(attack=0.1, decay=0.2, sustain=0.7, release=0.3)
+        >>> scaled_env = unipolar_to_bipolar(env)  # Convert [0,1] to [-1,1]
+        >>> panner = ModulatedPanner(scaled_env)
 
     Args:
         modulator: Generator that returns values in range [-1, 1].
-                  -1 = hard left, 0 = center, 1 = hard right.
+                  Values outside this range are clamped internally.
 
     Attributes:
         modulator: The modulator instance.
@@ -298,7 +311,7 @@ class ModulatedPanner(Panner):
     Example:
         >>> from src.engine import SineOscillator, ModulatedPanner, Chain
         >>> # LFO oscillates between -1 and 1, directly controlling pan
-        >>> lfo = SineOscillator(4)  # 4 Hz auto-pan, no wave_range needed!
+        >>> lfo = SineOscillator(4)  # 4 Hz auto-pan
         >>> panner = ModulatedPanner(lfo)
         >>> chain = Chain(SineOscillator(440), panner)
         >>> samples = chain.get_samples(1000)
@@ -627,12 +640,21 @@ class ModulatedVolume(Volume):
     - amplitude property (linear control)
     - db_to_linear() / linear_to_db() utilities
 
-    **Modulation:**
-    The modulator's output directly sets the amplitude value, creating
-    effects like tremolo (LFO modulation) or envelope shaping (ADSR).
+    **Modulation & CV Range:**
+    - **For amplitude modulation:** CV should be in range [0, max_amplitude]
+      (e.g., [0, 1] for normal volume control)
+    - **For gain_db modulation:** CV should be in dB range (e.g., [-60, 12])
+
+    **Note:** If your CV source outputs a different range:
+        >>> from src.engine import bipolar_to_unipolar
+        >>> lfo = SineOscillator(2)  # Output: [-1, 1]
+        >>> scaled_lfo = bipolar_to_unipolar(lfo)  # Output: [0, 1]
+        >>> volume = ModulatedVolume(scaled_lfo)
 
     Args:
-        modulator: Generator that produces amplitude values (0.0 to max).
+        modulator: Generator that produces amplitude/gain values.
+            - For amplitude (default): [0.0, max] range
+            - For gain_db: dB range (e.g., [-60, 12])
             Examples: LFO for tremolo, ADSR for envelope shaping.
 
     Example:
@@ -1048,18 +1070,30 @@ class ModulatedClipper(Modifier):
     """Clipper with modulated threshold.
 
     The modulator controls the clipping threshold symmetrically.
-    Modulator values are scaled from [0, 1] to control the threshold.
+
+    **CV Range:** The modulator should output values in range [0, 1]:
+    - 0.0 = tight clipping (maximum distortion)
+    - 1.0 = no clipping (clean signal)
+
+    **Note:** If your CV source outputs a different range (e.g., oscillator [-1, 1]),
+    use CVScaler to convert it:
+        >>> from src.engine import bipolar_to_unipolar
+        >>> lfo = SineOscillator(2)  # Output: [-1, 1]
+        >>> scaled_lfo = bipolar_to_unipolar(lfo)  # Output: [0, 1]
+        >>> clipper = ModulatedClipper(scaled_lfo)
 
     Example:
-        >>> lfo = SineOscillator(2, amplitude=0.5, sample_rate=44100)
-        >>> clipper = ModulatedClipper(lfo)
-        >>> # LFO oscillates between 0 and 1, modulating threshold
+        >>> lfo = SineOscillator(2, amplitude=0.5)  # Output: [-0.5, 0.5]
+        >>> # Need to scale to [0, 1]
+        >>> from src.engine import scale_cv
+        >>> scaled = scale_cv(lfo, from_range=(-0.5, 0.5), to_range=(0, 1))
+        >>> clipper = ModulatedClipper(scaled)
     """
 
     descriptor = ComponentDescriptor(
         name="ModulatedClipper",
         category=ComponentCategory.MODIFIER,
-        description="Clipper with CV threshold control",
+        description="Clipper with CV threshold control (CV range: [0, 1])",
         config_params=[],
         fluent_api_name="modulated_clipper",
         tags=["modifier", "clipper", "modulation"],
@@ -1069,10 +1103,18 @@ class ModulatedClipper(Modifier):
         """Initialize modulated clipper.
 
         Args:
-            modulator: Component that provides threshold modulation values [0, 1]
+            modulator: Component that provides threshold modulation values.
+                **Expected range: [0, 1]**
+                - 0.0 = maximum clipping
+                - 1.0 = no clipping
 
         Raises:
             TypeError: If modulator doesn't implement iterator protocol
+
+        Note:
+            The modulator output is clamped to [0, 1] internally, so values
+            outside this range will be clipped. For best results, use CVScaler
+            to properly scale your CV source.
         """
         if not (hasattr(modulator, "__iter__") and hasattr(modulator, "__next__")):
             raise TypeError(
@@ -1081,6 +1123,8 @@ class ModulatedClipper(Modifier):
 
         self._modulator_source = modulator
         self.modulator = iter(modulator)
+
+        logger.debug("ModulatedClipper initialized (CV range: [0, 1])")
 
     def __iter__(self):
         """Reset iterator."""

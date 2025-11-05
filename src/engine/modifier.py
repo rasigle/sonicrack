@@ -1043,6 +1043,105 @@ class Clipper(Modifier):
         return np.clip(samples, self._min, self._max).astype(np.float32)
 
 
+@register_component()
+class ModulatedClipper(Modifier):
+    """Clipper with modulated threshold.
+
+    The modulator controls the clipping threshold symmetrically.
+    Modulator values are scaled from [0, 1] to control the threshold.
+
+    Example:
+        >>> lfo = SineOscillator(2, amplitude=0.5, sample_rate=44100)
+        >>> clipper = ModulatedClipper(lfo)
+        >>> # LFO oscillates between 0 and 1, modulating threshold
+    """
+
+    descriptor = ComponentDescriptor(
+        name="ModulatedClipper",
+        category=ComponentCategory.MODIFIER,
+        description="Clipper with CV threshold control",
+        config_params=[],
+        fluent_api_name="modulated_clipper",
+        tags=["modifier", "clipper", "modulation"],
+    )
+
+    def __init__(self, modulator):
+        """Initialize modulated clipper.
+
+        Args:
+            modulator: Component that provides threshold modulation values [0, 1]
+
+        Raises:
+            TypeError: If modulator doesn't implement iterator protocol
+        """
+        if not (hasattr(modulator, "__iter__") and hasattr(modulator, "__next__")):
+            raise TypeError(
+                f"modulator must be iterable or have __next__, got {type(modulator).__name__}"
+            )
+
+        self._modulator_source = modulator
+        self.modulator = iter(modulator)
+
+    def __iter__(self):
+        """Reset iterator."""
+        self.modulator = iter(self._modulator_source)
+        return self
+
+    def __next__(self):
+        """Get next modulation value and advance modulator."""
+        return next(self.modulator)
+
+    def trigger_release(self):
+        """Trigger release on modulator if supported."""
+        if hasattr(self._modulator_source, "trigger_release"):
+            self._modulator_source.trigger_release()
+
+    @property
+    def ended(self):
+        """Check if modulator has ended."""
+        if hasattr(self._modulator_source, "ended"):
+            return self._modulator_source.ended
+        return False
+
+    def __call__(
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
+        """Clip input using modulated threshold.
+
+        Args:
+            val: Input value (mono float, stereo tuple, or array)
+
+        Returns:
+            Clipped value (same type as input)
+        """
+        if isinstance(val, np.ndarray):
+            # Vectorized path
+            mod_values = _get_modulation_values(
+                self._modulator_source, self.modulator, len(val)
+            )
+            # Clamp modulation to [0, 1] and use as threshold
+            thresholds = np.clip(mod_values, 0.0, 1.0)
+
+            # Clip sample by sample (since threshold varies)
+            result = np.empty_like(val)
+            for i in range(len(val)):
+                thresh = thresholds[i]
+                result[i] = np.clip(val[i], -thresh, thresh)
+
+            return result.astype(np.float32)
+
+        # Scalar path
+        mod_value = next(self.modulator)
+        threshold = np.clip(mod_value, 0.0, 1.0)
+
+        if isinstance(val, Iterable):
+            # Stereo tuple
+            return tuple(np.clip(v, -threshold, threshold) for v in val)
+
+        # Mono scalar
+        return float(np.clip(val, -threshold, threshold))
+
+
 def _apply_vectorized_panning(
     samples: np.ndarray, mod_values: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:

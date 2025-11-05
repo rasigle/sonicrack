@@ -409,6 +409,7 @@ class ModularSynthWindow(QMainWindow):
 
         # Get all connections
         connections = self.patch_canvas.get_connections()
+        logger.debug(f"Canvas has {len(connections)} connections")
         if not connections:
             self.audio_engine.clear_audiopath()
             return False
@@ -497,8 +498,24 @@ class ModularSynthWindow(QMainWindow):
     def _on_cable_connected(self, start_port, end_port):
         """Handle cable connection."""
         logger.debug(f"Cable connected: {start_port.port_name} -> {end_port.port_name}")
+
         # Mark patch as modified
         self._mark_patch_modified()
+
+        # Update UI state of affected modules BEFORE compilation
+        affected_modules = set()
+        if start_port and start_port.parent_module:
+            affected_modules.add(start_port.parent_module)
+        if end_port and end_port.parent_module:
+            affected_modules.add(end_port.parent_module)
+
+        for module in affected_modules:
+            if hasattr(module, 'update_knob_state'):
+                try:
+                    module.update_knob_state()
+                except Exception as e:
+                    logger.warning(f"Failed to update knob state for {module.metadata.title}: {e}")
+
         # Auto-compile when connection changes
         self._compile_patch()
 
@@ -511,6 +528,21 @@ class ModularSynthWindow(QMainWindow):
         # Mark patch as modified
         self._mark_patch_modified()
 
+        # Update UI state of affected modules BEFORE compilation
+        # This ensures knobs update even if compilation fails
+        affected_modules = set()
+        if start_port and start_port.parent_module:
+            affected_modules.add(start_port.parent_module)
+        if end_port and end_port.parent_module:
+            affected_modules.add(end_port.parent_module)
+
+        for module in affected_modules:
+            if hasattr(module, 'update_knob_state'):
+                try:
+                    module.update_knob_state()
+                except Exception as e:
+                    logger.warning(f"Failed to update knob state for {module.metadata.title}: {e}")
+
         # Check if output module was disconnected
         output_module_class = self.registry.get("Output")
         if output_module_class and isinstance(
@@ -521,10 +553,15 @@ class ModularSynthWindow(QMainWindow):
             self.audio_engine.clear_audiopath()
             logger.info("Output disconnected - playback stopped")
 
-        # Automatically recompile patch to update visual feedback (knob states, etc.)
-        # This ensures that knobs re-enable immediately when CV inputs are disconnected
-        logger.info("Cable disconnected - auto-recompiling patch to update UI state")
-        self._compile_patch()
+        # Automatically recompile patch to update audio chain
+        # Even if compilation fails, UI was already updated above
+        logger.info("Cable disconnected - auto-recompiling patch to update audio chain")
+
+        try:
+            self._compile_patch()
+        except Exception as e:
+            logger.error(f"Compilation failed after cable disconnect: {e}")
+            # UI state was already updated, so this is acceptable
 
     def _on_module_deleted(self, module):
         """Handle module deletion.

@@ -1,18 +1,20 @@
-from typing import Any
+import logging
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from src.engine import ModulatedPanner, Panner
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
-from src.gui.widgets import Knob
-from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.module_registry import register_module
+from src.gui.modules.modulated_base import ModulatedModuleBase
+from src.gui.widgets import Knob
+
+logger = logging.getLogger(__name__)
 
 
 @register_module()
-class PannerModule(ModuleWidget):
-    """Panner module for stereo positioning."""
+class PannerModule(ModulatedModuleBase):
+    """Panner module for stereo positioning with modulation support."""
 
     metadata = ModuleMetadata(
         title="Panner (Mod)",
@@ -50,35 +52,20 @@ class PannerModule(ModuleWidget):
         # Register parameters for automatic get/set
         self.register_parameter("position", self.pan_knob)
 
-        self.modulator_component = None
-
-        self.component = self.create_engine_component()
+        # Set control_knob for base class functionality
+        self.control_knob = self.pan_knob
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
         """Panner requires the In port to be connected."""
         return ["In"]
 
-    def get_modulation_inputs(self) -> list[str]:
-        """Panner can optionally use Mod port for modulation."""
-        return ["Mod"]
+    # Implement abstract methods from ModulatedModuleBase
+    def create_modulated_component(self, mod_comp):
+        """Create ModulatedPanner with modulation."""
+        return ModulatedPanner(mod_comp)
 
-    def create_engine_component(
-        self,
-        input_components: list[Any] | None = None,
-        modulation_components: dict[str, Any] | None = None,
-    ):
-        """Create the panner component."""
-        pan = self.pan_knob.get_value()
-
-        # Check if modulation is provided
-        mod_comp = None
-        if modulation_components and "Mod" in modulation_components:
-            mod_comp = modulation_components["Mod"]
-        elif self.modulator_component:
-            mod_comp = self.modulator_component
-
-        if mod_comp:
-            return ModulatedPanner(mod_comp)
-
-        return Panner(pan)
+    def create_unmodulated_component(self):
+        """Create simple Panner without modulation."""
+        position = self.pan_knob.get_value()
+        return Panner(position)

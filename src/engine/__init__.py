@@ -115,6 +115,7 @@ from src.engine.modifier import (
     Frequency,
     ModulatedFrequency,
     Clipper,
+    ModulatedClipper,
 )
 
 # Modulated Oscillator
@@ -185,6 +186,7 @@ __all__ = [
     "Frequency",
     "ModulatedFrequency",
     "Clipper",
+    "ModulatedClipper",
     # Filters
     "butter",
     "apply_filter",

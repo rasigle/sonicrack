@@ -46,6 +46,11 @@ class PatchCompiler:
         self._build_cache = {}
         self._module_to_component = {}
 
+        # Log all connections for debugging
+        logger.info(f"Patch set with {len(connections)} connections:")
+        for start_port, end_port in connections:
+            logger.info(f"  {start_port.parent_module.metadata.title}.{start_port.port_name} → {end_port.parent_module.metadata.title}.{end_port.port_name}")
+
     def compile(self) -> AudioComponent | None:
         """Compile the patch into an audio component.
 
@@ -250,17 +255,24 @@ class PatchCompiler:
 
         for mod_port_name in module.get_modulation_inputs():
             mod_port = self._find_port_by_name(module, mod_port_name)
+            logger.debug(f"Looking for modulation on port '{mod_port_name}': port={mod_port}")
             if mod_port:
                 mod_conn = self._find_connection_to_port(mod_port)
+                logger.debug(f"  Found connection: {mod_conn}")
                 if mod_conn:
+                    logger.debug(f"  Connection source module: {mod_conn.parent_module.metadata.title if mod_conn.parent_module else 'None'}")
                     mod_component = self._build_component_from_port(mod_conn)
                     if mod_component:
                         modulation_components[mod_port_name] = mod_component
+                        logger.info(f"  Collected modulation '{mod_port_name}': {type(mod_component).__name__} (id={id(mod_component)})")
+                else:
+                    logger.debug(f"  No connection found for port '{mod_port_name}'")
 
         return modulation_components
 
     # === Category-Specific Builders ===
-    def _build_source_module(self, module: AudioModule) -> AudioComponent | None:
+    @staticmethod
+    def _build_source_module(module: AudioModule) -> AudioComponent | None:
         """Build SOURCE module (oscillators, LFOs, envelopes without CV inputs).
 
         Args:

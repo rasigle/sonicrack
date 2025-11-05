@@ -284,14 +284,10 @@ class Cable(QGraphicsItem):
 
     def _on_delete_requested(self):
         """Handle delete request from context menu."""
-        # Emit disconnection signal if we're in a PatchCanvas
+        # Use centralized delete method
         if self.scene() and isinstance(self.scene().parent(), PatchCanvas):
             canvas = self.scene().parent()
-            if self.start_port and self.end_port:
-                canvas.cable_disconnected.emit(self.start_port, self.end_port)
-
-        # Remove the cable
-        self.remove()
+            canvas.delete_cable(self, emit_signal=True)
 
 
 class PatchCanvas(QGraphicsView):
@@ -467,9 +463,7 @@ class PatchCanvas(QGraphicsView):
             # Delete selected cables
             for item in selected_items:
                 if isinstance(item, Cable):
-                    if item.start_port and item.end_port:
-                        self.cable_disconnected.emit(item.start_port, item.end_port)
-                    item.remove()
+                    self.delete_cable(item, emit_signal=True)
 
             # Delete selected modules (and their connected cables)
             from src.gui.widgets.module_widget import ModuleWidget
@@ -482,11 +476,7 @@ class PatchCanvas(QGraphicsView):
                         cables_to_remove.extend(port.cables[:])  # Copy list
 
                     for cable in cables_to_remove:
-                        if cable.start_port and cable.end_port:
-                            self.cable_disconnected.emit(
-                                cable.start_port, cable.end_port
-                            )
-                        cable.remove()
+                        self.delete_cable(cable, emit_signal=True)
 
                     # Emit signal that module is being deleted
                     self.module_deleted.emit(item)
@@ -513,6 +503,34 @@ class PatchCanvas(QGraphicsView):
             # Place at center of view
             center = self.mapToScene(self.viewport().rect().center())
             module.setPos(center)
+
+    def delete_cable(self, cable: Cable, emit_signal: bool = True):
+        """Delete a cable and optionally emit the disconnection signal.
+
+        This is the single centralized method for cable deletion to ensure
+        consistent behavior: always remove from scene BEFORE emitting signal.
+        This ensures that when the patch recompiles, get_connections() won't
+        find the deleted cable.
+
+        Args:
+            cable: The cable to delete
+            emit_signal: Whether to emit cable_disconnected signal (default True)
+        """
+        if not cable:
+            return
+
+        # Store port references before removing
+        start_port = cable.start_port
+        end_port = cable.end_port
+
+        # Remove cable from scene FIRST (before signal)
+        # This is critical: if we emit the signal first, the recompilation
+        # will still see this cable in get_connections()
+        cable.remove()
+
+        # Emit disconnection signal AFTER removal
+        if emit_signal and start_port and end_port:
+            self.cable_disconnected.emit(start_port, end_port)
 
     def create_connection(self, start_port: Port, end_port: Port) -> Cable | None:
         """Create a cable connection between two ports.

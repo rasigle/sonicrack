@@ -66,7 +66,7 @@ def test_volume_smoothing():
     samples = np.ones(1000) * 0.5
 
     # Apply volume at 1.0
-    result1 = vol.scale_vectorized(samples[:100])
+    result1 = vol._scale_vectorized(samples[:100])
     assert np.allclose(result1, 0.5)
 
     # Change volume (should trigger smoothing)
@@ -77,7 +77,7 @@ def test_volume_smoothing():
     assert vol._target_amplitude != vol._current_amplitude
 
     # Generate samples - should smooth
-    result2 = vol.scale_vectorized(samples[100:541])
+    result2 = vol._scale_vectorized(samples[100:541])
 
     # Verify smooth transition (not instant jump)
     assert abs(result2[0] - result1[-1]) < 0.1  # Smooth start
@@ -95,7 +95,7 @@ def test_volume_gain_db_smoothing():
     samples = np.ones(1000) * 0.5
 
     # Apply at 0 dB
-    result1 = vol.scale_vectorized(samples[:100])
+    result1 = vol._scale_vectorized(samples[:100])
     assert np.allclose(result1, 0.5)
 
     # Change to -12 dB (0.25 linear)
@@ -105,7 +105,7 @@ def test_volume_gain_db_smoothing():
     assert vol._smoothing_samples_remaining > 0
 
     # Generate with smoothing
-    result2 = vol.scale_vectorized(samples[100:541])
+    result2 = vol._scale_vectorized(samples[100:541])
 
     # Smooth transition
     assert abs(result2[0] - result1[-1]) < 0.1

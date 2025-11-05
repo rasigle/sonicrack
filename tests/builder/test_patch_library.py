@@ -48,7 +48,7 @@ class TestPresetSaveLoad(unittest.TestCase):
                 .adsr(0.1, 0.2, 0.7, 0.3)
                 .volume(0.6)
                 .panner(-0.5)
-                .clipper((-0.8, 0.8))
+                .volume((-0.8, 0.8))
             )
 
             builder.save_preset(filepath)

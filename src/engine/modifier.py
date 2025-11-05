@@ -27,6 +27,7 @@ Note:
     Modifiers are designed to be used with the Chain composer but can also
     be used standalone by calling them directly with signal values.
 """
+from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Iterable
@@ -36,9 +37,87 @@ import numpy as np
 
 from src.engine.audio_component import AudioComponent, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
+from src.engine.oscillator import _derive_amplitude_from_init
 from src.utils.logging_config import get_engine_logger
+from src.utils.math import linear_to_db, db_to_linear
+from src.utils.utils import track_provided_args
 
 logger = get_engine_logger("modifier")
+
+
+def _validate_modulator(modulator: Any) -> None:
+    """Validate that a modulator is usable.
+
+    Args:
+        modulator: The modulator to validate.
+
+    Raises:
+        TypeError: If modulator is None or not iterable/iterator.
+    """
+    if modulator is None:
+        raise TypeError("modulator cannot be None")
+    if not hasattr(modulator, "__iter__") and not hasattr(modulator, "__next__"):
+        raise TypeError(
+            f"modulator must be iterable or have __next__, got "
+            f"{type(modulator).__name__}"
+        )
+
+
+def _get_modulation_values(
+        modulator_source: Any, modulator_iter: Any, num_samples: int
+) -> np.ndarray:
+    """Get modulation values for vectorized processing.
+
+    Tries to get samples from the modulator in the most efficient way:
+    1. Call get_samples() on the source (preferred - usually vectorized)
+    2. Call get_samples() on the iterator (if available)
+    3. Fall back to iterating manually
+
+    Args:
+        modulator_source: The original modulator source object.
+        modulator_iter: The iterator instance.
+        num_samples: Number of modulation values to retrieve.
+
+    Returns:
+        Array of modulation values.
+    """
+    # Prefer calling `get_samples` on the original source if available
+    if hasattr(modulator_source, "get_samples"):
+        return modulator_source.get_samples(
+            num_samples, reset=False, mode="vectorized"
+        )
+    elif hasattr(modulator_iter, "get_samples"):
+        # Iterator might itself expose get_samples
+        return modulator_iter.get_samples(
+            num_samples, reset=False, mode="vectorized"
+        )
+    else:
+        # Fallback to iterator if vectorization not available
+        return np.array(
+            [next(modulator_iter) for _ in range(num_samples)], dtype=np.float32
+        )
+
+
+def _get_next_modulation_value(
+        modulator_source: Any, modulator_iter: Any
+) -> tuple[float, Any]:
+    """Get the next modulation value for scalar processing.
+
+    Handles iterator exhaustion by recreating the iterator from the source.
+
+    Args:
+        modulator_source: The original modulator source object.
+        modulator_iter: The current iterator instance.
+
+    Returns:
+        Tuple of (next_value, potentially_new_iterator).
+    """
+    try:
+        return next(modulator_iter), modulator_iter
+    except StopIteration:
+        # Re-create iterator and advance
+        new_iter = iter(modulator_source)
+        return next(new_iter), new_iter
 
 
 class Modifier(AudioComponent):
@@ -46,7 +125,7 @@ class Modifier(AudioComponent):
 
     @abstractmethod
     def __call__(self, val: float | tuple[float, ...]) -> float | tuple[float, ...]:
-        """Apply modification to a value.
+        """Apply modification to a value or a bunch of values.
 
         Args:
             val: Input value (mono float or stereo tuple).
@@ -246,14 +325,7 @@ class ModulatedPanner(Panner):
         Raises:
             TypeError: If modulator is None or not iterable.
         """
-        # Input validation
-        if modulator is None:
-            raise TypeError("modulator cannot be None")
-        if not hasattr(modulator, "__iter__") and not hasattr(modulator, "__next__"):
-            raise TypeError(
-                f"modulator must be iterable or have __next__, got "
-                f"{type(modulator).__name__}"
-            )
+        _validate_modulator(modulator)
 
         super().__init__(position=0.0)
 
@@ -266,7 +338,7 @@ class ModulatedPanner(Panner):
 
         logger.debug("ModulatedPanner initialized and modulator started")
 
-    def __iter__(self) -> "ModulatedPanner":
+    def __iter__(self) -> ModulatedPanner:
         """Re-initialize modulator for iteration."""
         # Re-create the iterator from the original source so iteration
         # always starts fresh. This handles both iterator and iterable
@@ -281,80 +353,58 @@ class ModulatedPanner(Panner):
             Current pan position.
         """
         # Property setter handles clipping, no need to clip here
-        mod_value = next(self.modulator)
-        self.position = mod_value  # Setter clips and updates gains
+        self.position = next(self.modulator)  # Setter clips and updates gains
         return self.position
 
     def __call__(
         self, val: float | np.ndarray
     ) -> tuple[float, float] | tuple[np.ndarray, np.ndarray]:
-        """Advance scalar modulators and produce a panned value.
+        """Apply modulated panning to input value(s).
 
-        For scalar calls (single sample), advance the internal iterator once so
-        calling `panner(sample)` advances modulation implicitly. For array
-        inputs, fall back to vectorized path which reads the required number
-        of modulation values.
+        For scalar inputs, advances the modulator once and applies panning.
+        For array inputs, uses vectorized processing for optimal performance.
+
+        Args:
+            val: Mono input value or array.
+
+        Returns:
+            Tuple of (left, right) stereo values or arrays.
         """
-        # Array path: delegate to pan_vectorized which handles vectorized mods
         if isinstance(val, np.ndarray):
-            return self.pan_vectorized(val)
+            # Vectorized path: process entire array at once
+            mod_values = self._get_modulation_values(len(val))
+            return _apply_vectorized_panning(val, mod_values)
 
         # Scalar path: advance modulator once and update position
-        try:
-            mod_value = next(self.modulator)
-        except StopIteration:
-            # Re-create iterator and advance
-            self.modulator = iter(self._modulator_source)
-            mod_value = next(self.modulator)
+        mod_value = self._get_next_modulation_value()
         self.position = mod_value
         return super().__call__(val)
 
-    def pan_vectorized(self, samples: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """Apply modulated panning to an array of samples (fully vectorized).
-
-        Args:
-            samples: Mono input array.
-            (num_samples is computed internally as len(samples)).
+    def _get_next_modulation_value(self) -> float:
+        """Get the next modulation value for scalar processing.
 
         Returns:
-            Tuple of (left, right) stereo arrays.
+            Next modulation value.
         """
-        num_samples = len(samples)
+        value, self.modulator = _get_next_modulation_value(
+            self._modulator_source, self.modulator
+        )
+        return value
 
-        # Get modulation values vectorized (50-100x faster than loop!).
-        # Prefer calling `get_samples` on the original source if available
-        # (many modulators implement a high-performance `get_samples`). If not,
-        # fall back to iterating the iterator instance.
-        if hasattr(self._modulator_source, "get_samples"):
-            mod_values = self._modulator_source.get_samples(
-                num_samples, reset=False, mode="vectorized"
-            )
-        elif hasattr(self.modulator, "get_samples"):
-            # iterator might itself expose get_samples
-            mod_values = self.modulator.get_samples(
-                num_samples, reset=False, mode="vectorized"
-            )
-        else:
-            # Fallback to iterator if vectorization not available
-            mod_values = np.array(
-                [next(self.modulator) for _ in range(num_samples)], dtype=np.float32
-            )
+    def _get_modulation_values(self, num_samples: int) -> np.ndarray:
+        """Get modulation values for vectorized processing.
 
-        # Clip to valid range
-        mod_values = np.clip(mod_values, -1.0, 1.0)
+        Args:
+            num_samples: Number of modulation values to retrieve.
 
-        # Convert to angles [0, π/2] - fully vectorized
-        angles = (mod_values + 1.0) * np.pi / 4.0
-
-        # Calculate gains - vectorized
-        left_gains = np.cos(angles)
-        right_gains = np.sin(angles)
-
-        # Apply gains - vectorized
-        left = left_gains * samples
-        right = right_gains * samples
-
-        return left.astype(np.float32), right.astype(np.float32)
+        Returns:
+            Array of modulation values, clipped to [-1, 1].
+        """
+        mod_values = _get_modulation_values(
+            self._modulator_source, self.modulator, num_samples
+        )
+        # Clip to valid range for panning
+        return np.clip(mod_values, -1.0, 1.0)
 
 
 @register_component()
@@ -386,10 +436,6 @@ class Volume(Modifier):
         gain_db: Gain in decibels. Default: None (uses amplitude)
             Overrides amplitude if provided.
 
-    Attributes:
-        amplitude: Current amplitude multiplier (settable).
-        gain_db: Current gain in dB (settable).
-
     Example:
         >>> # Using dB control (recommended for audio)
         >>> vol = Volume(gain_db=-6)  # -6 dB reduction
@@ -409,6 +455,7 @@ class Volume(Modifier):
         tags=["modifier", "gain_db", "volume", "amplitude", "gain", "db"],
     )
 
+    @track_provided_args
     def __init__(self, amplitude: float = 1.0, gain_db: float | None = None) -> None:
         """Initialize volume modifier.
 
@@ -422,27 +469,9 @@ class Volume(Modifier):
             TypeError: If amplitude is not a number.
             ValueError: If amplitude is negative.
         """
-        # Handle amplitude vs gain_db priority
-        if gain_db is not None:
-            self._amplitude = self.db_to_linear(gain_db)
-            # Warn if amplitude doesn't match gain_db
-            if amplitude != 1.0:  # Only warn if user explicitly set amplitude
-                expected_amp = self.db_to_linear(gain_db)
-                if abs(amplitude - expected_amp) > 0.01:
-                    logger.warning(
-                        f"Both gain_db={gain_db} and amplitude={amplitude} specified. "
-                        f"Using gain_db ({gain_db} dB = {expected_amp:.3f} linear). "
-                        f"To use amplitude, set gain_db=None."
-                    )
-        else:
-            # Input validation for amplitude
-            if not isinstance(amplitude, (int, float, np.number)):
-                raise TypeError(
-                    f"amplitude must be a number, got {type(amplitude).__name__}"
-                )
-            if amplitude < 0:
-                raise ValueError(f"amplitude must be non-negative, got {amplitude}")
-            self._amplitude = float(amplitude)
+        self._amplitude = _derive_amplitude_from_init(
+            self._provided_args, amplitude, gain_db  # noqa
+        )
 
         # Amplitude smoothing to prevent clicks when changing gain
         self._target_amplitude = self._amplitude
@@ -451,32 +480,6 @@ class Volume(Modifier):
         self._smoothing_duration_samples = 441  # 10ms at 44.1kHz
 
         logger.debug(f"Volume initialized with amplitude: {self._amplitude}")
-
-    @staticmethod
-    def db_to_linear(db: float) -> float:
-        """Convert decibels to linear amplitude.
-
-        Args:
-            db: Gain in decibels
-
-        Returns:
-            Linear amplitude
-        """
-        return 10 ** (db / 20.0)
-
-    @staticmethod
-    def linear_to_db(linear: float) -> float:
-        """Convert linear amplitude to decibels.
-
-        Args:
-            linear: Linear amplitude (must be > 0)
-
-        Returns:
-            Gain in decibels (-inf for zero)
-        """
-        if linear <= 0:
-            return float("-inf")
-        return 20 * np.log10(linear)
 
     @property
     def amplitude(self) -> float:
@@ -505,11 +508,11 @@ class Volume(Modifier):
             -20 dB = 1/10 amplitude
             -∞ dB = silence
         """
-        return self.linear_to_db(self._amplitude)
+        return linear_to_db(self._amplitude)
 
     @gain_db.setter
     def gain_db(self, value: float):
-        new_amplitude = self.db_to_linear(value)
+        new_amplitude = db_to_linear(value)
         # Initiate smooth transition (prevents clicks)
         self._target_amplitude = new_amplitude
         self._smoothing_samples_remaining = self._smoothing_duration_samples
@@ -546,7 +549,7 @@ class Volume(Modifier):
             f"Got {type(val)}"
         )
 
-    def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
+    def _scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
         """Apply volume scaling to array of samples (vectorized).
 
         Args:
@@ -608,12 +611,13 @@ class ModulatedVolume(Volume):
             Examples: LFO for tremolo, ADSR for envelope shaping.
 
     Example:
+        >>> from engine import SineOscillator, ADSREnvelope
         >>> # Tremolo effect with LFO
         >>> lfo = SineOscillator(frequency=5, amplitude=0.5, gain_db=None)
         >>> tremolo = ModulatedVolume(lfo)
         >>>
         >>> # Envelope shaping
-        >>> env = ADSR(attack=0.1, decay=0.2, sustain=0.7, release=0.3)
+        >>> env = ADSREnvelope(attack=0.1, decay=0.2, sustain=0.7, release=0.3)
         >>> shaped = ModulatedVolume(env)
     """
 
@@ -625,76 +629,144 @@ class ModulatedVolume(Volume):
         tags=["modifier", "volume", "amplitude", "modulation", "tremolo", "envelope"],
     )
 
-    def __init__(self, modulator):
+    def __init__(self, modulator, modulation_target: str = "amplitude"):
         """Initialize modulated volume.
 
         Args:
             modulator: Any kind of generator that returns a value within the range
-                of [0, max_amp] this is used to set the `amp` value directly.
+                of [0, max_amp] for amplitude or dB range for gain_db.
                 If max_amp is > 1 then the amplitude of the input will increase.
+            modulation_target: What to modulate - either "amplitude" or "gain_db".
+                - "amplitude": Modulator output directly sets linear amplitude (default)
+                - "gain_db": Modulator output sets gain in decibels
+                Defaults to "amplitude".
 
         Raises:
             TypeError: If modulator is None or not iterable.
+            ValueError: If modulation_target is not "amplitude" or "gain_db".
         """
-        if modulator is None:
-            raise TypeError("modulator cannot be None")
-        if not hasattr(modulator, "__iter__") and not hasattr(modulator, "__next__"):
-            raise TypeError(
-                f"modulator must be iterable or have __next__, "
-                f"got {type(modulator).__name__}"
+        _validate_modulator(modulator)
+
+        # Validate modulation_target
+        if modulation_target not in ("amplitude", "gain_db"):
+            raise ValueError(
+                f"modulation_target must be 'amplitude' or 'gain_db', "
+                f"got '{modulation_target}'"
             )
 
         super().__init__(0.0)
-        self.modulator = modulator
 
-        # Auto-initialize the modulator to avoid common errors
-        iter(self.modulator)
-        logger.debug("ModulatedVolume initialized and modulator started")
+        # Keep the original modulator object (source) so we can re-create
+        # fresh iterators when needed. Also keep an iterator instance.
+        self._modulator_source = modulator
+        self.modulator = iter(self._modulator_source)
+        self._modulation_target = modulation_target
+
+        logger.debug(
+            f"ModulatedVolume initialized with modulation_target={modulation_target}"
+        )
 
     def __iter__(self):
         """Re-initialize modulator for iteration."""
-        iter(self.modulator)
+        # Re-create the iterator from the original source
+        self.modulator = iter(self._modulator_source)
         return self
 
     def __next__(self):
-        self.amplitude = next(self.modulator)
+        """Get next modulated value and update volume.
+
+        Returns:
+            Current amplitude (always returns linear amplitude regardless of target).
+        """
+        mod_value = next(self.modulator)
+        if self._modulation_target == "gain_db":
+            self.gain_db = mod_value
+        else:
+            self.amplitude = mod_value
         return self.amplitude
 
     def trigger_release(self):
+        """Trigger release on modulator if supported."""
         if hasattr(self.modulator, "trigger_release"):
             self.modulator.trigger_release()
 
     @property
     def ended(self):
-        if hasattr(self.modulator, "ended"):
-            return self.modulator.ended
+        """Check if modulator has ended."""
+        if hasattr(self._modulator_source, "ended"):
+            return self._modulator_source.ended
         return False
 
-    def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
-        """Apply modulated volume scaling to array of samples (vectorized).
+    def __call__(
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
+        """Apply modulated volume to input value(s).
+
+        For scalar inputs, advances the modulator once and applies volume.
+        For array inputs, uses vectorized processing for optimal performance.
 
         Args:
-            samples: Input array.
+            val: Input value (mono float, stereo tuple, or array).
 
         Returns:
-            Scaled array (float32) with time-varying amplitude.
-
-        Note:
-            This enables true vectorization in Chain, avoiding the iterator fallback.
+            Volume-scaled value (same type as input).
         """
-        n = len(samples)
+        if isinstance(val, np.ndarray):
+            # Vectorized path: process entire array at once (50-100x faster)
+            mod_values = self._get_modulation_values(len(val))
+            return self._apply_vectorized_volume(val, mod_values)
 
-        # Get modulation values for all samples (vectorized)
-        if hasattr(self.modulator, "get_samples"):
-            mod_values = self.modulator.get_samples(n, reset=False, mode="vectorized")
+        # Scalar path: advance modulator once and update amplitude or gain_db
+        mod_value = self._get_next_modulation_value()
+        if self._modulation_target == "gain_db":
+            self.gain_db = mod_value
         else:
-            # Fallback to iterator if modulator doesn't have get_samples
-            mod_values = np.array(
-                [next(self.modulator) for _ in range(n)], dtype=np.float32
-            )
+            self.amplitude = mod_value
+        return super().__call__(val)
 
-        # Apply time-varying amplitude
-        return (samples * mod_values).astype(np.float32)
+    def _get_modulation_values(self, num_samples: int) -> np.ndarray:
+        """Get modulation values for vectorized processing.
+
+        Args:
+            num_samples: Number of modulation values to retrieve.
+
+        Returns:
+            Array of modulation (amplitude) values.
+        """
+        return _get_modulation_values(
+            self._modulator_source, self.modulator, num_samples
+        )
+
+    def _apply_vectorized_volume(
+        self, samples: np.ndarray, mod_values: np.ndarray
+    ) -> np.ndarray:
+        """Apply time-varying volume using vectorized operations.
+
+        Args:
+            samples: Input samples.
+            mod_values: Modulation values (amplitude or gain_db depending on target).
+
+        Returns:
+            Volume-modulated samples.
+        """
+        if self._modulation_target == "gain_db":
+            # Convert dB values to linear amplitude
+            amplitude_values = db_to_linear(mod_values)
+            return (samples * amplitude_values).astype(np.float32)
+        else:
+            # Direct amplitude modulation
+            return (samples * mod_values).astype(np.float32)
+
+    def _get_next_modulation_value(self) -> float:
+        """Get the next modulation value for scalar processing.
+
+        Returns:
+            Next amplitude value.
+        """
+        value, self.modulator = _get_next_modulation_value(
+            self._modulator_source, self.modulator
+        )
+        return value
 
 
 @register_component()
@@ -801,24 +873,16 @@ class ModulatedFrequency(Frequency):
         Raises:
             TypeError: If modulator is None or not iterable.
         """
-        # Input validation
-        if modulator is None:
-            raise TypeError("modulator cannot be None")
-        if not hasattr(modulator, "__iter__") and not hasattr(modulator, "__next__"):
-            raise TypeError(
-                f"modulator must be iterable or have __next__, got "
-                f"{type(modulator).__name__}"
-            )
+        _validate_modulator(modulator)
 
         super().__init__(1.0)
-        self.modulator = modulator
-        # Auto-initialize the modulator to avoid common errors
-        iter(self.modulator)
+        self._modulator_source = modulator
+        self.modulator = iter(self._modulator_source)
         logger.debug("ModulatedFrequency initialized and modulator started")
 
     def __iter__(self):
         """Re-initialize modulator for iteration."""
-        iter(self.modulator)
+        self.modulator = iter(self._modulator_source)
         return self
 
     def __next__(self):
@@ -848,15 +912,8 @@ class ModulatedFrequency(Frequency):
             This enables true vectorization in Chain, avoiding the iterator fallback.
         """
         n = len(samples)
-
-        # Get modulation values for all samples (vectorized)
-        if hasattr(self.modulator, "get_samples"):
-            mod_values = self.modulator.get_samples(n, reset=False, mode="vectorized")
-        else:
-            # Fallback to iterator if modulator doesn't have get_samples
-            mod_values = np.array(
-                [next(self.modulator) for _ in range(n)], dtype=np.float32
-            )
+        # Get modulation values using shared helper
+        mod_values = _get_modulation_values(self._modulator_source, self.modulator, n)
 
         # Apply time-varying frequency multiplier
         return (samples * mod_values).astype(np.float32)
@@ -959,3 +1016,29 @@ class Clipper(Modifier):
             Clipped array (float32).
         """
         return np.clip(samples, self._min, self._max).astype(np.float32)
+
+
+def _apply_vectorized_panning(
+        samples: np.ndarray, mod_values: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply constant-power panning using vectorized operations.
+
+    Args:
+        samples: Mono input samples.
+        mod_values: Pan positions in range [-1, 1].
+
+    Returns:
+        Tuple of (left, right) stereo arrays.
+    """
+    # Convert to angles [0, π/2] - fully vectorized
+    angles = (mod_values + 1.0) * np.pi / 4.0
+
+    # Calculate gains using constant-power panning law
+    left_gains = np.cos(angles)
+    right_gains = np.sin(angles)
+
+    # Apply gains
+    left = left_gains * samples
+    right = right_gains * samples
+
+    return left.astype(np.float32), right.astype(np.float32)

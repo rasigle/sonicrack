@@ -142,7 +142,9 @@ class Oscillator(Generator):
         self._phase = phase
         self._sample_rate = sample_rate
         self._wave_range = wave_range
-        self._initial_amp = self._derive_amplitude_from_init(amplitude, gain_db)
+        self._initial_amp = _derive_amplitude_from_init(
+            self._provided_args, amplitude, gain_db  # noqa
+        )
 
         self._i = 0
         self._step = 0
@@ -318,40 +320,6 @@ class Oscillator(Generator):
         This is called from `__iter__` whenever iteration is (re)initialized.
         """
         pass
-
-    def _derive_amplitude_from_init(self, amplitude: float, gain_db: float) -> float:
-        """
-        Determines the linear amplitude based on __init__ parameters.
-        Priority:
-        1. `gain_db` if it is not None.
-        2. `amplitude` if it is not None.
-        3. Default to `gain_db`'s default value.
-        A warning is issued if both are provided and they conflict.
-        """
-        gain_db_set = "gain_db" in self._provided_args  # noqa
-        amplitude_set = "amplitude" in self._provided_args  # noqa
-
-        # If gain_db is explicitly provided and is not None, it takes precedence.
-        if gain_db_set and gain_db is not None:
-            expected_amp = db_to_linear(gain_db)
-            # Warn if amplitude was also set and conflicts with gain_db's value.
-            if (
-                amplitude_set
-                and amplitude is not None
-                and not np.isclose(amplitude, expected_amp)
-            ):
-                logging.warning(
-                    f"Both gain_db={gain_db} and amplitude={amplitude} were specified. "
-                    f"Using gain_db, which results in an amplitude of {expected_amp:.3f}."
-                )
-            return expected_amp
-
-        # Otherwise, use amplitude if it was provided and is not None.
-        if amplitude_set and amplitude is not None:
-            return amplitude
-
-        # As a fallback, use the default value for gain_db.
-        return db_to_linear(gain_db)
 
     def __next__(self):
         """Return the next sample from the oscillator.
@@ -968,3 +936,38 @@ def synth(
         raise ValueError(f"Unsupported waveform type: {stype}")
 
     return osc.get_samples(n_samples, mode=mode)
+
+
+def _derive_amplitude_from_init(given_args, amplitude: float, gain_db: float) -> float:
+    """
+    Determines the linear amplitude based on __init__ parameters.
+    Priority:
+    1. `gain_db` if it is not None.
+    2. `amplitude` if it is not None.
+    3. Default to `gain_db`'s default value.
+    A warning is issued if both are provided and they conflict.
+    """
+    gain_db_set = "gain_db" in given_args
+    amplitude_set = "amplitude" in given_args
+
+    # If gain_db is explicitly provided and is not None, it takes precedence.
+    if gain_db_set and gain_db is not None:
+        expected_amp = db_to_linear(gain_db)
+        # Warn if amplitude was also set and conflicts with gain_db's value.
+        if (
+            amplitude_set
+            and amplitude is not None
+            and not np.isclose(amplitude, expected_amp)
+        ):
+            logging.warning(
+                f"Both gain_db={gain_db} and amplitude={amplitude} were specified. "
+                f"Using gain_db, which results in an amplitude of {expected_amp:.3f}."
+            )
+        return expected_amp
+
+    # Otherwise, use amplitude if it was provided and is not None.
+    if amplitude_set and amplitude is not None:
+        return amplitude
+
+    # As a fallback, use the default value for gain_db.
+    return db_to_linear(gain_db)

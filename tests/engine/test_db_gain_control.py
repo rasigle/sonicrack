@@ -168,7 +168,7 @@ class TestVolumeDBControl:
         """Test Volume vectorized scaling with dB."""
         vol = Volume(gain_db=-20)  # 0.1 amplitude
         samples = np.ones(100)
-        result = vol.scale_vectorized(samples)
+        result = vol._scale_vectorized(samples)
         assert np.all(result == pytest.approx(0.1))
 
     def test_volume_warning_on_mismatch(self, caplog):

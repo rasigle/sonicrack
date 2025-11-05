@@ -3,16 +3,16 @@
 import numpy as np
 
 
-def db_to_linear(db: float) -> float:
+def db_to_linear(db: float | np.ndarray) -> float | np.ndarray:
     """Convert decibels to linear amplitude.
 
     Standard audio conversion using the formula: amplitude = 10^(dB/20)
 
     Args:
-        db: Gain in decibels
+        db: Gain in decibels (scalar or array)
 
     Returns:
-        Linear amplitude
+        Linear amplitude (same type as input)
 
     Examples:
         >>> db_to_linear(0)    # 1.0 (unity gain)

@@ -95,7 +95,7 @@ def example_2_library_management():
         .sawtooth(880, amplitude=0.8, gain_db=None)  # A5
         .adsr(0.05, 0.2, 0.6, 0.3)
         .volume(0.6)
-        .clipper((-0.8, 0.8))
+        .volume((-0.8, 0.8))
     )
     library.save(lead_preset, category="leads")
     print("   ✓ Saved: Bright Lead (leads category)")
@@ -215,7 +215,7 @@ def example_5_preset_inspection():
         .adsr(0.1, 0.3, 0.6, 0.5)
         .volume(0.6)
         .panner(0.2)
-        .clipper((-0.7, 0.7))
+        .volume((-0.7, 0.7))
     )
 
     # Get full description
@@ -265,7 +265,7 @@ def example_6_metadata_and_organization():
         .sine(440, amplitude=0.75, gain_db=None)
         .adsr(0.02, 0.5, 0.3, 0.8)
         .volume(0.65)
-        .clipper((-0.85, 0.85))
+        .volume((-0.85, 0.85))
     )
 
     # Save with additional metadata
@@ -375,7 +375,7 @@ def example_8_advanced_presetes():
         .set_description("Fundamental with added harmonics")
         .sawtooth(55, amplitude=0.8, gain_db=None)  # Rich in harmonics
         .adsr(0.01, 0.15, 0.7, 0.25)
-        .clipper((-0.9, 0.9))
+        .volume((-0.9, 0.9))
         .volume(0.65)
     )
 

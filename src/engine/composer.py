@@ -219,8 +219,9 @@ class Chain(Composer):
     def get_samples_vectorized(self, n: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
         """Generate n samples using fully vectorized processing.
 
-        Applies each modifier using vectorized methods where available,
-        providing speedup over iterator approach.
+        Applies each modifier using their __call__ method, which handles
+        vectorization internally. Modifiers that return tuples (left, right)
+        are automatically detected as panners and converted to stereo arrays.
 
         Args:
             n: Number of samples to produce.
@@ -241,49 +242,31 @@ class Chain(Composer):
 
         # Apply each modifier in sequence using vectorized methods
         for modifier in self.modifiers:
-            # Check for vectorized methods first (priority order for performance)
+            # Use the modifier's __call__ method directly
+            # This works for all modifiers: Panner, ModulatedPanner, Volume, etc.
 
-            if hasattr(modifier, "pan_vectorized"):
-                # Panner/ModulatedPanner - optimized stereo panning
-                if hasattr(modifier, "__next__"):
-                    # ModulatedPanner - fully vectorized with modulation
-                    left, right = modifier.pan_vectorized(samples, n)
+            if samples.ndim == 1:
+                # Mono input - call modifier
+                result = modifier(samples)
+
+                # Check if result is stereo (tuple) - indicates panning
+                if isinstance(result, tuple) and len(result) == 2:
+                    # Panner/ModulatedPanner returned (left, right)
+                    left, right = result
+                    samples = np.column_stack((left, right))
                 else:
-                    # Static Panner - simple vectorized
-                    left, right = modifier.pan_vectorized(samples)
-                # Convert to stereo array: shape (n, 2)
-                samples = np.column_stack((left, right))
-
-            elif hasattr(modifier, "scale_vectorized"):
-                # Volume/Frequency - vectorized scaling
-                samples = modifier.scale_vectorized(samples)
-
-            elif hasattr(modifier, "clip_vectorized"):
-                # Clipper - vectorized clipping
-                samples = modifier.clip_vectorized(samples)
-
-            elif hasattr(modifier, "__call__") and not hasattr(modifier, "__next__"):
-                # Static modifier without state - can apply directly to array
-                # This handles Volume, Frequency, Clipper if they don't have vectorized
-                # methods
-                samples = modifier(samples)
-
+                    # Regular modifier (Volume, etc.) returned modified samples
+                    samples = result
             else:
-                # Modifier with state (like ModulatedVolume) - need to iterate
-                # This is rare and slower, but maintains correctness
-                result = []
-                for sample in samples:
-                    if hasattr(modifier, "__next__"):
-                        next(modifier)  # Advance modifier state
-                    result.append(modifier(sample))
-
-                # Convert result to appropriate format
-                if result and isinstance(result[0], tuple):
-                    # Stereo output
-                    samples = np.array(result, dtype=np.float32)
+                # Stereo input - apply modifier to left channel
+                # (Panners shouldn't receive stereo input, but handle gracefully)
+                result = modifier(samples[:, 0])
+                if isinstance(result, tuple) and len(result) == 2:
+                    left, right = result
+                    samples = np.column_stack((left, right))
                 else:
-                    # Mono output
-                    samples = np.array(result, dtype=np.float32)
+                    # Apply same modification to both channels
+                    samples = np.column_stack((result, modifier(samples[:, 1])))
 
         return samples.astype(np.float32)
 

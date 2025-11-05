@@ -62,7 +62,7 @@ class ButterworthFilter(Modifier):
     Example:
         >>> # Low-pass filter at 1kHz
         >>> lpf = ButterworthFilter(cutoff=1000, filter_type="low")
-        >>> filtered = lpf.scale_vectorized(audio_samples)
+        >>> filtered = lpf(audio_samples)
         >>>
         >>> # Band-pass filter 200-2000 Hz
         >>> bpf = ButterworthFilter(cutoff=(200, 2000), filter_type="band")

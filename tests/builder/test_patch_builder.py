@@ -101,7 +101,7 @@ class TestPatchBuilder(unittest.TestCase):
 
     def test_with_clip(self):
         """Test adding clipping."""
-        patch = PresetBuilder().sine(440, amplitude=2.0).clipper((-0.5, 0.5)).build()
+        patch = PresetBuilder().sine(440, amplitude=2.0).volume((-0.5, 0.5)).build()
 
         # Generate samples
         samples = patch.get_samples(1000)
@@ -133,7 +133,7 @@ class TestPatchBuilder(unittest.TestCase):
             .adsr(0.1, 0.2, 0.7, 0.3)
             .volume(0.5)
             .panner(0.0)
-            .clipper((-0.9, 0.9))
+            .volume((-0.9, 0.9))
             .build()
         )
 
@@ -379,7 +379,7 @@ class TestPatchBuilderConvenience(unittest.TestCase):
 
     def test_clear_effects(self):
         """Test clearing effects from patch."""
-        builder = PresetBuilder().sine(440).volume(0.5).panner(0.3).clipper((-0.9, 0.9))
+        builder = PresetBuilder().sine(440).volume(0.5).panner(0.3).volume((-0.9, 0.9))
 
         # Clear effects
         builder.clear_effects()

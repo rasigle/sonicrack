@@ -1,13 +1,13 @@
 from typing import Any
-import numpy as np
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.module_registry import register_module
+from src.utils.math import db_to_linear
 
 
 @register_module()
@@ -63,43 +63,10 @@ class OutputModule(ModuleWidget):
 
         self.input_component = None
 
-    @staticmethod
-    def db_to_linear(db: float) -> float:
-        """Convert decibels to linear amplitude.
-
-        Args:
-            db: Gain in decibels
-
-        Returns:
-            Linear amplitude
-
-        Examples:
-            >>> OutputModule.db_to_linear(0)    # 1.0 (unity gain)
-            >>> OutputModule.db_to_linear(-3)   # ~0.707 (safe headroom)
-            >>> OutputModule.db_to_linear(-6)   # 0.5 (half amplitude)
-            >>> OutputModule.db_to_linear(-60)  # 0.001 (very quiet)
-        """
-        return 10 ** (db / 20.0)
-
-    @staticmethod
-    def linear_to_db(linear: float) -> float:
-        """Convert linear amplitude to decibels.
-
-        Args:
-            linear: Linear amplitude (must be > 0)
-
-        Returns:
-            Gain in decibels
-        """
-        if linear <= 0:
-            return -60.0  # Silence
-        return 20 * np.log10(linear)
-
     def _on_volume_changed(self):
         """Handle volume knob changes - convert dB to linear and emit."""
         db_value = self.volume_knob.get_value()
-        linear_value = self.db_to_linear(db_value)
-        self.master_volume_changed.emit(linear_value)
+        self.master_volume_changed.emit(db_to_linear(db_value))
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -122,5 +89,4 @@ class OutputModule(ModuleWidget):
         Returns:
             Linear amplitude (0.0 to 2.0+) converted from dB.
         """
-        db_value = self.volume_knob.get_value()
-        return self.db_to_linear(db_value)
+        return db_to_linear(self.volume_knob.get_value())

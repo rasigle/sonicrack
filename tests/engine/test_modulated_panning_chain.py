@@ -17,6 +17,7 @@ class TestModulatedPanningInChain(unittest.TestCase):
         """Test that ModulatedPanner in Chain produces different L/R channels."""
         # Create chain with modulated panner
         env = ADSREnvelope(0.1, 0.1, 0.5, 0.1, sample_rate=1000)
+        env.trigger_note_on()  # Trigger envelope to produce varying values
         gen = Chain(SineOscillator(220, sample_rate=1000), ModulatedPanner(env))
 
         # Generate samples using vectorized mode
@@ -59,6 +60,7 @@ class TestModulatedPanningInChain(unittest.TestCase):
     def test_modulated_panning_iterator_mode(self):
         """Test that modulated panning also works in iterator mode."""
         env = ADSREnvelope(0.1, 0.1, 0.5, 0.1, sample_rate=1000)
+        env.trigger_note_on()  # Trigger envelope
         gen = Chain(SineOscillator(220, sample_rate=1000), ModulatedPanner(env))
 
         # Use iterator mode explicitly

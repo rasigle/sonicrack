@@ -10,7 +10,7 @@ from typing import Any
 from pathlib import Path
 from datetime import datetime
 
-from src.gui.audio_module_interface import ModuleMetadata
+from src.constants import PRESET_FILE_EXTENSION
 
 logger = logging.getLogger(__name__)
 
@@ -43,83 +43,63 @@ class PresetManager:
         self,
         modules: list[Any],
         connections: list[tuple[Any, Any]],
-        name: str,
-        author: str = "",
-        description: str = "",
-        tags: list[str] = None,
-        category: str = "User",
+        metadata: dict[str, Any],
+        file_path: str | Path | None = None,
+        save_as_library_preset: bool = False
     ) -> Path | None:
-        """Save a patch as a preset.
+        """Actually save a patch as a file.
 
         Args:
             modules: List of module widgets
             connections: List of (output_port, input_port) tuples
-            name: Preset name
-            author: Author name
-            description: Preset description
-            tags: List of tags for categorization
-            category: Category (e.g., "Bass", "Lead", "Pad", "User")
+            metadata: Preset metadata dictionary, including:
+                # name: Preset name
+                # author: Author name
+                # description: Preset description
+                # tags: List of tags for categorization
+                # category: Category (e.g., "Bass", "Lead", "Pad", "User")
+            file_path: Optional path to save preset file. If None, uses preset name.
+            save_as_library_preset: If True, saves to library presets directory
 
         Returns:
             Path to saved preset file, or None if save failed
         """
+        # Determine the actual file path
+        if save_as_library_preset:
+            # Saving to library - use preset name
+            preset_name = metadata.get("name", "unnamed_preset")
+            sanitized_name = _sanitize_filename(preset_name)
+            file_path = self.preset_directory / sanitized_name
+        else:
+            # Saving to specific path (e.g., Save Patch As)
+            if not file_path:
+                logger.error("No file path provided for save_preset")
+                return None
+            file_path = Path(file_path)
+            # Ensure extension
+            if not str(file_path).endswith(PRESET_FILE_EXTENSION):
+                file_path = Path(str(file_path) + PRESET_FILE_EXTENSION)
+
+        # Serialize the patch
+        preset_data = self._serialize_patch(modules, connections, metadata)
+
         try:
-            # Build preset data structure
-            preset_data = {
-                "metadata": {
-                    "name": name,
-                    "author": author,
-                    "description": description,
-                    "tags": tags or [],
-                    "category": category,
-                    "created": datetime.now().isoformat(),
-                    "version": "1.0",
-                },
-                "modules": [],
-                "connections": [],
-            }
-
-            # Create module ID mapping
-            module_ids = {id(module): idx for idx, module in enumerate(modules)}
-
-            # Serialize modules
-            for module_id, module in zip(module_ids.values(), modules):
-                metadata: ModuleMetadata = module.metadata
-                module_data = {
-                    "id": module_id,
-                    "type": metadata.title,
-                    "custom_name": module.custom_name,
-                    "module_category": metadata.category,
-                    "position": {"x": module.pos().x(), "y": module.pos().y()},
-                    "parameters": module.get_parameters(),
-                }
-                preset_data["modules"].append(module_data)
-
-            # Serialize connections
-            for start_port, end_port in connections:
-                connection_data = {
-                    "from_module": module_ids[id(start_port.parent_module)],
-                    "from_port": start_port.index,
-                    "to_module": module_ids[id(end_port.parent_module)],
-                    "to_port": end_port.index,
-                }
-                preset_data["connections"].append(connection_data)
+            # Ensure parent directory exists
+            file_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Save to file
-            filename = self._sanitize_filename(name) + ".json"
-            filepath = self.preset_directory / filename
-
-            with open(filepath, "w", encoding="utf-8") as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(preset_data, f, indent=2)
 
-            logger.info(f"Preset saved: {filepath}")
-            return filepath
+            logger.info(f"Preset saved successfully to: {file_path}")
+            return file_path
 
         except Exception as e:
-            logger.error(f"Failed to save preset: {e}", exc_info=True)
+            logger.error(f"Failed to save preset to {file_path}: {e}", exc_info=True)
             return None
 
-    def load_preset(self, filepath: Path) -> dict[str, Any] | None:
+    @staticmethod
+    def load_preset(filepath: Path) -> dict[str, Any] | None:
         """Load a preset from file.
 
         Args:
@@ -171,7 +151,8 @@ class PresetManager:
 
         return presets
 
-    def delete_preset(self, filepath: Path) -> bool:
+    @staticmethod
+    def delete_preset(filepath: Path) -> bool:
         """Delete a preset file.
 
         Args:
@@ -203,28 +184,65 @@ class PresetManager:
         return sorted(categories)
 
     @staticmethod
-    def _sanitize_filename(name: str) -> str:
-        """Sanitize a preset name for use as filename.
+    def _serialize_patch(
+            modules: list[Any],
+            connections: list[tuple[Any, Any]],
+            metadata: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Serialize a patch to a dictionary structure.
+
+        This is a helper method used by both save_preset and direct patch saving.
+        It serializes modules and connections without metadata.
 
         Args:
-            name: Preset name
+            modules: List of module widgets
+            connections: List of (output_port, input_port) tuples
 
         Returns:
-            Sanitized filename (without extension)
+            Dictionary containing serialized patch data
         """
-        # Replace invalid characters with underscore
-        invalid_chars = '<>:"/\\|?*'
-        for char in invalid_chars:
-            name = name.replace(char, "_")
+        # Build preset data structure
+        preset_data = {
+            "metadata": {
+                "name": metadata.get("name", "Untitled Preset"),
+                "author":  metadata.get("author", ""),
+                "description": metadata.get("description", ""),
+                "tags": metadata.get("tags", []) ,
+                "category": metadata.get("category", "User") ,
+                "created": datetime.now().isoformat(),
+                "version": "1.0",
+            },
+            "modules": [],
+            "connections": [],
+        }
 
-        # Remove leading/trailing whitespace and dots
-        name = name.strip(". ")
+        # Create module ID mapping
+        module_ids = {id(module): idx for idx, module in enumerate(modules)}
 
-        # Limit length
-        if len(name) > 100:
-            name = name[:100]
+        # Serialize modules
+        for module_id, module in zip(module_ids.values(), modules):
+            metadata = module.metadata
+            module_data = {
+                "id": module_id,
+                "type": metadata.title,
+                "custom_name": module.custom_name,
+                "module_category": metadata.category.value,  # Convert enum to string
+                "position": {"x": module.pos().x(), "y": module.pos().y()},
+                "parameters": module.get_parameters(),
+            }
+            preset_data["modules"].append(module_data)
 
-        return name if name else "unnamed_preset"
+        # Serialize connections
+        for start_port, end_port in connections:
+            connection_data = {
+                "source_module": module_ids[id(start_port.parent_module)],
+                "source_port": start_port.port_name,
+                "target_module": module_ids[id(end_port.parent_module)],
+                "target_port": end_port.port_name,
+            }
+            preset_data["connections"].append(connection_data)
+
+        return preset_data
 
     def export_preset(self, filepath: Path, export_path: Path) -> bool:
         """Export a preset to a different location.
@@ -265,3 +283,35 @@ class PresetManager:
         except Exception as e:
             logger.error(f"Failed to import preset: {e}", exc_info=True)
             return None
+
+
+
+def _sanitize_filename(name: str) -> str:
+    """Sanitize a preset name for use as filename.
+
+    Args:
+        name: Preset name (not a full path!)
+
+    Returns:
+        Sanitized filename with extension
+    """
+    if not name:
+        name = "unnamed_preset"
+
+    # Replace invalid filename characters
+    invalid_chars = '<>:"/\\|?*'
+    for char in invalid_chars:
+        name = name.replace(char, "_")
+
+    # Remove leading/trailing whitespace and dots
+    name = name.strip(". ")
+
+    # Ensure we have a valid name
+    if not name:
+        name = "unnamed_preset"
+
+    # Add extension if not present
+    if not name.lower().endswith(PRESET_FILE_EXTENSION):
+        name += PRESET_FILE_EXTENSION
+
+    return name

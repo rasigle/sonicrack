@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal
@@ -13,6 +14,8 @@ if TYPE_CHECKING:
     from src.gui.modules.output import OutputModule
     from src.gui.widgets.module_widget import ModuleWidget
 
+
+logger = logging.getLogger(__name__)
 
 class Port(QGraphicsItem):
     """A connection port on a module (input or output).
@@ -509,6 +512,38 @@ class PatchCanvas(QGraphicsView):
             # Place at center of view
             center = self.mapToScene(self.viewport().rect().center())
             module.setPos(center)
+
+    def create_connection(self, start_port: Port, end_port: Port) -> Cable | None:
+        """Create a cable connection between two ports.
+
+        This is a helper method for programmatically creating cables,
+        e.g., when loading presets or patches.
+
+        Args:
+            start_port: Output port (source)
+            end_port: Input port (destination)
+
+        Returns:
+            The created Cable object, or None if connection is invalid
+        """
+        # Validate ports
+        if start_port.port_type != "output" or end_port.port_type != "input":
+            logger.warning(f"Invalid port types for cable creation")
+            return None
+
+        # Check for self-connection
+        if start_port.parent_module == end_port.parent_module:
+            logger.warning(f"Cannot create self-connection")
+            return None
+
+        # Create and add cable
+        cable = Cable(start_port, end_port)
+        self.scene.addItem(cable)
+
+        # Emit signal
+        self.cable_connected.emit(start_port, end_port)
+
+        return cable
 
     def get_connections(self) -> list[tuple[Port, Port]]:
         """Get all cable connections in the canvas.

@@ -27,8 +27,8 @@ from src.gui.preset_manager import PresetManager
 logger = logging.getLogger(__name__)
 
 
-class PresetBrowserDialog(QDialog):
-    """Dialog for browsing and managing presets.
+class LibraryPresetBrowserDialog(QDialog):
+    """Dialog for browsing and managing library presets.
 
     Allows users to:
     - Browse available presets
@@ -333,7 +333,7 @@ class PresetBrowserDialog(QDialog):
                 QMessageBox.critical(self, "Error", "Failed to export preset.")
 
 
-class SavePresetDialog(QDialog):
+class SaveLibraryPresetDialog(QDialog):
     """Dialog for saving a preset with metadata."""
 
     def __init__(self, parent=None):

@@ -9,6 +9,7 @@ from pathlib import Path
 # Standard library paths
 RESOURCES_PATH = Path(__file__).parent.parent / "resources"
 SPLASH_PATH = Path(RESOURCES_PATH) / "splash" / "splash.png"
+PRESET_FILE_EXTENSION = ".apr"  # Audio Preset file extension
 
 # Sample rate constants
 DEFAULT_SAMPLE_RATE = 44100  # CD quality

@@ -1,8 +1,9 @@
 """Main window for the modular synthesizer."""
 
 import logging
+from pathlib import Path
 
-from PyQt6.QtCore import Qt, QTimer, QPointF
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -17,21 +18,22 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QScrollArea,
     QSplitter,
-    QDialog,
+    QDialog, QFileDialog
 )
 
+from src.constants import PRESET_FILE_EXTENSION
 from src.engine import AudioComponent
 from src.gui.audio_engine import AudioEngine
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.dialogs.about_dialog import show_about
-from src.gui.dialogs.preset_dialog import PresetBrowserDialog, SavePresetDialog
+from src.gui.dialogs.preset_library_dialog import LibraryPresetBrowserDialog, \
+    SaveLibraryPresetDialog
 from src.gui.module_registry import initialize_modules
 from src.gui.modules.output import OutputModule
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
 from src.gui.preset_manager import PresetManager
 from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH, DEBOUNCE_TIMER_DELAY_MS
-from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets.spectrum_analyzer import SpectrumAnalyzer
 from src.gui.widgets.tree_analyzer import TreeAnalyzer
 from src.gui.widgets.waveform_display import WaveformDisplay
@@ -70,6 +72,10 @@ class ModularSynthWindow(QMainWindow):
         self.audio_engine = AudioEngine()
         self.patch_compiler = PatchCompiler()
         self.preset_manager = PresetManager()
+
+        # Patch file tracking
+        self.current_patch_path = None  # Path to currently loaded patch file
+        self.patch_modified = False  # Track if patch has unsaved changes
 
         # Debounce timer for parameter changes (avoid audio spikes)
         self.compile_debounce_timer = QTimer()
@@ -244,15 +250,31 @@ class ModularSynthWindow(QMainWindow):
         new_action.triggered.connect(self._new_patch)
         file_menu.addAction(new_action)
 
+        open_patch_action = QAction("&Open Patch...", self)
+        open_patch_action.setShortcut("Ctrl+O")
+        open_patch_action.triggered.connect(self._open_patch)
+        file_menu.addAction(open_patch_action)
+
         file_menu.addSeparator()
 
-        save_preset_action = QAction("&Save Preset...", self)
-        save_preset_action.setShortcut("Ctrl+S")
-        save_preset_action.triggered.connect(self._save_preset)
+        save_patch_action = QAction("&Save Patch", self)
+        save_patch_action.setShortcut("Ctrl+S")
+        save_patch_action.triggered.connect(self._save_patch)
+        file_menu.addAction(save_patch_action)
+
+        save_patch_as_action = QAction("Save Patch &As...", self)
+        save_patch_as_action.setShortcut("Ctrl+Shift+S")
+        save_patch_as_action.triggered.connect(self._save_patch_as)
+        file_menu.addAction(save_patch_as_action)
+
+        file_menu.addSeparator()
+
+        save_preset_action = QAction("Save as Preset...", self)
+        save_preset_action.triggered.connect(self._save_as_library_preset)
         file_menu.addAction(save_preset_action)
 
         load_preset_action = QAction("&Load Preset...", self)
-        load_preset_action.setShortcut("Ctrl+O")
+        load_preset_action.setShortcut("Ctrl+Shift+O")
         load_preset_action.triggered.connect(self._load_preset)
         file_menu.addAction(load_preset_action)
 
@@ -350,6 +372,9 @@ class ModularSynthWindow(QMainWindow):
         self.patch_canvas.add_module(module_instance)
         self.statusbar.showMessage(f"Added {module_name}")
         logger.info(f"Added module: {module_name}")
+
+        # Mark patch as modified
+        self._mark_patch_modified()
 
         # Auto-compile when module is added
         self._compile_patch()
@@ -469,6 +494,8 @@ class ModularSynthWindow(QMainWindow):
     def _on_cable_connected(self, start_port, end_port):
         """Handle cable connection."""
         logger.debug(f"Cable connected: {start_port.port_name} -> {end_port.port_name}")
+        # Mark patch as modified
+        self._mark_patch_modified()
         # Auto-compile when connection changes
         self._compile_patch()
 
@@ -477,6 +504,9 @@ class ModularSynthWindow(QMainWindow):
         logger.debug(
             f"Cable disconnected: {start_port.port_name} -> {end_port.port_name}"
         )
+
+        # Mark patch as modified
+        self._mark_patch_modified()
 
         # Check if output module was disconnected
         output_module_class = self.registry.get("Output")
@@ -500,6 +530,9 @@ class ModularSynthWindow(QMainWindow):
             module: The module that was deleted
         """
         logger.info(f"Module deleted: {module.metadata.title}")
+
+        # Mark patch as modified
+        self._mark_patch_modified()
 
         # If Output module was deleted, stop playback immediately
         if module.metadata.category == ModuleCategory.OUTPUT:
@@ -525,6 +558,9 @@ class ModularSynthWindow(QMainWindow):
             value: New value
         """
         logger.debug(f"Parameter changed: {param_name} = {value}")
+
+        # Mark patch as modified
+        self._mark_patch_modified()
 
         # Find which module emitted this signal
         sender_module = self.sender()
@@ -575,18 +611,202 @@ class ModularSynthWindow(QMainWindow):
             self.waveform_display.set_samples(self.audio_engine.current_buffer)
             self.spectrum_analyzer.set_samples(self.audio_engine.current_buffer)
 
-    def _new_patch(self):
-        """Create a new patch."""
-        reply = QMessageBox.question(
+    def _update_window_title(self):
+        """Update window title to show current patch name and modified status."""
+        base_title = APP_TITLE
+
+        if self.current_patch_path:
+            patch_name = Path(self.current_patch_path).stem
+            title = f"{patch_name} - {base_title}"
+        else:
+            title = f"Untitled - {base_title}"
+
+        # Add asterisk if modified
+        if self.patch_modified:
+            title = f"*{title}"
+
+        self.setWindowTitle(title)
+
+    def _mark_patch_modified(self):
+        """Mark the patch as modified (has unsaved changes)."""
+        if not self.patch_modified:
+            self.patch_modified = True
+            self._update_window_title()
+
+    def _save_patch(self):
+        """Save the current patch into a file.
+
+        If no path exists, prompts for Save As."""
+        if self.current_patch_path:
+            # Save to existing file
+            self._do_save_patch(self.current_patch_path)
+        else:
+            # No path yet - do Save As
+            self._save_patch_as()
+
+    def _save_patch_as(self):
+        """Save the current patch with a new name."""
+        from PyQt6.QtWidgets import QFileDialog
+
+        modules = self.patch_canvas.get_modules()
+        if not modules:
+            QMessageBox.warning(
+                self,
+                "No Modules",
+                "Add some modules to the canvas before saving.",
+            )
+            return
+
+        # Default to Documents directory
+        default_dir = str(Path.home() / "Documents")
+
+        # Show file dialog with proper filter format
+        file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "New Patch",
-            "Clear the current patch?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            "Save Patch As",
+            default_dir,
+            f"Patch Files (*{PRESET_FILE_EXTENSION});;All Files (*.*)",
         )
 
-        if reply == QMessageBox.StandardButton.Yes:
+        # Check if user cancelled
+        if not file_path:
+            return
+
+        # Ensure proper extension
+        if not file_path.endswith(PRESET_FILE_EXTENSION):
+            file_path += PRESET_FILE_EXTENSION
+
+        self._do_save_patch(file_path)
+
+    def _do_save_patch(self, file_path: str):
+        """Actually save the patch to a file.
+
+        Args:
+            file_path: Path to save the patch to
+        """
+        # Validate file path
+        if not file_path:
+            logger.warning("Save cancelled - no file path provided")
+            return
+
+        modules = self.patch_canvas.get_modules()
+        connections = self.patch_canvas.get_connections()
+        metadata = {}
+
+        success = self.preset_manager.save_preset(
+            modules, connections, metadata, file_path
+        )
+
+        if not success:
+            QMessageBox.critical(
+                self,
+                "Save Error",
+                f"Failed to save patch to:\n{file_path}"
+            )
+            logger.error(f"Failed to save patch to {file_path}")
+            return
+
+        # Update state
+        self.current_patch_path = file_path
+        self.patch_modified = False
+        self._update_window_title()
+
+        self.statusbar.showMessage(f"Patch saved: {Path(file_path).name}")
+        logger.info(f"Patch saved to {file_path}")
+
+    def _open_patch(self):
+        """Open a patch file via user-dialog."""
+
+        # Check for unsaved changes
+        if self.patch_modified:
+            reply = QMessageBox.question(
+                self,
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before opening?",
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No
+                | QMessageBox.StandardButton.Cancel,
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                self._save_patch()
+            elif reply == QMessageBox.StandardButton.Cancel:
+                return
+
+        # Default to Documents directory
+        default_dir = str(Path.home() / "Documents")
+
+        # Show file dialog with proper filter format
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Patch",
+            default_dir,
+            f"Patch Files (*{PRESET_FILE_EXTENSION});;All Files (*.*)",
+        )
+
+        if file_path:
+            self._do_load_patch(file_path)
+
+    def _do_load_patch(self, file_path: str):
+        """Actually open a patch from a file.
+
+        Args:
+            file_path: Path to the patch file
+        """
+        import json
+        from pathlib import Path
+
+        try:
+            # Load patch data
+            with open(file_path, "r") as f:
+                patch_data = json.load(f)
+
+            # Clear current patch
             self._clear_canvas()
-            self.statusbar.showMessage("New patch created")
+
+            # Apply the patch
+            self._apply_preset(patch_data)
+
+            # Update state
+            self.current_patch_path = file_path
+            self.patch_modified = False
+            self._update_window_title()
+
+            self.statusbar.showMessage(f"Patch loaded: {Path(file_path).name}")
+            logger.info(f"Patch loaded from {file_path}")
+
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Open Error",
+                f"Failed to open patch:\n{str(e)}",
+            )
+            logger.error(f"Failed to open patch: {e}")
+
+    def _new_patch(self):
+        """Create a new patch."""
+        # Check for unsaved changes
+        if self.patch_modified:
+            reply = QMessageBox.question(
+                self,
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before creating a new "
+                "patch?",
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No
+                | QMessageBox.StandardButton.Cancel,
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                self._save_patch()
+            elif reply == QMessageBox.StandardButton.Cancel:
+                return
+
+        # Clear and reset
+        self._clear_canvas()
+        self.current_patch_path = None
+        self.patch_modified = False
+        self._update_window_title()
 
     def _clear_canvas(self):
         """Clear the patch canvas."""
@@ -595,16 +815,12 @@ class ModularSynthWindow(QMainWindow):
         self.patch_canvas.clear_all()
         self.waveform_display.clear()
         self.spectrum_analyzer.clear()
+        self.tree_analyzer.clear()
         self.statusbar.showMessage("Canvas cleared")
 
-    def _save_preset(self):
+    def _save_as_library_preset(self):
         """Save the current patch as a preset."""
-        # Get all modules and connections
-        modules = [
-            item
-            for item in self.patch_canvas.scene.items()
-            if isinstance(item, ModuleWidget)
-        ]
+        modules = self.patch_canvas.get_modules()
         connections = self.patch_canvas.get_connections()
 
         if not modules:
@@ -616,7 +832,7 @@ class ModularSynthWindow(QMainWindow):
             return
 
         # Show save preset dialog
-        dialog = SavePresetDialog(self)
+        dialog = SaveLibraryPresetDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             metadata = dialog.get_metadata()
 
@@ -624,11 +840,8 @@ class ModularSynthWindow(QMainWindow):
             filepath = self.preset_manager.save_preset(
                 modules=modules,
                 connections=connections,
-                name=metadata["name"],
-                author=metadata["author"],
-                description=metadata["description"],
-                tags=metadata["tags"],
-                category=metadata["category"],
+                metadata=metadata,
+                save_as_library_preset=True
             )
 
             if filepath:
@@ -642,7 +855,7 @@ class ModularSynthWindow(QMainWindow):
     def _load_preset(self):
         """Load a preset and rebuild the patch."""
         # Show preset browser dialog
-        dialog = PresetBrowserDialog(self.preset_manager, self)
+        dialog = LibraryPresetBrowserDialog(self.preset_manager, self)
         dialog.preset_selected.connect(self._apply_preset)
         dialog.exec()
 
@@ -650,86 +863,93 @@ class ModularSynthWindow(QMainWindow):
         """Apply a loaded preset to the canvas.
 
         Args:
-            preset_data: Preset data dictionary
+            preset_data: Dictionary containing preset data with 'modules' and 'connections'
         """
-        try:
-            # Stop playback first
-            self.audio_engine.stop_playback()
+        # Clear current patch
+        self.audio_engine.stop_playback()
+        self.patch_canvas.clear_all()
 
-            # Clear current patch
-            self.patch_canvas.clear_all()
+        # Rebuild modules
+        module_map = {}  # Maps old module IDs to new module instances
 
-            # Create modules
-            module_map = {}  # Maps preset module IDs to actual module instances
+        for module_data in preset_data.get("modules", []):
+            module_type = module_data.get("type")
+            module_id = module_data.get("id")
+            position = module_data.get("position", {"x": 0, "y": 0})
+            parameters = module_data.get("parameters", {})
 
-            for module_data in preset_data.get("modules", []):
-                module_type = module_data["type"]
-                module_id = module_data["id"]
+            # Get module class from registry
+            module_class = self.registry.get(module_type)
+            if not module_class:
+                logger.warning(f"Unknown module type: {module_type}")
+                continue
 
-                module_class = self.registry.get(module_type, strict=True)
+            # Create module instance
+            module_instance = module_class()
 
-                # Create module
-                module = module_class()
+            # Set parameters
+            for param_name, param_value in parameters.items():
+                if hasattr(module_instance, "set_parameter"):
+                    try:
+                        module_instance.set_parameter(param_name, param_value)
+                    except Exception as e:
+                        logger.warning(f"Failed to set parameter {param_name}: {e}")
 
-                # Connect parameter change signal
-                module.parameter_changed.connect(self._on_parameter_changed)
+            # Connect parameter change signal
+            module_instance.parameter_changed.connect(self._on_parameter_changed)
 
-                # Restore custom name if present
-                custom_name = module_data.get("custom_name", "")
-                if custom_name:
-                    module.set_custom_name(custom_name)
+            # Special handling for Output module
+            if isinstance(module_instance, OutputModule):
+                module_instance.master_volume_changed.connect(
+                    self.audio_engine.set_master_volume
+                )
+                QTimer.singleShot(0, module_instance._on_volume_changed)
 
-                # Set position
-                pos_data = module_data.get("position", {})
-                x = pos_data.get("x", 0)
-                y = pos_data.get("y", 0)
+            # Add to canvas
+            self.patch_canvas.add_module(module_instance)
 
-                # Add to canvas
-                self.patch_canvas.add_module(module, QPointF(x, y))
+            # Set position
+            module_instance.setPos(position["x"], position["y"])
 
-                # Set parameters
-                params = module_data.get("parameters", {})
-                module.set_parameters(params)
+            # Store in map
+            module_map[module_id] = module_instance
 
-                # Store in map
-                module_map[module_id] = module
+        # Rebuild connections
+        for connection_data in preset_data.get("connections", []):
+            source_id = connection_data.get("source_module")
+            source_port = connection_data.get("source_port")
+            target_id = connection_data.get("target_module")
+            target_port = connection_data.get("target_port")
 
-            # Create connections
-            for conn_data in preset_data.get("connections", []):
-                from_module_id = conn_data["from_module"]
-                from_port_idx = conn_data["from_port"]
-                to_module_id = conn_data["to_module"]
-                to_port_idx = conn_data["to_port"]
+            source_module = module_map.get(source_id)
+            target_module = module_map.get(target_id)
 
-                # Get modules
-                from_module = module_map.get(from_module_id)
-                to_module = module_map.get(to_module_id)
+            if source_module and target_module:
+                # Find the ports
+                source_port_obj = None
+                target_port_obj = None
 
-                if from_module and to_module:
-                    # Get ports
-                    if from_port_idx < len(from_module.output_ports):
-                        from_port = from_module.output_ports[from_port_idx]
+                for port in source_module.output_ports:
+                    if port.port_name == source_port:
+                        source_port_obj = port
+                        break
 
-                        if to_port_idx < len(to_module.input_ports):
-                            to_port = to_module.input_ports[to_port_idx]
+                for port in target_module.input_ports:
+                    if port.port_name == target_port:
+                        target_port_obj = port
+                        break
 
-                            # Create cable
-                            from src.gui.patch_canvas import Cable
+                if source_port_obj and target_port_obj:
+                    # Create cable connection
+                    self.patch_canvas.create_connection(source_port_obj, target_port_obj)
+                else:
+                    logger.warning(
+                        f"Could not find ports: {source_port} or {target_port}"
+                    )
 
-                            cable = Cable(from_port, to_port)
-                            self.patch_canvas.scene.addItem(cable)
-
-            # Auto-compile the loaded patch
-            self._compile_patch()
-
-            # Show success message
-            preset_name = preset_data.get("metadata", {}).get("name", "Unknown")
-            self.statusbar.showMessage(f"Loaded preset: {preset_name}")
-            logger.info(f"Preset loaded: {preset_name}")
-
-        except Exception as e:
-            logger.error(f"Failed to apply preset: {e}", exc_info=True)
-            QMessageBox.critical(self, "Error", f"Failed to load preset:\n{e}")
+        # Compile the loaded patch
+        self._compile_patch()
+        self.statusbar.showMessage("Preset loaded successfully")
 
     def closeEvent(self, event):
         """Handle window close event."""

@@ -295,11 +295,8 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_negative_amplitude(self) -> None:
         """Test oscillator with negative amplitude."""
-        osc = SineOscillator(frequency=440, amplitude=-1.0)
-        samples = osc.get_samples_vectorized(100)
-
-        # Should produce inverted waveform
-        self.assertTrue(np.all(np.abs(samples) <= 1.01))
+        with self.assertRaises(ValueError):
+            SineOscillator(frequency=440, amplitude=-1.0)
 
     def test_invalid_mode(self) -> None:
         """Test invalid mode parameter raises ValueError."""

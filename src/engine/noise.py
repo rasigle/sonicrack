@@ -65,9 +65,12 @@ Note:
 
 import numpy as np
 
+from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_GAIN_DB
 from src.engine.audio_component import Generator, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
-from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.oscillator import _derive_amplitude_from_init
+from utils.math import linear_to_db, db_to_linear
+from utils.utils import track_provided_args
 
 
 def white_noise(
@@ -731,27 +734,76 @@ class NoiseGenerator(Generator):
         tags=["oscillator", "noise", "modulation", "synthesis"],
     )
 
+    @track_provided_args
     def __init__(
         self,
         noise_type: str = "White",
         amplitude: float = 0.5,
+        gain_db: float | None = DEFAULT_GAIN_DB,
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
     ):
         """Initialize noise generator.
 
         Args:
             noise_type: Type of noise to generate
-            amplitude: Amplitude scaling factor (0.0-1.0)
+            amplitude: Amplitude scaling factor (0.0-1.0). Ignored if gain_db is specified.
+            gain_db: Gain in decibels (0 dB = no change). Overrides amplitude if provided.
             sample_rate: Sample rate in Hz
         """
         super().__init__(sample_rate)
         self.noise_type: str = noise_type
-        self.amplitude: float = amplitude
-        self._sample_rate: int | float = sample_rate
+
+        # Handle amplitude vs gain_db priority (same as oscillators)
+        self._amplitude = _derive_amplitude_from_init(
+            self._provided_args, amplitude, gain_db  # noqa
+        )
+
+        # Amplitude smoothing to prevent clicks when changing gain
+        self._target_amplitude = self._amplitude
+        self._current_amplitude = self._amplitude
+        self._smoothing_samples_remaining = 0
+        self._smoothing_duration_samples = 441  # 10ms at 44.1kHz
 
         self._buffer = None
         self._buffer_index = 0
         self._buffer_size = 1024  # Generate in chunks for efficiency
+
+    @property
+    def amplitude(self) -> float:
+        """float: Current amplitude multiplier (linear scale).
+
+        For audio work, consider using the gain_db property instead.
+        """
+        return self._amplitude
+
+    @amplitude.setter
+    def amplitude(self, value: float):
+        if value < 0:
+            raise ValueError(f"amplitude must be non-negative, got {value}")
+        # Initiate smooth transition (prevents clicks)
+        self._target_amplitude = float(value)
+        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        self._amplitude = float(value)
+
+    @property
+    def gain_db(self) -> float:
+        """float: Current gain in decibels (professional audio standard).
+
+        Common dB values:
+            0 dB = unity gain (no change)
+            -6 dB = half amplitude
+            -20 dB = 1/10 amplitude
+            -∞ dB = silence
+        """
+        return linear_to_db(self._amplitude)
+
+    @gain_db.setter
+    def gain_db(self, value: float):
+        new_amplitude = db_to_linear(value)
+        # Initiate smooth transition (prevents clicks)
+        self._target_amplitude = new_amplitude
+        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        self._amplitude = new_amplitude
 
     def __iter__(self):
         """Initialize iterator (required for iterator protocol)."""
@@ -767,7 +819,7 @@ class NoiseGenerator(Generator):
         """
         # Refill buffer if needed
         if self._buffer is None or self._buffer_index >= len(self._buffer):
-            duration = self._buffer_size / self._sample_rate
+            duration = self._buffer_size / self.sample_rate
             self._buffer = self._generate_noise(duration, self._buffer_size)
             self._buffer_index = 0
 
@@ -788,31 +840,31 @@ class NoiseGenerator(Generator):
         # Generate the appropriate noise type
         if self.noise_type == "White":
             return white_noise(
-                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
             )
         if self.noise_type == "Pink":
             return pink_noise(
-                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
             )
         if self.noise_type == "Brown":
             return brownian_noise(
-                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
             )
         if self.noise_type == "Blue":
             return blue_noise(
-                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
             )
         if self.noise_type == "Grey":
             return grey_noise(
-                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
             )
         if self.noise_type == "Velvet":
             return velvet_noise(
-                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
             )
         if self.noise_type == "Sample & Hold":
             return sample_hold_noise(
-                dur=duration, amplitude=self.amplitude, sr=self._sample_rate
+                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
             )
 
         raise ValueError(f"Unknown noise type: {self.noise_type}")
@@ -841,5 +893,5 @@ class NoiseGenerator(Generator):
         Returns:
             Array of noise samples
         """
-        duration = num_samples / self._sample_rate
+        duration = num_samples / self.sample_rate
         return self._generate_noise(duration, num_samples)

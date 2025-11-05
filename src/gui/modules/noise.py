@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QComboBox
 
+from src.constants import DEFAULT_GAIN_DB
 from src.engine.noise import NoiseGenerator
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.audio_module_interface import ModuleMetadata
@@ -61,12 +62,12 @@ class NoiseModule(ModuleWidget):
         type_layout.addWidget(self.type_combo)
         layout.addLayout(type_layout)
 
-        # Amplitude control
-        self.amp_knob = Knob("Amplitude", 0.0, 1.0, 0.5)
-        self.amp_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("amplitude", self.amp_knob.get_value())
+        # Gain in dB control (alternative to amplitude)
+        self.gain_knob = Knob("Gain (dB)", -60, 12, DEFAULT_GAIN_DB, logarithmic=False)
+        self.gain_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("gain_db", self.gain_knob.get_value())
         )
-        layout.addWidget(self.amp_knob, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.gain_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
@@ -75,7 +76,7 @@ class NoiseModule(ModuleWidget):
         self.register_parameter(
             "noise_type", self.type_combo, getter="currentText", setter="setCurrentText"
         )
-        self.register_parameter("amplitude", self.amp_knob)
+        self.register_parameter("gain_db", self.gain_knob)
 
         self.component = self.create_engine_component()
 
@@ -92,7 +93,5 @@ class NoiseModule(ModuleWidget):
     ):
         """Create the noise component."""
         noise_type = self.type_combo.currentText()
-        amp = self.amp_knob.get_value()
-
-        # Create noise generator with current settings
-        return NoiseGenerator(noise_type=noise_type, amplitude=amp)
+        gain_db = self.gain_knob.get_value()
+        return NoiseGenerator(noise_type=noise_type, gain_db=gain_db)

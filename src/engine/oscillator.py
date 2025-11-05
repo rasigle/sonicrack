@@ -947,6 +947,14 @@ def _derive_amplitude_from_init(given_args, amplitude: float, gain_db: float) ->
     3. Default to `gain_db`'s default value.
     A warning is issued if both are provided and they conflict.
     """
+    # Input validation
+    if amplitude and not isinstance(amplitude, (int, float, np.number)):
+        raise TypeError(f"Amplitude must be number, got {type(amplitude).__name__}")
+    if amplitude and amplitude < 0.0:
+        raise ValueError(f"Amplitude must be non-negative, got {amplitude}")
+    if gain_db and not isinstance(gain_db, (int, float, np.number)):
+        raise TypeError(f"Gain_db must be a number, got {type(gain_db).__name__}")
+
     gain_db_set = "gain_db" in given_args
     amplitude_set = "amplitude" in given_args
 

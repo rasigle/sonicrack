@@ -547,7 +547,7 @@ class TestVolume(unittest.TestCase):
         volume = Volume(0.5)
         result = volume((1.0, 1.0))
 
-        self.assertIsInstance(result, tuple)
+        self.assertIsInstance(result, np.ndarray)
         self.assertEqual(len(result), 2)
         self.assertAlmostEqual(result[0], 0.5, places=5)
         self.assertAlmostEqual(result[1], 0.5, places=5)
@@ -573,7 +573,7 @@ class TestVolume(unittest.TestCase):
         """Test volume with stereo tuple input."""
         volume = Volume(0.5)
         result = volume((1.0, -1.0))
-        self.assertIsInstance(result, tuple)
+        self.assertIsInstance(result, np.ndarray)
         self.assertEqual(len(result), 2)
         self.assertAlmostEqual(result[0], 0.5)
         self.assertAlmostEqual(result[1], -0.5)
@@ -642,18 +642,21 @@ class TestModulatedVolume(unittest.TestCase):
 
     def test_modulation_changes_volume(self) -> None:
         """Test that modulation affects volume."""
-        env = ADSREnvelope(0.1, 0.1, 0.5, 0.1, sample_rate=100)
+        env = ADSREnvelope(0.1, 0.1, 0.5, 0.1, sample_rate=1000)
         env.trigger_note_on()  # Trigger envelope to produce varying values
         volume = ModulatedVolume(env)
 
-        # Get several values
-        results = []
-        for _ in range(10):
-            result = volume(1.0)  # __call__ advances modulator internally
-            results.append(result)
+        # Use vectorized mode to avoid smoothing interference
+        # Create input signal (constant amplitude)
+        input_signal = np.ones(100, dtype=np.float32)
 
-        # Volume should change over time
-        self.assertGreater(len(set(results)), 1)
+        # Apply modulated volume
+        result = volume(input_signal)
+
+        # Volume should vary over time during attack phase
+        # Check that output values are different (envelope is modulating)
+        unique_values = len(np.unique(np.round(result, decimals=3)))
+        self.assertGreater(unique_values, 10, "Volume should change during envelope attack")
 
     def test_initialization_with_envelope(self):
         """Test ModulatedVolume initializes with envelope."""

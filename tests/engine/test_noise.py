@@ -418,8 +418,83 @@ class TestSampleHoldNoise(unittest.TestCase):
         np.testing.assert_array_equal(noise1, noise2)
 
 
-if __name__ == "__main__":
-    unittest.main()
+class TestNoiseGenerator(unittest.TestCase):
+    """Test suite for NoiseGenerator wrapper class."""
+
+    def test_initialization_with_amplitude(self):
+        """Test NoiseGenerator initializes with amplitude parameter."""
+        from src.engine.noise import NoiseGenerator
+
+        gen = NoiseGenerator(noise_type="White", amplitude=0.5)
+        self.assertEqual(gen.noise_type, "White")
+        self.assertEqual(gen.amplitude, 0.5)
+
+    def test_initialization_with_gain_db(self):
+        """Test NoiseGenerator initializes with gain_db parameter."""
+        from src.engine.noise import NoiseGenerator
+        from src.utils.math import db_to_linear
+
+        gen = NoiseGenerator(noise_type="Pink", gain_db=-6)
+        self.assertEqual(gen.noise_type, "Pink")
+        # -6 dB should be approximately 0.5 amplitude
+        self.assertAlmostEqual(gen.amplitude, db_to_linear(-6), places=4)
+
+    def test_gain_db_overrides_amplitude(self):
+        """Test that gain_db takes precedence over amplitude."""
+        from src.engine.noise import NoiseGenerator
+        from src.utils.math import db_to_linear
+
+        # When both are specified, gain_db should win
+        gen = NoiseGenerator(noise_type="White", amplitude=0.5, gain_db=0)
+        self.assertAlmostEqual(gen.amplitude, db_to_linear(0), places=4)
+        self.assertEqual(gen.amplitude, 1.0)
+
+    def test_default_amplitude(self):
+        """Test default amplitude is 0.5."""
+        from src.engine.noise import NoiseGenerator
+
+        gen = NoiseGenerator(noise_type="White")
+        self.assertEqual(gen.gain_db, -20)
+        self.assertEqual(gen.amplitude, 0.1)
+
+    def test_iterator_protocol(self):
+        """Test NoiseGenerator supports iterator protocol."""
+        from src.engine.noise import NoiseGenerator
+
+        gen = NoiseGenerator(noise_type="White", amplitude=1.0)
+        gen_iter = iter(gen)
+
+        # Get a sample
+        sample = next(gen_iter)
+        self.assertIsInstance(sample, float)
+
+    def test_get_samples(self):
+        """Test NoiseGenerator.get_samples() method."""
+        from src.engine.noise import NoiseGenerator
+
+        gen = NoiseGenerator(noise_type="White", amplitude=1.0, sample_rate=1000)
+        samples = gen.get_samples(100)
+
+        self.assertEqual(len(samples), 100)
+        self.assertIsInstance(samples, np.ndarray)
+
+    def test_gain_db_affects_output_level(self):
+        """Test that gain_db affects the output amplitude."""
+        from src.engine.noise import NoiseGenerator
+
+        gen1 = NoiseGenerator(noise_type="White", gain_db=-20, sample_rate=1000)
+        gen2 = NoiseGenerator(noise_type="White", gain_db=0, sample_rate=1000)
+
+        samples1 = gen1.get_samples(1000)
+        samples2 = gen2.get_samples(1000)
+
+        # 0 dB should be louder than -20 dB
+        self.assertGreater(np.std(samples2), np.std(samples1))
+
+        # -20 dB is 0.1 amplitude, 0 dB is 1.0 amplitude
+        # Ratio should be approximately 10:1
+        ratio = np.std(samples2) / np.std(samples1)
+        self.assertAlmostEqual(ratio, 10.0, delta=1.0)
 
 
 if __name__ == "__main__":

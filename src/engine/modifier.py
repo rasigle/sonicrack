@@ -469,14 +469,6 @@ class Volume(Modifier):
             TypeError: If amplitude is not a number.
             ValueError: If amplitude is negative.
         """
-        # Input validation
-        if amplitude and not isinstance(amplitude, (int, float, np.number)):
-            raise TypeError(f"Amplitude must be number, got {type(amplitude).__name__}")
-        if amplitude and amplitude < 0.0:
-            raise ValueError(f"Amplitude must be non-negative, got {amplitude}")
-        if gain_db and not isinstance(gain_db, (int, float, np.number)):
-            raise TypeError(f"Gain_db must be a number, got {type(gain_db).__name__}")
-
         self._amplitude = _derive_amplitude_from_init(
             self._provided_args, amplitude, gain_db  # noqa
         )
@@ -540,16 +532,33 @@ class Volume(Modifier):
         Raises:
             TypeError: If input is not int, float, numpy array, or Iterable.
         """
-        # Optimize: check array first (most common in vectorized code)
-        if isinstance(val, np.ndarray):
-            return val * self._amplitude
+        # Scalar input
+        if isinstance(val, float | int | np.number):
+            # Apply amplitude with smoothing if transitioning (prevents clicks!)
+            if self._smoothing_samples_remaining > 0:
+                # Create smooth amplitude envelope (linear ramp)
+                amp_envelope = np.linspace(
+                    self._current_amplitude,
+                    self._target_amplitude,
+                    self._smoothing_samples_remaining,
+                )
 
-        if isinstance(val, Iterable):
-            return tuple(v * self._amplitude for v in val)
+                # Apply smoothed amplitude to single sample
+                result = val * amp_envelope[0]
 
-        # Accept int, float, and numpy number types
-        if isinstance(val, (int, float, np.number)):
-            return val * self._amplitude
+                # Update state
+                self._smoothing_samples_remaining -= 1
+                if self._smoothing_samples_remaining <= 0:
+                    self._current_amplitude = self._target_amplitude
+
+                return float(result)
+            else:
+                # No smoothing needed - direct multiplication
+                return float(val * self._amplitude)
+
+        # Vectorized input
+        if isinstance(val, tuple | np.ndarray | Iterable):
+            return self._scale_vectorized(np.asarray(val))
 
         logger.error(f"Invalid input type for Volume: {type(val)}")
         raise TypeError(

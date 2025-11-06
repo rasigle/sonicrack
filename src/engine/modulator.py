@@ -230,6 +230,7 @@ class ADSREnvelope(Generator):
 
     def _get_r_stepper(self):
         val = 1
+        stepper = None
         if self.release_duration > 0:
             release_step = -self.val / (self.release_duration * self._sample_rate)
             stepper = itertools.count(self.val, step=release_step)
@@ -240,6 +241,8 @@ class ADSREnvelope(Generator):
                 self.ended = True
                 val = 0
             else:
+                if stepper is None:
+                    return
                 val = next(stepper)
             yield val
 

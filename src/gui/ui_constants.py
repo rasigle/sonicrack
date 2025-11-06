@@ -1,3 +1,5 @@
+from xmlrpc.server import MultiPathXMLRPCServer
+
 from src.constants import RESOURCES_PATH
 
 APP_ICON_NAME = "icon.png"
@@ -7,3 +9,8 @@ APP_TITLE = "AudioPlayground - Modular Synthesizer"
 # Debounce compilation to avoid audio spikes during knob rotation
 # Wait an amount of ms after last change before recompiling
 DEBOUNCE_TIMER_DELAY_MS = 50
+
+
+MIN_PW_PERCENTAGE_VALUE = 1
+MAX_PW_PERCENTAGE_VALUE = 99
+DEFAULT_PW_PERCENTAGE_VALUE = 50

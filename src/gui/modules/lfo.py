@@ -14,6 +14,11 @@ from src.engine.oscillator import (
 )
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
+from src.gui.ui_constants import (
+    MIN_PW_PERCENTAGE_VALUE,
+    MAX_PW_PERCENTAGE_VALUE,
+    DEFAULT_PW_PERCENTAGE_VALUE,
+)
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -21,7 +26,9 @@ if TYPE_CHECKING:
     from src.engine.audio_component import AudioComponent
 
 
-LFO_FREQUENCY_RANGE = (0.01, 20.0)  # LFO frequency range in Hz
+LFO_MIN_FREQUENCY = 0.01
+LFO_MAX_FREQUENCY = 20.0  # LFO frequency range in Hz
+LFO_DEFAULT_FREQUENCY = 1.0  # Default LFO frequency in Hz
 LFO_DEFAULT_GAIN_DB = 0
 
 
@@ -42,7 +49,7 @@ class LFOModule(ModuleWidget):
         """Initialize LFO module."""
         super().__init__(
             width=240,
-            height=260,
+            height=300,
             color=QColor(100, 140, 200),
         )
 
@@ -66,23 +73,59 @@ class LFOModule(ModuleWidget):
 
         # Frequency control (knob) - optimized for LFO range
         knobs_layout = QHBoxLayout()
-        self.freq_knob = Knob("Frequency (Hz)", LFO_FREQUENCY_RANGE[0], LFO_FREQUENCY_RANGE[1], 1.0)
+        self.freq_knob = Knob(
+            "Frequency (Hz)",
+            LFO_MIN_FREQUENCY,
+            LFO_MAX_FREQUENCY,
+            LFO_DEFAULT_FREQUENCY,
+        )
         self.freq_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("frequency", self.freq_knob.get_value())
         )
         knobs_layout.addWidget(self.freq_knob)
         layout.addLayout(knobs_layout)
 
+        # Pulse width control (for square wave)
+        pw_layout = QHBoxLayout()
+        self.pulsewidth_knob = Knob(
+            "PW",
+            MIN_PW_PERCENTAGE_VALUE / 100,
+            MAX_PW_PERCENTAGE_VALUE / 100,
+            DEFAULT_PW_PERCENTAGE_VALUE / 100,
+        )
+        self.pulsewidth_knob.value_changed.connect(self._on_pulsewidth_changed)
+        pw_layout.addWidget(self.pulsewidth_knob)
+        layout.addLayout(pw_layout)
+
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
         # Register parameters for automatic get/set
         self.register_parameter("frequency", self.freq_knob)
+        self.register_parameter("pulsewidth", self.pulsewidth_knob)
+
+        # Track individual oscillator components for hotswap
+        self._square_oscillator = None
 
         # Create initial components
         self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
+    def _on_pulsewidth_changed(self):
+        """Handle pulse width changes - only update square oscillator if connected."""
+        if len(self.square_port.cables) > 0 and self._square_oscillator is not None:
+            # Hotswap: update pulse width directly on the square oscillator
+            try:
+                self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
+                self.parameter_changed.emit(
+                    "pulsewidth", self.pulsewidth_knob.get_value()
+                )
+            except (AttributeError, ValueError) as e:
+                # If hotswap fails, log warning (but don't recreate component)
+                import logging
+
+                logging.warning(f"Failed to hotswap pulsewidth: {e}")
+
     @staticmethod
     def get_cv_output_range() -> tuple[float, float]:
         """LFO outputs bipolar signal [-1, 1].
@@ -103,6 +146,7 @@ class LFOModule(ModuleWidget):
             Dictionary mapping port names to their oscillator components
         """
         freq = self.freq_knob.get_value()
+        pulsewidth = self.pulsewidth_knob.get_value()
         components = {}
 
         # Create oscillators only for connected outputs
@@ -122,9 +166,16 @@ class LFOModule(ModuleWidget):
             )
 
         if len(self.square_port.cables) > 0:
-            components["Square"] = SquareOscillator(
-                freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1)
+            self._square_oscillator = SquareOscillator(
+                freq,
+                gain_db=LFO_DEFAULT_GAIN_DB,
+                wave_range=(-1, 1),
+                pulsewidth=pulsewidth,
             )
+            components["Square"] = self._square_oscillator
+        else:
+            # Clear reference when not connected
+            self._square_oscillator = None
 
         if not components:
             # No outputs connected - return a silent component

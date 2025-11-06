@@ -154,6 +154,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         even if compilation fails.
         """
         import logging
+
         logger = logging.getLogger(__name__)
 
         # Check Freq port
@@ -165,7 +166,9 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         has_freq_cv = freq_port and len(freq_port.cables) > 0
 
-        logger.info(f"VCO update_knob_state: Freq port has {len(freq_port.cables) if freq_port else 0} cables, has_freq_cv={has_freq_cv}")
+        logger.info(
+            f"VCO update_knob_state: Freq port has {len(freq_port.cables) if freq_port else 0} cables, has_freq_cv={has_freq_cv}"
+        )
 
         if has_freq_cv:
             # Frequency controlled by CV - disable knob
@@ -189,7 +192,9 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         has_gain_cv = gain_port and len(gain_port.cables) > 0
 
-        logger.info(f"VCO update_knob_state: Gain port has {len(gain_port.cables) if gain_port else 0} cables, has_gain_cv={has_gain_cv}")
+        logger.info(
+            f"VCO update_knob_state: Gain port has {len(gain_port.cables) if gain_port else 0} cables, has_gain_cv={has_gain_cv}"
+        )
 
         if has_gain_cv:
             # Gain controlled by CV - disable knob
@@ -216,6 +221,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         - Gain input: CV control of amplitude (e.g., from envelope)
         """
         import logging
+
         logger = logging.getLogger(__name__)
 
         wave_type = self.wave_combo.currentText()
@@ -224,8 +230,14 @@ class ModulatedOscillatorModule(ModuleWidget):
         phase = self.phase_slider.get_value()
 
         # Check for modulation inputs
-        freq_modulator = input_components[0] if input_components and len(input_components) > 0 else None
-        gain_modulator = modulation_components.get("Gain") if modulation_components else None
+        freq_modulator = (
+            input_components[0]
+            if input_components and len(input_components) > 0
+            else None
+        )
+        gain_modulator = (
+            modulation_components.get("Gain") if modulation_components else None
+        )
 
         has_freq_mod = freq_modulator is not None
         has_gain_mod = gain_modulator is not None
@@ -249,24 +261,32 @@ class ModulatedOscillatorModule(ModuleWidget):
             self.freq_knob.setEnabled(False)
             self.freq_knob.setStyleSheet("opacity: 0.5;")
             self.freq_knob.setToolTip("Frequency controlled by Freq input (CV)")
-            logger.info("VCO create_engine_component: Freq knob DISABLED (has modulation)")
+            logger.info(
+                "VCO create_engine_component: Freq knob DISABLED (has modulation)"
+            )
         else:
             self.freq_knob.setEnabled(True)
             self.freq_knob.setStyleSheet("")
             self.freq_knob.setToolTip("Manual frequency control (Hz)")
-            logger.info("VCO create_engine_component: Freq knob ENABLED (no modulation)")
+            logger.info(
+                "VCO create_engine_component: Freq knob ENABLED (no modulation)"
+            )
 
         # Update UI state for gain knob
         if has_gain_mod:
             self.gain_knob.setEnabled(False)
             self.gain_knob.setStyleSheet("opacity: 0.5;")
             self.gain_knob.setToolTip("Gain controlled by Gain input (CV)")
-            logger.info("VCO create_engine_component: Gain knob DISABLED (has modulation)")
+            logger.info(
+                "VCO create_engine_component: Gain knob DISABLED (has modulation)"
+            )
         else:
             self.gain_knob.setEnabled(True)
             self.gain_knob.setStyleSheet("")
             self.gain_knob.setToolTip("Manual gain control (dB)")
-            logger.info("VCO create_engine_component: Gain knob ENABLED (no modulation)")
+            logger.info(
+                "VCO create_engine_component: Gain knob ENABLED (no modulation)"
+            )
 
         # If we have frequency or gain modulation, create ModulatedOscillator
         if has_freq_mod or has_gain_mod:
@@ -282,7 +302,9 @@ class ModulatedOscillatorModule(ModuleWidget):
                 # Multiply base amplitude by CV value
                 return base_amp * cv_amp
 
-            logger.info(f"VCO: Creating ModulatedOscillator (freq_mod={has_freq_mod}, gain_mod={has_gain_mod})")
+            logger.info(
+                f"VCO: Creating ModulatedOscillator (freq_mod={has_freq_mod}, gain_mod={has_gain_mod})"
+            )
 
             # Build modulator list based on what's connected
             modulators = []
@@ -298,10 +320,7 @@ class ModulatedOscillatorModule(ModuleWidget):
                 freq_mod = freq_mod_func
 
             return ModulatedOscillator(
-                osc,
-                *modulators,
-                amp_mod=amp_mod,
-                freq_mod=freq_mod
+                osc, *modulators, amp_mod=amp_mod, freq_mod=freq_mod
             )
 
         # No modulation - return plain oscillator

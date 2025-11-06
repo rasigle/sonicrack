@@ -189,6 +189,199 @@ class TestSquareOscillator(TestOscillatorBase):
         ratio = positive_count / (positive_count + negative_count)
         self.assertAlmostEqual(ratio, 0.5, delta=0.1)
 
+    def test_pulsewidth_default(self) -> None:
+        """Test default pulse width is 0.5 (50% duty cycle)."""
+        osc = SquareOscillator(frequency=440)
+        self.assertEqual(osc.pulsewidth, 0.5)
+
+    def test_pulsewidth_initialization(self) -> None:
+        """Test pulse width can be set during initialization."""
+        osc = SquareOscillator(frequency=440, pulsewidth=0.25)
+        self.assertEqual(osc.pulsewidth, 0.25)
+
+    def test_pulsewidth_property(self) -> None:
+        """Test pulse width property getter and setter."""
+        osc = SquareOscillator(frequency=440, pulsewidth=0.5)
+
+        # Test getter
+        self.assertEqual(osc.pulsewidth, 0.5)
+
+        # Test setter
+        osc.pulsewidth = 0.75
+        self.assertEqual(osc.pulsewidth, 0.75)
+
+        # Verify internal threshold is updated
+        expected_threshold = 0.75 * 2 * np.pi
+        self.assertAlmostEqual(osc._pulsewidth_threshold, expected_threshold)
+
+    def test_pulsewidth_validation(self) -> None:
+        """Test pulse width validation rejects invalid values."""
+        osc = SquareOscillator(frequency=440)
+
+        # Test values outside [0.0, 1.0] are rejected
+        with self.assertRaises(ValueError):
+            osc.pulsewidth = 1.5
+
+        with self.assertRaises(ValueError):
+            osc.pulsewidth = -0.1
+
+        # Test boundary values are accepted
+        osc.pulsewidth = 0.0  # Should work
+        self.assertEqual(osc.pulsewidth, 0.0)
+
+        osc.pulsewidth = 1.0  # Should work
+        self.assertEqual(osc.pulsewidth, 1.0)
+
+    def test_pulsewidth_duty_cycle_narrow(self) -> None:
+        """Test narrow pulse (10% duty cycle) produces correct ratio."""
+        osc = SquareOscillator(
+            frequency=10, pulsewidth=0.1, sample_rate=10000, gain_db=0
+        )
+        samples = osc.get_samples_vectorized(10000)
+
+        high_count = np.sum(samples > 0)
+        total_count = len(samples)
+        duty_cycle = high_count / total_count
+
+        # Should be close to 10% high
+        self.assertAlmostEqual(duty_cycle, 0.1, delta=0.05)
+
+    def test_pulsewidth_duty_cycle_wide(self) -> None:
+        """Test wide pulse (90% duty cycle) produces correct ratio."""
+        osc = SquareOscillator(
+            frequency=10, pulsewidth=0.9, sample_rate=10000, gain_db=0
+        )
+        samples = osc.get_samples_vectorized(10000)
+
+        high_count = np.sum(samples > 0)
+        total_count = len(samples)
+        duty_cycle = high_count / total_count
+
+        # Should be close to 90% high
+        self.assertAlmostEqual(duty_cycle, 0.9, delta=0.05)
+
+    def test_pulsewidth_duty_cycle_25(self) -> None:
+        """Test 25% pulse width produces correct duty cycle."""
+        osc = SquareOscillator(
+            frequency=10, pulsewidth=0.25, sample_rate=10000, gain_db=0
+        )
+        samples = osc.get_samples_vectorized(10000)
+
+        high_count = np.sum(samples > 0)
+        total_count = len(samples)
+        duty_cycle = high_count / total_count
+
+        # Should be close to 25% high
+        self.assertAlmostEqual(duty_cycle, 0.25, delta=0.05)
+
+    def test_pulsewidth_duty_cycle_75(self) -> None:
+        """Test 75% pulse width produces correct duty cycle."""
+        osc = SquareOscillator(
+            frequency=10, pulsewidth=0.75, sample_rate=10000, gain_db=0
+        )
+        samples = osc.get_samples_vectorized(10000)
+
+        high_count = np.sum(samples > 0)
+        total_count = len(samples)
+        duty_cycle = high_count / total_count
+
+        # Should be close to 75% high
+        self.assertAlmostEqual(duty_cycle, 0.75, delta=0.05)
+
+    def test_pulsewidth_runtime_change(self) -> None:
+        """Test pulse width can be changed at runtime."""
+        osc = SquareOscillator(
+            frequency=10, pulsewidth=0.5, sample_rate=10000, gain_db=0
+        )
+
+        # Generate samples with 50% duty cycle
+        samples1 = osc.get_samples_vectorized(5000)
+        duty1 = np.sum(samples1 > 0) / len(samples1)
+
+        # Change to 25% duty cycle
+        osc.pulsewidth = 0.25
+        samples2 = osc.get_samples_vectorized(5000)
+        duty2 = np.sum(samples2 > 0) / len(samples2)
+
+        # Verify duty cycles are different and approximately correct
+        self.assertNotAlmostEqual(duty1, duty2, delta=0.1)
+        self.assertAlmostEqual(duty1, 0.5, delta=0.05)
+        self.assertAlmostEqual(duty2, 0.25, delta=0.05)
+
+    def test_pulsewidth_iterator_vs_vectorized(self) -> None:
+        """Test iterator and vectorized modes produce same results with pulse width."""
+        osc1 = SquareOscillator(frequency=440, pulsewidth=0.3, gain_db=0)
+        osc2 = SquareOscillator(frequency=440, pulsewidth=0.3, gain_db=0)
+
+        samples_iter = np.array(osc1.get_samples_iterator(1000))
+        samples_vec = osc2.get_samples_vectorized(1000)
+
+        # Should produce identical results
+        self.assert_arrays_close(samples_iter, samples_vec, rtol=1e-10)
+
+    def test_pulsewidth_phase_continuity(self) -> None:
+        """Test pulse width doesn't break phase continuity."""
+        osc = SquareOscillator(frequency=440, pulsewidth=0.3, gain_db=0)
+
+        samples1 = osc.get_samples_vectorized(500)
+        samples2 = osc.get_samples_vectorized(500)
+
+        # Concatenate and verify no unexpected discontinuities
+        combined = np.concatenate([samples1, samples2])
+
+        # All samples should be either -1 or 1 (with amplitude scaling)
+        unique_vals = np.unique(np.round(combined, decimals=5))
+        self.assertLessEqual(len(unique_vals), 3)
+
+    def test_pulsewidth_extreme_values(self) -> None:
+        """Test extreme pulse width values (near 0 and 1)."""
+        # Very narrow pulse (1% duty cycle)
+        osc_narrow = SquareOscillator(
+            frequency=10, pulsewidth=0.01, sample_rate=10000, gain_db=0
+        )
+        samples_narrow = osc_narrow.get_samples_vectorized(10000)
+        duty_narrow = np.sum(samples_narrow > 0) / len(samples_narrow)
+        self.assertLess(duty_narrow, 0.05)
+
+        # Very wide pulse (99% duty cycle)
+        osc_wide = SquareOscillator(
+            frequency=10, pulsewidth=0.99, sample_rate=10000, gain_db=0
+        )
+        samples_wide = osc_wide.get_samples_vectorized(10000)
+        duty_wide = np.sum(samples_wide > 0) / len(samples_wide)
+        self.assertGreater(duty_wide, 0.95)
+
+    def test_pulsewidth_with_wave_range(self) -> None:
+        """Test pulse width works correctly with custom wave range."""
+        osc = SquareOscillator(
+            frequency=10,
+            pulsewidth=0.25,
+            sample_rate=10000,
+            gain_db=0,
+            wave_range=(0, 10),
+        )
+        samples = osc.get_samples_vectorized(10000)
+
+        # Should oscillate between 0 and 10
+        self.assertAlmostEqual(np.min(samples), 0.0, delta=0.1)
+        self.assertAlmostEqual(np.max(samples), 10.0, delta=0.1)
+
+        # Duty cycle should still be ~25%
+        high_count = np.sum(samples > 5)  # Above midpoint
+        duty_cycle = high_count / len(samples)
+        self.assertAlmostEqual(duty_cycle, 0.25, delta=0.05)
+
+    def test_pulsewidth_backward_compatibility(self) -> None:
+        """Test that old code using threshold still works."""
+        # Old API with threshold (deprecated but should still work)
+        osc = SquareOscillator(frequency=440, threshold=0)
+        samples = osc.get_samples_vectorized(1000)
+
+        # Should produce valid square wave
+        self.assertTrue(np.all(np.isfinite(samples)))
+        unique_vals = np.unique(np.round(samples, decimals=5))
+        self.assertLessEqual(len(unique_vals), 3)
+
 
 class TestSawtoothOscillator(TestOscillatorBase):
     """Test suite for SawtoothOscillator."""

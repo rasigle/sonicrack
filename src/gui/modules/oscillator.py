@@ -14,6 +14,11 @@ from src.engine.oscillator import (
 )
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
+from src.gui.ui_constants import (
+    MIN_PW_PERCENTAGE_VALUE,
+    MAX_PW_PERCENTAGE_VALUE,
+    DEFAULT_PW_PERCENTAGE_VALUE,
+)
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -21,6 +26,9 @@ if TYPE_CHECKING:
     from src.engine.audio_component import AudioComponent
 
 OSCILLATOR_DEFAULT_GAIN_DB = 0.0
+OSCILLATOR_DEFAULT_FREQUENCY = 120
+OSCILLATOR_MIN_FREQUENCY = 20
+OSCILLATOR_MAX_FREQUENCY = 2000
 
 
 @register_module()
@@ -37,7 +45,7 @@ class OscillatorModule(ModuleWidget):
         """Initialize oscillator module."""
         super().__init__(
             width=220,
-            height=200,
+            height=240,
             color=QColor(80, 120, 200),
         )
 
@@ -61,25 +69,56 @@ class OscillatorModule(ModuleWidget):
 
         # Frequency control (knobs)
         knobs_layout = QHBoxLayout()
-        self.freq_knob = Knob("Freq (Hz)", 20, 2000, 440)
+        self.freq_knob = Knob(
+            "Freq (Hz)",
+            OSCILLATOR_MIN_FREQUENCY,
+            OSCILLATOR_MAX_FREQUENCY,
+            OSCILLATOR_DEFAULT_FREQUENCY,
+        )
         self.freq_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("frequency", self.freq_knob.get_value())
         )
         knobs_layout.addWidget(self.freq_knob)
         layout.addLayout(knobs_layout)
 
+        # Pulse width control (for square wave)
+        pw_layout = QHBoxLayout()
+        self.pulsewidth_knob = Knob(
+            "PW",
+            MIN_PW_PERCENTAGE_VALUE / 100,
+            MAX_PW_PERCENTAGE_VALUE / 100,
+            DEFAULT_PW_PERCENTAGE_VALUE / 100,
+        )
+        self.pulsewidth_knob.value_changed.connect(self._on_pulsewidth_changed)
+        pw_layout.addWidget(self.pulsewidth_knob)
+        layout.addLayout(pw_layout)
+
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
         self.register_parameter("frequency", self.freq_knob)
+        self.register_parameter("pulsewidth", self.pulsewidth_knob)
+
+        # Track individual oscillator components for hotswap
+        self._square_oscillator = None
 
         self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
-    def _on_wave_changed(self, wave_type: str):
-        """Handle waveform type change."""
-        self.create_engine_component()
-        self.parameter_changed.emit("waveform", wave_type)
+    def _on_pulsewidth_changed(self):
+        """Handle pulse width changes - only update square oscillator if connected."""
+        if len(self.square_port.cables) > 0 and self._square_oscillator is not None:
+            # Hotswap: update pulse width directly on the square oscillator
+            try:
+                self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
+                self.parameter_changed.emit(
+                    "pulsewidth", self.pulsewidth_knob.get_value()
+                )
+            except (AttributeError, ValueError) as e:
+                # If hotswap fails, log warning (but don't recreate component)
+                import logging
+
+                logging.warning(f"Failed to hotswap pulsewidth: {e}")
 
     def create_engine_component(
         self,
@@ -92,6 +131,7 @@ class OscillatorModule(ModuleWidget):
             Dictionary mapping port names to their oscillator components
         """
         freq = self.freq_knob.get_value()
+        pulsewidth = self.pulsewidth_knob.get_value()
         components = {}
 
         # Create oscillators only for connected outputs
@@ -111,9 +151,13 @@ class OscillatorModule(ModuleWidget):
             )
 
         if len(self.square_port.cables) > 0:
-            components["Square"] = SquareOscillator(
-                freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB
+            self._square_oscillator = SquareOscillator(
+                freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, pulsewidth=pulsewidth
             )
+            components["Square"] = self._square_oscillator
+        else:
+            # Clear reference when not connected
+            self._square_oscillator = None
 
         if not components:
             # No outputs connected - return a silent component

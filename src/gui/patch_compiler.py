@@ -395,7 +395,11 @@ class PatchCompiler:
         # Also collect from ALL other input ports (like VCO's Freq port)
         # that aren't required or modulation ports
         required_set = set(module.get_required_inputs())
-        modulation_set = set(module.get_modulation_inputs()) if hasattr(module, 'get_modulation_inputs') else set()
+        modulation_set = (
+            set(module.get_modulation_inputs())
+            if hasattr(module, "get_modulation_inputs")
+            else set()
+        )
 
         for port in getattr(module, "input_ports", []):
             port_name = port.port_name
@@ -411,12 +415,18 @@ class PatchCompiler:
                     input_components.append(component)
 
         # Collect modulation components (like VCO's Gain port)
-        modulation_components = self._collect_modulation_components(module) if hasattr(module, 'get_modulation_inputs') else None
+        modulation_components = (
+            self._collect_modulation_components(module)
+            if hasattr(module, "get_modulation_inputs")
+            else None
+        )
 
         # Create component with CV inputs and modulation
         return module.create_engine_component(
             input_components=input_components if input_components else None,
-            modulation_components=modulation_components if modulation_components else None,
+            modulation_components=(
+                modulation_components if modulation_components else None
+            ),
         )
 
     def _build_output_module(self, module: AudioModule) -> AudioComponent | None:

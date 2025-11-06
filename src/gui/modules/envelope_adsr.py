@@ -1,7 +1,8 @@
 from typing import Any
+import logging
 
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 
 from src.engine import ADSREnvelope
 from src.engine.gate_triggered_adsr import GateTriggeredADSR
@@ -30,7 +31,7 @@ class ADSRModule(ModuleWidget):
         """Initialize ADSR module."""
         super().__init__(
             width=220,
-            height=220,
+            height=260,
             color=QColor(120, 180, 80),
         )
 
@@ -90,6 +91,40 @@ class ADSRModule(ModuleWidget):
 
         layout.addLayout(knobs_layout2)
 
+        # Manual trigger button
+        trigger_layout = QHBoxLayout()
+        self.trigger_button = QPushButton("Trigger")
+        self.trigger_button.setCheckable(False)  # Not a toggle, just a momentary push
+        self.trigger_button.setMinimumHeight(35)
+        self.trigger_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: 2px solid #45a049;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:pressed {
+                background-color: #45a049;
+                border: 2px solid #3d8b40;
+            }
+            QPushButton:hover {
+                background-color: #5cbf60;
+            }
+        """)
+        self.trigger_button.setToolTip(
+            "Manual Trigger\n"
+            "Press: Start attack phase\n"
+            "Hold: Sustain phase\n"
+            "Release: Trigger release phase"
+        )
+        # Connect press and release events
+        self.trigger_button.pressed.connect(self._on_trigger_pressed)
+        self.trigger_button.released.connect(self._on_trigger_released)
+        trigger_layout.addWidget(self.trigger_button)
+        layout.addLayout(trigger_layout)
+
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
@@ -99,7 +134,32 @@ class ADSRModule(ModuleWidget):
         self.register_parameter("sustain_level", self.sustain_knob)
         self.register_parameter("release_duration", self.release_knob)
 
+        # Track ADSR component for manual triggering
+        self._adsr_component = None
+
         self.component = self.create_engine_component()
+
+    def _on_trigger_pressed(self):
+        """Handle trigger button press - start attack phase."""
+        if self._adsr_component is not None:
+            try:
+                # If wrapped in GateTriggeredADSR, access the inner ADSR
+                adsr = getattr(self._adsr_component, 'adsr', self._adsr_component)
+                adsr.trigger_note_on()
+                logging.debug("ADSR manually triggered (note on)")
+            except (AttributeError, Exception) as e:
+                logging.warning(f"Failed to trigger ADSR: {e}")
+
+    def _on_trigger_released(self):
+        """Handle trigger button release - start release phase."""
+        if self._adsr_component is not None:
+            try:
+                # If wrapped in GateTriggeredADSR, access the inner ADSR
+                adsr = getattr(self._adsr_component, 'adsr', self._adsr_component)
+                adsr.trigger_note_off()
+                logging.debug("ADSR manually released (note off)")
+            except (AttributeError, Exception) as e:
+                logging.warning(f"Failed to release ADSR: {e}")
 
     def get_required_inputs(self) -> list[str]:
         """Gate input is optional - ADSR works without gate triggering."""
@@ -135,7 +195,9 @@ class ADSRModule(ModuleWidget):
         # If gate input is connected, wrap with gate-triggered version
         if input_components and len(input_components) > 0:
             gate_source = input_components[0]
-            return GateTriggeredADSR(adsr, gate_source)
+            self._adsr_component = GateTriggeredADSR(adsr, gate_source)
+        else:
+            # No gate input, return plain ADSR (can be manually triggered)
+            self._adsr_component = adsr
 
-        # No gate input, return plain ADSR (can be manually triggered)
-        return adsr
+        return self._adsr_component

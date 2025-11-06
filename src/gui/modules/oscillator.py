@@ -70,15 +70,7 @@ class OscillatorModule(ModuleWidget):
             lambda: self.parameter_changed.emit("gain_db", self.gain_knob.get_value())
         )
         knobs_layout.addWidget(self.gain_knob)
-
         layout.addLayout(knobs_layout)
-
-        # Phase control
-        self.phase_slider = HSlider("Phase", 0, 360, 0)
-        self.phase_slider.value_changed.connect(
-            lambda v: self.parameter_changed.emit("phase", v)
-        )
-        layout.addWidget(self.phase_slider)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
@@ -89,7 +81,6 @@ class OscillatorModule(ModuleWidget):
         )
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("gain_db", self.gain_knob)
-        self.register_parameter("phase", self.phase_slider)
 
         self.component = self.create_engine_component()
 
@@ -108,15 +99,14 @@ class OscillatorModule(ModuleWidget):
         wave_type = self.wave_combo.currentText()
         freq = self.freq_knob.get_value()
         gain_db = self.gain_knob.get_value()
-        phase = self.phase_slider.get_value()
 
         if wave_type == "Sine":
-            return SineOscillator(freq, gain_db=gain_db, phase=phase)
+            return SineOscillator(freq, gain_db=gain_db)
         elif wave_type == "Square":
-            return SquareOscillator(freq, gain_db=gain_db, phase=phase)
+            return SquareOscillator(freq, gain_db=gain_db)
         elif wave_type == "Sawtooth":
-            return SawtoothOscillator(freq, gain_db=gain_db, phase=phase)
+            return SawtoothOscillator(freq, gain_db=gain_db)
         elif wave_type == "Triangle":
-            return TriangleOscillator(freq, gain_db=gain_db, phase=phase)
+            return TriangleOscillator(freq, gain_db=gain_db)
 
         raise ValueError(f"Unknown waveform type: {wave_type}")

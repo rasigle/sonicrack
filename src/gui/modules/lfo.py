@@ -73,15 +73,7 @@ class LFOModule(ModuleWidget):
             lambda: self.parameter_changed.emit("gain_db", self.depth_knob.get_value())
         )
         knobs_layout.addWidget(self.depth_knob)
-
         layout.addLayout(knobs_layout)
-
-        # Phase control
-        self.phase_slider = HSlider("Phase", 0, 360, 0)
-        self.phase_slider.value_changed.connect(
-            lambda v: self.parameter_changed.emit("phase", v)
-        )
-        layout.addWidget(self.phase_slider)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
@@ -92,7 +84,6 @@ class LFOModule(ModuleWidget):
         )
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("gain_db", self.depth_knob)
-        self.register_parameter("phase", self.phase_slider)
 
         self.component = self.create_engine_component()
 
@@ -119,24 +110,23 @@ class LFOModule(ModuleWidget):
         wave_type = self.wave_combo.currentText()
         freq = self.freq_knob.get_value()
         gain_db = self.depth_knob.get_value()
-        phase = self.phase_slider.get_value()
 
         # LFO uses the same oscillators but at lower frequencies
         # and with wave_range set to modulation range (-1 to 1)
         if wave_type == "Sine":
             return SineOscillator(
-                freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1)
+                freq, gain_db=gain_db, wave_range=(-1, 1)
             )
         if wave_type == "Square":
             return SquareOscillator(
-                freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1)
+                freq, gain_db=gain_db, wave_range=(-1, 1)
             )
         if wave_type == "Sawtooth":
             return SawtoothOscillator(
-                freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1)
+                freq, gain_db=gain_db, wave_range=(-1, 1)
             )
         if wave_type == "Triangle":
             return TriangleOscillator(
-                freq, gain_db=gain_db, phase=phase, wave_range=(-1, 1)
+                freq, gain_db=gain_db, wave_range=(-1, 1)
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")

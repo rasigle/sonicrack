@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
 )
 
+from src import version
 from src.constants import PRESET_FILE_EXTENSION
 from src.engine import AudioComponent
 from src.gui.audio_engine import AudioEngine
@@ -299,7 +300,7 @@ class ModularSynthWindow(QMainWindow):
         help_menu = menubar.addMenu("&Help")
 
         about_action = QAction("&About", self)
-        about_action.triggered.connect(lambda: show_about(self))
+        about_action.triggered.connect(lambda: show_about(self, version=version))
         help_menu.addAction(about_action)
 
     def _setup_toolbar(self):

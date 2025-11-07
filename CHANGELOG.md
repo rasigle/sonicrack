@@ -2,14 +2,68 @@
 
 All notable changes to AudioPlayground will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## Planned
+- Rework visualizers as modules
+- Visualization system as visualization modules
+- Rethink mono stereo channels
+- Display ADSR shape in module
+- Add Lowpass Filter with resonance module
+- Improve LFO shapes
+- Better Architecture with UI/Logic Separation
+- Fullscreen support
+- Activate/deactivate modules
+- Undo / Redo system
+- Make communication between UI and engine fully preset based
+- Review the engine preset system (fluent API)
+- Make the ui look cooler and integrate a rack design
+
+
+### Added
+
+- BLEP anti-aliasing for oscillators
+- Polish API and documentation and code (comprehensive update complete)
+- Documentation hub with clear navigation (docs/README.md)
+- Complete package documentation (Engine, GUI, Builder)
+- Quick Start Guide (5-minute tutorial)
+- Architecture overview with system design
+- Comprehensive troubleshooting guide
+- Complete documentation index
+- Learning paths for users, developers, musicians
+- API reference structure
+- VCA module implementation and patch compiler fix
+- Voltage controlled amplifier module (VCA)
+- Clarified module interface (create_engine_component vs get_output_component)
+- Fixed mixer: independent oscillator outputs per port
+- Added mix_mode parameter to WaveAdder (sum/average modes)
+- Volume knobs for mixer with hot-swapping (click-free)
+- Per-channel gain controls in mixer (4 channels)
+- Mixer properly isolates channels with Volume components
+- Comprehensive developer documentation for module creation
+- Reverb, delay and distortion effects
+- Automatic cv range adaption
+- Manual button to trigger adsr envelope
+- PW support for square waves
+- Oscillator enhancements
+- No notes on midi playback
+- Fix Lock and unlock knobs in modulated widgets
+- Modulated clipper
+- Noise with db
+- Panner and Volume module not working
+- Store name of current patch, to allow direct Save or Save As
+
+
+## Not implemented:
+- Do not pan the canvas when scroll with the mouse-wheel over a locked knob
+- Make module widgets debuggable without ui components
+
+
 
 ## [1.0.0] - 2025-11-04
 
 ### 🎉 Initial Release
 
-First production-ready release of AudioPlayground!
+First release of AudioPlayground!
 
 ### Added
 

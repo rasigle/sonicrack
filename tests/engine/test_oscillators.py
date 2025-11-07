@@ -16,9 +16,9 @@ from src.engine.oscillator import (
     SineOscillator,
     SawtoothOscillator,
     TriangleOscillator,
+    SquareOscillator,
     synth,
 )
-from engine import SquareOscillator
 
 
 class TestOscillatorBase(unittest.TestCase):
@@ -371,16 +371,6 @@ class TestSquareOscillator(TestOscillatorBase):
         duty_cycle = high_count / len(samples)
         self.assertAlmostEqual(duty_cycle, 0.25, delta=0.05)
 
-    def test_pulsewidth_backward_compatibility(self) -> None:
-        """Test that old code using threshold still works."""
-        # Old API with threshold (deprecated but should still work)
-        osc = SquareOscillator(frequency=440, threshold=0)
-        samples = osc.get_samples_vectorized(1000)
-
-        # Should produce valid square wave
-        self.assertTrue(np.all(np.isfinite(samples)))
-        unique_vals = np.unique(np.round(samples, decimals=5))
-        self.assertLessEqual(len(unique_vals), 3)
 
 
 class TestSawtoothOscillator(TestOscillatorBase):

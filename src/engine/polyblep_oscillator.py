@@ -20,9 +20,10 @@ from enum import Enum
 
 import numpy as np
 
-from engine import register_component, ComponentDescriptor, ComponentCategory
-from engine.audio_component import Generator
 from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_GAIN_DB
+from src.engine.audio_component import Generator
+from src.engine.audio_component_registry import register_component, ComponentDescriptor, \
+    ComponentCategory
 from src.engine.oscillator import _derive_amplitude_from_init
 from src.utils.utils import track_provided_args
 
@@ -72,12 +73,27 @@ class PolyBLEPWaveforms:
         return np.sin(2.0 * np.pi * phase)
 
     @staticmethod
-    def square(phase: float, increment: float) -> float:
-        """Generate antialiased square wave."""
-        naive = -1.0 if phase < 0.5 else 1.0
+    def square(phase: float, increment: float, pulsewidth: float = 0.5) -> float:
+        """Generate antialiased square wave with variable pulse width.
+
+        Args:
+            phase: Current phase [0.0, 1.0)
+            increment: Phase increment per sample
+            pulsewidth: Pulse width (0.0 to 1.0), default 0.5 for 50% duty cycle
+
+        Returns:
+            Square wave sample value
+        """
+        # Generate naive square with specified pulsewidth
+        naive = -1.0 if phase < pulsewidth else 1.0
+
+        # Apply PolyBLEP at rising edge (phase = 0)
         correction = PolyBLEPWaveforms.polyblep(phase, increment)
-        phase_shifted = (phase + 0.5) % 1.0
+
+        # Apply PolyBLEP at falling edge (phase = pulsewidth)
+        phase_shifted = (phase - pulsewidth + 1.0) % 1.0
         correction -= PolyBLEPWaveforms.polyblep(phase_shifted, increment)
+
         return naive - correction
 
     @staticmethod
@@ -133,7 +149,8 @@ class PolyBLEPOscillator(Generator):
                  gain_db: float | None = DEFAULT_GAIN_DB, phase: float = 0.0,
                  sample_rate: int | float = DEFAULT_SAMPLE_RATE,
                  wave_range: tuple[float, float] = (-1, 1),
-                 wave_shape: WaveShape = WaveShape.SAWTOOTH_UP):
+                 wave_shape: WaveShape = WaveShape.SAWTOOTH_UP,
+                 pulsewidth: float = 0.5):
         """Initialize PolyBLEP oscillator.
 
         Args:
@@ -146,10 +163,18 @@ class PolyBLEPOscillator(Generator):
             sample_rate: Sample rate in Hz (default: 44100)
             wave_range: Output range tuple (min, max), default: (-1, 1)
             wave_shape: Waveform shape (default: SAWTOOTH_UP)
+            pulsewidth: Pulse width for square wave (0.0 to 1.0, default: 0.5)
+                0.5 = 50% duty cycle (standard square wave)
+                0.1 = 10% duty cycle (narrow pulse)
+                0.9 = 90% duty cycle (wide pulse)
         """
         super().__init__(sample_rate)
-        self._sample_rate = float(sample_rate)
         self.wave_shape = wave_shape
+
+        # Validate pulsewidth
+        if not 0.0 < pulsewidth < 1.0:
+            raise ValueError(f"pulsewidth must be between 0.0 and 1.0, got {pulsewidth}")
+        self._pulsewidth = pulsewidth
 
         # Store initial values
         self._freq = frequency
@@ -218,12 +243,6 @@ class PolyBLEPOscillator(Generator):
         return self._current_amplitude
 
     # Properties matching Oscillator API
-
-    @property
-    def sample_rate(self) -> float:
-        """Sample rate in Hz."""
-        return self._sample_rate
-
     @property
     def frequency(self) -> float:
         """Current oscillator frequency in Hz."""
@@ -233,7 +252,7 @@ class PolyBLEPOscillator(Generator):
     def frequency(self, value: float):
         """Set oscillator frequency."""
         self._f = value
-        self._increment = (value / self._sample_rate) % 1.0
+        self._increment = (value / self.sample_rate) % 1.0
 
     @property
     def amplitude(self) -> float:
@@ -283,6 +302,31 @@ class PolyBLEPOscillator(Generator):
         self._update_range_conversion()
 
     @property
+    def pulsewidth(self) -> float:
+        """Current pulse width (0.0 to 1.0) for square wave.
+
+        Only affects square wave generation.
+        0.5 = 50% duty cycle (standard square)
+        0.1 = 10% duty cycle (narrow pulse)
+        0.9 = 90% duty cycle (wide pulse)
+        """
+        return self._pulsewidth
+
+    @pulsewidth.setter
+    def pulsewidth(self, value: float):
+        """Set pulse width for square wave.
+
+        Args:
+            value: Pulse width between 0.0 and 1.0
+
+        Raises:
+            ValueError: If value is outside valid range
+        """
+        if not 0.0 < value < 1.0:
+            raise ValueError(f"pulsewidth must be between 0.0 and 1.0, got {value}")
+        self._pulsewidth = value
+
+    @property
     def init_freq(self) -> float:
         """Initial frequency supplied at construction."""
         return self._freq
@@ -315,14 +359,14 @@ class PolyBLEPOscillator(Generator):
         if self.wave_shape == WaveShape.SINE:
             value = PolyBLEPWaveforms.sine(phase)
         elif self.wave_shape == WaveShape.SQUARE:
-            value = PolyBLEPWaveforms.square(phase, self._increment)
+            value = PolyBLEPWaveforms.square(phase, self._increment, self._pulsewidth)
         elif self.wave_shape == WaveShape.SAWTOOTH_UP:
             value = PolyBLEPWaveforms.sawtooth(phase, self._increment)
         elif self.wave_shape == WaveShape.SAWTOOTH_DOWN:
             value = -PolyBLEPWaveforms.sawtooth(phase, self._increment)
         elif self.wave_shape == WaveShape.TRIANGLE:
             # Triangle via integration
-            square_val = PolyBLEPWaveforms.square(phase, self._increment)
+            square_val = PolyBLEPWaveforms.square(phase, self._increment, self._pulsewidth)
             self._triangle_accumulator = (
                 self._increment * square_val +
                 self._triangle_accumulator * (1.0 - (0.25 * self._increment))
@@ -400,10 +444,11 @@ class PolyBLEPOscillator(Generator):
         return samples.astype(np.float32)
 
     def _generate_square_vectorized(self, phases: np.ndarray) -> np.ndarray:
-        """Generate PolyBLEP square wave (vectorized)."""
-        output = np.where(phases < 0.5, -1.0, 1.0).astype(np.float64)
+        """Generate PolyBLEP square wave with variable pulsewidth (vectorized)."""
+        # Generate naive square with specified pulsewidth
+        output = np.where(phases < self._pulsewidth, -1.0, 1.0).astype(np.float64)
 
-        # Apply PolyBLEP corrections
+        # Apply PolyBLEP corrections at rising edge (phase = 0)
         mask1 = phases < self._increment
         if np.any(mask1):
             p = phases[mask1] / self._increment
@@ -414,7 +459,8 @@ class PolyBLEPOscillator(Generator):
             p = (phases[mask2] - 1.0) / self._increment
             output[mask2] -= (p + p) + (p * p) + 1.0
 
-        phases_shifted = (phases + 0.5) % 1.0
+        # Apply PolyBLEP corrections at falling edge (phase = pulsewidth)
+        phases_shifted = (phases - self._pulsewidth + 1.0) % 1.0
         mask3 = phases_shifted < self._increment
         if np.any(mask3):
             p = phases_shifted[mask3] / self._increment
@@ -449,7 +495,7 @@ class PolyBLEPOscillator(Generator):
 
         for i in range(n):
             phase = self._phase_normalized
-            square = PolyBLEPWaveforms.square(phase, self._increment)
+            square = PolyBLEPWaveforms.square(phase, self._increment, self._pulsewidth)
 
             self._triangle_accumulator = (
                 self._increment * square +
@@ -521,11 +567,22 @@ def generate_sine(frequency: float, duration: float, sample_rate: float = 44100.
 
 
 def generate_square(frequency: float, duration: float, sample_rate: float = 44100.0,
-                   amplitude: float = 1.0) -> np.ndarray:
-    """Generate an antialiased square wave."""
+                   amplitude: float = 1.0, pulsewidth: float = 0.5) -> np.ndarray:
+    """Generate an antialiased square wave with variable pulsewidth.
+
+    Args:
+        frequency: Frequency in Hz
+        duration: Duration in seconds
+        sample_rate: Sample rate in Hz
+        amplitude: Amplitude (linear scale)
+        pulsewidth: Pulse width (0.0 to 1.0), default 0.5 for 50% duty cycle
+
+    Returns:
+        Array of samples
+    """
     n_samples = int(duration * sample_rate)
     osc = PolyBLEPOscillator(frequency, amplitude, None, 0, sample_rate,
-                             wave_shape=WaveShape.SQUARE)
+                             wave_shape=WaveShape.SQUARE, pulsewidth=pulsewidth)
     return osc.get_samples(n_samples)
 
 

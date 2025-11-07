@@ -155,9 +155,9 @@ from src.engine.oscillator import (
     SineOscillator,
     SawtoothOscillator,
     TriangleOscillator,
+    SquareOscillator,
     synth,
 )
-from engine.oscillator_square import SquareOscillator
 
 # Effects
 from src.engine.effects import (

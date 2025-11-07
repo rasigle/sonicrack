@@ -5,13 +5,14 @@ from typing import TYPE_CHECKING
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
+from src.engine.polyblep_oscillator import PolyBLEPOscillator, WaveShape
 from src.engine.composer import WaveAdder
 from src.engine.oscillator import (
     SineOscillator,
     SawtoothOscillator,
     TriangleOscillator,
+    SquareOscillator
 )
-from engine import SquareOscillator
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
 from src.gui.ui_constants import (
@@ -147,7 +148,7 @@ class OscillatorModule(ModuleWidget):
         input_components: list[AudioComponent] | None = None,
         modulation_components: dict[str, AudioComponent] | None = None,
     ) -> AudioComponent | None:
-        """Create the LFO components for all connected outputs.
+        """Create the components for all connected outputs.
 
         Returns:
             Dictionary mapping port names to their oscillator components
@@ -217,18 +218,18 @@ class OscillatorModule(ModuleWidget):
 
         # Return the specific oscillator for the requested output port
         if port_name == "Sine" and len(self.sine_port.cables) > 0:
-            self._sine_oscillator = SineOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+            self._sine_oscillator = PolyBLEPOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, wave_shape=WaveShape.SINE)
             return self._sine_oscillator
         elif port_name == "Triangle" and len(self.triangle_port.cables) > 0:
-            self._triangle_oscillator = TriangleOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+            self._triangle_oscillator = PolyBLEPOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, wave_shape=WaveShape.TRIANGLE)
             return self._triangle_oscillator
         elif port_name == "Sawtooth" and len(self.sawtooth_port.cables) > 0:
-            self._sawtooth_oscillator = SawtoothOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+            self._sawtooth_oscillator = PolyBLEPOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, wave_shape=WaveShape.SAWTOOTH_UP)
             return self._sawtooth_oscillator
         elif port_name == "Square" and len(self.square_port.cables) > 0:
             # Create and store reference for hot-swapping pulsewidth
-            self._square_oscillator = SquareOscillator(
-                freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, pulsewidth=pulsewidth
+            self._square_oscillator = PolyBLEPOscillator(
+                freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, pulsewidth=pulsewidth, wave_shape=WaveShape.SQUARE
             )
             return self._square_oscillator
 

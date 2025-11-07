@@ -7,13 +7,11 @@ performance, and proper factory behavior.
 import numpy as np
 import pytest
 
-from src.engine.oscillator_square import (
+from src.engine.oscillator import (
     SquareWaveFactory,
     SquareWaveStrategy,
     IdealSquareStrategy,
-    BandlimitedSquareStrategy,
     SoftSquareStrategy,
-    ComparatorSquareStrategy,
 )
 
 
@@ -25,23 +23,11 @@ class TestSquareWaveFactory:
         strategy = SquareWaveFactory.create("ideal")
         assert isinstance(strategy, IdealSquareStrategy)
 
-    def test_factory_creates_bandlimited_strategy(self):
-        """Factory should create bandlimited strategy."""
-        strategy = SquareWaveFactory.create("bandlimited", sample_rate=48000)
-        assert isinstance(strategy, BandlimitedSquareStrategy)
-        assert strategy.sample_rate == 48000
-
     def test_factory_creates_soft_strategy(self):
         """Factory should create soft strategy."""
         strategy = SquareWaveFactory.create("soft", smoothness=15.0)
         assert isinstance(strategy, SoftSquareStrategy)
         assert strategy.smoothness == 15.0
-
-    def test_factory_creates_comparator_strategy(self):
-        """Factory should create comparator strategy."""
-        strategy = SquareWaveFactory.create("comparator", hysteresis=0.05)
-        assert isinstance(strategy, ComparatorSquareStrategy)
-        assert strategy.hysteresis == 0.05
 
     def test_factory_unknown_mode_raises(self):
         """Factory should raise error for unknown mode."""
@@ -53,9 +39,7 @@ class TestSquareWaveFactory:
         modes = SquareWaveFactory.get_available_modes()
         assert isinstance(modes, list)
         assert "ideal" in modes
-        assert "bandlimited" in modes
         assert "soft" in modes
-        assert "comparator" in modes
 
     def test_factory_register_custom_strategy(self):
         """Factory should allow registering custom strategies."""
@@ -129,45 +113,6 @@ class TestIdealSquareStrategy:
         assert result == 0  # Low value
 
 
-class TestBandlimitedSquareStrategy:
-    """Test bandlimited square wave strategy."""
-
-    @pytest.fixture
-    def strategy(self):
-        return BandlimitedSquareStrategy(sample_rate=44100)
-
-    def test_bandlimited_has_blep_table(self, strategy):
-        """Bandlimited strategy should have BLEP table."""
-        assert hasattr(strategy, 'blep_table')
-        assert len(strategy.blep_table) > 0
-        assert isinstance(strategy.blep_table, np.ndarray)
-
-    def test_bandlimited_blep_table_properties(self, strategy):
-        """BLEP table should start at 0 and end at 1."""
-        assert strategy.blep_table[0] == pytest.approx(0, abs=0.01)
-        assert strategy.blep_table[-1] == pytest.approx(1, abs=0.01)
-        # Should be monotonically increasing
-        assert np.all(np.diff(strategy.blep_table) >= 0)
-
-    def test_bandlimited_reduces_high_frequency_content(self, strategy):
-        """Bandlimited square should have less high-frequency content than ideal."""
-        # Generate one period
-        phases = np.linspace(0, 2*np.pi, 1000)
-        threshold = np.pi
-
-        # Compare with ideal
-        ideal = IdealSquareStrategy()
-        ideal_samples = ideal.generate_samples(phases, threshold, -1, 1)
-        bandlimited_samples = strategy.generate_samples(phases, threshold, -1, 1)
-
-        # Check that transitions are smoother (less instant jumps)
-        ideal_diffs = np.abs(np.diff(ideal_samples))
-        bandlimited_diffs = np.abs(np.diff(bandlimited_samples))
-
-        # Ideal should have sharper transitions
-        assert np.max(ideal_diffs) >= np.max(bandlimited_diffs)
-
-
 class TestSoftSquareStrategy:
     """Test soft square wave strategy."""
 
@@ -218,58 +163,10 @@ class TestSoftSquareStrategy:
         assert high_smooth < low_smooth
 
 
-class TestComparatorSquareStrategy:
-    """Test comparator square wave strategy."""
-
-    @pytest.fixture
-    def strategy(self):
-        return ComparatorSquareStrategy(hysteresis=0.01)
-
-    def test_comparator_has_state(self, strategy):
-        """Comparator strategy should maintain state."""
-        assert hasattr(strategy, 'last_state')
-        assert strategy.last_state in [0, 1]
-
-    def test_comparator_hysteresis_prevents_rapid_switching(self, strategy):
-        """Hysteresis should prevent rapid state changes."""
-        threshold = np.pi
-
-        # Generate samples near threshold
-        phases = np.linspace(threshold - 0.05, threshold + 0.05, 20)
-        samples = []
-
-        for phase in phases:
-            sample = strategy.generate_sample(phase, threshold, -1, 1)
-            samples.append(sample)
-
-        # Count transitions
-        transitions = np.sum(np.abs(np.diff(samples)) > 1)
-
-        # Should have few transitions due to hysteresis
-        # (ideal would switch back and forth many times)
-        assert transitions <= 2  # At most one up and one down
-
-    def test_comparator_vectorized_applies_hysteresis(self, strategy):
-        """Vectorized comparator should apply hysteresis smoothing."""
-        threshold = np.pi
-        phases = np.linspace(0, 2*np.pi, 100)
-
-        samples = strategy.generate_samples(phases, threshold, -1, 1)
-
-        # Should have defined high and low regions
-        assert np.max(samples) > 0
-        assert np.min(samples) < 0
-
-        # With hysteresis, there should be smooth transition regions
-        # (not all samples are exactly ±1)
-        unique_values = len(np.unique(samples))
-        assert unique_values > 2  # More than just high and low
-
-
 class TestStrategyConsistency:
     """Test consistency across all strategies."""
 
-    @pytest.fixture(params=["ideal", "bandlimited", "soft", "comparator"])
+    @pytest.fixture(params=["ideal", "soft"])
     def strategy_name(self, request):
         return request.param
 
@@ -292,12 +189,8 @@ class TestStrategyConsistency:
     def test_all_strategies_have_correct_average(self, strategy_name):
         """All strategies should have average near midpoint for 50% duty cycle."""
         kwargs = {}
-        if strategy_name == "bandlimited":
-            kwargs["sample_rate"] = 44100
-        elif strategy_name == "soft":
+        if strategy_name == "soft":
             kwargs["smoothness"] = 10.0
-        elif strategy_name == "comparator":
-            kwargs["hysteresis"] = 0.01
 
         strategy = SquareWaveFactory.create(strategy_name, **kwargs)
 

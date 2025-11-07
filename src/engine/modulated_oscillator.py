@@ -248,8 +248,8 @@ class ModulatedOscillator(Generator):
             SineOscillator,
             TriangleOscillator,
             SawtoothOscillator,
+            SquareOscillator
         )
-        from src.engine.oscillator_square import SquareOscillator
 
         # Step 1: Generate all modulator values in bulk (vectorized)
         mod_arrays = []

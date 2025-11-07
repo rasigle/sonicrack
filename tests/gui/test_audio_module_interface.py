@@ -3,7 +3,7 @@
 import pytest
 from PyQt6.QtWidgets import QApplication
 
-from src.engine import SineOscillator
+from src.engine.oscillator import SineOscillator, TriangleOscillator, SawtoothOscillator, SquareOscillator
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.modules.mixer import MixerModule
 from src.gui.modules.oscillator import OscillatorModule
@@ -27,16 +27,32 @@ def test_oscillator_interface(qapp):
     # Check module type (property, not method)
     assert module.metadata.category == ModuleCategory.SOURCE
 
-    # Check no required inputs
+    # Check no required inputs (oscillator is a source)
     assert module.get_required_inputs() == []
     assert module.get_modulation_inputs() == []
 
-    # Check component creation
+    # Check component creation with no ports connected returns None
     component = module.create_engine_component(
         input_components=None, modulation_components=None
     )
-    assert component is not None
-    assert isinstance(component, SineOscillator)
+    assert component is None
+
+    # Check that get_output_component returns oscillators for each port
+    # Note: These create new oscillator instances each time
+    sine_component = module.get_output_component("Sine")
+    assert sine_component is None or isinstance(sine_component, SineOscillator)
+
+    triangle_component = module.get_output_component("Triangle")
+    assert triangle_component is None  # No cables connected
+
+    square_component = module.get_output_component("Square")
+    assert square_component is None  # No cables connected
+
+    # Check that module has the expected output ports
+    assert hasattr(module, 'sine_port')
+    assert hasattr(module, 'triangle_port')
+    assert hasattr(module, 'sawtooth_port')
+    assert hasattr(module, 'square_port')
 
 
 def test_volume_interface(qapp):

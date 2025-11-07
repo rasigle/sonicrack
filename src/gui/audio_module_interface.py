@@ -95,19 +95,82 @@ class AudioModule(ABC):
         This is called by the patch compiler to instantiate the actual
         audio processing component based on the module's current parameters.
 
+        **IMPORTANT**: This method is called when:
+        - The module has a single output, OR
+        - The module has multiple outputs but get_output_component() is NOT implemented
+
+        For modules with multiple INDEPENDENT outputs (e.g., Oscillator with Sine,
+        Triangle, Square, Sawtooth), implement get_output_component() instead.
+        This method will then only be called if get_output_component() is not defined.
+
         Args:
             input_components: List of compiled audio components from input
                 connections.
-                For SOURCE modules, this is None.
-                For MODIFIER modules, this contains exactly one component.
-                For MIXER modules, this contains multiple components.
+                - SOURCE modules: None (generate audio from scratch)
+                - MODIFIER modules: Exactly one component (transform audio)
+                - MIXER modules: Multiple components (combine audio)
             modulation_components: Dictionary mapping modulation port names to
-                their compiled components (e.g., {"mod": lfo_component})
+                their compiled components (e.g., {"freq_mod": lfo_component})
 
         Returns:
             The audio engine component (Oscillator, Envelope, Chain, etc.)
+
+        Examples:
+            # Simple oscillator (single output):
+            return SineOscillator(self.freq_knob.get_value())
+
+            # Volume modifier (transforms input):
+            return Volume(amplitude=self.gain_knob.get_value())
+
+            # Mixer (combines inputs):
+            processed = [Chain(inp, Volume(gain)) for inp, gain in ...]
+            return WaveAdder(*processed, mix_mode="sum")
         """
         pass
+
+    def get_output_component(self, port_name: str) -> AudioComponent | None:
+        """Get the component for a SPECIFIC output port.
+
+        **OPTIONAL METHOD**: Only implement this if your module has multiple
+        INDEPENDENT outputs that should produce different signals.
+
+        If this method is implemented, it takes precedence over create_engine_component()
+        when building connections from this module's outputs.
+
+        **When to implement this:**
+        - Module has multiple output ports (Sine, Triangle, Square, Sawtooth)
+        - Each output should produce a DIFFERENT signal (not mixed together)
+        - Example: Oscillator module where each waveform is independent
+
+        **When NOT to implement this:**
+        - Module has single output → use create_engine_component() only
+        - Multiple outputs should produce the SAME signal → use create_engine_component()
+        - Example: LFO that broadcasts the same signal to multiple destinations
+
+        Args:
+            port_name: Name of the output port (e.g., "Sine", "Triangle")
+
+        Returns:
+            The audio component for that specific output port, or None if
+            the port is not connected or invalid.
+
+        Example (Oscillator with independent outputs):
+            def get_output_component(self, port_name: str):
+                freq = self.freq_knob.get_value()
+                if port_name == "Sine":
+                    return SineOscillator(freq)
+                elif port_name == "Triangle":
+                    return TriangleOscillator(freq)
+                elif port_name == "Square":
+                    return SquareOscillator(freq)
+                return None
+
+        Note:
+            If this method is NOT implemented, the patch compiler will fall back
+            to calling create_engine_component() and use that for ALL outputs.
+        """
+        # Default: not implemented - use create_engine_component() instead
+        return None
 
     def get_required_inputs(self) -> list[str]:
         """Return list of required input port names.

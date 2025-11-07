@@ -22,7 +22,7 @@ from src.engine.audio_component_registry import (
 from src.utils.utils import track_provided_args, filter_provided_args
 
 # Type alias for square wave modes
-SquareWaveMode = Literal["ideal", "bandlimited", "soft", "comparator"]
+SquareWaveMode = Literal["ideal", "ideal_smooth","soft"]
 
 
 class SquareWaveStrategy(ABC):
@@ -102,84 +102,42 @@ class IdealSquareStrategy(SquareWaveStrategy):
         return np.where(phases < pulsewidth_threshold, high_value, low_value).astype(np.float32)
 
 
-class BandlimitedSquareStrategy(SquareWaveStrategy):
-    """Bandlimited square wave using MinBLEP (Minimum-phase Band-Limited Step).
+class IdealSquareStrategySmoothing(SquareWaveStrategy):
+    """Ideal (aliased) square wave with amplitude smoothing.
 
-    Reduces aliasing by applying a bandlimited step function at transitions.
-    This creates a cleaner, more professional sound at high frequencies.
+    This variant of the ideal square wave includes amplitude smoothing
+    to reduce clicks when changing amplitude or other parameters.
 
-    Best for: High-quality synthesis, anti-aliasing required
-    Note: Higher CPU cost than ideal square
+    Best for: Low frequencies, retro sounds, CPU efficiency,
+    with reduced clicks on parameter changes.
     """
 
-    def __init__(self, sample_rate: float = 44100):
-        """Initialize bandlimited strategy.
+    def __init__(self, smoothing_time_ms: float = 5.0, sample_rate: float = 44100):
+        """Initialize ideal square strategy with amplitude smoothing.
 
         Args:
-            sample_rate: Sample rate in Hz (for BLEP kernel generation)
+            smoothing_time_ms: Time in milliseconds for amplitude transitions
+            sample_rate: Sample rate for calculating smoothing samples
         """
+        self.smoothing_time_ms = smoothing_time_ms
         self.sample_rate = sample_rate
-        # MinBLEP kernel parameters
-        self.blep_length = 64  # Samples in BLEP kernel
-        self.oversampling = 16  # BLEP table oversampling
-        self._generate_blep_table()
 
-        # State for edge detection
-        self.last_phase = 0.0
+        # Smoothing state
+        self._current_amplitude = 1.0
+        self._target_amplitude = 1.0
+        self._smoothing_samples_remaining = 0
 
-    def _generate_blep_table(self):
-        """Generate MinBLEP lookup table.
-
-        The MinBLEP kernel is a minimum-phase bandlimited step function
-        used to replace discontinuous transitions.
-        """
-        import sys
-        print("[BLEP] Starting table generation...", file=sys.stderr, flush=True)
-
-        # Create bandlimited step using sinc interpolation
-        n = self.blep_length * self.oversampling
-        print(f"[BLEP] n={n}", file=sys.stderr, flush=True)
-
-        t = np.arange(n) / self.oversampling - self.blep_length / 2
-        print(f"[BLEP] t created, len={len(t)}", file=sys.stderr, flush=True)
-
-        # Sinc function with Blackman window
-        sinc = np.sinc(t)
-        print(f"[BLEP] sinc created", file=sys.stderr, flush=True)
-
-        window = np.blackman(n)
-        print(f"[BLEP] window created", file=sys.stderr, flush=True)
-
-        # Integrate to get step function (BLEP is integral of BLAMP)
-        blep = np.cumsum(sinc * window)
-        print(f"[BLEP] cumsum done", file=sys.stderr, flush=True)
-
-        blep = blep - blep[0]  # Start at 0
-        blep = blep / blep[-1]  # End at 1
-        print(f"[BLEP] normalized", file=sys.stderr, flush=True)
-
-        # Ensure monotonically increasing and clamp to [0, 1]
-        blep = np.maximum.accumulate(blep)  # Force monotonic increasing
-        blep = np.clip(blep, 0, 1)  # Ensure [0, 1] range
-        print(f"[BLEP] clamped", file=sys.stderr, flush=True)
-
-        self.blep_table = blep.astype(np.float32)
-        print(f"[BLEP] Table generation complete, len={len(self.blep_table)}", file=sys.stderr, flush=True)
-
-    def _apply_blep(self, phase: float, output: float, last_phase: float) -> float:
-        """Apply BLEP correction at phase discontinuities.
+    def set_amplitude(self, amplitude: float):
+        """Set target amplitude with smoothing.
 
         Args:
-            phase: Current phase
-            output: Current output value
-            last_phase: Previous phase
-
-        Returns:
-            Corrected output value
+            amplitude: New target amplitude
         """
-        # Detect edge crossing (phase wraps or crosses pulsewidth threshold)
-        # Simplified for single sample - full implementation would track edges
-        return output  # Placeholder - full BLEP requires state tracking
+        if abs(amplitude - self._current_amplitude) > 0.001:
+            self._target_amplitude = amplitude
+            self._smoothing_samples_remaining = int(
+                self.smoothing_time_ms * self.sample_rate / 1000
+            )
 
     def generate_sample(
         self,
@@ -188,14 +146,24 @@ class BandlimitedSquareStrategy(SquareWaveStrategy):
         low_value: float,
         high_value: float,
     ) -> float:
-        # Ideal square as base
-        ideal = high_value if phase < pulsewidth_threshold else low_value
+        # Generate ideal square value
+        val = high_value if phase < pulsewidth_threshold else low_value
 
-        # Apply BLEP correction (simplified - full version needs edge buffer)
-        corrected = self._apply_blep(phase, ideal, self.last_phase)
-        self.last_phase = phase
+        # Apply smoothing if active
+        if self._smoothing_samples_remaining > 0:
+            # Calculate smoothing factor for this sample
+            progress = 1.0 - (self._smoothing_samples_remaining /
+                            (self.smoothing_time_ms * self.sample_rate / 1000))
+            current_amp = (self._current_amplitude +
+                          (self._target_amplitude - self._current_amplitude) * progress)
 
-        return corrected
+            self._smoothing_samples_remaining -= 1
+            if self._smoothing_samples_remaining <= 0:
+                self._current_amplitude = self._target_amplitude
+
+            return val * current_amp
+
+        return val * self._current_amplitude
 
     def generate_samples(
         self,
@@ -204,78 +172,38 @@ class BandlimitedSquareStrategy(SquareWaveStrategy):
         low_value: float,
         high_value: float,
     ) -> np.ndarray:
-        # Generate ideal square wave (convert to float64 for BLEP corrections)
-        output = np.where(phases < pulsewidth_threshold, high_value, low_value).astype(np.float64)
+        n = len(phases)
 
-        # Detect transitions (where output changes)
-        transitions = np.diff(output, prepend=output[0])
-        transition_indices = np.where(transitions != 0)[0]
+        # Generate ideal square wave
+        val = np.where(phases < pulsewidth_threshold, high_value, low_value)
 
-        # DEBUG: Log transition detection
-        import sys
-        if len(transition_indices) > 0:
-            print(f"[BLEP DEBUG] Found {len(transition_indices)} transitions at indices: {transition_indices[:5]}", file=sys.stderr, flush=True)
-            print(f"[BLEP DEBUG] Transition heights: {transitions[transition_indices][:5]}", file=sys.stderr, flush=True)
-            print(f"[BLEP DEBUG] BLEP table length: {len(self.blep_table)}, downsampled: {len(self.blep_table[::self.oversampling])}", file=sys.stderr, flush=True)
+        # Apply amplitude with smoothing if transitioning (prevents clicks!)
+        if self._smoothing_samples_remaining > 0:
+            # Calculate how many samples to smooth in this buffer
+            smooth_count = min(n, self._smoothing_samples_remaining)
 
-        # Apply BLEP at each transition
-        corrections_applied = 0
-        for idx in transition_indices:
-            # Apply BLEP kernel centered at transition
-            blep_start = max(0, idx - self.blep_length // 2)
-            blep_end = min(len(output), idx + self.blep_length // 2)
-            blep_range = blep_end - blep_start
+            # Create smooth amplitude envelope (linear ramp)
+            amp_envelope = np.linspace(
+                self._current_amplitude, self._target_amplitude, smooth_count
+            )
 
-            if blep_range > 0 and blep_range <= self.blep_length:
-                # Get downsampled BLEP table
-                blep_downsampled = self.blep_table[::self.oversampling]
+            # Apply smoothed amplitude to first part
+            samples = np.zeros(n, dtype=np.float32)
+            samples[:smooth_count] = val[:smooth_count] * amp_envelope
 
-                # Calculate which part of the BLEP table to use
-                # If we're at the start of the array, use latter part of BLEP
-                # If we're at the end, use earlier part
-                offset = idx - blep_start
-                table_start = self.blep_length // 2 - offset
-                table_end = table_start + blep_range
+            # Apply target amplitude to rest (if any)
+            if smooth_count < n:
+                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
 
-                # Clamp to valid range
-                table_start = max(0, min(len(blep_downsampled) - blep_range, table_start))
-                table_end = table_start + blep_range
+            # Update state
+            self._smoothing_samples_remaining -= smooth_count
+            if self._smoothing_samples_remaining <= 0:
+                self._current_amplitude = self._target_amplitude
 
-                if table_end <= len(blep_downsampled):
-                    kernel_slice = blep_downsampled[table_start:table_end]
-                    transition_height = transitions[idx]
-
-                    # Apply BLEP residual correction
-                    # BLEP table goes from 0 to 1, representing the smooth step
-                    # We center it at 0.5 and apply the full transition height
-                    # This creates smooth transitions that may slightly overshoot,
-                    # which is normal and necessary for proper bandlimiting
-                    correction = (kernel_slice - 0.5) * transition_height
-
-                    # DEBUG
-                    if corrections_applied == 0:
-                        print(f"[BLEP DEBUG] First correction at idx {idx}:", file=sys.stderr, flush=True)
-                        print(f"  kernel_slice range: [{kernel_slice.min():.4f}, {kernel_slice.max():.4f}]", file=sys.stderr, flush=True)
-                        print(f"  transition_height: {transition_height:.4f}", file=sys.stderr, flush=True)
-                        print(f"  correction range: [{correction.min():.4f}, {correction.max():.4f}]", file=sys.stderr, flush=True)
-                        print(f"  applying to output[{blep_start}:{blep_end}]", file=sys.stderr, flush=True)
-
-                    output[blep_start:blep_end] += correction
-                    corrections_applied += 1
-
-        # DEBUG: Summary
-        if len(transition_indices) > 0:
-            print(f"[BLEP DEBUG] Applied {corrections_applied}/{len(transition_indices)} corrections", file=sys.stderr, flush=True)
-            print(f"[BLEP DEBUG] Output after BLEP: min={output.min():.4f}, max={output.max():.4f}", file=sys.stderr, flush=True)
-
-        # NOTE: Do NOT clamp here! The BLEP correction intentionally creates smooth
-        # transitions that may slightly exceed the output range. Clamping would
-        # flatten these transitions and destroy the antialiasing effect.
-        # The small overshoot (typically < 10%) is normal for BLEP and represents
-        # the Gibbs phenomenon being minimized through bandlimiting.
-
-        return output
-
+            return samples
+        else:
+            # No smoothing needed - just apply current amplitude
+            return (val * self._current_amplitude).astype(np.float32)
 
 
 class SoftSquareStrategy(SquareWaveStrategy):
@@ -347,91 +275,6 @@ class SoftSquareStrategy(SquareWaveStrategy):
         return low_value + (high_value - low_value) * (smooth_step + 1) / 2
 
 
-class ComparatorSquareStrategy(SquareWaveStrategy):
-    """Comparator-based square wave (sine comparison with hysteresis).
-
-    Simulates a hardware comparator circuit by comparing a sine wave
-    against a threshold, with optional hysteresis for stability.
-
-    Best for: Analog emulation, circuit modeling
-    """
-
-    def __init__(self, hysteresis: float = 0.01):
-        """Initialize comparator strategy.
-
-        Args:
-            hysteresis: Hysteresis amount (0.0 to 0.1)
-                0.0 = no hysteresis (instant switching)
-                0.1 = 10% hysteresis (more stable)
-        """
-        self.hysteresis = hysteresis
-        self.last_state = 1  # Start high
-
-    def generate_sample(
-        self,
-        phase: float,
-        pulsewidth_threshold: float,
-        low_value: float,
-        high_value: float,
-    ) -> float:
-        # Convert phase to sine value for comparison
-        sine_value = np.sin(phase)
-
-        # Calculate threshold from pulsewidth
-        # pulsewidth_threshold is in phase (0-2π)
-        # Convert to sine threshold
-        threshold = np.cos(pulsewidth_threshold / 2)
-
-        # Apply hysteresis
-        if self.last_state == 1:  # Currently high
-            switch_threshold = threshold - self.hysteresis
-            if sine_value < switch_threshold:
-                self.last_state = 0
-        else:  # Currently low
-            switch_threshold = threshold + self.hysteresis
-            if sine_value > switch_threshold:
-                self.last_state = 1
-
-        return high_value if self.last_state == 1 else low_value
-
-    def generate_samples(
-        self,
-        phases: np.ndarray,
-        pulsewidth_threshold: float,
-        low_value: float,
-        high_value: float,
-    ) -> np.ndarray:
-        # Generate sine wave for comparison
-        sine_values = np.sin(phases)
-
-        # Calculate threshold from pulsewidth
-        threshold = np.cos(pulsewidth_threshold / 2)
-
-        # Apply hysteresis (simplified - full version would track state)
-        # Convert to float32 to allow hysteresis modifications
-        output = np.where(sine_values > threshold, high_value, low_value).astype(np.float32)
-
-        # Apply hysteresis smoothing
-        if self.hysteresis > 0:
-            # Create transition regions
-            lower_threshold = threshold - self.hysteresis
-            upper_threshold = threshold + self.hysteresis
-
-            # Find transition zones
-            in_lower = (sine_values >= lower_threshold) & (sine_values <= threshold)
-            in_upper = (sine_values >= threshold) & (sine_values <= upper_threshold)
-
-            # Smooth transitions in hysteresis zones
-            output[in_lower] = low_value + (high_value - low_value) * (
-                (sine_values[in_lower] - lower_threshold) / (2 * self.hysteresis)
-            )
-            output[in_upper] = low_value + (high_value - low_value) * (
-                0.5 + (sine_values[in_upper] - threshold) / (2 * self.hysteresis)
-            )
-
-        return output
-
-
 class SquareWaveFactory:
     """Factory for creating square wave strategy instances.
 
@@ -441,9 +284,8 @@ class SquareWaveFactory:
 
     _strategies = {
         "ideal": IdealSquareStrategy,
-        "bandlimited": BandlimitedSquareStrategy,
+        "ideal_smooth": IdealSquareStrategySmoothing,
         "soft": SoftSquareStrategy,
-        "comparator": ComparatorSquareStrategy,
     }
 
     @classmethod
@@ -457,13 +299,11 @@ class SquareWaveFactory:
         Args:
             mode: Type of square wave generation
                 - "ideal": Traditional square wave (instant transitions)
-                - "bandlimited": MinBLEP antialiased square wave
+                - "ideal_smooth": Ideal square with amplitude smoothing (reduces clicks)
                 - "soft": Smooth transitions using tanh()
-                - "comparator": Sine comparator with hysteresis
             **kwargs: Strategy-specific parameters
-                For "bandlimited": sample_rate
+                For "ideal_smooth": smoothing_time_ms (default 5.0), sample_rate
                 For "soft": smoothness (1.0-100.0)
-                For "comparator": hysteresis (0.0-0.1)
 
         Returns:
             SquareWaveStrategy instance
@@ -475,14 +315,13 @@ class SquareWaveFactory:
             >>> # Ideal square wave
             >>> strategy = SquareWaveFactory.create("ideal")
 
-            >>> # Bandlimited square
-            >>> strategy = SquareWaveFactory.create("bandlimited", sample_rate=48000)
+            >>> # Ideal square with amplitude smoothing
+            >>> strategy = SquareWaveFactory.create("ideal_smooth",
+            ...                                      smoothing_time_ms=10.0,
+            ...                                      sample_rate=48000)
 
             >>> # Soft square with custom smoothness
             >>> strategy = SquareWaveFactory.create("soft", smoothness=20.0)
-
-            >>> # Comparator with hysteresis
-            >>> strategy = SquareWaveFactory.create("comparator", hysteresis=0.05)
         """
         if mode not in cls._strategies:
             raise ValueError(
@@ -590,27 +429,20 @@ class SquareOscillator(SineOscillator):
                 Default: 0.5
             mode: Square wave generation algorithm. Options:
                 - "ideal": Traditional square wave (instant transitions, aliasing)
-                - "bandlimited": MinBLEP antialiased square wave (clean, CPU intensive)
+                - "ideal_smooth": Ideal square with amplitude smoothing (reduces clicks)
                 - "soft": Smooth transitions using tanh() (warm, reduced aliasing)
-                - "comparator": Sine comparator with hysteresis (analog emulation)
                 Default: "ideal"
             **mode_kwargs: Algorithm-specific parameters:
-                - For "bandlimited": No additional parameters (uses sample_rate)
+                - For "ideal_smooth": smoothing_time_ms (default 5.0), sample_rate
                 - For "soft": smoothness (1.0-100.0, default 10.0)
-                - For "comparator": hysteresis (0.0-0.1, default 0.01)
 
         Examples:
             >>> # Standard square wave (50% duty cycle, ideal algorithm)
             >>> osc = SquareOscillator(frequency=440)
 
-            >>> # Narrow pulse with bandlimited algorithm (antialiased)
-            >>> osc = SquareOscillator(frequency=880, pulsewidth=0.2, mode="bandlimited")
-
             >>> # Soft square with custom smoothness
             >>> osc = SquareOscillator(frequency=220, mode="soft", smoothness=20.0)
 
-            >>> # Comparator mode with hysteresis (analog emulation)
-            >>> osc = SquareOscillator(frequency=110, mode="comparator", hysteresis=0.05)
         """
         # Filter to pass only arguments explicitly provided by user
         kwargs = filter_provided_args(
@@ -619,7 +451,6 @@ class SquareOscillator(SineOscillator):
             amplitude=amplitude,
             gain_db=gain_db,
             phase=phase,
-            sample_rate=sample_rate,
             wave_range=wave_range,
         )
         super().__init__(**kwargs)
@@ -637,11 +468,6 @@ class SquareOscillator(SineOscillator):
         # pulsewidth of 0.5 = threshold of π (50% duty cycle)
         # pulsewidth of 0.25 = threshold of π/2 (25% of cycle is high)
         self._pulsewidth_threshold = pulsewidth * 2 * np.pi
-
-        # Create square wave generation strategy
-        # Pass sample_rate for bandlimited mode
-        if mode == "bandlimited" and "sample_rate" not in mode_kwargs:
-            mode_kwargs["sample_rate"] = sample_rate
 
         self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)
         self._mode_kwargs = mode_kwargs
@@ -694,23 +520,16 @@ class SquareOscillator(SineOscillator):
         Args:
             mode: New generation algorithm
             **mode_kwargs: Algorithm-specific parameters
-                - For "bandlimited": (uses existing sample_rate)
                 - For "soft": smoothness (1.0-100.0)
-                - For "comparator": hysteresis (0.0-0.1)
 
         Examples:
             >>> osc = SquareOscillator(frequency=440, mode="ideal")
-            >>> osc.set_mode("bandlimited")  # Switch to antialiased
             >>> osc.set_mode("soft", smoothness=15.0)  # Soft with custom smoothness
             >>> osc.set_mode("comparator", hysteresis=0.03)  # Comparator mode
         """
         # Update mode
         self._mode = mode
         self._mode_kwargs = mode_kwargs
-
-        # Pass sample_rate for bandlimited mode if not provided
-        if mode == "bandlimited" and "sample_rate" not in mode_kwargs:
-            mode_kwargs["sample_rate"] = self._sample_rate
 
         # Create new strategy
         self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)
@@ -725,7 +544,7 @@ class SquareOscillator(SineOscillator):
         Example:
             >>> modes = SquareOscillator.get_available_modes()
             >>> print(modes)
-            ['ideal', 'bandlimited', 'soft', 'comparator']
+            ['ideal', 'soft']
         """
         return SquareWaveFactory.get_available_modes()
 
@@ -772,32 +591,6 @@ class SquareOscillator(SineOscillator):
             low_value=self._wave_range[0],
             high_value=self._wave_range[1],
         )
-
-        # # Apply amplitude with smoothing if transitioning (prevents clicks!)
-        # if self._smoothing_samples_remaining > 0:
-        #     # ...existing smoothing code...
-        #     # Calculate how many samples to smooth in this buffer
-        #     smooth_count = min(n, self._smoothing_samples_remaining)
-        #
-        #     # Create smooth amplitude envelope (linear ramp)
-        #     amp_envelope = np.linspace(
-        #         self._current_amplitude, self._target_amplitude, smooth_count
-        #     )
-        #
-        #     # Apply smoothed amplitude to first part
-        #     samples = np.zeros(n, dtype=np.float32)
-        #     samples[:smooth_count] = val[:smooth_count] * amp_envelope
-        #
-        #     # Apply target amplitude to rest (if any)
-        #     if smooth_count < n:
-        #         samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
-        #
-        #     # Update state
-        #     self._smoothing_samples_remaining -= smooth_count
-        #     if self._smoothing_samples_remaining <= 0:
-        #         self._current_amplitude = self._target_amplitude
-        # else:
-        #     # No smoothing needed - direct multiplication
 
         samples = val * self._a
 

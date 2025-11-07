@@ -55,7 +55,7 @@ from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_GAIN_DB
 from src.engine.audio_component import Generator, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.utils.math import db_to_linear, linear_to_db, squish_val
-from src.utils.utils import track_provided_args, filter_provided_args
+from src.utils.utils import track_provided_args
 
 DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS = 10  # 10 milliseconds
 """Default duration for amplitude smoothing to prevent clicks"""
@@ -758,206 +758,6 @@ class SineOscillator(Oscillator):
         return samples.astype(np.float32)
 
 
-@register_component()
-class SquareOscillator(SineOscillator):
-    """Square wave generator built on sine reference.
-
-    The square wave threshold compares the underlying sine value to `threshold`
-    and yields either `wave_range[0]` or `wave_range[1]` accordingly.
-    """
-
-    descriptor = ComponentDescriptor(
-        name="Square",
-        category=ComponentCategory.OSCILLATOR,
-        description="Square/Pulse wave oscillator with variable pulse width",
-        tags=["basic", "oscillator", "square", "pulse"],
-        fluent_api_name="square",
-        config_params=[
-            "frequency",
-            "gain_db",
-            "amplitude",
-            "phase",
-            "sample_rate",
-            "wave_range",
-            "pulsewidth",
-        ],
-    )
-
-    @track_provided_args
-    def __init__(
-        self,
-        frequency: float = 440,
-        amplitude: float = 1.0,
-        gain_db: float | None = DEFAULT_GAIN_DB,
-        phase: float = 0.0,
-        sample_rate: int | float = DEFAULT_SAMPLE_RATE,
-        wave_range: tuple[float, float] = (-1, 1),
-        threshold: float = 0,
-        pulsewidth: float = 0.5,
-    ):
-        """Construct a square/pulse oscillator with variable pulse width.
-
-        Args:
-            frequency: Initial frequency in Hz.
-            amplitude: Linear amplitude (0.0 to 1.0+). Default: 1.0
-                Note: Ignored if gain_db is specified.
-            gain_db: Gain in decibels. Default: -20.0 (safe for mixing)
-                Overrides amplitude if provided.
-                Set to None to use amplitude parameter instead.
-            phase: Initial phase in degrees. Defaults to 0.0.
-            sample_rate: Samples per second. Defaults to `DEFAULT_SAMPLE_RATE`.
-            wave_range: Tuple specifying value range (min, max) of raw waveform before
-                amplitude scaling. Defaults to (-1, 1).
-                Advanced feature - most users should leave as default.
-            threshold: Threshold used on sine reference to decide polarity.
-                Deprecated - use pulsewidth instead.
-            pulsewidth: Pulse width as fraction of period (0.0 to 1.0).
-                0.5 = traditional square wave (50% duty cycle)
-                0.1 = narrow pulse (10% high, 90% low)
-                0.9 = wide pulse (90% high, 10% low)
-                Default: 0.5
-
-        Note:
-            If both threshold and pulsewidth are provided, pulsewidth takes precedence.
-            The threshold parameter is maintained for backward compatibility.
-        """
-        # Filter to pass only arguments explicitly provided by user
-        kwargs = filter_provided_args(
-            self._provided_args,  # noqa
-            frequency=frequency,
-            amplitude=amplitude,
-            gain_db=gain_db,
-            phase=phase,
-            sample_rate=sample_rate,
-            wave_range=wave_range,
-        )
-        super().__init__(**kwargs)
-
-        # Validate pulsewidth
-        if not 0.0 <= pulsewidth <= 1.0:
-            raise ValueError(
-                f"pulsewidth must be between 0.0 and 1.0, got {pulsewidth}"
-            )
-
-        self._pulsewidth = pulsewidth
-
-        # Convert pulsewidth to phase threshold for compatibility with existing logic
-        # pulsewidth of 0.5 = threshold of 0 (sine crosses zero at 50% of cycle)
-        # pulsewidth of 0.25 = threshold where sine = 1 (25% of cycle is high)
-        # Use phase comparison instead of sine threshold for more intuitive control
-        self._pulsewidth_threshold = pulsewidth * 2 * np.pi
-
-        # Backward compatibility: if threshold was explicitly set, warn user
-        if "threshold" in self._provided_args and threshold != 0:  # noqa
-            logging.warning(
-                "Using deprecated 'threshold' parameter. Consider using 'pulsewidth' instead. "
-                f"Current threshold={threshold}, pulsewidth={pulsewidth}"
-            )
-            # Keep the old threshold for backward compatibility if explicitly set
-            self.threshold = threshold
-        else:
-            # Use pulsewidth-based threshold
-            self.threshold = threshold  # Keep for any legacy code that might access it
-
-    @property
-    def pulsewidth(self) -> float:
-        """float: Current pulse width (0.0 to 1.0).
-
-        Returns the duty cycle as a fraction of the period.
-        0.5 = traditional square wave (50% duty cycle)
-        0.1 = narrow pulse (10% high)
-        0.9 = wide pulse (90% high)
-        """
-        return self._pulsewidth
-
-    @pulsewidth.setter
-    def pulsewidth(self, value: float):
-        """Set pulse width and update internal threshold.
-
-        Args:
-            value: Pulse width between 0.0 and 1.0
-
-        Raises:
-            ValueError: If value is outside the range [0.0, 1.0]
-        """
-        if not 0.0 <= value <= 1.0:
-            raise ValueError(f"pulsewidth must be between 0.0 and 1.0, got {value}")
-        self._pulsewidth = value
-        self._pulsewidth_threshold = value * 2 * np.pi
-
-    def __next__(self):
-        """Return next square sample and advance internal phase.
-
-        Returns:
-            float: Next square sample scaled by amplitude.
-        """
-        # Use phase-based comparison for more accurate pulse width control
-        # Compare current phase (wrapped to 0-2π) with pulsewidth threshold
-        current_phase = (self._i + self._p) % (2 * np.pi)
-        val = (
-            self._wave_range[1]
-            if current_phase < self._pulsewidth_threshold
-            else self._wave_range[0]
-        )
-
-        # Optimized phase wrapping: only wrap when needed (10-15% faster)
-        self._i += self._step
-        if self._i >= 2 * np.pi:
-            self._i -= 2 * np.pi
-
-        return val * self._a
-
-    def get_samples_vectorized(self, n: int) -> np.ndarray:
-        """Generate n samples using NumPy vectorization.
-
-        Returns:
-            np.ndarray: Array of square samples (float32).
-        """
-        # Generate phase values for all samples (optimized: pre-add phase offset)
-        phases = (self._i + self._p) + self._step * np.arange(n)
-
-        # Wrap phases to 0-2π for pulse width comparison
-        wrapped_phases = phases % (2 * np.pi)
-
-        # Use phase-based comparison for accurate pulse width control
-        val = np.where(
-            wrapped_phases < self._pulsewidth_threshold,
-            self._wave_range[1],
-            self._wave_range[0],
-        )
-
-        # Apply amplitude with smoothing if transitioning (prevents clicks!)
-        if self._smoothing_samples_remaining > 0:
-            # Calculate how many samples to smooth in this buffer
-            smooth_count = min(n, self._smoothing_samples_remaining)
-
-            # Create smooth amplitude envelope (linear ramp)
-            amp_envelope = np.linspace(
-                self._current_amplitude, self._target_amplitude, smooth_count
-            )
-
-            # Apply smoothed amplitude to first part
-            samples = np.zeros(n, dtype=np.float32)
-            samples[:smooth_count] = val[:smooth_count] * amp_envelope
-
-            # Apply target amplitude to rest (if any)
-            if smooth_count < n:
-                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
-
-            # Update state
-            self._smoothing_samples_remaining -= smooth_count
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
-        else:
-            # No smoothing needed - direct multiplication
-            samples = val * self._a
-
-        # Update internal state with phase wrapping
-        self._i = (self._i + self._step * n) % (2 * np.pi)
-
-        return samples.astype(np.float32)
-
-
 def synth(
     frequency: float = 440,
     dur: float = 1.0,
@@ -986,6 +786,8 @@ def synth(
         raise ValueError("Frequency must be non-negative.")
 
     n_samples = int(dur * sr)
+
+    from src.engine.oscillator_square import SquareOscillator
 
     stype = stype.lower()
     if stype == "sin":

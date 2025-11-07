@@ -334,7 +334,7 @@ class WaveAdder(Composer):
         self.mix_mode = mix_mode
 
         # Debug logging
-        logger.info(
+        logger.debug(
             f"WaveAdder initialized: {len(generators)} generators, "
             f"stereo={stereo}, mix_mode={mix_mode!r}"
         )

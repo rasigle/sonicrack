@@ -98,9 +98,11 @@ class AudioComponentRegistry:
 
         # Check if already registered
         if descriptor.name in self._components and not override:
+            existing_component = self._components[descriptor.name]
             logger.warning(
-                f"Component '{descriptor.name}' already registered, skipping. "
-                f"Use override=True to replace."
+                f"Skipping component '{descriptor.name}' provided from "
+                f"'{component_class.__name__}', because it was already registered from "
+                f"class '{existing_component.__name__}'. Use override=True to replace."
             )
             return
 

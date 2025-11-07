@@ -1,4 +1,3 @@
-
 from src.constants import RESOURCES_PATH
 
 APP_ICON_NAME = "icon.png"

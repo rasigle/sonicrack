@@ -199,4 +199,3 @@ class OscillatorModule(ModuleWidget):
             return self._square_oscillator
 
         return None
-

@@ -201,10 +201,33 @@ class PatchCompiler:
         source_module = connection.parent_module
         source_port_name = connection.port_name
 
+        logger.info(
+            f"_build_component_from_port: source_module={source_module.metadata.title}, port_name='{source_port_name}'"
+        )
+
         # Check if source module has multiple outputs
         if hasattr(source_module, "get_output_component"):
-            return source_module.get_output_component(source_port_name)
+            logger.info(
+                f"_build_component_from_port: {source_module.metadata.title} has get_output_component, calling it"
+            )
+            component = source_module.get_output_component(source_port_name)
+            logger.info(
+                f"_build_component_from_port: get_output_component returned {component}"
+            )
+
+            # If get_output_component returns None, it means the module uses the default
+            # implementation and we should fall back to _build_chain_from_module
+            if component is not None:
+                return component
+            else:
+                logger.info(
+                    f"_build_component_from_port: get_output_component returned None, falling back to _build_chain_from_module"
+                )
+                return self._build_chain_from_module(source_module)
         else:
+            logger.info(
+                f"_build_component_from_port: {source_module.metadata.title} does not have get_output_component, calling _build_chain_from_module"
+            )
             return self._build_chain_from_module(source_module)
 
     def _collect_input_components_from_port(
@@ -533,6 +556,9 @@ class PatchCompiler:
         modulation_components = self._collect_modulation_components(module)
 
         # Create the modifier component
+        logger.info(
+            f"{name}: Calling create_engine_component with input_components=[{input_comp}], modulation_components={modulation_components}"
+        )
         modifier_component = module.create_engine_component(
             input_components=[input_comp],
             modulation_components=(
@@ -540,7 +566,14 @@ class PatchCompiler:
             ),
         )
 
+        logger.info(
+            f"{name}: create_engine_component returned: {modifier_component}, type={type(modifier_component).__name__ if modifier_component else 'None'}"
+        )
+
         if not modifier_component:
+            logger.warning(
+                f"{name}: create_engine_component returned None - skipping module"
+            )
             return None
 
         # Chain input with modifier

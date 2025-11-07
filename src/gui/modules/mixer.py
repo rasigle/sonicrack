@@ -48,11 +48,15 @@ class MixerModule(ModuleWidget):
         # First row of knobs (Ch 1 & 2)
         knobs_row1 = QHBoxLayout()
 
-        self.gain1_knob = Knob("Ch 1", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False)
+        self.gain1_knob = Knob(
+            "Ch 1", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
+        )
         self.gain1_knob.value_changed.connect(lambda: self._on_gain_changed(0))
         knobs_row1.addWidget(self.gain1_knob)
 
-        self.gain2_knob = Knob("Ch 2", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False)
+        self.gain2_knob = Knob(
+            "Ch 2", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
+        )
         self.gain2_knob.value_changed.connect(lambda: self._on_gain_changed(1))
         knobs_row1.addWidget(self.gain2_knob)
 
@@ -61,11 +65,15 @@ class MixerModule(ModuleWidget):
         # Second row of knobs (Ch 3 & 4)
         knobs_row2 = QHBoxLayout()
 
-        self.gain3_knob = Knob("Ch 3", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False)
+        self.gain3_knob = Knob(
+            "Ch 3", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
+        )
         self.gain3_knob.value_changed.connect(lambda: self._on_gain_changed(2))
         knobs_row2.addWidget(self.gain3_knob)
 
-        self.gain4_knob = Knob("Ch 4", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False)
+        self.gain4_knob = Knob(
+            "Ch 4", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
+        )
         self.gain4_knob.value_changed.connect(lambda: self._on_gain_changed(3))
         knobs_row2.addWidget(self.gain4_knob)
 
@@ -122,7 +130,9 @@ class MixerModule(ModuleWidget):
                     f"(Volume obj id={id(vol_comp)})"
                 )
             except (AttributeError, ValueError) as e:
-                logger.warning(f"❌ Failed to hotswap gain for Ch {channel_index + 1}: {e}")
+                logger.warning(
+                    f"❌ Failed to hotswap gain for Ch {channel_index + 1}: {e}"
+                )
         else:
             logger.debug(
                 f"⏭️ Skipping hot-swap for Ch {channel_index + 1}: "
@@ -205,7 +215,9 @@ class MixerModule(ModuleWidget):
                     )
 
             # Use mix_mode='sum' for standard mixer behavior (maintains volume levels)
-            logger.info(f"Creating WaveAdder with mix_mode='sum' for {len(processed_inputs)} inputs")
+            logger.info(
+                f"Creating WaveAdder with mix_mode='sum' for {len(processed_inputs)} inputs"
+            )
             return WaveAdder(*processed_inputs, mix_mode="sum")
 
         return None

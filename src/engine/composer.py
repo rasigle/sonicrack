@@ -32,6 +32,7 @@ Note:
     handling of stereo/mono conversion where needed. They also propagate
     trigger_release() and ended properties to all child components.
 """
+
 import logging
 
 from abc import ABC, abstractmethod

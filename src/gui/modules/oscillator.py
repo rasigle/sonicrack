@@ -75,9 +75,7 @@ class OscillatorModule(ModuleWidget):
             OSCILLATOR_MAX_FREQUENCY,
             OSCILLATOR_DEFAULT_FREQUENCY,
         )
-        self.freq_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("frequency", self.freq_knob.get_value())
-        )
+        self.freq_knob.value_changed.connect(self._on_frequency_changed)
         knobs_layout.addWidget(self.freq_knob)
         layout.addLayout(knobs_layout)
 
@@ -100,11 +98,35 @@ class OscillatorModule(ModuleWidget):
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
         # Track individual oscillator components for hotswap
+        self._sine_oscillator = None
+        self._triangle_oscillator = None
+        self._sawtooth_oscillator = None
         self._square_oscillator = None
 
         self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
+    def _on_frequency_changed(self):
+        """Handle frequency changes - update all connected oscillators."""
+        new_freq = self.freq_knob.get_value()
+
+        # Hotswap: update frequency directly on all connected oscillators
+        try:
+            if self._sine_oscillator is not None:
+                self._sine_oscillator.frequency = new_freq
+            if self._triangle_oscillator is not None:
+                self._triangle_oscillator.frequency = new_freq
+            if self._sawtooth_oscillator is not None:
+                self._sawtooth_oscillator.frequency = new_freq
+            if self._square_oscillator is not None:
+                self._square_oscillator.frequency = new_freq
+
+            self.parameter_changed.emit("frequency", new_freq)
+        except (AttributeError, ValueError) as e:
+            # If hotswap fails, log warning (but don't recreate component)
+            import logging
+            logging.warning(f"Failed to hotswap frequency: {e}")
+
     def _on_pulsewidth_changed(self):
         """Handle pulse width changes - only update square oscillator if connected."""
         if len(self.square_port.cables) > 0 and self._square_oscillator is not None:
@@ -136,19 +158,28 @@ class OscillatorModule(ModuleWidget):
 
         # Create oscillators only for connected outputs
         if len(self.sine_port.cables) > 0:
-            components["Sine"] = SineOscillator(
+            self._sine_oscillator = SineOscillator(
                 freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB
             )
+            components["Sine"] = self._sine_oscillator
+        else:
+            self._sine_oscillator = None
 
         if len(self.triangle_port.cables) > 0:
-            components["Triangle"] = TriangleOscillator(
+            self._triangle_oscillator = TriangleOscillator(
                 freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB
             )
+            components["Triangle"] = self._triangle_oscillator
+        else:
+            self._triangle_oscillator = None
 
         if len(self.sawtooth_port.cables) > 0:
-            components["Sawtooth"] = SawtoothOscillator(
+            self._sawtooth_oscillator = SawtoothOscillator(
                 freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB
             )
+            components["Sawtooth"] = self._sawtooth_oscillator
+        else:
+            self._sawtooth_oscillator = None
 
         if len(self.square_port.cables) > 0:
             self._square_oscillator = SquareOscillator(
@@ -186,11 +217,14 @@ class OscillatorModule(ModuleWidget):
 
         # Return the specific oscillator for the requested output port
         if port_name == "Sine" and len(self.sine_port.cables) > 0:
-            return SineOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+            self._sine_oscillator = SineOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+            return self._sine_oscillator
         elif port_name == "Triangle" and len(self.triangle_port.cables) > 0:
-            return TriangleOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+            self._triangle_oscillator = TriangleOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+            return self._triangle_oscillator
         elif port_name == "Sawtooth" and len(self.sawtooth_port.cables) > 0:
-            return SawtoothOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+            self._sawtooth_oscillator = SawtoothOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+            return self._sawtooth_oscillator
         elif port_name == "Square" and len(self.square_port.cables) > 0:
             # Create and store reference for hot-swapping pulsewidth
             self._square_oscillator = SquareOscillator(

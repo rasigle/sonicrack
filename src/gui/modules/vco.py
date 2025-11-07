@@ -16,10 +16,10 @@ from PyQt6.QtWidgets import (
 from constants import DEFAULT_GAIN_DB
 from src.engine import (
     SineOscillator,
-    SquareOscillator,
     SawtoothOscillator,
     TriangleOscillator,
 )
+from engine import SquareOscillator
 from src.engine.modulated_oscillator import ModulatedOscillator
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob, HSlider

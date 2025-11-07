@@ -8,10 +8,10 @@ from PyQt6.QtWidgets import QHBoxLayout
 from src.engine.composer import WaveAdder
 from src.engine.oscillator import (
     SineOscillator,
-    SquareOscillator,
     SawtoothOscillator,
     TriangleOscillator,
 )
+from engine import SquareOscillator
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
 from src.gui.ui_constants import (

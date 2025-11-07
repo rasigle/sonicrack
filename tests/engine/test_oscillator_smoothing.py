@@ -6,10 +6,10 @@ import pytest
 import numpy as np
 from src.engine.oscillator import (
     SineOscillator,
-    SquareOscillator,
     SawtoothOscillator,
     TriangleOscillator,
 )
+from engine import SquareOscillator
 
 
 @pytest.mark.parametrize(

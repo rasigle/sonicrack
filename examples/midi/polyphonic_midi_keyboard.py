@@ -33,14 +33,14 @@ try:
     )
     from src.engine.midi.input import MIDO_AVAILABLE
     from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
-    from src.engine import (
+    from engine import (
         SineOscillator,
-        SquareOscillator,
         SawtoothOscillator,
         ADSREnvelope,
         Chain,
+        SquareOscillator,
+        ModulatedVolume
     )
-    from src.engine.modifier import ModulatedVolume
     from src.constants import DEFAULT_SAMPLE_RATE
 except ImportError as e:
     print(f"Error: Could not import modules: {e}")

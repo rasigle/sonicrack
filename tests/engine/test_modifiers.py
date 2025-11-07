@@ -1026,7 +1026,7 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
         for ModulatedVolume has been fixed.
         """
         from src.engine.composer import Chain
-        from src.engine.oscillator import SquareOscillator
+        from engine import SquareOscillator
 
         # Create chain with ModulatedVolume (the problematic case)
         osc = SquareOscillator(440, amplitude=0.5, gain_db=None, sample_rate=1000)
@@ -1118,7 +1118,8 @@ class TestChainVectorizationPerformance(unittest.TestCase):
     def test_chain_with_multiple_modulated_modifiers(self):
         """Test Chain with multiple modulated modifiers (complex case)."""
         from src.engine.composer import Chain
-        from src.engine.oscillator import SquareOscillator, TriangleOscillator
+        from src.engine.oscillator import TriangleOscillator
+        from engine import SquareOscillator
         from src.engine.modifier import ModulatedPanner
 
         # This is similar to the user's original code

@@ -5,17 +5,18 @@ This example demonstrates how to use the audio effects with existing audio chain
 Effects can be easily chained together with oscillators and other components.
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
-from src.engine import (
+import numpy as np
+
+from engine import (
     SineOscillator,
-    SquareOscillator,
     Chain,
     Distortion,
     Delay,
     Reverb,
     ADSREnvelope,
     ModulatedOscillator,
+    SquareOscillator
 )
 
 # Set up parameters

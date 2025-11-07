@@ -14,11 +14,11 @@ import numpy as np
 
 from src.engine.oscillator import (
     SineOscillator,
-    SquareOscillator,
     SawtoothOscillator,
     TriangleOscillator,
     synth,
 )
+from engine import SquareOscillator
 
 
 class TestOscillatorBase(unittest.TestCase):

@@ -153,11 +153,11 @@ from src.engine.noise import (
 from src.engine.oscillator import (
     Oscillator,
     SineOscillator,
-    SquareOscillator,
     SawtoothOscillator,
     TriangleOscillator,
     synth,
 )
+from engine.oscillator_square import SquareOscillator
 
 # Effects
 from src.engine.effects import (

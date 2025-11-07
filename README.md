@@ -13,6 +13,12 @@
 
 ---
 
+## 📚 Documentation
+
+**→ [Complete Documentation](docs/README.md)** | **[Quick Start](docs/getting-started/quickstart.md)** | **[API Reference](docs/api-reference/)**
+
+---
+
 ## 🎯 What is AudioPlayground?
 
 AudioPlayground is a **audio synthesis framework** combining:

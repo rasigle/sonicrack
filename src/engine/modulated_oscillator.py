@@ -246,10 +246,10 @@ class ModulatedOscillator(Generator):
         # Import oscillator types for type checking
         from src.engine.oscillator import (
             SineOscillator,
-            SquareOscillator,
             TriangleOscillator,
             SawtoothOscillator,
         )
+        from src.engine.oscillator_square import SquareOscillator
 
         # Step 1: Generate all modulator values in bulk (vectorized)
         mod_arrays = []

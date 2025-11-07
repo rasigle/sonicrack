@@ -16,10 +16,10 @@ import pytest
 from src.engine.modifier import Volume, ModulatedVolume
 from src.engine.oscillator import (
     SineOscillator,
-    SquareOscillator,
     TriangleOscillator,
     SawtoothOscillator,
 )
+from engine import SquareOscillator
 
 
 class TestOscillatorDBControl:

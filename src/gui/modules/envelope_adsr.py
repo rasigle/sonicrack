@@ -96,7 +96,8 @@ class ADSRModule(ModuleWidget):
         self.trigger_button = QPushButton("Trigger")
         self.trigger_button.setCheckable(False)  # Not a toggle, just a momentary push
         self.trigger_button.setMinimumHeight(35)
-        self.trigger_button.setStyleSheet("""
+        self.trigger_button.setStyleSheet(
+            """
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
@@ -112,7 +113,8 @@ class ADSRModule(ModuleWidget):
             QPushButton:hover {
                 background-color: #5cbf60;
             }
-        """)
+        """
+        )
         self.trigger_button.setToolTip(
             "Manual Trigger\n"
             "Press: Start attack phase\n"
@@ -144,7 +146,7 @@ class ADSRModule(ModuleWidget):
         if self._adsr_component is not None:
             try:
                 # If wrapped in GateTriggeredADSR, access the inner ADSR
-                adsr = getattr(self._adsr_component, 'adsr', self._adsr_component)
+                adsr = getattr(self._adsr_component, "adsr", self._adsr_component)
                 adsr.trigger_note_on()
                 logging.debug("ADSR manually triggered (note on)")
             except (AttributeError, Exception) as e:
@@ -155,7 +157,7 @@ class ADSRModule(ModuleWidget):
         if self._adsr_component is not None:
             try:
                 # If wrapped in GateTriggeredADSR, access the inner ADSR
-                adsr = getattr(self._adsr_component, 'adsr', self._adsr_component)
+                adsr = getattr(self._adsr_component, "adsr", self._adsr_component)
                 adsr.trigger_note_off()
                 logging.debug("ADSR manually released (note off)")
             except (AttributeError, Exception) as e:

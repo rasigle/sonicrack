@@ -746,8 +746,10 @@ class NoiseGenerator(Generator):
 
         Args:
             noise_type: Type of noise to generate
-            amplitude: Amplitude scaling factor (0.0-1.0). Ignored if gain_db is specified.
-            gain_db: Gain in decibels (0 dB = no change). Overrides amplitude if provided.
+            amplitude: Amplitude scaling factor (0.0-1.0). Ignored if gain_db is
+                specified.
+            gain_db: Gain in decibels (0 dB = no change). Overrides amplitude if
+                provided.
             sample_rate: Sample rate in Hz
         """
         super().__init__(sample_rate)

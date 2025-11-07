@@ -1118,7 +1118,8 @@ class ModulatedClipper(Modifier):
         """
         if not (hasattr(modulator, "__iter__") and hasattr(modulator, "__next__")):
             raise TypeError(
-                f"modulator must be iterable or have __next__, got {type(modulator).__name__}"
+                f"modulator must be iterable or have __next__, "
+                f"got {type(modulator).__name__}"
             )
 
         self._modulator_source = modulator

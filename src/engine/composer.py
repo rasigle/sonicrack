@@ -151,13 +151,21 @@ class Chain(Composer):
         Args:
             oscillator: instance of an Oscillator or anything else that can generate a
                 sequence of numbers by using __iter__ and __next__.
-            modifiers: Any function that takes in a value modifies it and returns
-                another value. Example: instances of Panner.
+            modifiers: Modifiers or Effects (both implement __call__).
+                Examples: Volume(0.5), Panner(0.7), Distortion(drive=2.0)
 
         Raises:
             TypeError: If oscillator doesn't implement iterator protocol.
-            TypeError: If any modifier is not a Modifier instance.
             ValueError: If oscillator is None.
+
+        Example:
+            >>> # Mix Modifiers seamlessly - all derive from Modifier!
+            >>> chain = Chain(
+            ...     SineOscillator(440),
+            ...     Volume(0.5),
+            ...     Distortion(drive=2.0, mix=0.8),
+            ...     Panner(0.7)
+            ... )
         """
         super().__init__()
 

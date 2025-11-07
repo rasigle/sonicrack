@@ -159,6 +159,13 @@ from src.engine.oscillator import (
     synth,
 )
 
+# Effects
+from src.engine.effects import (
+    Distortion,
+    Delay,
+    Reverb,
+)
+
 __all__ = [
     # Audio Component Base
     "AudioComponent",
@@ -214,4 +221,8 @@ __all__ = [
     "grey_noise",
     "sample_hold_noise",
     "NoiseGenerator",
+    # Effects
+    "Distortion",
+    "Delay",
+    "Reverb",
 ]

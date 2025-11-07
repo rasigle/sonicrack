@@ -51,7 +51,8 @@ class PatchCompiler:
         logger.info(f"Patch set with {len(connections)} connections:")
         for start_port, end_port in connections:
             logger.info(
-                f"  {start_port.parent_module.metadata.title}.{start_port.port_name} → {end_port.parent_module.metadata.title}.{end_port.port_name}"
+                f"  {start_port.parent_module.metadata.title}.{start_port.port_name} "
+                f"-> {end_port.parent_module.metadata.title}.{end_port.port_name}"
             )
 
     def compile(self) -> AudioComponent | None:

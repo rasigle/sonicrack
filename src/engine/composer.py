@@ -32,6 +32,7 @@ Note:
     handling of stereo/mono conversion where needed. They also propagate
     trigger_release() and ended properties to all child components.
 """
+import logging
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -43,6 +44,8 @@ from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.engine.modulated_oscillator import ModulatedOscillator
 from src.engine.oscillator import Oscillator
+
+logger = logging.getLogger(__name__)
 
 
 class Composer(AudioComponent, ABC):
@@ -281,7 +284,11 @@ class Chain(Composer):
 
 @register_component()
 class WaveAdder(Composer):
-    """Component that returns the mean of the output of multiple generators.
+    """Component that combines the output of multiple generators.
+
+    Supports two mixing modes:
+    - 'average': Returns the mean (prevents clipping, default for backward compatibility)
+    - 'sum': Returns the sum (standard mixer behavior, maintains levels)
 
     For parallel composition of waves.
     """
@@ -293,7 +300,7 @@ class WaveAdder(Composer):
         tags=["composer", "wave_adder"],
     )
 
-    def __init__(self, *generators, stereo: bool = False):
+    def __init__(self, *generators, stereo: bool = False, mix_mode: str = "average"):
         """Initialize WaveAdder.
 
         Args:
@@ -301,9 +308,12 @@ class WaveAdder(Composer):
                 sequence of numbers by using __iter__ and __next__.
             stereo: if True the output will have a tuple of two numbers for the left
                 and the right channel each, else only one number.
+            mix_mode: 'average' (default) or 'sum'.
+                - 'average': divides by number of generators (prevents clipping)
+                - 'sum': direct sum (standard mixer behavior)
 
         Raises:
-            ValueError: If no generators provided.
+            ValueError: If no generators provided or invalid mix_mode.
             TypeError: If stereo is not a boolean.
         """
         super().__init__(*generators)
@@ -315,15 +325,28 @@ class WaveAdder(Composer):
         if not isinstance(stereo, bool):
             raise TypeError(f"stereo must be a boolean, got {type(stereo).__name__}")
 
+        if mix_mode not in ("average", "sum"):
+            raise ValueError(f"mix_mode must be 'average' or 'sum', got {mix_mode!r}")
+
         self.generators = generators
         self.stereo = stereo
+        self.mix_mode = mix_mode
+
+        # Debug logging
+        logger.info(
+            f"WaveAdder initialized: {len(generators)} generators, "
+            f"stereo={stereo}, mix_mode={mix_mode!r}"
+        )
 
     def _mod_channels(self, _val):
         if isinstance(_val, (int, float)) and self.stereo:
             return _val, _val
 
         if isinstance(_val, Sequence) and not self.stereo:
-            return sum(_val) / len(_val)
+            if self.mix_mode == "sum":
+                return sum(_val)
+            else:  # average
+                return sum(_val) / len(_val)
         return _val
 
     def trigger_release(self):
@@ -344,9 +367,15 @@ class WaveAdder(Composer):
         vals = [self._mod_channels(next(gen)) for gen in self.generators]
         if self.stereo:
             l, r = zip(*vals)
-            return sum(l) / len(l), sum(r) / len(r)
+            if self.mix_mode == "sum":
+                return sum(l), sum(r)
+            else:  # average
+                return sum(l) / len(l), sum(r) / len(r)
 
-        return sum(vals) / len(vals)
+        if self.mix_mode == "sum":
+            return sum(vals)
+        else:  # average
+            return sum(vals) / len(vals)
 
     def get_samples_vectorized(self, n: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
         """Generate n samples using fully vectorized operations.
@@ -372,13 +401,12 @@ class WaveAdder(Composer):
 
             # Handle stereo conversion if needed
             if self.stereo and samples.ndim == 1:
+                # Convert mono to stereo
                 samples = np.column_stack((samples, samples))
             elif not self.stereo and samples.ndim == 2:
+                # Convert stereo to mono
                 samples = samples.mean(axis=1)
-            else:
-                raise ValueError(
-                    "Inconsistent stereo setting with single generator output."
-                )
+            # else: already in correct format (mono->mono or stereo->stereo)
 
             return samples.astype(np.float32)
 
@@ -394,12 +422,15 @@ class WaveAdder(Composer):
             all_mono = all(s.ndim == 1 for s in all_samples)
 
             if all_mono:
-                # Pure mono: direct mean (fastest path)
-                # Stack all: (n_generators, n) -> mean -> (n,)
+                # Pure mono: direct sum or mean (fastest path)
+                # Stack all: (n_generators, n) -> sum/mean -> (n,)
                 stacked = np.stack(all_samples, axis=0)
-                return stacked.mean(axis=0, dtype=np.float32)
+                if self.mix_mode == "sum":
+                    return stacked.sum(axis=0, dtype=np.float32)
+                else:  # average
+                    return stacked.mean(axis=0, dtype=np.float32)
             else:
-                # Mixed mono/stereo: convert stereo to mono, then mean
+                # Mixed mono/stereo: convert stereo to mono, then sum/mean
                 mono_samples = []
                 for samples in all_samples:
                     if samples.ndim == 2:
@@ -410,7 +441,10 @@ class WaveAdder(Composer):
                         mono_samples.append(samples)
 
                 stacked = np.stack(mono_samples, axis=0)
-                return stacked.mean(axis=0, dtype=np.float32)
+                if self.mix_mode == "sum":
+                    return stacked.sum(axis=0, dtype=np.float32)
+                else:  # average
+                    return stacked.mean(axis=0, dtype=np.float32)
 
         # Stereo mode
         # Check if we have mixed mono/stereo inputs
@@ -428,6 +462,9 @@ class WaveAdder(Composer):
             all_samples = stereo_samples
 
         # All samples now stereo: (n, 2) each
-        # Stack: (n_generators, n, 2) -> mean -> (n, 2)
+        # Stack: (n_generators, n, 2) -> sum/mean -> (n, 2)
         stacked = np.stack(all_samples, axis=0)
-        return stacked.mean(axis=0, dtype=np.float32)
+        if self.mix_mode == "sum":
+            return stacked.sum(axis=0, dtype=np.float32)
+        else:  # average
+            return stacked.mean(axis=0, dtype=np.float32)

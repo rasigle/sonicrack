@@ -167,3 +167,36 @@ class OscillatorModule(ModuleWidget):
             return next(iter(components.values()))
 
         return WaveAdder(*components.values())
+
+    def get_output_component(self, port_name: str) -> AudioComponent | None:
+        """Get the component for a specific output port.
+
+        This allows each output to be independent instead of mixing them all together.
+        This is the correct behavior for oscillators - Sine, Triangle, Square, and Sawtooth
+        outputs should be separate signals, not mixed.
+
+        Args:
+            port_name: Name of the output port (e.g., "Sine", "Triangle")
+
+        Returns:
+            The oscillator component for that specific output, or None if not connected
+        """
+        freq = self.freq_knob.get_value()
+        pulsewidth = self.pulsewidth_knob.get_value()
+
+        # Return the specific oscillator for the requested output port
+        if port_name == "Sine" and len(self.sine_port.cables) > 0:
+            return SineOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+        elif port_name == "Triangle" and len(self.triangle_port.cables) > 0:
+            return TriangleOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+        elif port_name == "Sawtooth" and len(self.sawtooth_port.cables) > 0:
+            return SawtoothOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+        elif port_name == "Square" and len(self.square_port.cables) > 0:
+            # Create and store reference for hot-swapping pulsewidth
+            self._square_oscillator = SquareOscillator(
+                freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, pulsewidth=pulsewidth
+            )
+            return self._square_oscillator
+
+        return None
+

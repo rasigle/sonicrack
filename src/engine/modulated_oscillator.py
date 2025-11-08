@@ -7,6 +7,7 @@ creating natural-sounding, expressive audio.
 
 Classes:
     ModulatedOscillator: Combines an oscillator with modulators for dynamic synthesis.
+    ModulatedFrequency: Specialized class for frequency modulation (vibrato, FM synthesis).
 
 Example:
     >>> from src.engine import SineOscillator, ADSREnvelope
@@ -32,6 +33,21 @@ Example:
     >>>
     >>> # Trigger note release
     >>> mod_osc.trigger_release()
+
+Example - Frequency Modulation (Vibrato):
+    >>> from src.engine.modulated_oscillator import ModulatedFrequency
+    >>>
+    >>> # Carrier oscillator
+    >>> carrier = SineOscillator(frequency=440, amplitude=0.5)
+    >>>
+    >>> # LFO for vibrato (5 Hz, ±50 Hz depth)
+    >>> lfo = SineOscillator(frequency=5.0, amplitude=50.0)
+    >>>
+    >>> # Create frequency-modulated oscillator
+    >>> vibrato = ModulatedFrequency(carrier, lfo)
+    >>>
+    >>> # Generate samples
+    >>> samples = vibrato.get_samples(44100)
 
 Modulation Types:
     - amp_mod: Modulate oscillator amplitude (common for ADSR envelopes)
@@ -78,7 +94,7 @@ class ModulatedOscillator(Generator):
     )
 
     def __init__(
-        self, oscillator, *modulators, amp_mod=None, freq_mod=None, phase_mod=None
+        self, oscillator: Oscillator, *modulators, amp_mod=None, freq_mod=None, phase_mod=None
     ):
         """Initialize the ModulatedOscillator.
 
@@ -104,7 +120,6 @@ class ModulatedOscillator(Generator):
                 value and the modulator value and returns the modified value.
                 If set the third modulator of the last modulator is used for the values.
         """
-
         super().__init__()
         if not isinstance(oscillator, Oscillator):
             raise TypeError(
@@ -112,7 +127,7 @@ class ModulatedOscillator(Generator):
                 f"Given: {type(oscillator)}"
             )
 
-        self.oscillator = oscillator
+        self.oscillator: Oscillator = oscillator
         self.modulators = modulators
 
         self.amp_mod = amp_mod
@@ -416,3 +431,135 @@ class ModulatedOscillator(Generator):
         if reset:
             iter(self)
         return self.get_samples_vectorized(n)
+
+
+@register_component()
+class ModulatedFrequency(ModulatedOscillator):
+    """Frequency-modulated oscillator for vibrato and FM synthesis.
+
+    This is a specialized version of ModulatedOscillator that specifically handles
+    frequency modulation. It provides a simpler interface for the common case where
+    you want to modulate only the frequency of an oscillator.
+
+    This class actually modulates the FREQUENCY of the oscillator (creating vibrato
+    or FM synthesis effects), not the amplitude. For amplitude modulation (tremolo),
+    use ModulatedVolume or ModulatedOscillator with amp_mod.
+
+    Args:
+        oscillator: The carrier oscillator whose frequency will be modulated.
+        modulator: Generator that produces frequency modulation values.
+                  The modulator output is ADDED to the base frequency.
+                  Example: LFO with amplitude=50 creates ±50 Hz variation.
+        freq_mod_func: Optional custom frequency modulation function.
+                      Defaults to: lambda base_freq, mod_val: base_freq + mod_val
+
+    Example - Vibrato (LFO modulates frequency):
+        >>> from src.engine.oscillator import SineOscillator
+        >>>
+        >>> # Carrier: 440 Hz sine wave
+        >>> carrier = SineOscillator(frequency=440, amplitude=0.5)
+        >>>
+        >>> # LFO: 5 Hz sine with ±50 Hz range
+        >>> lfo = SineOscillator(frequency=5.0, amplitude=50.0)
+        >>>
+        >>> # Create frequency-modulated oscillator (vibrato)
+        >>> vibrato = ModulatedFrequency(carrier, lfo)
+        >>>
+        >>> # Generate samples
+        >>> samples = vibrato.get_samples(44100)
+        >>> # Result: 440 Hz tone with 5 Hz vibrato, ±50 Hz depth
+
+    Example - FM Synthesis (audio-rate modulation):
+        >>> # Carrier: 440 Hz
+        >>> carrier = SineOscillator(frequency=440, amplitude=0.3)
+        >>>
+        >>> # Modulator: 220 Hz (half the carrier frequency)
+        >>> # with large amplitude for strong FM effect
+        >>> fm_modulator = SineOscillator(frequency=220, amplitude=200.0)
+        >>>
+        >>> # Create FM oscillator
+        >>> fm_synth = ModulatedFrequency(carrier, fm_modulator)
+        >>>
+        >>> # Generate samples
+        >>> samples = fm_synth.get_samples(44100)
+        >>> # Result: Rich harmonic content from FM synthesis
+
+    Example - Custom modulation function:
+        >>> # Custom function for exponential frequency modulation
+        >>> def exp_freq_mod(base_freq, mod_val):
+        ...     # Convert linear modulation to exponential (semitones)
+        ...     semitones = mod_val / 100.0  # mod_val in cents
+        ...     return base_freq * (2.0 ** (semitones / 12.0))
+        >>>
+        >>> carrier = SineOscillator(frequency=440)
+        >>> lfo = SineOscillator(frequency=5.0, amplitude=100.0)  # ±100 cents = ±1 semitone
+        >>> vibrato = ModulatedFrequency(carrier, lfo, freq_mod_func=exp_freq_mod)
+
+    Attributes:
+        oscillator: The carrier oscillator being modulated.
+        modulators: Tuple containing the frequency modulator(s).
+        freq_mod: The frequency modulation function being used.
+
+    Note:
+        The modulator output is ADDED to the base frequency by default.
+        For ±50 Hz vibrato around 440 Hz:
+        - Base frequency: 440 Hz
+        - LFO amplitude: 50 Hz
+        - Result: frequency sweeps from 390 Hz to 490 Hz
+
+    See Also:
+        - ModulatedOscillator: For general-purpose modulation (amp, freq, phase)
+        - ModulatedVolume: For amplitude modulation (tremolo)
+    """
+
+    descriptor = ComponentDescriptor(
+        name="Modulated Frequency",
+        category=ComponentCategory.OSCILLATOR,
+        description="Frequency-modulated oscillator (vibrato, FM synthesis)",
+        tags=["oscillator", "modulated", "frequency", "vibrato", "fm"],
+        config_params=["gain_db", "frequency", "phase"],
+    )
+
+    def __init__(self, oscillator, modulator, freq_mod_func=None):
+        """Initialize frequency-modulated oscillator.
+
+        Args:
+            oscillator: Carrier oscillator whose frequency will be modulated.
+                       Must be an instance of Oscillator.
+            modulator: Frequency modulator (LFO or audio-rate oscillator).
+                      Output is added to base frequency by default.
+            freq_mod_func: Optional custom frequency modulation function with
+                          signature: (base_freq: float, mod_val: float) -> float
+                          Default: lambda base_freq, mod_val: base_freq + mod_val
+
+        Raises:
+            TypeError: If oscillator is not an Oscillator instance.
+            TypeError: If modulator doesn't support iteration.
+
+        Example:
+            >>> from engine import SineOscillator
+            >>> carrier = SineOscillator(frequency=440, amplitude=0.5)
+            >>> lfo = SineOscillator(frequency=5.0, amplitude=50.0)
+            >>> fm_osc = ModulatedFrequency(carrier, lfo)
+        """
+        # Default frequency modulation: add modulator output to base frequency
+        if freq_mod_func is None:
+            freq_mod_func = lambda base_freq, mod_val: base_freq + mod_val
+
+        # Initialize parent ModulatedOscillator with only freq_mod
+        # Note: modulator is passed as positional argument (*modulators in parent)
+        super().__init__(
+            oscillator,
+            modulator,  # Positional argument for *modulators
+            freq_mod=freq_mod_func,
+            amp_mod=None,  # No amplitude modulation
+            phase_mod=None  # No phase modulation
+        )
+
+    def __repr__(self):
+        """Return string representation."""
+        return (
+            f"ModulatedFrequency("
+            f"oscillator={self.oscillator.__class__.__name__}, "
+            f"modulator={self.modulators[0].__class__.__name__})"
+        )

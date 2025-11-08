@@ -8,8 +8,8 @@ Main modules:
     - logging_config: Centralized logging configuration
 
 Quick imports:
-    >>> from utils import save_wave, load_wave, play_wave, note_to_frequency
-    >>> from utils import get_logger, setup_logging
+    >>> from src.utils import save_wave, load_wave, play_wave, note_to_frequency
+    >>> from src.utils import get_logger, setup_logging
 """
 
 # Audio utilities

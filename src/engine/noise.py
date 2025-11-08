@@ -69,8 +69,8 @@ from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_GAIN_DB
 from src.engine.audio_component import Generator, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.engine.oscillator import _derive_amplitude_from_init
-from utils.math import linear_to_db, db_to_linear
-from utils.utils import track_provided_args
+from src.utils.math import linear_to_db, db_to_linear
+from src.utils.utils import track_provided_args
 
 
 def white_noise(

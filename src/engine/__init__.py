@@ -113,13 +113,12 @@ from src.engine.modifier import (
     Volume,
     ModulatedVolume,
     Frequency,
-    ModulatedFrequency,
     Clipper,
     ModulatedClipper,
 )
 
 # Modulated Oscillator
-from src.engine.modulated_oscillator import ModulatedOscillator
+from src.engine.modulated_oscillator import ModulatedOscillator, ModulatedFrequency
 
 # CV Utilities
 from src.engine.cv_utils import (

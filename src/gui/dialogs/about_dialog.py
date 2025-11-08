@@ -9,7 +9,7 @@ def show_about(parent: QWidget, version: str = ""):
     version_text = f"<b>Version:</b> {version}" if version else ""
     about_text = (
         f"<h2>AudioPlayground Modular Synthesizer</h2>"
-        "<p>A full-featured modular synthesis environment.</p>"
+        "<p>A flexible audio synthesis environment.</p>"
         "<p><b>Features:</b></p>"
         "<ul>"
         "<li>Visual modular patching</li>"

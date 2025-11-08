@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 
 from src.gui.audio_module_interface import AudioModule
 from src.gui.patch_canvas import Port
-
+from src.gui.dialogs.module_info_dialog import ModuleInfoDialog
 
 if TYPE_CHECKING:
     pass
@@ -296,15 +296,12 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         title_rect = QRectF(0, 0, self.module_width, title_bar_height)
         painter.fillRect(title_rect, QColor(30, 30, 30, 200))
 
-        from PyQt6.QtGui import QFont
-
-        title = self.metadata.title
         # Module type (always shown at top)
         type_rect = QRectF(0, 3, self.module_width, 14)
         painter.setPen(QColor(150, 150, 150))
         font_type = MODULE_TYPE_FONT
         painter.setFont(font_type)
-        painter.drawText(type_rect, Qt.AlignmentFlag.AlignCenter, title)
+        painter.drawText(type_rect, Qt.AlignmentFlag.AlignCenter, self.metadata.title)
 
         # Custom name (if set, shown prominently)
         if self.custom_name:
@@ -313,30 +310,6 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             font_name = QFont("Arial", 10, QFont.Weight.Bold)
             painter.setFont(font_name)
             painter.drawText(name_rect, Qt.AlignmentFlag.AlignCenter, self.custom_name)
-
-            # Component type below custom name
-            if self.metadata.category:
-                comp_rect = QRectF(0, 34, self.module_width, 12)
-                painter.setPen(QColor(130, 130, 130))
-                font_comp = MODULE_CATEGORY_FONT
-                painter.setFont(font_comp)
-                painter.drawText(
-                    comp_rect,
-                    Qt.AlignmentFlag.AlignCenter,
-                    f"[{self.metadata.category.value}]",
-                )
-        else:
-            # No custom name - show component type
-            if self.metadata.category:
-                comp_rect = QRectF(0, 20, self.module_width, 18)
-                painter.setPen(QColor(200, 200, 200))
-                font_comp = MODULE_CATEGORY_FONT
-                painter.setFont(font_comp)
-                painter.drawText(
-                    comp_rect,
-                    Qt.AlignmentFlag.AlignCenter,
-                    f"({self.metadata.category.value})",
-                )
 
         # Draw port labels
         painter.setPen(QColor(220, 220, 220))
@@ -408,6 +381,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         menu = QMenu()
         rename_action = menu.addAction("Rename...")
         delete_action = menu.addAction("Delete")
+        info_action = menu.addAction("Module Info...")
 
         action = menu.exec(event.screenPos())
 
@@ -433,6 +407,12 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
                 # Remove the module
                 self.scene().removeItem(self)
+
+        elif action == info_action:
+            # Show module info dialog
+
+            dialog = ModuleInfoDialog(self)
+            dialog.exec()
 
     def mousePressEvent(self, event):
         """Handle mouse press to enable dragging from anywhere on the module."""

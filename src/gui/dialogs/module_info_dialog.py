@@ -98,7 +98,8 @@ class ModuleInfoDialog(QDialog):
         metadata = self.module.metadata
         self.name_label.setText(f"<b>Name:</b> {metadata.title}")
         self.category_label.setText(f"<b>Category:</b> {metadata.category}")
-        # self.tags_label.setText(f"<b>Tags:</b> {', '.join(metadata.tags) if metadata.tags else '-'}")
+        # self.tags_label.setText(f"<b>Tags:</b>
+        # {', '.join(metadata.tags) if metadata.tags else '-'}")
         self.author_label.setText(f"<b>Author:</b> {metadata.author}")
         self.version_label.setText(f"<b>Version:</b> {metadata.version}")
         self.description_text.setHtml(metadata.description)

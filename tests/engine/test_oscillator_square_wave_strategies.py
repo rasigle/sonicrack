@@ -45,10 +45,14 @@ class TestSquareWaveFactory:
         """Factory should allow registering custom strategies."""
 
         class CustomStrategy(SquareWaveStrategy):
-            def generate_sample(self, phase, pulsewidth_threshold, low_value, high_value):
+            def generate_sample(
+                self, phase, pulsewidth_threshold, low_value, high_value
+            ):
                 return 0.5
 
-            def generate_samples(self, phases, pulsewidth_threshold, low_value, high_value):
+            def generate_samples(
+                self, phases, pulsewidth_threshold, low_value, high_value
+            ):
                 return np.full_like(phases, 0.5)
 
         SquareWaveFactory.register_strategy("custom", CustomStrategy)
@@ -81,19 +85,21 @@ class TestIdealSquareStrategy:
         # Test single sample
         assert strategy.generate_sample(0, np.pi, -1, 1) == 1  # High
         assert strategy.generate_sample(np.pi, np.pi, -1, 1) == -1  # Low
-        assert strategy.generate_sample(2*np.pi - 0.01, np.pi, -1, 1) == -1  # Low
+        assert strategy.generate_sample(2 * np.pi - 0.01, np.pi, -1, 1) == -1  # Low
 
     def test_ideal_25_percent_duty_cycle(self, strategy):
         """Ideal strategy should produce 25% duty cycle at threshold=π/2."""
         threshold = np.pi / 2
         assert strategy.generate_sample(0, threshold, -1, 1) == 1  # High
-        assert strategy.generate_sample(threshold - 0.01, threshold, -1, 1) == 1  # Still high
+        assert (
+            strategy.generate_sample(threshold - 0.01, threshold, -1, 1) == 1
+        )  # Still high
         assert strategy.generate_sample(threshold, threshold, -1, 1) == -1  # Low
         assert strategy.generate_sample(np.pi, threshold, -1, 1) == -1  # Low
 
     def test_ideal_vectorized_matches_sample_by_sample(self, strategy):
         """Vectorized and sample-by-sample should produce same results."""
-        phases = np.linspace(0, 2*np.pi, 100)
+        phases = np.linspace(0, 2 * np.pi, 100)
         threshold = np.pi
 
         # Vectorized
@@ -144,7 +150,7 @@ class TestSoftSquareStrategy:
         assert high > 0.5  # Should be closer to 1
 
         # Far from threshold (low side)
-        low = strategy.generate_sample(2*np.pi - 0.1, threshold, -1, 1)
+        low = strategy.generate_sample(2 * np.pi - 0.1, threshold, -1, 1)
         assert low < -0.5  # Should be closer to -1
 
     def test_soft_smoothness_parameter_effect(self):
@@ -157,7 +163,9 @@ class TestSoftSquareStrategy:
 
         # Both should be on low side, but high smoothness should be lower
         low_smooth = smooth_low.generate_sample(phase_near_threshold, threshold, -1, 1)
-        high_smooth = smooth_high.generate_sample(phase_near_threshold, threshold, -1, 1)
+        high_smooth = smooth_high.generate_sample(
+            phase_near_threshold, threshold, -1, 1
+        )
 
         # Higher smoothness = sharper = closer to ideal value
         assert high_smooth < low_smooth
@@ -179,7 +187,7 @@ class TestStrategyConsistency:
         strategy = SquareWaveFactory.create(strategy_name, **kwargs)
 
         # Test custom range
-        phases = np.linspace(0, 2*np.pi, 100)
+        phases = np.linspace(0, 2 * np.pi, 100)
         samples = strategy.generate_samples(phases, np.pi, 0, 10)
 
         # All samples should be within range
@@ -195,7 +203,7 @@ class TestStrategyConsistency:
         strategy = SquareWaveFactory.create(strategy_name, **kwargs)
 
         # Generate full period with 50% duty cycle
-        phases = np.linspace(0, 2*np.pi, 1000)
+        phases = np.linspace(0, 2 * np.pi, 1000)
         samples = strategy.generate_samples(phases, np.pi, -1, 1)
 
         # Average should be near 0 for 50% duty cycle
@@ -211,7 +219,7 @@ class TestPerformance:
         import time
 
         strategy = IdealSquareStrategy()
-        phases = np.linspace(0, 2*np.pi, 10000)
+        phases = np.linspace(0, 2 * np.pi, 10000)
         threshold = np.pi
 
         # Vectorized
@@ -232,4 +240,3 @@ class TestPerformance:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

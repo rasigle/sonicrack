@@ -36,7 +36,7 @@ from typing import Any
 
 import numpy as np
 
-from constants import DEFAULT_GAIN_DB
+from src.constants import DEFAULT_GAIN_DB
 from src.engine.audio_component import AudioComponent, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
 from src.engine.oscillator import _derive_amplitude_from_init

@@ -1,8 +1,8 @@
 """PolyBLEP Oscillator Implementation - API Compatible with Standard Oscillators.
 
-This module provides bandlimited oscillators using the PolyBLEP (Polynomial Bandlimited Step)
-algorithm, which is simpler and more efficient than MinBLEP while still providing good
-antialiasing characteristics.
+This module provides bandlimited oscillators using the PolyBLEP (Polynomial
+Bandlimited Step) algorithm, which is simpler and more efficient than MinBLEP while
+still providing good antialiasing characteristics.
 
 PolyBLEP works by smoothing discontinuities in waveforms using polynomial corrections
 at the transition points. This reduces aliasing without requiring large lookup tables.
@@ -22,14 +22,18 @@ import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_GAIN_DB
 from src.engine.audio_component import Generator
-from src.engine.audio_component_registry import register_component, ComponentDescriptor, \
-    ComponentCategory
+from src.engine.audio_component_registry import (
+    register_component,
+    ComponentDescriptor,
+    ComponentCategory,
+)
 from src.engine.oscillator import _derive_amplitude_from_init
 from src.utils.utils import track_provided_args
 
 
 class WaveShape(Enum):
     """Supported waveform shapes."""
+
     SINE = "sine"
     TRIANGLE = "triangle"
     SQUARE = "square"
@@ -140,17 +144,22 @@ class PolyBLEPOscillator(Generator):
     descriptor = ComponentDescriptor(
         name="PolyBLEPOscillator",
         category=ComponentCategory.OSCILLATOR,
-        description="PolyBLEP Bandlimited Oscillator with full Oscillator API compatibility",
+        description="PolyBLEP Bandlimited Oscillator",
         tags=["oscillator", "polyblep", "bandlimited", "synthesis"],
     )
 
     @track_provided_args
-    def __init__(self, frequency: float = 440.0, amplitude: float = 1.0,
-                 gain_db: float | None = DEFAULT_GAIN_DB, phase: float = 0.0,
-                 sample_rate: int | float = DEFAULT_SAMPLE_RATE,
-                 wave_range: tuple[float, float] = (-1, 1),
-                 wave_shape: WaveShape = WaveShape.SAWTOOTH_UP,
-                 pulsewidth: float = 0.5):
+    def __init__(
+        self,
+        frequency: float = 440.0,
+        amplitude: float = 1.0,
+        gain_db: float | None = DEFAULT_GAIN_DB,
+        phase: float = 0.0,
+        sample_rate: int | float = DEFAULT_SAMPLE_RATE,
+        wave_range: tuple[float, float] = (-1, 1),
+        wave_shape: WaveShape = WaveShape.SAWTOOTH_UP,
+        pulsewidth: float = 0.5,
+    ):
         """Initialize PolyBLEP oscillator.
 
         Args:
@@ -173,7 +182,9 @@ class PolyBLEPOscillator(Generator):
 
         # Validate pulsewidth
         if not 0.0 < pulsewidth < 1.0:
-            raise ValueError(f"pulsewidth must be between 0.0 and 1.0, got {pulsewidth}")
+            raise ValueError(
+                f"pulsewidth must be between 0.0 and 1.0, got {pulsewidth}"
+            )
         self._pulsewidth = pulsewidth
 
         # Store initial values
@@ -232,10 +243,14 @@ class PolyBLEPOscillator(Generator):
         """Get amplitude with smoothing."""
         if self._smoothing_samples_remaining > 0:
             # Linear interpolation
-            t = 1.0 - (self._smoothing_samples_remaining /
-                      self._smoothing_samples_duration_total)
-            amp = self._current_amplitude + (self._target_amplitude -
-                                            self._current_amplitude) * t
+            t = 1.0 - (
+                self._smoothing_samples_remaining
+                / self._smoothing_samples_duration_total
+            )
+            amp = (
+                self._current_amplitude
+                + (self._target_amplitude - self._current_amplitude) * t
+            )
             self._smoothing_samples_remaining -= 1
             if self._smoothing_samples_remaining == 0:
                 self._current_amplitude = self._target_amplitude
@@ -366,10 +381,12 @@ class PolyBLEPOscillator(Generator):
             value = -PolyBLEPWaveforms.sawtooth(phase, self._increment)
         elif self.wave_shape == WaveShape.TRIANGLE:
             # Triangle via integration
-            square_val = PolyBLEPWaveforms.square(phase, self._increment, self._pulsewidth)
+            square_val = PolyBLEPWaveforms.square(
+                phase, self._increment, self._pulsewidth
+            )
             self._triangle_accumulator = (
-                self._increment * square_val +
-                self._triangle_accumulator * (1.0 - (0.25 * self._increment))
+                self._increment * square_val
+                + self._triangle_accumulator * (1.0 - (0.25 * self._increment))
             )
             value = self._triangle_accumulator * 4.0
         else:
@@ -424,9 +441,7 @@ class PolyBLEPOscillator(Generator):
         if self._smoothing_samples_remaining > 0:
             smooth_count = min(n, self._smoothing_samples_remaining)
             amp_envelope = np.linspace(
-                self._current_amplitude,
-                self._target_amplitude,
-                smooth_count
+                self._current_amplitude, self._target_amplitude, smooth_count
             )
             samples[:smooth_count] *= amp_envelope
             if smooth_count < n:
@@ -439,7 +454,11 @@ class PolyBLEPOscillator(Generator):
 
         # Update phase
         if phases is not None:
-            self._phase_normalized = (phases[-1] + self._increment) % 1.0 if n > 0 else self._phase_normalized
+            self._phase_normalized = (
+                (phases[-1] + self._increment) % 1.0
+                if n > 0
+                else self._phase_normalized
+            )
 
         return samples.astype(np.float32)
 
@@ -498,8 +517,8 @@ class PolyBLEPOscillator(Generator):
             square = PolyBLEPWaveforms.square(phase, self._increment, self._pulsewidth)
 
             self._triangle_accumulator = (
-                self._increment * square +
-                self._triangle_accumulator * (1.0 - (0.25 * self._increment))
+                self._increment * square
+                + self._triangle_accumulator * (1.0 - (0.25 * self._increment))
             )
 
             samples[i] = self._triangle_accumulator * 4.0
@@ -509,8 +528,9 @@ class PolyBLEPOscillator(Generator):
 
     # Standard generation methods
 
-    def get_samples_iterator(self, n: int = DEFAULT_SAMPLE_RATE,
-                            reset: bool = False) -> np.ndarray:
+    def get_samples_iterator(
+        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False
+    ) -> np.ndarray:
         """Generate n samples using iterator (slower but flexible).
 
         Args:
@@ -524,8 +544,9 @@ class PolyBLEPOscillator(Generator):
             iter(self)
         return np.array([next(self) for _ in range(n)], dtype=np.float32)
 
-    def get_samples(self, n: int = DEFAULT_SAMPLE_RATE,
-                   reset: bool = False, mode: str = "auto") -> np.ndarray:
+    def get_samples(
+        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+    ) -> np.ndarray:
         """Generate n samples using specified method.
 
         Args:
@@ -557,17 +578,27 @@ class PolyBLEPOscillator(Generator):
 
 
 # Convenience functions
-def generate_sine(frequency: float, duration: float, sample_rate: float = 44100.0,
-                 amplitude: float = 1.0) -> np.ndarray:
+def generate_sine(
+    frequency: float,
+    duration: float,
+    sample_rate: float = 44100.0,
+    amplitude: float = 1.0,
+) -> np.ndarray:
     """Generate a sine wave."""
     n_samples = int(duration * sample_rate)
-    osc = PolyBLEPOscillator(frequency, amplitude, None, 0, sample_rate,
-                             wave_shape=WaveShape.SINE)
+    osc = PolyBLEPOscillator(
+        frequency, amplitude, None, 0, sample_rate, wave_shape=WaveShape.SINE
+    )
     return osc.get_samples(n_samples)
 
 
-def generate_square(frequency: float, duration: float, sample_rate: float = 44100.0,
-                   amplitude: float = 1.0, pulsewidth: float = 0.5) -> np.ndarray:
+def generate_square(
+    frequency: float,
+    duration: float,
+    sample_rate: float = 44100.0,
+    amplitude: float = 1.0,
+    pulsewidth: float = 0.5,
+) -> np.ndarray:
     """Generate an antialiased square wave with variable pulsewidth.
 
     Args:
@@ -581,25 +612,41 @@ def generate_square(frequency: float, duration: float, sample_rate: float = 4410
         Array of samples
     """
     n_samples = int(duration * sample_rate)
-    osc = PolyBLEPOscillator(frequency, amplitude, None, 0, sample_rate,
-                             wave_shape=WaveShape.SQUARE, pulsewidth=pulsewidth)
+    osc = PolyBLEPOscillator(
+        frequency,
+        amplitude,
+        None,
+        0,
+        sample_rate,
+        wave_shape=WaveShape.SQUARE,
+        pulsewidth=pulsewidth,
+    )
     return osc.get_samples(n_samples)
 
 
-def generate_sawtooth(frequency: float, duration: float, sample_rate: float = 44100.0,
-                     amplitude: float = 1.0) -> np.ndarray:
+def generate_sawtooth(
+    frequency: float,
+    duration: float,
+    sample_rate: float = 44100.0,
+    amplitude: float = 1.0,
+) -> np.ndarray:
     """Generate an antialiased sawtooth wave."""
     n_samples = int(duration * sample_rate)
-    osc = PolyBLEPOscillator(frequency, amplitude, None, 0, sample_rate,
-                             wave_shape=WaveShape.SAWTOOTH_UP)
+    osc = PolyBLEPOscillator(
+        frequency, amplitude, None, 0, sample_rate, wave_shape=WaveShape.SAWTOOTH_UP
+    )
     return osc.get_samples(n_samples)
 
 
-def generate_triangle(frequency: float, duration: float, sample_rate: float = 44100.0,
-                     amplitude: float = 1.0) -> np.ndarray:
+def generate_triangle(
+    frequency: float,
+    duration: float,
+    sample_rate: float = 44100.0,
+    amplitude: float = 1.0,
+) -> np.ndarray:
     """Generate a triangle wave."""
     n_samples = int(duration * sample_rate)
-    osc = PolyBLEPOscillator(frequency, amplitude, None, 0, sample_rate,
-                             wave_shape=WaveShape.TRIANGLE)
+    osc = PolyBLEPOscillator(
+        frequency, amplitude, None, 0, sample_rate, wave_shape=WaveShape.TRIANGLE
+    )
     return osc.get_samples(n_samples)
-

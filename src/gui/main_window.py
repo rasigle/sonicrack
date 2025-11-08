@@ -1,16 +1,17 @@
 """Main window for the modular synthesizer."""
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from PyQt6 import QtGui, QtWidgets, QtCore
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
     QToolBar,
     QLabel,
     QStatusBar,
@@ -24,7 +25,6 @@ from PyQt6.QtWidgets import (
 
 from src import version
 from src.constants import PRESET_FILE_EXTENSION
-from src.engine import AudioComponent
 from src.gui.audio_engine import AudioEngine
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.dialogs.about_dialog import show_about
@@ -43,6 +43,9 @@ from src.gui.widgets.tree_analyzer import TreeAnalyzer
 from src.gui.widgets.waveform_display import WaveformDisplay
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from src.engine import AudioComponent
 
 
 class ModularSynthWindow(QMainWindow):
@@ -70,7 +73,7 @@ class ModularSynthWindow(QMainWindow):
         if not APP_ICON_PATH.exists():
             logger.warning(f"App icon not found at {APP_ICON_PATH}")
         else:
-            self.setWindowIcon(QIcon(str(APP_ICON_PATH)))
+            self.setWindowIcon(QtGui.QIcon(str(APP_ICON_PATH)))
 
         # Core components
         self.audio_engine = AudioEngine()
@@ -82,7 +85,7 @@ class ModularSynthWindow(QMainWindow):
         self.patch_modified = False  # Track if patch has unsaved changes
 
         # Debounce timer for parameter changes (avoid audio spikes)
-        self.compile_debounce_timer = QTimer()
+        self.compile_debounce_timer = QtCore.QTimer()
         self.compile_debounce_timer.setSingleShot(True)
         # Don't update tree for parameter changes - only for structure changes
         self.compile_debounce_timer.timeout.connect(
@@ -97,7 +100,7 @@ class ModularSynthWindow(QMainWindow):
         self._connect_signals()
 
         # Visualization timer
-        self.vis_timer = QTimer()
+        self.vis_timer = QtCore.QTimer()
         self.vis_timer.timeout.connect(self._update_visualizations)
         self.vis_timer.start(50)  # Update at 20 Hz
 
@@ -163,7 +166,7 @@ class ModularSynthWindow(QMainWindow):
 
         # Add module buttons
         for module_name in self.registry.list_modules():
-            btn = QPushButton(f"+ {module_name}")
+            btn = QtWidgets.QPushButton(f"+ {module_name}")
             btn.setMinimumHeight(35)
             btn.clicked.connect(
                 lambda checked, name=module_name: self._add_module(name)
@@ -220,13 +223,13 @@ class ModularSynthWindow(QMainWindow):
         controls_layout = QVBoxLayout()
 
         # Play/Stop buttons
-        btn_layout = QHBoxLayout()
-        self.play_btn = QPushButton("▶ Play")
+        btn_layout = QtWidgets.QHBoxLayout()
+        self.play_btn = QtWidgets.QPushButton("▶ Play")
         self.play_btn.setMinimumHeight(40)
         self.play_btn.clicked.connect(self._on_play_clicked)
         btn_layout.addWidget(self.play_btn)
 
-        self.stop_btn = QPushButton("⬛ Stop")
+        self.stop_btn = QtWidgets.QPushButton("⬛ Stop")
         self.stop_btn.setMinimumHeight(40)
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._on_stop_clicked)
@@ -243,48 +246,48 @@ class ModularSynthWindow(QMainWindow):
         return panel
 
     def _setup_menu(self):
-        """Setup the menu bar."""
+        """Set up the menu bar."""
         menubar = self.menuBar()
 
         # File menu
         file_menu = menubar.addMenu("&File")
 
-        new_action = QAction("&New Patch", self)
+        new_action = QtGui.QAction("&New Patch", self)
         new_action.setShortcut("Ctrl+N")
         new_action.triggered.connect(self._new_patch)
         file_menu.addAction(new_action)
 
-        open_patch_action = QAction("&Open Patch...", self)
+        open_patch_action = QtGui.QAction("&Open Patch...", self)
         open_patch_action.setShortcut("Ctrl+O")
         open_patch_action.triggered.connect(self._open_patch)
         file_menu.addAction(open_patch_action)
 
         file_menu.addSeparator()
 
-        save_patch_action = QAction("&Save Patch", self)
+        save_patch_action = QtGui.QAction("&Save Patch", self)
         save_patch_action.setShortcut("Ctrl+S")
         save_patch_action.triggered.connect(self._save_patch)
         file_menu.addAction(save_patch_action)
 
-        save_patch_as_action = QAction("Save Patch &As...", self)
+        save_patch_as_action = QtGui.QAction("Save Patch &As...", self)
         save_patch_as_action.setShortcut("Ctrl+Shift+S")
         save_patch_as_action.triggered.connect(self._save_patch_as)
         file_menu.addAction(save_patch_as_action)
 
         file_menu.addSeparator()
 
-        save_preset_action = QAction("Save as Preset...", self)
+        save_preset_action = QtGui.QAction("Save as Preset...", self)
         save_preset_action.triggered.connect(self._save_as_library_preset)
         file_menu.addAction(save_preset_action)
 
-        load_preset_action = QAction("&Load Preset...", self)
+        load_preset_action = QtGui.QAction("&Load Preset...", self)
         load_preset_action.setShortcut("Ctrl+Shift+O")
         load_preset_action.triggered.connect(self._load_preset)
         file_menu.addAction(load_preset_action)
 
         file_menu.addSeparator()
 
-        exit_action = QAction("E&xit", self)
+        exit_action = QtGui.QAction("E&xit", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
@@ -292,14 +295,14 @@ class ModularSynthWindow(QMainWindow):
         # Edit menu
         edit_menu = menubar.addMenu("&Edit")
 
-        clear_action = QAction("&Clear Canvas", self)
+        clear_action = QtGui.QAction("&Clear Canvas", self)
         clear_action.triggered.connect(self._clear_canvas)
         edit_menu.addAction(clear_action)
 
         # Help menu
         help_menu = menubar.addMenu("&Help")
 
-        about_action = QAction("&About", self)
+        about_action = QtGui.QAction("&About", self)
         about_action.triggered.connect(lambda: show_about(self, version=version))
         help_menu.addAction(about_action)
 
@@ -906,7 +909,8 @@ class ModularSynthWindow(QMainWindow):
         """Apply a loaded preset to the canvas.
 
         Args:
-            preset_data: Dictionary containing preset data with 'modules' and 'connections'
+            preset_data: Dictionary containing preset data with 'modules' and
+                'connections'
         """
         # Clear current patch
         self.audio_engine.stop_playback()

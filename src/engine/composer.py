@@ -288,7 +288,8 @@ class WaveAdder(Composer):
     """Component that combines the output of multiple generators.
 
     Supports two mixing modes:
-    - 'average': Returns the mean (prevents clipping, default for backward compatibility)
+    - 'average': Returns the mean (prevents clipping, default for backward
+      compatibility)
     - 'sum': Returns the sum (standard mixer behavior, maintains levels)
 
     For parallel composition of waves.

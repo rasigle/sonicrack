@@ -134,8 +134,8 @@ class AudioModule(ABC):
         **OPTIONAL METHOD**: Only implement this if your module has multiple
         INDEPENDENT outputs that should produce different signals.
 
-        If this method is implemented, it takes precedence over create_engine_component()
-        when building connections from this module's outputs.
+        If this method is implemented, it takes precedence over
+        create_engine_component() when building connections from this module's outputs.
 
         **When to implement this:**
         - Module has multiple output ports (Sine, Triangle, Square, Sawtooth)
@@ -144,7 +144,8 @@ class AudioModule(ABC):
 
         **When NOT to implement this:**
         - Module has single output → use create_engine_component() only
-        - Multiple outputs should produce the SAME signal → use create_engine_component()
+        - Multiple outputs should produce the SAME signal →
+          use create_engine_component()
         - Example: LFO that broadcasts the same signal to multiple destinations
 
         Args:

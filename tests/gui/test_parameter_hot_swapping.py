@@ -6,7 +6,7 @@ Run this test while the GUI is running and audio is playing.
 
 import pytest
 
-from constants import DEFAULT_GAIN_DB
+from src.constants import DEFAULT_GAIN_DB
 from src.engine.oscillator import SineOscillator
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.patch_compiler import PatchCompiler

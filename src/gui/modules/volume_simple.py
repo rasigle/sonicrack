@@ -3,7 +3,7 @@ from typing import Any
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from constants import DEFAULT_GAIN_DB
+from src.constants import DEFAULT_GAIN_DB
 from src.engine import Volume
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob

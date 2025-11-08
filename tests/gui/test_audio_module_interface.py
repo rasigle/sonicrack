@@ -3,7 +3,12 @@
 import pytest
 from PyQt6.QtWidgets import QApplication
 
-from src.engine.oscillator import SineOscillator, TriangleOscillator, SawtoothOscillator, SquareOscillator
+from src.engine.oscillator import (
+    SineOscillator,
+    TriangleOscillator,
+    SawtoothOscillator,
+    SquareOscillator,
+)
 from src.gui.audio_module_interface import ModuleCategory
 from src.gui.modules.mixer import MixerModule
 from src.gui.modules.oscillator import OscillatorModule
@@ -49,10 +54,10 @@ def test_oscillator_interface(qapp):
     assert square_component is None  # No cables connected
 
     # Check that module has the expected output ports
-    assert hasattr(module, 'sine_port')
-    assert hasattr(module, 'triangle_port')
-    assert hasattr(module, 'sawtooth_port')
-    assert hasattr(module, 'square_port')
+    assert hasattr(module, "sine_port")
+    assert hasattr(module, "triangle_port")
+    assert hasattr(module, "sawtooth_port")
+    assert hasattr(module, "square_port")
 
 
 def test_volume_interface(qapp):

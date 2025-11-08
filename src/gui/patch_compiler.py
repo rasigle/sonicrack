@@ -168,11 +168,13 @@ class PatchCompiler:
 
         component = builder(module)
 
-        # Cache component (but NOT for modifiers - they cache internally to avoid Chain wrapper issues)
+        # Cache component (but NOT for modifiers - they cache internally to avoid
+        # Chain wrapper issues)
         if component and category != ModuleCategory.MODIFIER:
             self._cache_component(module, component)
         elif component and category == ModuleCategory.MODIFIER:
-            # For modifiers, only cache in build_cache (not module_to_component - that's handled in _build_modifier_module)
+            # For modifiers, only cache in build_cache (not module_to_component -
+            # that's handled in _build_modifier_module)
             self._build_cache[module] = component
 
         return component
@@ -202,13 +204,15 @@ class PatchCompiler:
         source_port_name = connection.port_name
 
         logger.info(
-            f"_build_component_from_port: source_module={source_module.metadata.title}, port_name='{source_port_name}'"
+            f"_build_component_from_port: source_module={source_module.metadata.title}"
+            f", port_name='{source_port_name}'"
         )
 
         # Check if source module has multiple outputs
         if hasattr(source_module, "get_output_component"):
             logger.info(
-                f"_build_component_from_port: {source_module.metadata.title} has get_output_component, calling it"
+                f"_build_component_from_port: {source_module.metadata.title} has "
+                f"get_output_component, calling it"
             )
             component = source_module.get_output_component(source_port_name)
             logger.info(
@@ -221,12 +225,14 @@ class PatchCompiler:
                 return component
             else:
                 logger.info(
-                    f"_build_component_from_port: get_output_component returned None, falling back to _build_chain_from_module"
+                    "_build_component_from_port: get_output_component returned None, "
+                    "falling back to _build_chain_from_module"
                 )
                 return self._build_chain_from_module(source_module)
         else:
             logger.info(
-                f"_build_component_from_port: {source_module.metadata.title} does not have get_output_component, calling _build_chain_from_module"
+                f"_build_component_from_port: {source_module.metadata.title} does not "
+                f"have get_output_component, calling _build_chain_from_module"
             )
             return self._build_chain_from_module(source_module)
 
@@ -289,14 +295,16 @@ class PatchCompiler:
         if hasattr(target_module, "get_cv_range"):
             target_range = target_module.get_cv_range(port_name)
             logger.debug(
-                f"  Target {target_module.metadata.title}.{port_name} expects CV range: {target_range}"
+                f"  Target {target_module.metadata.title}.{port_name} expects CV "
+                f"range: {target_range}"
             )
 
         # Get source's output range
         if hasattr(source_module, "get_cv_output_range"):
             source_range = source_module.get_cv_output_range()
             logger.debug(
-                f"  Source {source_module.metadata.title} outputs CV range: {source_range}"
+                f"  Source {source_module.metadata.title} outputs CV range: "
+                f"{source_range}"
             )
 
         # Check if we need to insert a scaler
@@ -357,7 +365,8 @@ class PatchCompiler:
 
             source_module = mod_conn.parent_module
             logger.debug(
-                f"  Found connection from: {source_module.metadata.title if source_module else 'Unknown'}"
+                f"  Found connection from: "
+                f"{source_module.metadata.title if source_module else 'Unknown'}"
             )
 
             # Build the modulation component
@@ -557,7 +566,9 @@ class PatchCompiler:
 
         # Create the modifier component
         logger.info(
-            f"{name}: Calling create_engine_component with input_components=[{input_comp}], modulation_components={modulation_components}"
+            f"{name}: Calling create_engine_component with "
+            f"input_components=[{input_comp}], "
+            f"modulation_components={modulation_components}"
         )
         modifier_component = module.create_engine_component(
             input_components=[input_comp],
@@ -567,7 +578,8 @@ class PatchCompiler:
         )
 
         logger.info(
-            f"{name}: create_engine_component returned: {modifier_component}, type={type(modifier_component).__name__ if modifier_component else 'None'}"
+            f"{name}: create_engine_component returned: {modifier_component}, type="
+            f"{type(modifier_component).__name__ if modifier_component else 'None'}"
         )
 
         if not modifier_component:
@@ -582,7 +594,8 @@ class PatchCompiler:
         # Track modifier for hot-swapping (not the Chain wrapper)
         logger.info(
             f"Storing {name} modifier for hot-swapping: "
-            f"component id={id(modifier_component)}, type={type(modifier_component).__name__}"
+            f"component id={id(modifier_component)}, "
+            f"type={type(modifier_component).__name__}"
         )
         self._module_to_component[module] = modifier_component
 

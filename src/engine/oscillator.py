@@ -760,7 +760,7 @@ class SineOscillator(Oscillator):
 
 
 # Type alias for square wave modes
-SquareWaveMode = Literal["ideal", "ideal_smooth","soft"]
+SquareWaveMode = Literal["ideal", "ideal_smooth", "soft"]
 
 
 @register_component()
@@ -870,7 +870,6 @@ class SquareOscillator(SineOscillator):
 
         self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)
         self._mode_kwargs = mode_kwargs
-
 
     @property
     def pulsewidth(self) -> float:
@@ -1199,7 +1198,9 @@ class IdealSquareStrategy(SquareWaveStrategy):
         low_value: float,
         high_value: float,
     ) -> np.ndarray:
-        return np.where(phases < pulsewidth_threshold, high_value, low_value).astype(np.float32)
+        return np.where(phases < pulsewidth_threshold, high_value, low_value).astype(
+            np.float32
+        )
 
 
 class IdealSquareStrategySmoothing(SquareWaveStrategy):
@@ -1252,10 +1253,14 @@ class IdealSquareStrategySmoothing(SquareWaveStrategy):
         # Apply smoothing if active
         if self._smoothing_samples_remaining > 0:
             # Calculate smoothing factor for this sample
-            progress = 1.0 - (self._smoothing_samples_remaining /
-                            (self.smoothing_time_ms * self.sample_rate / 1000))
-            current_amp = (self._current_amplitude +
-                          (self._target_amplitude - self._current_amplitude) * progress)
+            progress = 1.0 - (
+                self._smoothing_samples_remaining
+                / (self.smoothing_time_ms * self.sample_rate / 1000)
+            )
+            current_amp = (
+                self._current_amplitude
+                + (self._target_amplitude - self._current_amplitude) * progress
+            )
 
             self._smoothing_samples_remaining -= 1
             if self._smoothing_samples_remaining <= 0:
@@ -1347,7 +1352,8 @@ class SoftSquareStrategy(SquareWaveStrategy):
         # We want: before threshold → +1 (high), after threshold → -1 (low)
 
         dist_from_threshold = phase - pulsewidth_threshold
-        # Negate to get correct polarity: before threshold gives negative (→ +1 after negation)
+        # Negate to get correct polarity: before threshold gives negative
+        # (→ +1 after negation)
         smooth_step = np.tanh(-dist_from_threshold * self.smoothness)
 
         # smooth_step is now: +1 before threshold, -1 after threshold
@@ -1389,11 +1395,7 @@ class SquareWaveFactory:
     }
 
     @classmethod
-    def create(
-        cls,
-        mode: SquareWaveMode = "ideal",
-        **kwargs
-    ) -> SquareWaveStrategy:
+    def create(cls, mode: SquareWaveMode = "ideal", **kwargs) -> SquareWaveStrategy:
         """Create a square wave strategy instance.
 
         Args:
@@ -1443,11 +1445,7 @@ class SquareWaveFactory:
         return list(cls._strategies.keys())
 
     @classmethod
-    def register_strategy(
-        cls,
-        name: str,
-        strategy_class: type[SquareWaveStrategy]
-    ):
+    def register_strategy(cls, name: str, strategy_class: type[SquareWaveStrategy]):
         """Register a custom square wave strategy.
 
         Args:
@@ -1458,7 +1456,5 @@ class SquareWaveFactory:
             TypeError: If strategy_class doesn't inherit from SquareWaveStrategy
         """
         if not issubclass(strategy_class, SquareWaveStrategy):
-            raise TypeError(
-                f"{strategy_class} must inherit from SquareWaveStrategy"
-            )
+            raise TypeError(f"{strategy_class} must inherit from SquareWaveStrategy")
         cls._strategies[name] = strategy_class

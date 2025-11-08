@@ -25,28 +25,23 @@ except ImportError:
     print("Install with: pip install sounddevice")
     sys.exit(1)
 
-try:
-    from src.engine.midi import (
-        PolyphonicSynth,
-        MIDIInput,
-        midi_to_note_name,
-    )
-    from src.engine.midi.input import MIDO_AVAILABLE
-    from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
-    from engine import (
-        SineOscillator,
-        SawtoothOscillator,
-        ADSREnvelope,
-        Chain,
-        SquareOscillator,
-        ModulatedVolume
-    )
-    from src.constants import DEFAULT_SAMPLE_RATE
-except ImportError as e:
-    print(f"Error: Could not import modules: {e}")
-    print("Make sure you're running from the project root directory")
-    sys.exit(1)
 
+from src.engine.midi import (
+    PolyphonicSynth,
+    MIDIInput,
+    midi_to_note_name,
+)
+from src.engine.midi.input import MIDO_AVAILABLE
+from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
+from engine import (
+    SineOscillator,
+    SawtoothOscillator,
+    ADSREnvelope,
+    Chain,
+    SquareOscillator,
+    ModulatedVolume,
+)
+from src.constants import DEFAULT_SAMPLE_RATE
 
 # ANSI colors
 class Colors:

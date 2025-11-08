@@ -59,7 +59,8 @@ class CVScaler:
             )
         if output_range[0] >= output_range[1]:
             raise ValueError(
-                f"output_range min ({output_range[0]}) must be < max ({output_range[1]})"
+                f"output_range min ({output_range[0]}) must be < max "
+                f"({output_range[1]})"
             )
 
         self._source = source

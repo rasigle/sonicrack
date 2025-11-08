@@ -16,7 +16,7 @@ from engine import (
     Reverb,
     ADSREnvelope,
     ModulatedOscillator,
-    SquareOscillator
+    SquareOscillator,
 )
 
 # Set up parameters

@@ -286,7 +286,7 @@ class Cable(QGraphicsItem):
         """Handle delete request from context menu."""
         # Use centralized delete method
         if self.scene() and isinstance(self.scene().parent(), PatchCanvas):
-            canvas = self.scene().parent()
+            canvas: PatchCanvas = self.scene().parent()
             canvas.delete_cable(self, emit_signal=True)
 
 

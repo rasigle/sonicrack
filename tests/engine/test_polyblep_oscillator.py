@@ -111,8 +111,13 @@ class TestPolyBLEPOscillatorConstruction:
 
     def test_wave_shape_parameter(self):
         """Test construction with different wave shapes."""
-        for shape in [WaveShape.SINE, WaveShape.SQUARE, WaveShape.SAWTOOTH_UP,
-                     WaveShape.SAWTOOTH_DOWN, WaveShape.TRIANGLE]:
+        for shape in [
+            WaveShape.SINE,
+            WaveShape.SQUARE,
+            WaveShape.SAWTOOTH_UP,
+            WaveShape.SAWTOOTH_DOWN,
+            WaveShape.TRIANGLE,
+        ]:
             osc = PolyBLEPOscillator(wave_shape=shape)
             assert osc.wave_shape == shape
 
@@ -279,8 +284,7 @@ class TestPolyBLEPOscillatorWaveShapes:
 
     def test_sine_generation(self):
         """Test sine wave generation."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0,
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(frequency=440, gain_db=0, wave_shape=WaveShape.SINE)
         samples = osc.get_samples(1000, mode="vectorized")
 
         assert -1.1 <= samples.min() <= -0.9, "Sine min should be near -1"
@@ -289,8 +293,7 @@ class TestPolyBLEPOscillatorWaveShapes:
 
     def test_square_generation(self):
         """Test square wave generation."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0,
-                                wave_shape=WaveShape.SQUARE)
+        osc = PolyBLEPOscillator(frequency=440, gain_db=0, wave_shape=WaveShape.SQUARE)
         samples = osc.get_samples(1000, mode="vectorized")
 
         # PolyBLEP square may have slight overshoot
@@ -299,8 +302,9 @@ class TestPolyBLEPOscillatorWaveShapes:
 
     def test_sawtooth_up_generation(self):
         """Test sawtooth up generation."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0,
-                                wave_shape=WaveShape.SAWTOOTH_UP)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, wave_shape=WaveShape.SAWTOOTH_UP
+        )
         samples = osc.get_samples(1000, mode="vectorized")
 
         assert -1.2 <= samples.min() <= -0.8
@@ -308,8 +312,9 @@ class TestPolyBLEPOscillatorWaveShapes:
 
     def test_sawtooth_down_generation(self):
         """Test sawtooth down generation."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0,
-                                wave_shape=WaveShape.SAWTOOTH_DOWN)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, wave_shape=WaveShape.SAWTOOTH_DOWN
+        )
         samples = osc.get_samples(1000, mode="vectorized")
 
         assert -1.2 <= samples.min() <= -0.8
@@ -317,14 +322,19 @@ class TestPolyBLEPOscillatorWaveShapes:
 
     def test_triangle_generation(self):
         """Test triangle wave generation."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0,
-                                wave_shape=WaveShape.TRIANGLE)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, wave_shape=WaveShape.TRIANGLE
+        )
         samples = osc.get_samples(1000, mode="vectorized")
 
         # Triangle via integration may have wider bounds initially
         # as the integrator stabilizes
-        assert -2.0 <= samples.min() <= 2.0, f"Triangle min out of bounds: {samples.min()}"
-        assert -2.0 <= samples.max() <= 2.0, f"Triangle max out of bounds: {samples.max()}"
+        assert (
+            -2.0 <= samples.min() <= 2.0
+        ), f"Triangle min out of bounds: {samples.min()}"
+        assert (
+            -2.0 <= samples.max() <= 2.0
+        ), f"Triangle max out of bounds: {samples.max()}"
 
         # After stabilization, should be closer to ±1
         # Check the last 500 samples (after integrator stabilizes)
@@ -338,8 +348,9 @@ class TestPolyBLEPOscillatorAmplitudeControl:
 
     def test_amplitude_affects_output(self):
         """Test that amplitude scales output."""
-        osc = PolyBLEPOscillator(frequency=440, amplitude=0.5, gain_db=None,
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(
+            frequency=440, amplitude=0.5, gain_db=None, wave_shape=WaveShape.SINE
+        )
         samples = osc.get_samples(1000, mode="vectorized")
 
         # Output should be scaled to ±0.5
@@ -349,8 +360,7 @@ class TestPolyBLEPOscillatorAmplitudeControl:
     def test_gain_db_affects_output(self):
         """Test that gain_db scales output."""
         # -6 dB ≈ 0.5 amplitude
-        osc = PolyBLEPOscillator(frequency=440, gain_db=-6,
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(frequency=440, gain_db=-6, wave_shape=WaveShape.SINE)
         samples = osc.get_samples(1000, mode="vectorized")
 
         # Output should be scaled to approximately ±0.5
@@ -359,8 +369,7 @@ class TestPolyBLEPOscillatorAmplitudeControl:
 
     def test_runtime_amplitude_change(self):
         """Test changing amplitude at runtime."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0,
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(frequency=440, gain_db=0, wave_shape=WaveShape.SINE)
 
         samples1 = osc.get_samples(100, mode="vectorized")
         rms1 = np.sqrt(np.mean(samples1**2))
@@ -393,10 +402,12 @@ class TestPolyBLEPOscillatorPhaseControl:
 
     def test_phase_affects_initial_output(self):
         """Test that phase shifts waveform."""
-        osc1 = PolyBLEPOscillator(frequency=440, phase=0, gain_db=0,
-                                 wave_shape=WaveShape.SINE)
-        osc2 = PolyBLEPOscillator(frequency=440, phase=90, gain_db=0,
-                                 wave_shape=WaveShape.SINE)
+        osc1 = PolyBLEPOscillator(
+            frequency=440, phase=0, gain_db=0, wave_shape=WaveShape.SINE
+        )
+        osc2 = PolyBLEPOscillator(
+            frequency=440, phase=90, gain_db=0, wave_shape=WaveShape.SINE
+        )
 
         samples1 = osc1.get_samples(10, mode="vectorized")
         samples2 = osc2.get_samples(10, mode="vectorized")
@@ -407,8 +418,9 @@ class TestPolyBLEPOscillatorPhaseControl:
 
     def test_runtime_phase_change(self):
         """Test changing phase at runtime."""
-        osc = PolyBLEPOscillator(frequency=440, phase=0, gain_db=0,
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(
+            frequency=440, phase=0, gain_db=0, wave_shape=WaveShape.SINE
+        )
 
         samples1 = osc.get_samples(10, mode="vectorized")
 
@@ -425,8 +437,9 @@ class TestPolyBLEPOscillatorWaveRangeConversion:
 
     def test_standard_range(self):
         """Test standard [-1, 1] range."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0, wave_range=(-1, 1),
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, wave_range=(-1, 1), wave_shape=WaveShape.SINE
+        )
         samples = osc.get_samples(1000, mode="vectorized")
 
         assert -1.1 <= samples.min() <= -0.9
@@ -434,8 +447,9 @@ class TestPolyBLEPOscillatorWaveRangeConversion:
 
     def test_unipolar_range(self):
         """Test unipolar [0, 1] range."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0, wave_range=(0, 1),
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, wave_range=(0, 1), wave_shape=WaveShape.SINE
+        )
         samples = osc.get_samples(1000, mode="vectorized")
 
         assert -0.1 <= samples.min() <= 0.1
@@ -443,8 +457,9 @@ class TestPolyBLEPOscillatorWaveRangeConversion:
 
     def test_custom_range(self):
         """Test custom range."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0, wave_range=(-5, 5),
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, wave_range=(-5, 5), wave_shape=WaveShape.SINE
+        )
         samples = osc.get_samples(1000, mode="vectorized")
 
         assert -5.5 <= samples.min() <= -4.5
@@ -452,8 +467,9 @@ class TestPolyBLEPOscillatorWaveRangeConversion:
 
     def test_runtime_range_change(self):
         """Test changing wave range at runtime."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0, wave_range=(-1, 1),
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, wave_range=(-1, 1), wave_shape=WaveShape.SINE
+        )
 
         samples1 = osc.get_samples(100, mode="vectorized")
 
@@ -470,8 +486,9 @@ class TestPolyBLEPOscillatorAntialiasing:
 
     def test_polyblep_differs_from_naive(self):
         """Test that PolyBLEP output differs from naive waveform."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0, sample_rate=44100,
-                                wave_shape=WaveShape.SQUARE)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, sample_rate=44100, wave_shape=WaveShape.SQUARE
+        )
         polyblep_samples = osc.get_samples(1000, mode="vectorized")
 
         # Generate naive square wave
@@ -485,8 +502,9 @@ class TestPolyBLEPOscillatorAntialiasing:
     def test_polyblep_reduces_high_frequency_content(self):
         """Test that PolyBLEP reduces high-frequency aliasing."""
         # Generate PolyBLEP square
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0, sample_rate=44100,
-                                wave_shape=WaveShape.SQUARE)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, sample_rate=44100, wave_shape=WaveShape.SQUARE
+        )
         polyblep_samples = osc.get_samples(4410, mode="vectorized")  # 0.1s
 
         # Generate naive square
@@ -503,8 +521,9 @@ class TestPolyBLEPOscillatorAntialiasing:
         high_freq_naive = np.mean(fft_naive[nyquist_idx:])
 
         # PolyBLEP should have less high-frequency content
-        assert high_freq_polyblep < high_freq_naive, \
-            "PolyBLEP should reduce high-frequency aliasing"
+        assert (
+            high_freq_polyblep < high_freq_naive
+        ), "PolyBLEP should reduce high-frequency aliasing"
 
 
 class TestPolyBLEPOscillatorPhaseContinuity:
@@ -512,8 +531,9 @@ class TestPolyBLEPOscillatorPhaseContinuity:
 
     def test_phase_continuity_after_vectorized(self):
         """Test phase is maintained after vectorized generation."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0, phase=0,
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, phase=0, wave_shape=WaveShape.SINE
+        )
 
         # Generate using vectorized
         samples1 = osc.get_samples(100, mode="vectorized")
@@ -529,8 +549,9 @@ class TestPolyBLEPOscillatorPhaseContinuity:
 
     def test_phase_continuity_mixed_modes(self):
         """Test phase continuity when switching modes."""
-        osc = PolyBLEPOscillator(frequency=440, gain_db=0, phase=0,
-                                wave_shape=WaveShape.SINE)
+        osc = PolyBLEPOscillator(
+            frequency=440, gain_db=0, phase=0, wave_shape=WaveShape.SINE
+        )
 
         # Generate using vectorized
         osc.get_samples(1000, mode="vectorized")
@@ -576,4 +597,3 @@ class TestConvenienceFunctions:
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v", "--tb=short"])
-

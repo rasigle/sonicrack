@@ -12,7 +12,12 @@ Tests cover:
 
 import pytest
 import numpy as np
-from src.engine.oscillator import SineOscillator, SquareOscillator, SawtoothOscillator, TriangleOscillator
+from src.engine.oscillator import (
+    SineOscillator,
+    SquareOscillator,
+    SawtoothOscillator,
+    TriangleOscillator,
+)
 from src.engine.modulated_oscillator import ModulatedFrequency, ModulatedOscillator
 
 
@@ -115,11 +120,11 @@ class TestModulatedFrequencySampleGeneration:
         fm = ModulatedFrequency(carrier, lfo)
 
         # Small buffer should use iterator
-        samples_small = fm.get_samples(100, mode='auto')
+        samples_small = fm.get_samples(100, mode="auto")
         assert len(samples_small) == 100
 
         # Large buffer should use vectorized
-        samples_large = fm.get_samples(2000, mode='auto')
+        samples_large = fm.get_samples(2000, mode="auto")
         assert len(samples_large) == 2000
 
     def test_samples_are_not_constant(self):
@@ -159,6 +164,7 @@ class TestModulatedFrequencyModulation:
 
     def test_multiplicative_frequency_modulation(self):
         """Test custom multiplicative frequency modulation."""
+
         def freq_mod_multiply(base_freq, mod_val):
             # Scale -1..+1 to 0.5..1.5
             factor = 0.5 + (mod_val + 1) / 2
@@ -209,6 +215,7 @@ class TestModulatedFrequencyModulation:
 
     def test_wide_pitch_sweep(self):
         """Test creating a wide pitch sweep with multiplicative modulation."""
+
         def freq_mod_sweep(base_freq, mod_val):
             # Map -1..+1 to 0.5..2.0 (one octave down to one octave up)
             factor = 0.5 + (mod_val + 1) * 0.75
@@ -341,4 +348,3 @@ class TestModulatedFrequencyIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
-

@@ -7,7 +7,8 @@ creating natural-sounding, expressive audio.
 
 Classes:
     ModulatedOscillator: Combines an oscillator with modulators for dynamic synthesis.
-    ModulatedFrequency: Specialized class for frequency modulation (vibrato, FM synthesis).
+    ModulatedFrequency: Specialized class for frequency modulation (vibrato,
+        FM synthesis).
 
 Example:
     >>> from src.engine import SineOscillator, ADSREnvelope
@@ -94,7 +95,12 @@ class ModulatedOscillator(Generator):
     )
 
     def __init__(
-        self, oscillator: Oscillator, *modulators, amp_mod=None, freq_mod=None, phase_mod=None
+        self,
+        oscillator: Oscillator,
+        *modulators,
+        amp_mod=None,
+        freq_mod=None,
+        phase_mod=None,
     ):
         """Initialize the ModulatedOscillator.
 
@@ -263,7 +269,7 @@ class ModulatedOscillator(Generator):
             SineOscillator,
             TriangleOscillator,
             SawtoothOscillator,
-            SquareOscillator
+            SquareOscillator,
         )
 
         # Step 1: Generate all modulator values in bulk (vectorized)
@@ -492,7 +498,8 @@ class ModulatedFrequency(ModulatedOscillator):
         ...     return base_freq * (2.0 ** (semitones / 12.0))
         >>>
         >>> carrier = SineOscillator(frequency=440)
-        >>> lfo = SineOscillator(frequency=5.0, amplitude=100.0)  # ±100 cents = ±1 semitone
+        >>> # ±100 cents = ±1 semitone
+        >>> lfo = SineOscillator(frequency=5.0, amplitude=100.0)
         >>> vibrato = ModulatedFrequency(carrier, lfo, freq_mod_func=exp_freq_mod)
 
     Attributes:
@@ -542,9 +549,12 @@ class ModulatedFrequency(ModulatedOscillator):
             >>> lfo = SineOscillator(frequency=5.0, amplitude=50.0)
             >>> fm_osc = ModulatedFrequency(carrier, lfo)
         """
+        def default_freq_mod(base_freq, mod_val):
+            return base_freq + mod_val
+
         # Default frequency modulation: add modulator output to base frequency
         if freq_mod_func is None:
-            freq_mod_func = lambda base_freq, mod_val: base_freq + mod_val
+            freq_mod_func = default_freq_mod
 
         # Initialize parent ModulatedOscillator with only freq_mod
         # Note: modulator is passed as positional argument (*modulators in parent)
@@ -553,7 +563,7 @@ class ModulatedFrequency(ModulatedOscillator):
             modulator,  # Positional argument for *modulators
             freq_mod=freq_mod_func,
             amp_mod=None,  # No amplitude modulation
-            phase_mod=None  # No phase modulation
+            phase_mod=None,  # No phase modulation
         )
 
     def __repr__(self):

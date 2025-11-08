@@ -126,8 +126,8 @@ class MixerModule(ModuleWidget):
                 old_amp = vol_comp.amplitude
                 vol_comp.amplitude = new_gain
                 logger.debug(
-                    f"✓ Hot-swapped Ch {channel_index + 1} Volume: {old_amp:.3f} → {new_gain:.3f} "
-                    f"(Volume obj id={id(vol_comp)})"
+                    f"✓ Hot-swapped Ch {channel_index + 1} Volume: {old_amp:.3f} → "
+                    f"{new_gain:.3f} (Volume obj id={id(vol_comp)})"
                 )
             except (AttributeError, ValueError) as e:
                 logger.warning(
@@ -163,9 +163,10 @@ class MixerModule(ModuleWidget):
 
             # Log all knob values for debugging
             all_gains = [k.get_value() for k in gain_knobs]
-            logger.info(
+            logger.debug(
                 f"Mixer knob values at compilation: Ch1={all_gains[0]:.3f}, "
-                f"Ch2={all_gains[1]:.3f}, Ch3={all_gains[2]:.3f}, Ch4={all_gains[3]:.3f}"
+                f"Ch2={all_gains[1]:.3f}, Ch3={all_gains[2]:.3f}, "
+                f"Ch4={all_gains[3]:.3f}"
             )
 
             # Map each input_component to its corresponding port index
@@ -175,12 +176,14 @@ class MixerModule(ModuleWidget):
                 if len(port.cables) > 0:
                     port_indices.append(port_idx)
                     logger.debug(
-                        f"  Port {port_idx} ({port.port_name}) has {len(port.cables)} cable(s)"
+                        f"  Port {port_idx} ({port.port_name}) has "
+                        f"{len(port.cables)} cable(s)"
                     )
 
-            logger.info(
+            logger.debug(
                 f"Mixer creating components: {len(input_components)} inputs, "
-                f"connected ports (0-indexed): {port_indices} = {[p+1 for p in port_indices]} (1-indexed)"
+                f"connected ports (0-indexed): {port_indices} = "
+                f"{[p+1 for p in port_indices]} (1-indexed)"
             )
 
             # Reset all volume components
@@ -216,7 +219,8 @@ class MixerModule(ModuleWidget):
 
             # Use mix_mode='sum' for standard mixer behavior (maintains volume levels)
             logger.info(
-                f"Creating WaveAdder with mix_mode='sum' for {len(processed_inputs)} inputs"
+                f"Creating WaveAdder with mix_mode='sum' for {len(processed_inputs)} "
+                f"inputs"
             )
             return WaveAdder(*processed_inputs, mix_mode="sum")
 

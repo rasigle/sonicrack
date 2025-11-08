@@ -372,7 +372,6 @@ class TestSquareOscillator(TestOscillatorBase):
         self.assertAlmostEqual(duty_cycle, 0.25, delta=0.05)
 
 
-
 class TestSawtoothOscillator(TestOscillatorBase):
     """Test suite for SawtoothOscillator."""
 

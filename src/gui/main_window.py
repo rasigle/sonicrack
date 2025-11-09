@@ -96,11 +96,6 @@ class ModularSynthWindow(QMainWindow):
         self._setup_statusbar()
         self._connect_signals()
 
-        # Visualization timer
-        self.vis_timer = QtCore.QTimer()
-        self.vis_timer.timeout.connect(self._update_visualizations)
-        self.vis_timer.start(50)  # Update at 20 Hz
-
         logger.info("Modular Synth Window initialized")
 
     def _setup_ui(self):
@@ -607,12 +602,6 @@ class ModularSynthWindow(QMainWindow):
                 # (Debouncing is less critical when not playing)
                 self.compile_debounce_timer.stop()
                 self.compile_debounce_timer.start(DEBOUNCE_TIMER_DELAY_MS)
-
-    def _update_visualizations(self):
-        """Update waveform and spectrum displays."""
-        if self.audio_engine.current_buffer is not None:
-            self.waveform_display.set_samples(self.audio_engine.current_buffer)
-            self.spectrum_analyzer.set_samples(self.audio_engine.current_buffer)
 
     def _update_window_title(self):
         """Update window title to show current patch name and modified status."""

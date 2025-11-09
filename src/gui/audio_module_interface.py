@@ -217,31 +217,6 @@ class AudioModule(ABC):
         """
         return self.custom_name
 
-    def validate_connections(self, connections: list[tuple]) -> list[str]:
-        """Validate module connections.
-
-        Override this to add custom validation logic for your module.
-
-        Args:
-            connections: List of all (source_port, dest_port) connections
-
-        Returns:
-            List of validation error messages (empty if valid)
-        """
-        errors = []
-
-        # Note: We don't validate required inputs here because the patch compiler
-        # gracefully skips modules with missing inputs during compilation.
-        # This allows for progressive patch building where modules can be connected
-        # to outputs before their inputs are connected.
-
-        # Custom validation can be added by overriding this method in subclasses
-
-        # Custom validation could be that a module is connected with an
-        # incompatible one.
-
-        return errors
-
     def _find_port_by_name(self, port_name: str):
         """Helper to find a port by name."""
         for port in getattr(self, "input_ports", []):

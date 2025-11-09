@@ -46,7 +46,7 @@ from src.engine.midi.cv_outputs import CVFrequencyOutput, CVGateOutput, CVVeloci
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.module_registry import register_module
-from src.gui.midi_worker_thread import MIDIWorkerThread
+from gui.modules.input.midi_worker_thread import MIDIWorkerThread
 
 logger = logging.getLogger(__name__)
 

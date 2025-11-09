@@ -783,9 +783,6 @@ class PatchCompiler:
             # No output module, so validate all modules (for completeness)
             signal_path_modules = self.modules
 
-        for module in signal_path_modules:
-            errors.extend(module.validate_connections(self.connections))
-
         # Note: Disconnected modules are intentionally NOT reported as errors
         # They remain on the canvas but are ignored during compilation
 

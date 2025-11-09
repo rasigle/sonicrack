@@ -62,9 +62,9 @@ Note:
 
 import numpy as np
 
+from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor, Generator
 from src.engine.audio_component_registry import register_component, ComponentCategory
-from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.oscillator import Oscillator
 
 

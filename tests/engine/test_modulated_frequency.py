@@ -18,7 +18,7 @@ from src.engine.oscillator import (
     SawtoothOscillator,
     TriangleOscillator,
 )
-from src.engine.modulated_oscillator import ModulatedFrequency, ModulatedOscillator
+from src.engine.oscillator_modulated import ModulatedFrequency, ModulatedOscillator
 
 
 class TestModulatedFrequencyBasics:

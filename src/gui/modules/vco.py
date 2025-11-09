@@ -16,7 +16,7 @@ from src.engine import (
     TriangleOscillator,
     SquareOscillator,
 )
-from src.engine.modulated_oscillator import ModulatedOscillator
+from src.engine.oscillator_modulated import ModulatedOscillator
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob, HSlider
 from src.gui.widgets.module_widget import ModuleWidget

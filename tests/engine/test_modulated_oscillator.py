@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from src.engine.modulated_oscillator import ModulatedOscillator
+from src.engine.oscillator_modulated import ModulatedOscillator
 from src.engine.modulator import ADSREnvelope
 from src.engine.oscillator import SineOscillator
 

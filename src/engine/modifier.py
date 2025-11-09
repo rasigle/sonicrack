@@ -296,7 +296,7 @@ class ModulatedPanner(Panner):
 
     **Note:** If your CV source outputs a different range (e.g., envelope [0, 1]),
     use CVScaler to convert it:
-        >>> from src.engine import unipolar_to_bipolar
+        >>> from engine import unipolar_to_bipolar, ADSREnvelope
         >>> env = ADSREnvelope(attack=0.1, decay=0.2, sustain=0.7, release=0.3)
         >>> scaled_env = unipolar_to_bipolar(env)  # Convert [0,1] to [-1,1]
         >>> panner = ModulatedPanner(scaled_env)
@@ -1008,7 +1008,7 @@ class ModulatedClipper(Modifier):
 
     **Note:** If your CV source outputs a different range (e.g., oscillator [-1, 1]),
     use CVScaler to convert it:
-        >>> from src.engine import bipolar_to_unipolar
+        >>> from engine import bipolar_to_unipolar, SineOscillator
         >>> lfo = SineOscillator(2)  # Output: [-1, 1]
         >>> scaled_lfo = bipolar_to_unipolar(lfo)  # Output: [0, 1]
         >>> clipper = ModulatedClipper(scaled_lfo)

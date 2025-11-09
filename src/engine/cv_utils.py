@@ -22,6 +22,7 @@ class CVScaler:
     - Volume/Clipper expect [0, 1] (unipolar)
 
     Example:
+        >>> from engine import SineOscillator, ModulatedVolume
         >>> # Scale oscillator [-1, 1] to volume [0, 1]
         >>> lfo = SineOscillator(2, amplitude=1.0)
         >>> scaler = CVScaler(lfo, input_range=(-1, 1), output_range=(0, 1))
@@ -150,6 +151,7 @@ def bipolar_to_unipolar(source: Any, clamp: bool = True) -> CVScaler:
         CVScaler instance
 
     Example:
+        >>> from engine import SineOscillator, ModulatedVolume
         >>> lfo = SineOscillator(2)  # Output: [-1, 1]
         >>> scaled = bipolar_to_unipolar(lfo)  # Output: [0, 1]
         >>> volume = ModulatedVolume(scaled)
@@ -172,6 +174,7 @@ def unipolar_to_bipolar(source: Any, clamp: bool = True) -> CVScaler:
         CVScaler instance
 
     Example:
+        >>> from engine import ADSREnvelope, ModulatedPanner
         >>> env = ADSREnvelope(attack=0.1, decay=0.2, sustain=0.7, release=0.3)
         >>> scaled = unipolar_to_bipolar(env)  # Output: [-1, 1]
         >>> panner = ModulatedPanner(scaled)
@@ -199,6 +202,7 @@ def scale_cv(
         CVScaler instance
 
     Example:
+        >>> from engine import SineOscillator, ModulatedVolume
         >>> lfo = SineOscillator(2, amplitude=0.5)  # Output: [-0.5, 0.5]
         >>> scaled = scale_cv(lfo, from_range=(-0.5, 0.5), to_range=(0, 1))
         >>> volume = ModulatedVolume(scaled)

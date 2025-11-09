@@ -9,8 +9,8 @@ import numpy as np
 from src.engine.midi import MIDIToCV, NoteOnMessage, NoteOffMessage
 from src.engine.midi.cv_outputs import CVFrequencyOutput, CVGateOutput
 from src.engine import SineOscillator, ADSREnvelope
-from src.engine.modulated_oscillator import ModulatedOscillator
-from src.engine.gate_triggered_adsr import GateTriggeredADSR
+from src.engine.oscillator_modulated import ModulatedOscillator
+from engine.modulator import GateTriggeredADSR
 
 
 class TestMIDIWorkflow:

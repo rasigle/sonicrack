@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
-from src.engine.polyblep_oscillator import PolyBLEPOscillator, WaveShape
+from src.engine.oscillator_polyblep import PolyBLEPOscillator, WaveShape
 from src.engine.composer import WaveAdder
 from src.engine.oscillator import (
     SineOscillator,

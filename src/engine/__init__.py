@@ -118,7 +118,7 @@ from src.engine.modifier import (
 )
 
 # Modulated Oscillator
-from src.engine.modulated_oscillator import ModulatedOscillator, ModulatedFrequency
+from src.engine.oscillator_modulated import ModulatedOscillator, ModulatedFrequency
 
 # CV Utilities
 from src.engine.cv_utils import (

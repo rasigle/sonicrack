@@ -7,7 +7,7 @@ antialiasing effectiveness.
 
 import pytest
 import numpy as np
-from src.engine.polyblep_oscillator import (
+from src.engine.oscillator_polyblep import (
     PolyBLEPOscillator,
     PolyBLEPWaveforms,
     WaveShape,

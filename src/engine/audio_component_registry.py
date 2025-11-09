@@ -14,16 +14,16 @@ The interface system provides:
 from __future__ import annotations
 
 import inspect
-from typing import Any, Type, Callable
+from typing import Type, Callable
 
 from src.engine.audio_component import (
     ComponentCategory,
     AudioComponent,
     ComponentDescriptor,
 )
-from src.utils.logging_config import get_logger
+from src.utils.logging_config import get_engine_logger
 
-logger = get_logger("audio.component_registry")
+logger = get_engine_logger("audio_component_registry")
 
 
 class AudioComponentRegistry:
@@ -226,7 +226,7 @@ class AudioComponentRegistry:
 
         return "\n".join(info)
 
-    def create_instance(self, name: str, *args, **kwargs) -> Any:
+    def create_instance(self, name: str, *args, **kwargs) -> AudioComponent:
         """Create component instance by name.
 
         Args:

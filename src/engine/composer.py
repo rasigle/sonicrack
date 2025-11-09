@@ -33,20 +33,19 @@ Note:
     trigger_release() and ended properties to all child components.
 """
 
-import logging
-
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 import numpy as np
 
-from src.engine.audio_component import AudioComponent, ComponentDescriptor
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.audio_component import AudioComponent, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
-from src.engine.modulated_oscillator import ModulatedOscillator
 from src.engine.oscillator import Oscillator
+from src.engine.oscillator_modulated import ModulatedOscillator
+from src.utils.logging_config import get_engine_logger
 
-logger = logging.getLogger(__name__)
+logger = get_engine_logger("composer")
 
 
 class Composer(AudioComponent, ABC):
@@ -163,6 +162,7 @@ class Chain(Composer):
             ValueError: If oscillator is None.
 
         Example:
+            >>> from engine import SineOscillator, Chain, Volume, Distortion, Panner
             >>> # Mix Modifiers seamlessly - all derive from Modifier!
             >>> chain = Chain(
             ...     SineOscillator(440),

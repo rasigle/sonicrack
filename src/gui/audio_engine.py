@@ -26,7 +26,8 @@ class AudioEngine(QObject):
     """
 
     # Signals
-    samples_generated = pyqtSignal(np.ndarray)  # Emitted when new samples are generated
+    samples_generated = pyqtSignal(np.ndarray)  # Emitted when new samples are generated (final output)
+    module_samples_generated = pyqtSignal(str, np.ndarray)  # (module_id, samples) for monitoring
     playback_started = pyqtSignal()
     playback_stopped = pyqtSignal()
     error_occurred = pyqtSignal(str)
@@ -77,6 +78,11 @@ class AudioEngine(QObject):
         # Track if we're in post-fade silence mode
         self.post_fade_silence: bool = False
 
+        # Signal monitoring for visualization
+        # Maps module_id → last buffer (for tap points)
+        self.signal_taps: dict[str, np.ndarray] = {}
+        self.enable_signal_monitoring: bool = True  # Can be disabled for performance
+
     def set_audiopatch(self, patch: AudioComponent):
         """Set the audio patch to play.
 
@@ -89,7 +95,38 @@ class AudioEngine(QObject):
     def clear_audiopath(self):
         """Clear the current audio patch."""
         self.patch = None
+        self.signal_taps.clear()
         logger.debug("Patch cleared")
+
+    def register_signal_tap(self, module_id: str):
+        """Register a module for signal monitoring.
+
+        Args:
+            module_id: Unique identifier for the module
+        """
+        self.signal_taps[module_id] = np.zeros(2048)  # Initialize with zeros
+        logger.debug(f"Registered signal tap: {module_id}")
+
+    def unregister_signal_tap(self, module_id: str):
+        """Unregister a module from signal monitoring.
+
+        Args:
+            module_id: Unique identifier for the module
+        """
+        if module_id in self.signal_taps:
+            del self.signal_taps[module_id]
+            logger.debug(f"Unregistered signal tap: {module_id}")
+
+    def get_signal_tap(self, module_id: str) -> np.ndarray | None:
+        """Get the last buffer for a monitored module.
+
+        Args:
+            module_id: Unique identifier for the module
+
+        Returns:
+            Last audio buffer or None if not registered
+        """
+        return self.signal_taps.get(module_id)
 
     def set_master_volume(self, volume: float):
         """Set the master output volume with smoothing to prevent clicks.

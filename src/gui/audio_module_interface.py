@@ -27,6 +27,9 @@ class ModuleCategory(StrEnum):
             (e.g., Volume, Pan, Clipper).
         MIXER: Represents modules that combine multiple audio inputs into
             a single output.
+        VISUALIZATION: Represents modules that display audio signals visually
+            without modifying them (e.g., Waveform, Spectrum Analyzer).
+            These act as pass-through modules.
         OUTPUT: Represents terminal modules that act as the final node
             in the signal chain (e.g., speakers, audio output).
     """
@@ -42,6 +45,9 @@ class ModuleCategory(StrEnum):
 
     # Combines multiple audio inputs
     MIXER = "Mixer"
+
+    # Visualization tools - pass-through with display
+    VISUALIZATION = "Visualization"
 
     # Terminal node
     OUTPUT = "Output"

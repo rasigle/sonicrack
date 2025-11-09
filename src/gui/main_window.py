@@ -33,7 +33,7 @@ from src.gui.dialogs.preset_library_dialog import (
     SaveLibraryPresetDialog,
 )
 from src.gui.module_registry import initialize_modules
-from src.gui.modules.output import OutputModule
+from src.gui.modules.output.output import OutputModule
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
 from src.gui.preset_manager import PresetManager
@@ -64,6 +64,7 @@ class ModularSynthWindow(QMainWindow):
         super().__init__()
 
         # Initialize the module registry with all built-in modules
+        print("Main")
         self.registry = initialize_modules()
 
         self.setWindowTitle(APP_TITLE)

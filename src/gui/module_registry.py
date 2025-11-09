@@ -266,7 +266,10 @@ def register_module(**override_metadata) -> Callable:
     return decorator
 
 
-def discover_modules(package_path: str = "src.gui.modules") -> int:
+def discover_modules(
+        package_path: str = "src.gui.modules",
+        recursive: bool = False
+) -> int:
     """Discover and import all module files in a package.
 
     This automatically imports all Python files in the modules package,
@@ -274,6 +277,7 @@ def discover_modules(package_path: str = "src.gui.modules") -> int:
 
     Args:
         package_path: Dot-separated package path to scan
+        recursive: If True, search subdirectories recursively
 
     Returns:
         Number of modules discovered
@@ -290,16 +294,23 @@ def discover_modules(package_path: str = "src.gui.modules") -> int:
         package_dir = Path(package.__file__).parent
 
         # Find all Python files
-        module_files = package_dir.glob("*.py")
+        module_files = package_dir.rglob("*.py") if recursive else package_dir.glob("*.py")
 
         count = 0
         for module_file in module_files:
-            # Skip __init__.py and private modules
-            if module_file.name.startswith("_"):
+
+            # Skip files and directories that start with '_' (private / __init__.py)
+            rel_path = module_file.relative_to(package_dir)
+            if any(part.startswith("_") for part in rel_path.parts):
                 continue
 
+            # Build dotted module name relative to the package
+            rel = Path(*rel_path.parts).with_suffix("").as_posix().replace("/", ".")
+            if rel.endswith(".__init__"):
+                rel = rel[: -len(".__init__")]
+            module_name = package_path if rel == "" else f"{package_path}.{rel}"
+
             # Import the module
-            module_name = f"{package_path}.{module_file.stem}"
             try:
                 importlib.import_module(module_name)
                 count += 1
@@ -375,7 +386,7 @@ def initialize_modules() -> ModuleRegistry:
 
     # Auto-discover and register all modules in the modules package
     # This will import all .py files and trigger their @register_module decorators
-    discover_modules("src.gui.modules")
+    discover_modules("src.gui.modules", recursive=True)
     logger.info(f"Auto-discovered and initialized {registry.count()} modules")
 
     return registry

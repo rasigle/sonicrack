@@ -7,7 +7,7 @@ from src.constants import DEFAULT_GAIN_DB
 from src.engine import ModulatedVolume, Volume
 from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
-from src.gui.modules.modulated_base import ModulatedModuleBase
+from src.gui.modules._modulated_base import ModulatedModuleBase
 from src.gui.widgets import Knob
 
 logger = logging.getLogger(__name__)

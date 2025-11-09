@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem
 
 if TYPE_CHECKING:
     from src.gui.audio_module_interface import ModuleCategory
-    from src.gui.modules.output import OutputModule
+    from src.gui.modules.output.output import OutputModule
     from src.gui.widgets.module_widget import ModuleWidget
 
 
@@ -605,7 +605,7 @@ class PatchCanvas(QGraphicsView):
         Returns:
             The OutputModule instance, or None if not found
         """
-        from src.gui.modules.output import OutputModule
+        from src.gui.modules.output.output import OutputModule
 
         for module in self.get_modules():
             if isinstance(module, OutputModule):

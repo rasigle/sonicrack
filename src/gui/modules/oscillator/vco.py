@@ -124,7 +124,7 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         logger = logging.getLogger(__name__)
         gain_value = self.gain_knob.get_value()
-        logger.info(f"VCO Gain changed to {gain_value} dB")
+        logger.debug(f"VCO Gain changed to {gain_value} dB")
         self.parameter_changed.emit("gain_db", gain_value)
 
     def get_required_inputs(self) -> list[str]:
@@ -163,7 +163,7 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         has_freq_cv = freq_port and len(freq_port.cables) > 0
 
-        logger.info(
+        logger.debug(
             f"VCO update_knob_state: Freq port has "
             f"{len(freq_port.cables) if freq_port else 0} cables, "
             f"has_freq_cv={has_freq_cv}"
@@ -174,13 +174,13 @@ class ModulatedOscillatorModule(ModuleWidget):
             self.freq_knob.setEnabled(False)
             self.freq_knob.setStyleSheet("opacity: 0.5;")
             self.freq_knob.setToolTip("Frequency controlled by Freq input (CV)")
-            logger.info("VCO: Freq knob DISABLED")
+            logger.debug("VCO: Freq knob DISABLED")
         else:
             # No frequency CV - enable knob
             self.freq_knob.setEnabled(True)
             self.freq_knob.setStyleSheet("")
             self.freq_knob.setToolTip("Manual frequency control (Hz)")
-            logger.info("VCO: Freq knob ENABLED")
+            logger.debug("VCO: Freq knob ENABLED")
 
         # Check Gain port
         gain_port = None

@@ -21,6 +21,7 @@ All notable changes to AudioPlayground will be documented in this file.
 
 ### Added
 
+- Added module subpackages and recursive search in module registry.
 - BLEP anti-aliasing for oscillators
 - Polish API and documentation and code (comprehensive update complete)
 - Documentation hub with clear navigation (docs/README.md)

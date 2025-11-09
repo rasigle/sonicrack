@@ -38,9 +38,6 @@ from src.gui.patch_canvas import PatchCanvas
 from src.gui.patch_compiler import PatchCompiler
 from src.gui.preset_manager import PresetManager
 from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH, DEBOUNCE_TIMER_DELAY_MS
-from src.gui.widgets.spectrum_analyzer import SpectrumAnalyzer
-from src.gui.widgets.tree_analyzer import TreeAnalyzer
-from src.gui.widgets.waveform_display import WaveformDisplay
 
 logger = logging.getLogger(__name__)
 
@@ -88,9 +85,8 @@ class ModularSynthWindow(QMainWindow):
         # Debounce timer for parameter changes (avoid audio spikes)
         self.compile_debounce_timer = QtCore.QTimer()
         self.compile_debounce_timer.setSingleShot(True)
-        # Don't update tree for parameter changes - only for structure changes
         self.compile_debounce_timer.timeout.connect(
-            lambda: self._compile_patch(update_tree=False)
+            lambda: self._compile_patch()
         )
 
         # UI setup
@@ -189,35 +185,6 @@ class ModularSynthWindow(QMainWindow):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(5, 5, 5, 5)
-
-        # Title
-        title = QLabel("Visualizations")
-        title.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
-        layout.addWidget(title)
-
-        # Waveform display
-        wave_group = QGroupBox("Waveform")
-        wave_layout = QVBoxLayout()
-        self.waveform_display = WaveformDisplay()
-        wave_layout.addWidget(self.waveform_display)
-        wave_group.setLayout(wave_layout)
-        layout.addWidget(wave_group)
-
-        # Spectrum analyzer
-        spectrum_group = QGroupBox("Spectrum")
-        spectrum_layout = QVBoxLayout()
-        self.spectrum_analyzer = SpectrumAnalyzer()
-        spectrum_layout.addWidget(self.spectrum_analyzer)
-        spectrum_group.setLayout(spectrum_layout)
-        layout.addWidget(spectrum_group)
-
-        # Tree analyzer
-        tree_group = QGroupBox("Patch Tree")
-        tree_layout = QVBoxLayout()
-        self.tree_analyzer = TreeAnalyzer()
-        tree_layout.addWidget(self.tree_analyzer)
-        tree_group.setLayout(tree_layout)
-        layout.addWidget(tree_group)
 
         # Control panel
         controls_group = QGroupBox("Playback")
@@ -387,15 +354,11 @@ class ModularSynthWindow(QMainWindow):
         # Auto-compile when module is added
         self._compile_patch()
 
-    def _compile_patch(
-        self, show_messages: bool = False, update_tree: bool = True
-    ) -> bool:
+    def _compile_patch(self, show_messages: bool = False) -> bool:
         """Compile the current patch automatically.
 
         Args:
             show_messages: If True, show message boxes for errors/success
-            update_tree: If True, update the tree visualization
-                (only needed for structure changes)
 
         Returns:
             True if compilation succeeded, False otherwise
@@ -409,7 +372,6 @@ class ModularSynthWindow(QMainWindow):
                 )
             # Clear patch and stop playback
             self.audio_engine.clear_audiopath()
-            self.tree_analyzer.clear()
             return False
 
         # Get all connections
@@ -433,14 +395,11 @@ class ModularSynthWindow(QMainWindow):
 
             # Clear patch and stop playback on error
             self.audio_engine.clear_audiopath()
-            self.tree_analyzer.clear()
             return False
 
         # Now we are read to compile
         audio_patch: AudioComponent = self.patch_compiler.compile()
         if audio_patch is None:
-            # Clear tree on compilation failure
-            self.tree_analyzer.clear()
 
             if show_messages:
                 QMessageBox.critical(
@@ -452,11 +411,6 @@ class ModularSynthWindow(QMainWindow):
             return False
 
         self.audio_engine.set_audiopatch(audio_patch)
-
-        # Update tree analyzer with patch structure (only when structure changes)
-        if update_tree:
-            tree_data = self.patch_compiler.build_patch_tree()
-            self.tree_analyzer.update_tree(tree_data)
 
         # Set the master volume from output module
         output_module = self.patch_canvas.get_output_module()
@@ -860,9 +814,6 @@ class ModularSynthWindow(QMainWindow):
         self.audio_engine.stop_playback()
         self.audio_engine.clear_audiopath()
         self.patch_canvas.clear_all()
-        self.waveform_display.clear()
-        self.spectrum_analyzer.clear()
-        self.tree_analyzer.clear()
         self.statusbar.showMessage("Canvas cleared")
 
     def _save_as_library_preset(self):

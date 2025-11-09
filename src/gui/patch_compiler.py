@@ -904,3 +904,15 @@ class PatchCompiler:
                     node["inputs"].append(port_info)
 
         return node
+
+    def get_tree_structure(self) -> dict[str, Any]:
+        """Get the hierarchical tree structure of the patch.
+
+        This is an alias for build_patch_tree() for compatibility with
+        visualization modules.
+
+        Returns:
+            Dictionary representing the patch tree structure
+        """
+        return self.build_patch_tree()
+

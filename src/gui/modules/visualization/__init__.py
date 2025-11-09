@@ -1,6 +1,8 @@
-"""Visualization modules for audio analysis and display."""
+"""Visualization modules for audio signal monitoring."""
 
-from src.gui.modules.visualization.waveform import WaveformModule
+from .waveform import WaveformModule
+from .spectrum import SpectrumModule
+from .tree_anlyzer import TreeAnalyzerModule
 
-__all__ = ["WaveformModule"]
+__all__ = ["WaveformModule", "SpectrumModule", "TreeAnalyzerModule"]
 

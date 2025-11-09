@@ -1,0 +1,402 @@
+"""Spectrum analyzer module for visualizing audio frequency content."""
+from PyQt6.uic.Compiler.qtproxies import QtCore
+
+"""Real-time spectrum analyzer widget."""
+
+import logging
+from typing import Any
+
+import numpy as np
+from PyQt6 import QtCore
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QPainter, QPen
+from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout
+
+from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
+from src.gui.module_registry import register_module
+from src.gui.widgets.module_widget import ModuleWidget
+
+logger = logging.getLogger(__name__)
+
+
+@register_module()
+class SpectrumModule(ModuleWidget):
+    """Spectrum analyzer module for real-time frequency visualization.
+
+    This is a pure visualization module - it only displays the frequency
+    spectrum and does NOT pass signals through. It has no output port.
+
+    **Important:** This module visualizes the FINAL OUTPUT after all processing.
+    It connects to the audio engine's output signal to show the frequency
+    content of what's being sent to the speakers.
+
+    **Usage:**
+    - Add to your patch (no connections required)
+    - The display always shows the frequency spectrum of final output
+    - Great for analyzing frequency content and monitoring mix
+    """
+
+    metadata = ModuleMetadata(
+        title="Spectrum",
+        category=ModuleCategory.VISUALIZATION,
+        description="Real-time frequency spectrum display (FFT analyzer)",
+    )
+
+    def __init__(self):
+        """Initialize spectrum analyzer module."""
+        super().__init__(
+            width=420,
+            height=260,
+            color=QColor(100, 80, 120),
+        )
+
+        # Add input port (optional - for patch organization only)
+        # The input connection doesn't affect what's displayed
+        self.in_port = self.add_input_port("In")
+
+        # NO OUTPUT PORT - this is a visualization-only module
+
+        # Use helper methods for UI construction
+        self.controls_widget = self._create_controls_container()
+        layout = self._create_standard_layout()
+
+        # Create spectrum analyzer widget
+        self.spectrum_display = SpectrumAnalyzer()
+        self.spectrum_display.setMinimumSize(400, 150)
+        layout.addWidget(self.spectrum_display)
+
+        # Add peak frequency display
+        stats_layout = QHBoxLayout()
+
+        self.peak_freq_label = QLabel("Peak: -- Hz")
+        self.peak_freq_label.setStyleSheet("color: #4ecdc4; font-weight: bold;")
+        stats_layout.addWidget(self.peak_freq_label)
+
+        stats_layout.addStretch()
+
+        self.level_label = QLabel("Level: -- dB")
+        self.level_label.setStyleSheet("color: #f39c12; font-weight: bold;")
+        stats_layout.addWidget(self.level_label)
+
+        layout.addLayout(stats_layout)
+
+        self.controls_widget.setLayout(layout)
+        self.proxy = self._add_controls_to_module(self.controls_widget)
+
+        # Store reference to input component
+        self.input_component = None
+
+        # Audio engine connection
+        self.audio_engine = None
+        self._audio_engine_connected = False
+
+        # Use timer to find and connect to audio engine
+        self.connection_timer = QtCore.QTimer()
+        self.connection_timer.timeout.connect(self._try_connect_audio_engine)
+        self.connection_timer.setInterval(100)  # Try every 100ms
+        self.connection_timer.start()
+
+        # Sample rate for frequency calculation
+        self.sample_rate = 44100
+
+    def _try_connect_audio_engine(self):
+        """Try to find and connect to the audio engine via scene/parent chain."""
+        if self._audio_engine_connected:
+            self.connection_timer.stop()
+            return
+
+        try:
+            # Navigate: Module → Scene → View (PatchCanvas) → Window (MainWindow)
+            scene = self.scene()
+            if scene is None:
+                return
+
+            views = scene.views()
+            if not views:
+                return
+
+            view = views[0]
+            main_window = view.window()
+
+            if not hasattr(main_window, 'audio_engine'):
+                return
+
+            # Found audio engine!
+            self.audio_engine = main_window.audio_engine
+
+            # Get sample rate
+            if hasattr(self.audio_engine, 'sample_rate'):
+                self.sample_rate = self.audio_engine.sample_rate
+
+            # Connect to signals
+            self.audio_engine.samples_generated.connect(self._on_samples_generated)
+            self.audio_engine.playback_stopped.connect(self._on_playback_stopped)
+
+            self._audio_engine_connected = True
+            self.connection_timer.stop()
+
+            logger.info("✓ Spectrum analyzer connected to audio engine")
+
+        except Exception as e:
+            logger.debug(f"Waiting for audio engine: {e}")
+
+    def _on_samples_generated(self, samples: np.ndarray):
+        """Handle audio samples from the audio engine.
+
+        This receives the FINAL output signal (after all processing).
+
+        Args:
+            samples: Final output samples (mono or stereo)
+        """
+        try:
+            # Convert stereo to mono for FFT
+            if len(samples.shape) == 2:
+                samples = np.mean(samples, axis=1)
+
+            # Update spectrum display
+            self.spectrum_display.set_samples(samples)
+
+            # Calculate and display peak frequency
+            if len(samples) > 0:
+                self._update_peak_frequency(samples)
+
+        except Exception as e:
+            logger.warning(f"Error updating spectrum: {e}")
+
+    def _update_peak_frequency(self, samples: np.ndarray):
+        """Calculate and display the peak frequency and level.
+
+        Args:
+            samples: Audio samples
+        """
+        try:
+            # Compute FFT
+            n = min(len(samples), 4096)
+            if n < 256:
+                return
+
+            # Apply window
+            window = np.hanning(n)
+            windowed = samples[:n] * window
+
+            # FFT
+            fft = np.fft.rfft(windowed)
+            magnitude = np.abs(fft)
+
+            # Find peak
+            peak_idx = np.argmax(magnitude)
+
+            # Convert to frequency
+            freq_resolution = self.sample_rate / (2 * len(magnitude))
+            peak_freq = peak_idx * freq_resolution
+
+            # Calculate level in dB
+            peak_level = 20 * np.log10(np.max(magnitude) + 1e-10)
+
+            # Update labels
+            if peak_freq < 1000:
+                self.peak_freq_label.setText(f"Peak: {peak_freq:.1f} Hz")
+            else:
+                self.peak_freq_label.setText(f"Peak: {peak_freq / 1000:.2f} kHz")
+
+            self.level_label.setText(f"Level: {peak_level:.1f} dB")
+
+        except Exception as e:
+            logger.debug(f"Error calculating peak frequency: {e}")
+
+    def _on_playback_stopped(self):
+        """Clear display when playback stops."""
+        self.spectrum_display.clear()
+        self.peak_freq_label.setText("Peak: -- Hz")
+        self.level_label.setText("Level: -- dB")
+
+    # AudioModuleInterface implementation
+    def get_required_inputs(self) -> list[str]:
+        """Spectrum analyzer has no required inputs.
+
+        The input port is optional - it doesn't affect what's displayed.
+        The spectrum always shows the final audio engine output.
+        """
+        return []  # No required inputs
+
+    def create_engine_component(
+        self,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
+    ):
+        """Create the engine component.
+
+        Spectrum analyzer is a pure visualization module with no audio processing.
+        It stores the input component reference for validation but doesn't
+        use it (the display shows the final audio engine output).
+
+        Args:
+            input_components: List of input audio components (optional)
+            modulation_components: Dict of modulation components (not used)
+
+        Returns:
+            None (visualization modules don't produce audio output)
+        """
+        # Store reference for validation/debugging, but don't use it
+        if input_components and len(input_components) > 0:
+            self.input_component = input_components[0]
+            logger.debug(
+                f"Spectrum analyzer input connected: "
+                f"{type(self.input_component).__name__}"
+            )
+        else:
+            self.input_component = None
+            logger.debug(
+                "Spectrum analyzer: no input connected (OK - monitors final output)"
+            )
+
+        # Return None - this module has no audio output
+        return None
+
+    def cleanup(self):
+        """Clean up resources when module is removed."""
+        self.connection_timer.stop()
+
+        # Disconnect from audio engine
+        if self.audio_engine and self._audio_engine_connected:
+            try:
+                self.audio_engine.samples_generated.disconnect(
+                    self._on_samples_generated
+                )
+                self.audio_engine.playback_stopped.disconnect(self._on_playback_stopped)
+            except Exception as e:
+                logger.debug(f"Error disconnecting from audio engine: {e}")
+
+        self.spectrum_display.clear()
+
+
+class SpectrumAnalyzer(QWidget):
+    """Widget for displaying audio spectrum in real-time.
+
+    Shows the frequency-domain representation of audio signals using FFT.
+    """
+
+    def __init__(self, parent: QWidget | None = None):
+        """Initialize the spectrum analyzer.
+
+        Args:
+            parent: Parent widget
+        """
+        super().__init__(parent)
+
+        self.setMinimumSize(400, 150)
+        self.fft_data: np.ndarray | None = None
+        self.fft_bins = 256
+
+        # Visual properties
+        self.bg_color = QColor(20, 20, 25)
+        self.grid_color = QColor(40, 40, 45)
+        self.bar_color = QColor(255, 150, 0)
+        self.peak_color = QColor(255, 0, 0)
+
+    def set_samples(self, samples: np.ndarray):
+        """Set the audio samples and compute FFT.
+
+        Args:
+            samples: Audio samples array
+        """
+        if samples is None or len(samples) == 0:
+            self.fft_data = None
+            self.update()
+            return
+
+        # Handle stereo by taking first channel
+        if len(samples.shape) > 1 and samples.shape[1] == 2:
+            samples = samples[:, 0]
+
+        # Compute FFT
+        n = min(len(samples), 4096)
+        if n < 256:
+            self.fft_data = None
+            self.update()
+            return
+
+        # Apply window function
+        window = np.hanning(n)
+        windowed = samples[:n] * window
+
+        # Compute FFT
+        fft = np.fft.rfft(windowed)
+        magnitude = np.abs(fft)
+
+        # Convert to dB
+        magnitude = np.maximum(magnitude, 1e-10)  # Avoid log(0)
+        db = 20 * np.log10(magnitude)
+
+        # Normalize to 0-1 range (assuming -80 dB to 0 dB)
+        db = np.clip(db, -80, 0)
+        normalized = (db + 80) / 80
+
+        # Downsample to display bins
+        bins_per_bucket = len(normalized) // self.fft_bins
+        if bins_per_bucket > 0:
+            buckets = []
+            for i in range(self.fft_bins):
+                start = i * bins_per_bucket
+                end = start + bins_per_bucket
+                if end <= len(normalized):
+                    buckets.append(np.max(normalized[start:end]))
+            self.fft_data = np.array(buckets)
+        else:
+            self.fft_data = normalized[: self.fft_bins]
+
+        self.update()
+
+    def clear(self):
+        """Clear the display."""
+        self.fft_data = None
+        self.update()
+
+    def paintEvent(self, event):
+        """Paint the spectrum."""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Draw background
+        painter.fillRect(self.rect(), self.bg_color)
+
+        width = self.width()
+        height = self.height()
+
+        # Draw grid lines (horizontal)
+        painter.setPen(QPen(self.grid_color, 1))
+        for i in range(5):
+            y = height * i / 4
+            painter.drawLine(0, int(y), width, int(y))
+
+        # Draw frequency scale labels
+        painter.setPen(QColor(100, 100, 100))
+        freq_labels = ["20Hz", "200Hz", "2kHz", "20kHz"]
+        for i, label in enumerate(freq_labels):
+            x = width * i / (len(freq_labels) - 1)
+            painter.drawText(int(x) - 20, height - 5, label)
+
+        # Draw spectrum bars
+        if self.fft_data is not None and len(self.fft_data) > 0:
+            bar_width = width / len(self.fft_data)
+
+            for i, magnitude in enumerate(self.fft_data):
+                x = i * bar_width
+                bar_height = magnitude * (height - 20)
+                y = height - bar_height - 15
+
+                # Color gradient based on level
+                if magnitude > 0.9:
+                    color = self.peak_color
+                elif magnitude > 0.7:
+                    color = QColor(255, 200, 0)
+                else:
+                    color = self.bar_color
+
+                painter.fillRect(
+                    int(x), int(y), max(1, int(bar_width) - 1), int(bar_height), color
+                )
+        else:
+            # Draw "No Signal" text
+            painter.setPen(QColor(100, 100, 100))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No Signal")

@@ -53,7 +53,7 @@ class ModuleCategory(StrEnum):
     OUTPUT = "Output"
 
 
-@dataclass
+@dataclass(frozen=True)
 class ModuleMetadata:
     """Metadata for audio modules.
 
@@ -83,6 +83,7 @@ class AudioModule(ABC):
 
     Attributes:
         custom_name (str): Optional custom name for the module instance.
+        metadata (ModuleMetadata): Static metadata about the module type.
     """
 
     metadata: ModuleMetadata
@@ -223,11 +224,3 @@ class AudioModule(ABC):
             if port.port_name == port_name:
                 return port
         return None
-
-    @staticmethod
-    def _is_port_connected(port, connections: list[tuple]) -> bool:
-        """Helper to check if a port is connected."""
-        for start_port, end_port in connections:
-            if end_port == port:
-                return True
-        return False

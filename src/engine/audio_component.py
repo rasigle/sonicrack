@@ -21,7 +21,7 @@ class ComponentCategory(Enum):
     EFFECT = "effect"
 
 
-@dataclass
+@dataclass(frozen=True)
 class ComponentDescriptor:
     """Metadata describing a component type.
 

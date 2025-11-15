@@ -6,10 +6,10 @@ from PyQt6.QtWidgets import QHBoxLayout
 
 from src.engine import Volume
 from src.engine.modifier import ModulatedVolume
-from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
+from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.module_registry import register_module
+from src.gui.core.module_registry import register_module
 
 logger = logging.getLogger(__name__)
 

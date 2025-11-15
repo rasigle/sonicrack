@@ -6,8 +6,8 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 
 from src.engine import ADSREnvelope
 from engine.modulator import GateTriggeredADSR
-from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
-from src.gui.module_registry import register_module
+from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 

@@ -43,10 +43,10 @@ from PyQt6.QtWidgets import (
 from src.engine.midi import MIDIToCV, MIDIMessage
 from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
 from src.engine.midi.cv_outputs import CVFrequencyOutput, CVGateOutput, CVVelocityOutput
-from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
+from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.module_registry import register_module
-from gui.modules.input.midi_worker_thread import MIDIWorkerThread
+from src.gui.core.module_registry import register_module
+from src.gui.modules.input.midi_worker_thread import MIDIWorkerThread
 
 logger = logging.getLogger(__name__)
 

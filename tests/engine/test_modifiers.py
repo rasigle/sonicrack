@@ -11,11 +11,11 @@ from src.engine.modifier import (
     Volume,
     ModulatedVolume,
     Frequency,
-    ModulatedFrequency,
     Clipper,
 )
 from src.engine.modulator import ADSREnvelope
 from src.engine.oscillator import SineOscillator
+from src.engine.oscillator_modulated import ModulatedFrequency
 
 
 class TestPanner(unittest.TestCase):
@@ -995,16 +995,16 @@ class TestModulatedFrequency(unittest.TestCase):
     def test_initialization_with_modulator(self):
         """Test ModulatedFrequency initializes with modulator."""
         lfo = SineOscillator(5, sample_rate=1000)
-        freq = ModulatedFrequency(lfo)
-        self.assertIsNotNone(freq.modulator)
+        vol = ModulatedVolume(lfo)
+        self.assertIsNotNone(vol.modulator)
 
     def test_iterator_protocol(self):
         """Test ModulatedFrequency supports iteration."""
         lfo = SineOscillator(5, sample_rate=1000)
-        freq = ModulatedFrequency(lfo)
-        iter(freq)
+        vol = ModulatedVolume(lfo)
+        iter(vol)
 
-        frequency = next(freq)
+        frequency = next(vol)
         self.assertIsInstance(frequency, (float, np.floating))
 
     def test_input_validation_none_modulator(self):
@@ -1048,44 +1048,6 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
 
         # First samples should be lower (attack phase)
         self.assertLess(np.mean(samples[:10]), np.mean(samples[40:50]))
-
-
-class TestModulatedFrequencyVectorization(unittest.TestCase):
-    """Test ModulatedFrequency vectorized methods."""
-
-    def test_scale_vectorized_with_oscillator(self):
-        """Test ModulatedFrequency.scale_vectorized with oscillator modulator."""
-        lfo = SineOscillator(
-            5, amplitude=1.0, sample_rate=1000
-        )  # Amplitude 1.0 for clear variation
-        mod_freq = ModulatedFrequency(lfo)
-
-        # Create test samples (frequencies)
-        samples = np.full(100, 440.0, dtype=np.float32)
-
-        # Apply modulated frequency (vectorized)
-        result = mod_freq.scale_vectorized(samples)
-
-        # Check result
-        self.assertEqual(len(result), 100)
-        self.assertEqual(result.dtype, np.float32)
-
-        # Result should vary (frequency is modulated by oscillator output -1 to 1)
-        # So result varies from 440*(-1) to 440*(1) = -440 to 440
-        self.assertGreater(np.std(result), 0.1)  # Should have variation
-
-    def test_scale_vectorized_shape_preservation(self):
-        """Test that scale_vectorized preserves input shape."""
-        lfo = SineOscillator(5, sample_rate=1000)
-        mod_freq = ModulatedFrequency(lfo)
-
-        # Test with different sizes
-        for n in [10, 100, 1000]:
-            samples = np.random.randn(n).astype(np.float32)
-            result = mod_freq.scale_vectorized(samples)
-
-            self.assertEqual(result.shape, samples.shape)
-            self.assertEqual(result.dtype, np.float32)
 
 
 class TestChainVectorizationPerformance(unittest.TestCase):

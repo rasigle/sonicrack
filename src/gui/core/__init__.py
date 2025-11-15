@@ -1,0 +1,1 @@
+# Logic stuff without GUI dependencies

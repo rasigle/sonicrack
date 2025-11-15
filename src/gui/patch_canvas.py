@@ -9,11 +9,11 @@ from PyQt6.QtCore import Qt, QPointF, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene
 
-from src.gui.cable import Cable
-from src.gui.port import Port
+from src.gui.widgets.cable_widget import Cable
+from src.gui.widgets.port_widget import PortWidget
 
 if TYPE_CHECKING:
-    from src.gui.audio_module_interface import ModuleCategory
+    from src.gui.core.module import ModuleCategory
     from src.gui.modules.output.output import OutputModule
     from src.gui.widgets.module_widget import ModuleWidget
 
@@ -28,8 +28,8 @@ class PatchCanvas(QGraphicsView):
     This is where modules are placed and connected with cables.
     """
 
-    cable_connected = pyqtSignal(Port, Port)  # Emitted when a cable is connected
-    cable_disconnected = pyqtSignal(Port, Port)  # Emitted when a cable is disconnected
+    cable_connected = pyqtSignal(PortWidget, PortWidget)  # Emitted when a cable is connected
+    cable_disconnected = pyqtSignal(PortWidget, PortWidget)  # Emitted when a cable is disconnected
     module_deleted = pyqtSignal(object)  # Emitted when a module is deleted
 
     def __init__(self, parent=None):
@@ -50,13 +50,13 @@ class PatchCanvas(QGraphicsView):
 
         # Cable dragging state
         self.dragging_cable: Cable | None = None
-        self.drag_start_port: Port | None = None
+        self.drag_start_port: PortWidget | None = None
 
     def mousePressEvent(self, event):
         """Handle mouse press for cable creation."""
         item = self.itemAt(event.pos())
 
-        if isinstance(item, Port):
+        if isinstance(item, PortWidget):
             # Start dragging a cable from this port
             if item.port_type == "output":
                 self.drag_start_port = item
@@ -82,7 +82,7 @@ class PatchCanvas(QGraphicsView):
         if self.dragging_cable:
             item = self.itemAt(event.pos())
 
-            if isinstance(item, Port) and item.port_type == "input":
+            if isinstance(item, PortWidget) and item.port_type == "input":
                 # Check if trying to connect to the same module
                 if item.parent_module == self.drag_start_port.parent_module:
                     # Self-connection not allowed - show error
@@ -126,7 +126,7 @@ class PatchCanvas(QGraphicsView):
 
         super().mouseReleaseEvent(event)
 
-    def _would_create_cycle(self, start_port: Port, end_port: Port) -> str | None:
+    def _would_create_cycle(self, start_port: PortWidget, end_port: PortWidget) -> str | None:
         """Check if adding a connection would create a cycle.
 
         Args:
@@ -264,7 +264,7 @@ class PatchCanvas(QGraphicsView):
         if emit_signal and start_port and end_port:
             self.cable_disconnected.emit(start_port, end_port)
 
-    def create_connection(self, start_port: Port, end_port: Port) -> Cable | None:
+    def create_connection(self, start_port: PortWidget, end_port: PortWidget) -> Cable | None:
         """Create a cable connection between two ports.
 
         This is a helper method for programmatically creating cables,
@@ -296,7 +296,7 @@ class PatchCanvas(QGraphicsView):
 
         return cable
 
-    def get_connections(self) -> list[tuple[Port, Port]]:
+    def get_connections(self) -> list[tuple[PortWidget, PortWidget]]:
         """Get all cable connections in the canvas.
 
         Returns:

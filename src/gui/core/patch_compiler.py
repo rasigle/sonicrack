@@ -6,8 +6,8 @@ from typing import Any, Callable
 from src.engine import CVScaler
 from src.engine.audio_component import AudioComponent
 from src.engine.composer import Chain, WaveAdder
-from src.gui.audio_module_interface import ModuleCategory, AudioModule
-from src.gui.patch_canvas import Port
+from src.gui.core.module import ModuleCategory, AudioModule
+from src.gui.widgets.port_widget import PortWidget
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class PatchCompiler:
     def __init__(self):
         """Initialize the patch compiler."""
         self.modules: list[AudioModule] = []
-        self.connections: list[tuple[Port, Port]] = []
+        self.connections: list[tuple[PortWidget, PortWidget]] = []
 
         self.compiled_patch: AudioComponent | None = None
         self._build_cache: dict[AudioModule, Any] = {}
@@ -34,7 +34,7 @@ class PatchCompiler:
         self._module_to_component: dict[AudioModule, AudioComponent] = {}
 
     def set_patch(
-        self, modules: list[AudioModule], connections: list[tuple[Port, Port]]
+        self, modules: list[AudioModule], connections: list[tuple[PortWidget, PortWidget]]
     ):
         """Set the patch to compile.
 
@@ -191,7 +191,7 @@ class PatchCompiler:
         self._build_cache[module] = component
         self._module_to_component[module] = component
 
-    def _build_component_from_port(self, connection: Port) -> Any | None:
+    def _build_component_from_port(self, connection: PortWidget) -> Any | None:
         """Build component from a connection's source module.
 
         Args:
@@ -237,7 +237,7 @@ class PatchCompiler:
             return self._build_chain_from_module(source_module)
 
     def _collect_input_components_from_port(
-        self, port: Port, track_skipped: bool = False
+        self, port: PortWidget, track_skipped: bool = False
     ) -> tuple[list, list[str]]:
         """Collect all components connected to a port.
 
@@ -602,7 +602,7 @@ class PatchCompiler:
         return component
 
     @staticmethod
-    def _find_port_by_name(module: AudioModule, port_name: str) -> Port | None:
+    def _find_port_by_name(module: AudioModule, port_name: str) -> PortWidget | None:
         """Find a port by name in a module.
 
         Args:
@@ -610,7 +610,7 @@ class PatchCompiler:
             port_name: The name of the port to find
 
         Returns:
-            The port or None if not found
+            The port widget or None if not found
         """
         for port in getattr(module, "input_ports", []):
             if port.port_name == port_name:
@@ -620,21 +620,21 @@ class PatchCompiler:
                 return port
         return None
 
-    def _find_connection_to_port(self, port: Port) -> Port | None:
+    def _find_connection_to_port(self, port: PortWidget) -> PortWidget | None:
         """Find the source port connected to the given input port.
 
         Args:
             port: The input port to find connection for
 
         Returns:
-            The source (output) port or None
+            The source (output) port widget or None
         """
         for start_port, end_port in self.connections:
             if end_port == port:
                 return start_port
         return None
 
-    def _find_all_connections_to_port(self, port: Port) -> list[Port]:
+    def _find_all_connections_to_port(self, port: PortWidget) -> list[PortWidget]:
         """Find ALL source ports connected to the given input port.
 
         This is important when multiple outputs connect to a single input -
@@ -644,7 +644,7 @@ class PatchCompiler:
             port: The input port to find connections for
 
         Returns:
-            List of source (output) ports connected to this input
+            List of source (output) port widgets connected to this input
         """
         connections = []
         for start_port, end_port in self.connections:

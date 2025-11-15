@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from src.gui.preset_manager import PresetManager
+from src.gui.core.preset_manager import PresetManager
 
 logger = logging.getLogger(__name__)
 

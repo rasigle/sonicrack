@@ -6,23 +6,25 @@ from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath
 from PyQt6.QtWidgets import QGraphicsItem
 
-from src.gui.port import Port
-
 if TYPE_CHECKING:
-    from src.gui.widgets.module_widget import ModuleWidget
+    from src.gui.widgets.port_widget import PortWidget
+
 
 class Cable(QGraphicsItem):
     """A cable connecting two ports.
 
     Cables route audio signals between module outputs and inputs.
+
+    This is a UI component that works with PortWidget (the visual representation).
+    The actual connection logic is handled by PortModel (contained in PortWidget).
     """
 
-    def __init__(self, start_port: Port, end_port: Port | None = None):
+    def __init__(self, start_port: PortWidget, end_port: PortWidget | None = None):
         """Initialize a cable.
 
         Args:
-            start_port: The output port where the cable starts
-            end_port: The input port where the cable ends (can be None for dragging)
+            start_port: The output port widget where the cable starts
+            end_port: The input port widget where the cable ends (can be None for dragging)
         """
         super().__init__()
         self.start_port = start_port
@@ -43,8 +45,12 @@ class Cable(QGraphicsItem):
         if end_port:
             end_port.add_cable(self)
 
-    def set_end_port(self, port: Port):
-        """Set the end port of the cable."""
+    def set_end_port(self, port: PortWidget):
+        """Set the end port of the cable.
+
+        Args:
+            port: The port widget to connect to
+        """
         if self.end_port:
             self.end_port.remove_cable(self)
         self.end_port = port

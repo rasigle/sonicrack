@@ -8,9 +8,9 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QComboBox
 
 from src.constants import DEFAULT_GAIN_DB
 from src.engine.noise import NoiseGenerator
-from src.gui.audio_module_interface import ModuleCategory
-from src.gui.audio_module_interface import ModuleMetadata
-from src.gui.module_registry import register_module
+from src.gui.core.module import ModuleCategory
+from src.gui.core.module import ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 

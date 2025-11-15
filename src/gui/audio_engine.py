@@ -7,7 +7,7 @@ from typing import Any, TYPE_CHECKING
 
 import numpy as np
 import sounddevice as sd
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6 import QtCore
 
 from src.constants import DEFAULT_SAMPLE_RATE
 
@@ -19,18 +19,18 @@ if TYPE_CHECKING:
     from src.engine.audio_component import AudioComponent
 
 
-class AudioEngine(QObject):
+class AudioEngine(QtCore.QObject):
     """Audio engine for real-time synthesis and playback.
 
     Manages audio generation from the patch and streams it to the audio output.
     """
 
     # Signals
-    samples_generated = pyqtSignal(np.ndarray)  # Emitted when new samples are generated (final output)
-    module_samples_generated = pyqtSignal(str, np.ndarray)  # (module_id, samples) for monitoring
-    playback_started = pyqtSignal()
-    playback_stopped = pyqtSignal()
-    error_occurred = pyqtSignal(str)
+    samples_generated = QtCore.pyqtSignal(np.ndarray)  # Emitted when new samples are generated (final output)
+    module_samples_generated = QtCore.pyqtSignal(str, np.ndarray)  # (module_id, samples) for monitoring
+    playback_started = QtCore.pyqtSignal()
+    playback_stopped = QtCore.pyqtSignal()
+    error_occurred = QtCore.pyqtSignal(str)
 
     def __init__(self, sample_rate: int = DEFAULT_SAMPLE_RATE, buffer_size: int = 2048):
         """Initialize the audio engine.

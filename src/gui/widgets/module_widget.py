@@ -15,8 +15,8 @@ from PyQt6.QtWidgets import (
     QGraphicsProxyWidget,
 )
 
-from src.gui.audio_module_interface import AudioModule
-from src.gui.patch_canvas import Port
+from src.gui.core.module import AudioModule
+from src.gui.widgets.port_widget import PortWidget
 from src.gui.dialogs.module_info_dialog import ModuleInfoDialog
 
 if TYPE_CHECKING:
@@ -88,8 +88,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self.component = None
 
         # Ports
-        self.input_ports: list[Port] = []
-        self.output_ports: list[Port] = []
+        self.input_ports: list[PortWidget] = []
+        self.output_ports: list[PortWidget] = []
 
         # Parameter registry for automatic get/set (widget, getter, setter)
         self._parameters: dict[str, tuple[Any, str, str]] = {}
@@ -328,31 +328,31 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             label_rect = QRectF(self.module_width - 55, port_y - 6, 50, 12)
             painter.drawText(label_rect, Qt.AlignmentFlag.AlignRight, port.port_name)
 
-    def add_input_port(self, name: str) -> Port:
+    def add_input_port(self, name: str) -> PortWidget:
         """Add an input port to the module.
 
         Args:
             name: Name of the input port
 
         Returns:
-            The created port
+            The created port widget
         """
-        port = Port("input", name, self, len(self.input_ports))
+        port = PortWidget("input", name, self, len(self.input_ports))
         port.setParentItem(self)
         self.input_ports.append(port)
         self._update_port_positions()
         return port
 
-    def add_output_port(self, name: str) -> Port:
+    def add_output_port(self, name: str) -> PortWidget:
         """Add an output port to the module.
 
         Args:
             name: Name of the output port
 
         Returns:
-            The created port
+            The created port widget
         """
-        port = Port("output", name, self, len(self.output_ports))
+        port = PortWidget("output", name, self, len(self.output_ports))
         port.setParentItem(self)
         self.output_ports.append(port)
         self._update_port_positions()

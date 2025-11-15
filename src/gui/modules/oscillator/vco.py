@@ -17,10 +17,10 @@ from src.engine import (
     SquareOscillator,
 )
 from src.engine.oscillator_modulated import ModulatedOscillator
-from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
+from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob, HSlider
 from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.module_registry import register_module
+from src.gui.core.module_registry import register_module
 
 
 @register_module()

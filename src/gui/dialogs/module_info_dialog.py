@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
 )
 
-from src.gui.audio_module_interface import AudioModule
+from src.gui.core.module import AudioModule
 
 logger = logging.getLogger(__name__)
 

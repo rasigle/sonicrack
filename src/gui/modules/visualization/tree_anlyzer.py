@@ -7,8 +7,8 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem
 
-from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
-from src.gui.module_registry import register_module
+from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)

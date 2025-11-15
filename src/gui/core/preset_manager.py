@@ -10,6 +10,7 @@ from typing import Any
 from pathlib import Path
 from datetime import datetime
 
+from src.gui.ui_constants import DEFAULT_PRESET_DIRECTORY
 from src.constants import PRESET_FILE_EXTENSION
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ class PresetManager:
             preset_directory: Directory to store presets. If None, uses default.
         """
         if preset_directory is None:
-            preset_directory = Path.home() / ".audioplayground" / "presets"
+            preset_directory = DEFAULT_PRESET_DIRECTORY
 
         self.preset_directory = Path(preset_directory)
         self.preset_directory.mkdir(parents=True, exist_ok=True)
@@ -242,7 +243,8 @@ class PresetManager:
 
         return preset_data
 
-    def export_preset(self, filepath: Path, export_path: Path) -> bool:
+    @staticmethod
+    def export_preset(filepath: Path, export_path: Path) -> bool:
         """Export a preset to a different location.
 
         Args:

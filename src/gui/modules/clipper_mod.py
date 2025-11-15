@@ -6,8 +6,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from src.engine import ModulatedClipper, Clipper
-from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
-from src.gui.module_registry import register_module
+from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
 from src.gui.widgets import Knob
 

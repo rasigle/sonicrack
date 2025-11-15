@@ -8,8 +8,8 @@ import pytest
 
 from src.constants import DEFAULT_GAIN_DB
 from src.engine.oscillator import SineOscillator
-from src.gui.audio_module_interface import ModuleCategory
-from src.gui.patch_compiler import PatchCompiler
+from src.gui.core.module import ModuleCategory
+from src.gui.core.patch_compiler import PatchCompiler
 
 
 class MockOscillatorModule:

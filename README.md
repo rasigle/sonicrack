@@ -121,29 +121,29 @@ python examples/modular_synth_app.py
 
 ### 🎵 **Sources** (Signal Generators)
 
-| Module | Description | Inputs | Outputs |
-|--------|-------------|--------|---------|
-| **Oscillator** | Multi-waveform (Sine/Square/Saw/Triangle) | - | Audio |
-| **LFO** | Low-frequency oscillator (0.01-20 Hz) | - | Modulation |
-| **ADSR Envelope** | Attack/Decay/Sustain/Release | - | Modulation |
-| **Noise** | 7 noise types (White/Pink/Brown/Blue/Grey/Velvet/S&H) | - | Audio |
+| Module            | Description                                           | Inputs | Outputs    |
+|-------------------|-------------------------------------------------------|--------|------------|
+| **Oscillator**    | Multi-waveform (Sine/Square/Saw/Triangle)             | -      | Audio      |
+| **LFO**           | Low-frequency oscillator (0.01-20 Hz)                 | -      | Modulation |
+| **ADSR Envelope** | Attack/Decay/Sustain/Release                          | -      | Modulation |
+| **Noise**         | 7 noise types (White/Pink/Brown/Blue/Grey/Velvet/S&H) | -      | Audio      |
 
 ### 🎚️ **Modifiers** (Audio Processing)
 
-| Module | Description | Inputs | Outputs |
-|--------|-------------|--------|---------|
-| **Gain** | Simple volume control | Audio | Audio |
-| **Volume (Mod)** | Volume with modulation input | Audio, Mod | Audio |
-| **Panner** | Stereo positioning | Audio | Stereo |
-| **Panner (Mod)** | Auto-pan with modulation | Audio, Mod | Stereo |
-| **Clipper** | Distortion/limiting effect | Audio | Audio |
+| Module           | Description                  | Inputs     | Outputs |
+|------------------|------------------------------|------------|---------|
+| **Gain**         | Simple volume control        | Audio      | Audio   |
+| **Volume (Mod)** | Volume with modulation input | Audio, Mod | Audio   |
+| **Panner**       | Stereo positioning           | Audio      | Stereo  |
+| **Panner (Mod)** | Auto-pan with modulation     | Audio, Mod | Stereo  |
+| **Clipper**      | Distortion/limiting effect   | Audio      | Audio   |
 
 ### 🎛️ **Utility**
 
-| Module | Description | Inputs | Outputs |
-|--------|-------------|--------|---------|
-| **Mixer** | 4-channel audio mixer | In 1-4 | Audio |
-| **Output** | Audio output with master volume | Audio | - |
+| Module     | Description                     | Inputs | Outputs |
+|------------|---------------------------------|--------|---------|
+| **Mixer**  | 4-channel audio mixer           | In 1-4 | Audio   |
+| **Output** | Audio output with master volume | Audio  | -       |
 
 ---
 
@@ -284,12 +284,12 @@ See [examples/](examples/) for more:
 
 ### **Test Coverage**: 271/271 Tests Passing ✅
 
-| Component | Tests | Status |
-|-----------|-------|--------|
-| **Engine** | 184 | ✅ Pass |
-| **Utils** | 24 | ✅ Pass |
-| **Builder** | 57 | ✅ Pass |
-| **UI** | 6 | ✅ Pass |
+| Component   | Tests | Status |
+|-------------|-------|--------|
+| **Engine**  | 184   | ✅ Pass |
+| **Utils**   | 24    | ✅ Pass |
+| **Builder** | 57    | ✅ Pass |
+| **UI**      | 6     | ✅ Pass |
 
 Run tests:
 ```bash
@@ -333,23 +333,25 @@ help(SineOscillator)  # Full API documentation
 ### **Create a Custom Module**
 
 ```python
-from src.gui.module_registry import register_module
+from src.gui.core.module_registry import register_module
+from src.gui.core.module import ModuleCategory
 from src.gui.widgets.module_widget import ModuleWidget
+
 
 @register_module()  # Auto-registers!
 class MyFilterModule(ModuleWidget):
     @property
     def module_title(self):
         return "My Filter"
-    
+
     @property
     def module_description(self):
         return "Custom filter effect"
-    
+
     @property
     def module_category(self):
         return ModuleCategory.MODIFIER
-    
+
     # ... implement UI and create_component()
 ```
 

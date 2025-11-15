@@ -26,17 +26,17 @@ from PyQt6.QtWidgets import (
 from src import version
 from src.constants import PRESET_FILE_EXTENSION
 from src.gui.audio_engine import AudioEngine
-from src.gui.audio_module_interface import ModuleCategory
+from src.gui.core.module import ModuleCategory
+from src.gui.core.module_registry import initialize_modules
+from src.gui.core.patch_compiler import PatchCompiler
+from src.gui.core.preset_manager import PresetManager
 from src.gui.dialogs.about_dialog import show_about
 from src.gui.dialogs.preset_library_dialog import (
     LibraryPresetBrowserDialog,
     SaveLibraryPresetDialog,
 )
-from src.gui.module_registry import initialize_modules
 from src.gui.modules.output.output import OutputModule
 from src.gui.patch_canvas import PatchCanvas
-from src.gui.patch_compiler import PatchCompiler
-from src.gui.preset_manager import PresetManager
 from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH, DEBOUNCE_TIMER_DELAY_MS
 
 logger = logging.getLogger(__name__)
@@ -564,7 +564,7 @@ class ModularSynthWindow(QMainWindow):
         sender_module = self.sender()
 
         # Validate sender is an AudioModuleInterface
-        from src.gui.audio_module_interface import AudioModule
+        from src.gui.core.module import AudioModule
 
         if isinstance(sender_module, AudioModule):
             # Check if module is actually in the compiled patch

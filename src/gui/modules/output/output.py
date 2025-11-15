@@ -3,8 +3,8 @@ from typing import Any
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
-from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
-from src.gui.module_registry import register_module
+from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 from src.utils.math import db_to_linear

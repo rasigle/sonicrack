@@ -9,8 +9,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath
 from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout
 
-from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
-from src.gui.module_registry import register_module
+from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class WaveformModule(ModuleWidget):
     metadata = ModuleMetadata(
         title="Waveform",
         category=ModuleCategory.VISUALIZATION,
-        description="Real-time waveform display (monitors final output)",
+        description="Real-time waveform visualization (monitors final output)",
     )
 
     def __init__(self):

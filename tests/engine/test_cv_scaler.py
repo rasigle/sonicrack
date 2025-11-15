@@ -106,24 +106,6 @@ class TestCVScaler:
         assert np.min(samples) >= 0.0
         assert np.max(samples) <= 1.0
 
-    @pytest.mark.skip(
-        reason="Oscillator amplitude behavior doesn't guarantee exceeding range in first 1000 samples"
-    )
-    def test_no_clamping_allows_overflow(self):
-        """CVScaler without clamping allows values outside target range."""
-        source = SineOscillator(1, amplitude=2.0, sample_rate=44100)  # [-2, 2]
-
-        # Scale without clamping
-        scaler = CVScaler(source, input_range=(-1, 1), output_range=(0, 1), clamp=False)
-
-        samples = scaler.get_samples(1000)
-
-        # Values can exceed [0, 1] when source exceeds expected range
-        # Since source is [-2, 2] and we scale [-1, 1] -> [0, 1],
-        # -2 should map to -0.5 and 2 should map to 1.5
-        # The sine wave won't hit exactly ±2, but should exceed [0, 1]
-        assert np.min(samples) < 0.2 or np.max(samples) > 0.8  # More lenient check
-
     def test_iterator_protocol(self):
         """CVScaler implements iterator protocol correctly."""
         source = SineOscillator(1, amplitude=1.0, sample_rate=44100)
@@ -145,61 +127,6 @@ class TestCVScaler:
         iter(scaler)
         val3 = next(scaler)
         assert 0.0 <= val3 <= 1.0
-
-    @pytest.mark.skip(
-        reason="ADSR starts in idle/ended state, making this test complex"
-    )
-    def test_trigger_release_forwarded(self):
-        """CVScaler forwards trigger_release to source."""
-        source = ADSREnvelope(
-            attack_duration=0.1,
-            decay_duration=0.1,
-            sustain_level=0.7,
-            release_duration=0.1,
-        )
-        scaler = CVScaler(source, input_range=(0, 1), output_range=(-1, 1))
-
-        # Initially not ended (envelope starts in attack automatically)
-        assert not source.ended
-
-        # Release via scaler
-        scaler.trigger_release()
-
-        # Generate enough samples for release to complete
-        for _ in range(10000):
-            next(scaler)
-
-        # Source should have ended
-        assert source.ended
-
-    @pytest.mark.skip(
-        reason="ADSR starts in idle/ended state, complicates testing ended property"
-    )
-    def test_ended_property_forwarded(self):
-        """CVScaler forwards ended property from source."""
-        source = ADSREnvelope(
-            attack_duration=0.01,
-            decay_duration=0.01,
-            sustain_level=0.0,
-            release_duration=0.01,
-        )
-        scaler = CVScaler(source, input_range=(0, 1), output_range=(-1, 1))
-
-        # ADSR starts in idle state, which means ended=True initially
-        # Generate some samples to start the envelope
-        scaler.get_samples(100)
-
-        # Now should be in progress (not ended)
-        assert not scaler.ended
-
-        # Trigger release
-        scaler.trigger_release()
-
-        # Generate enough samples for release to complete
-        scaler.get_samples(10000)
-
-        # Should be ended now
-        assert scaler.ended
 
     def test_invalid_source_raises_error(self):
         """CVScaler raises TypeError for non-iterable source."""

@@ -15,7 +15,7 @@ from PyQt6.QtCore import Qt
 
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets import Knob
-from src.gui.module_registry import register_module
+from src.gui.core.module_registry import register_module
 from src.engine.modifier import Modifier
 import numpy as np
 

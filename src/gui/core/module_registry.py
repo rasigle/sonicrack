@@ -5,7 +5,6 @@ enabling a plugin-like architecture where modules can self-register without
 modifying the central registry.
 
 New modules should use the @register_module decorator in their own files.
-See dynamic_registry.py for the plugin system documentation.
 """
 
 import importlib
@@ -28,7 +27,7 @@ class ModuleRegistry:
 
     Example:
         ```python
-        @register_module("My Module", category="oscillator")
+        @register_module()
         class MyModule(ModuleWidget):
             ...
         ```
@@ -221,10 +220,6 @@ class ModuleRegistry:
         logger.info("Cleared all registered modules")
 
 
-# Global registry instance
-_global_registry = ModuleRegistry()
-
-
 def get_registry() -> ModuleRegistry:
     """Get the global module registry.
 
@@ -326,14 +321,14 @@ def discover_modules(
         return 0
 
 
-def load_plugin(plugin_path: str) -> bool:
+def load_module(module_path: str) -> bool:
     """Load a module from an external plugin file.
 
     This allows loading modules from external Python files,
     enabling a true plugin system.
 
     Args:
-        plugin_path: Path to the plugin Python file
+        module_path: Path to the plugin Python file
 
     Returns:
         True if loaded successfully, False otherwise
@@ -346,31 +341,20 @@ def load_plugin(plugin_path: str) -> bool:
     """
     try:
         # Import the plugin file as a module
-        spec = importlib.util.spec_from_file_location("plugin", plugin_path)
+        spec = importlib.util.spec_from_file_location("plugin", module_path)
         if spec is None or spec.loader is None:
-            logger.error(f"Could not load plugin: {plugin_path}")
+            logger.error(f"Could not load plugin: {module_path}")
             return False
 
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
 
-        logger.info(f"Loaded plugin: {plugin_path}")
+        logger.info(f"Loaded plugin: {module_path}")
         return True
 
     except Exception as e:
-        logger.error(f"Failed to load plugin {plugin_path}: {e}")
+        logger.error(f"Failed to load plugin {module_path}: {e}")
         return False
-
-
-# Export public API
-__all__ = [
-    "ModuleRegistry",
-    "get_registry",
-    "register_module",
-    "discover_modules",
-    "load_plugin",
-    "initialize_modules",
-]
 
 
 def initialize_modules() -> ModuleRegistry:
@@ -390,3 +374,18 @@ def initialize_modules() -> ModuleRegistry:
     logger.info(f"Auto-discovered and initialized {registry.count()} modules")
 
     return registry
+
+
+# Export public API
+__all__ = [
+    "ModuleRegistry",
+    "get_registry",
+    "register_module",
+    "discover_modules",
+    "load_module",
+    "initialize_modules",
+]
+
+
+# Global registry instance
+_global_registry = ModuleRegistry()

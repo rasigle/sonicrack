@@ -4,7 +4,7 @@ import pytest
 from PyQt6.QtWidgets import QApplication
 
 from src.engine.oscillator import SineOscillator
-from src.gui.audio_module_interface import ModuleCategory
+from src.gui.core.module import ModuleCategory
 from src.gui.modules.mixer import MixerModule
 from src.gui.modules.oscillator.oscillator import OscillatorModule
 from src.gui.modules.output.output import OutputModule

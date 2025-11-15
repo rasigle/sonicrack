@@ -6,12 +6,12 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from src.gui.module_registry import (
+from src.gui.core.module_registry import (
     ModuleRegistry,
     get_registry,
     register_module,
     discover_modules,
-    load_plugin,
+    load_module,
     initialize_modules,
 )
 from src.gui.widgets.module_widget import ModuleWidget
@@ -174,7 +174,7 @@ class TestModuleRegistry:
 class TestDiscoverModules:
     """Tests for module discovery functionality."""
 
-    @patch('src.gui.module_registry.importlib.import_module')
+    @patch('src.gui.core.module_registry.importlib.import_module')
     def test_discover_modules_recursive_file_discovery(self, mock_import):
         """Test that recursive discovery finds files in subdirectories."""
         # Mock the import to prevent actual module loading
@@ -188,7 +188,7 @@ class TestDiscoverModules:
         # Recursive should find at least as many (likely more with subdirs)
         assert count_recursive >= count_flat
 
-    @patch('src.gui.module_registry.importlib.import_module')
+    @patch('src.gui.core.module_registry.importlib.import_module')
     def test_discover_modules_handles_import_errors(self, mock_import):
         """Test that import errors are handled gracefully."""
         # Make import fail
@@ -395,7 +395,7 @@ class TestLoadPlugin:
         """Test loading a valid plugin file."""
         plugin_file = Path(self.temp_dir) / "test_plugin.py"
         plugin_file.write_text('''
-from src.gui.module_registry import register_module
+from src.gui.core.module_registry import register_module
 from src.gui.widgets.module_widget import ModuleWidget
 
 @register_module()
@@ -411,13 +411,13 @@ class PluginModule(ModuleWidget):
         registry = get_registry()
         initial_count = registry.count()
 
-        result = load_plugin(str(plugin_file))
+        result = load_module(str(plugin_file))
         assert result is True
         assert registry.count() > initial_count
 
     def test_load_plugin_invalid_file(self):
         """Test loading a non-existent plugin file."""
-        result = load_plugin("nonexistent_plugin.py")
+        result = load_module("nonexistent_plugin.py")
         assert result is False
 
     def test_load_plugin_syntax_error(self):
@@ -425,14 +425,14 @@ class PluginModule(ModuleWidget):
         plugin_file = Path(self.temp_dir) / "bad_plugin.py"
         plugin_file.write_text("this is not valid python !!!")
 
-        result = load_plugin(str(plugin_file))
+        result = load_module(str(plugin_file))
         assert result is False
 
 
 class TestInitializeModules:
     """Tests for module initialization."""
 
-    @patch('src.gui.module_registry.discover_modules')
+    @patch('src.gui.core.module_registry.discover_modules')
     def test_initialize_modules(self, mock_discover):
         """Test module initialization process."""
         mock_discover.return_value = 10

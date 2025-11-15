@@ -13,8 +13,8 @@ from src.engine.oscillator import (
     TriangleOscillator,
     SquareOscillator,
 )
-from src.gui.audio_module_interface import ModuleCategory, ModuleMetadata
-from src.gui.module_registry import register_module
+from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.ui_constants import (
     MIN_PW_PERCENTAGE_VALUE,
     MAX_PW_PERCENTAGE_VALUE,

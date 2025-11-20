@@ -7,14 +7,16 @@ seamlessly with the modular synth GUI using the generic AudioModuleInterface.
 from __future__ import annotations
 
 from typing import Dict, Any, List, Optional
+
+import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
 
-from src.gui.widgets.module_widget import ModuleWidget
+from engine import Modifier
+from src.gui.core.module import ModuleMetadata, ModuleCategory
 from src.gui.widgets import Knob
-from src.engine import Modifier  # Base class for audio modifiers
-import numpy as np
+from src.gui.widgets.module_widget import ModuleWidget
 
 
 # Step 1: Create the audio engine component
@@ -37,23 +39,18 @@ class LowPassFilter(Modifier):
         rc = 1.0 / (2 * np.pi * cutoff_freq)
         self.alpha = 1.0 / (1.0 + rc * sample_rate)
 
-    def __call__(self, val: float | tuple[float, ...]) -> float | tuple[float, ...]:
-        pass
-
-    def get_samples_vectorized(self, num_samples: int) -> np.ndarray:
+    def __call__(
+        self, val: float | tuple[float, ...]
+    ) -> np.ndarray | float | tuple[float, ...]:
         """Process audio samples through the filter.
 
         Args:
-            num_samples: Number of samples to process
+            val: Input samples to process
 
         Returns:
             Filtered audio samples
         """
-        # Get input samples (this comes from the chained component)
-        if not self._get_input():
-            return np.zeros(num_samples)
-
-        input_samples = self._get_input().get_samples(num_samples)
+        input_samples = np.asarray(val)
 
         # Simple one-pole low-pass filter
         output = np.zeros_like(input_samples)
@@ -84,12 +81,15 @@ class LowPassFilterModule(ModuleWidget):
     to create a fully integrated, extensible module.
     """
 
+    metadata = ModuleMetadata(
+        title="Low-Pass Filter",
+        category=ModuleCategory.MODIFIER,
+        description="Simple volume/gain control",
+    )
+
     def __init__(self):
         """Initialize the filter module."""
-        # Initialize base class with module properties
         super().__init__(
-            "Low-Pass Filter",  # Display name
-            category="modifier",  # Category for organization
             width=160,  # Module width in pixels
             height=180,  # Module height in pixels
             color=QColor(80, 180, 120),  # Module color
@@ -97,8 +97,8 @@ class LowPassFilterModule(ModuleWidget):
 
         # Add input/output ports
         # Every MODIFIER needs at least one input and one output
-        self.in_port = self.add_input_port("In")
-        self.out_port = self.add_output_port("Out")
+        self.in_port = self.add_input("In")
+        self.out_port = self.add_output("Out")
 
         # Create the control UI
         self.controls_widget = QWidget()
@@ -138,7 +138,7 @@ class LowPassFilterModule(ModuleWidget):
 
         For this simple filter, we don't support modulation.
         If we wanted to add cutoff modulation, we would:
-        1. Add a modulation port: self.add_input_port("Cutoff Mod")
+        1. Add a modulation port: self.add_input("Cutoff Mod")
         2. Return ["Cutoff Mod"] here
         3. Handle it in create_component()
         """
@@ -231,19 +231,23 @@ def example_usage():
 class ModulatedLowPassFilterModule(ModuleWidget):
     """Filter with cutoff modulation support."""
 
+    metadata = ModuleMetadata(
+        title="Mod Filter",
+        category=ModuleCategory.MODIFIER,
+        description="Simple volume/gain control",
+    )
+
     def __init__(self):
         super().__init__(
-            "Mod Filter",
-            category="modifier",
             width=160,
             height=200,
             color=QColor(100, 200, 130),
         )
 
         # Add both audio and modulation inputs
-        self.in_port = self.add_input_port("In")
-        self.cutoff_mod_port = self.add_input_port("Cutoff Mod")
-        self.out_port = self.add_output_port("Out")
+        self.in_port = self.add_input("In")
+        self.cutoff_mod_port = self.add_input("Cutoff Mod")
+        self.out_port = self.add_output("Out")
 
         # ... setup UI ...
 

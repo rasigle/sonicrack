@@ -10,14 +10,16 @@ To use this plugin:
 """
 
 from typing import Optional, List, Any
-from PyQt6.QtGui import QColor
-from PyQt6.QtCore import Qt
 
-from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.widgets import Knob
-from src.gui.core.module_registry import register_module
-from src.engine.modifier import Modifier
 import numpy as np
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
+
+from engine import Modifier
+from gui.core.module import ModuleMetadata, ModuleCategory
+from src.gui.core.module_registry import register_module
+from src.gui.widgets import Knob
+from src.gui.widgets.module_widget import ModuleWidget
 
 
 # Custom audio engine component
@@ -30,12 +32,11 @@ class SimpleFilter(Modifier):
         self.resonance = resonance
         self.last_output = 0.0
 
-    def get_samples_vectorized(self, num_samples: int) -> np.ndarray:
-        """Apply simple filtering."""
-        if not self._get_input():
-            return np.zeros(num_samples)
+    def __call__(
+        self, val: float | tuple[float, ...]
+    ) -> np.ndarray | float | tuple[float, ...]:
 
-        input_samples = self._get_input().get_samples(num_samples)
+        input_samples = np.asarray(val)
 
         # Simple one-pole filter
         alpha = min(1.0, self.cutoff / 22050.0)
@@ -69,15 +70,19 @@ class SimpleFilterModule(ModuleWidget):
     - Following the standard module pattern
     """
 
+    metadata = ModuleMetadata(
+        title="Simple Filter",
+        category=ModuleCategory.MODIFIER,
+        description="Simple volume/gain control",
+    )
+
     def __init__(self):
         """Initialize the filter module."""
-        super().__init__(
-            "Simple Filter", width=180, height=200, color=QColor(100, 200, 150)
-        )
+        super().__init__(width=180, height=200, color=QColor(100, 200, 150))
 
         # Add ports
-        self.in_port = self.add_input_port("In")
-        self.out_port = self.add_output_port("Out")
+        self.in_port = self.add_input("In")
+        self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()

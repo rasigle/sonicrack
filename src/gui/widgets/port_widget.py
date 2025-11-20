@@ -3,6 +3,7 @@
 This module provides the UI layer for ports, handling rendering and interaction.
 The actual port logic is in src.gui.port_model.PortModel.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -32,26 +33,21 @@ class PortWidget(QGraphicsItem):
 
     def __init__(
         self,
-        port_type: str,  # "input" or "output"
-        port_name: str,
+        port: Port,
         parent_module: ModuleWidget,
-        index: int = 0,
     ):
         """Initialize the port widget.
 
         Args:
-            port_type: Type of port ("input" or "output")
-            port_name: Name identifier for the port
+            port: The port to wrap
             parent_module: The parent module widget
-            index: Optional index for ordering
         """
         super().__init__()
 
-        # Composition: Contains a PortModel for logic
-        self.model = Port(port_type, port_name, index)
+        self.port = port
+        self.parent_module = parent_module
 
         # UI-specific attributes
-        self.parent_module = parent_module
         self.cables: list[Cable] = []
         self.radius = 8
         self.hovered = False
@@ -67,27 +63,27 @@ class PortWidget(QGraphicsItem):
     @property
     def port_type(self) -> str:
         """Get port type from model."""
-        return self.model.port_type
+        return self.port.port_type
 
     @property
     def port_name(self) -> str:
         """Get port name from model."""
-        return self.model.port_name
+        return self.port.port_name
 
     @property
     def index(self) -> int:
         """Get port index from model."""
-        return self.model.index
+        return self.port.index
 
     @property
     def value(self) -> float:
         """Get port value from model."""
-        return self.model.value
+        return self.port.value
 
     @value.setter
     def value(self, val: float):
         """Set port value in model."""
-        self.model.value = val
+        self.port.value = val
 
     @property
     def connected_to(self) -> PortWidget | None:
@@ -96,7 +92,7 @@ class PortWidget(QGraphicsItem):
         Note: This returns the PortWidget wrapper, not the PortModel.
         For internal use, access self.model.connected_to for the model.
         """
-        if self.model.connected_to is None:
+        if self.port.connected_to is None:
             return None
         # Find the PortWidget that wraps this PortModel
         # This is a bit tricky - we need to maintain a registry or search
@@ -106,7 +102,7 @@ class PortWidget(QGraphicsItem):
     @property
     def is_connected(self) -> bool:
         """Check if port is connected."""
-        return self.model.is_connected
+        return self.port.is_connected
 
     # ========================================================================
     # Logic Methods - Delegate to Model
@@ -119,19 +115,20 @@ class PortWidget(QGraphicsItem):
             other: The port widget to connect to
         """
         if isinstance(other, PortWidget):
-            self.model.connect(other.model)
-        elif hasattr(other, 'model'):
+            self.port.connect(other.port)
+        elif hasattr(other, "model"):
             # Handle wrapped PortModel
-            self.model.connect(other.model)
+            self.port.connect(other.port)
         else:
             # Assume it's a PortModel directly
             from src.gui.core.port import Port
+
             if isinstance(other, Port):
-                self.model.connect(other)
+                self.port.connect(other)
 
     def disconnect(self) -> None:
         """Disconnect from any connected port."""
-        self.model.disconnect()
+        self.port.disconnect()
 
     def read(self) -> float:
         """Read value from connected port.
@@ -139,7 +136,7 @@ class PortWidget(QGraphicsItem):
         Returns:
             Value from connected port, or 0.0 if not connected
         """
-        return self.model.read()
+        return self.port.read()
 
     def write(self, value: float) -> None:
         """Write a value to this port.
@@ -147,7 +144,7 @@ class PortWidget(QGraphicsItem):
         Args:
             value: The value to write
         """
-        self.model.write(value)
+        self.port.write(value)
 
     # ========================================================================
     # UI Methods - Rendering and Interaction
@@ -247,7 +244,6 @@ class PortWidget(QGraphicsItem):
             Debug string
         """
         return (
-            f"PortWidget(model={repr(self.model)}, "
+            f"PortWidget(model={repr(self.port)}, "
             f"cables={len(self.cables)}, hovered={self.hovered})"
         )
-

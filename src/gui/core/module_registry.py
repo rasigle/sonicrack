@@ -262,8 +262,7 @@ def register_module(**override_metadata) -> Callable:
 
 
 def discover_modules(
-        package_path: str = "src.gui.modules",
-        recursive: bool = False
+    package_path: str = "src.gui.modules", recursive: bool = False
 ) -> int:
     """Discover and import all module files in a package.
 
@@ -289,7 +288,9 @@ def discover_modules(
         package_dir = Path(package.__file__).parent
 
         # Find all Python files
-        module_files = package_dir.rglob("*.py") if recursive else package_dir.glob("*.py")
+        module_files = (
+            package_dir.rglob("*.py") if recursive else package_dir.glob("*.py")
+        )
 
         count = 0
         for module_file in module_files:

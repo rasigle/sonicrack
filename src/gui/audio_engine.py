@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict, deque
 from typing import Any, TYPE_CHECKING
 
 import numpy as np
 import sounddevice as sd
 from PyQt6 import QtCore
 
+from src.gui.core.module import AudioModule
 from src.constants import DEFAULT_SAMPLE_RATE
 
 logger = logging.getLogger(__name__)
@@ -17,6 +19,7 @@ DEFAULT_FADEOUT_DURATION_MS = 50  # Default fade-out duration in milliseconds
 
 if TYPE_CHECKING:
     from src.engine.audio_component import AudioComponent
+    from src.gui.core.port import Port
 
 
 class AudioEngine(QtCore.QObject):
@@ -26,8 +29,12 @@ class AudioEngine(QtCore.QObject):
     """
 
     # Signals
-    samples_generated = QtCore.pyqtSignal(np.ndarray)  # Emitted when new samples are generated (final output)
-    module_samples_generated = QtCore.pyqtSignal(str, np.ndarray)  # (module_id, samples) for monitoring
+    samples_generated = QtCore.pyqtSignal(
+        np.ndarray
+    )  # Emitted when new samples are generated (final output)
+    module_samples_generated = QtCore.pyqtSignal(
+        str, np.ndarray
+    )  # (module_id, samples) for monitoring
     playback_started = QtCore.pyqtSignal()
     playback_stopped = QtCore.pyqtSignal()
     error_occurred = QtCore.pyqtSignal(str)
@@ -43,6 +50,9 @@ class AudioEngine(QtCore.QObject):
 
         self.sample_rate: float = sample_rate
         self.buffer_size: float = buffer_size
+
+        self.modules = []
+        self.connections = []
 
         # Audio state
         self.is_playing: bool = False
@@ -152,6 +162,8 @@ class AudioEngine(QtCore.QObject):
         if status:
             logger.warning(f"Audio callback status: {status}")
 
+        self.process()
+        return
         try:
             if self.patch is None:
                 # Output silence
@@ -307,15 +319,12 @@ class AudioEngine(QtCore.QObject):
             logger.warning("Already playing")
             return
 
-        if self.patch is None:
-            logger.warning("No patch set")
-            self.error_occurred.emit("No patch configured")
-            return
+        # if self.patch is None:
+        #     logger.warning("No patch set")
+        #     self.error_occurred.emit("No patch configured")
+        #     return
 
         try:
-            # Reset patch components
-            if hasattr(self.patch, "reset"):
-                self.patch.reset()
 
             # Enable fade-in to prevent startup click
             self.is_fading_in = True
@@ -444,3 +453,46 @@ class AudioEngine(QtCore.QObject):
         else:
             # Not playing, just clean up
             self.stop_playback()
+
+    def add_module(self, mod):
+        self.modules.append(mod)
+
+    def connect(self, start_port: Port, target_port: Port):
+        logger.info(
+            f"Cable connected: {start_port.port_name} -> {target_port.port_name}"
+        )
+        start_port.connect(target_port)
+
+    def disconnect(self, start_port: Port, target_port: Port):
+        start_port.disconnect()
+
+    def process(self):
+        ordered = self._build_graph()
+        print(ordered)
+        for module in ordered:
+            module.process()
+
+    def _build_graph(self) -> list[AudioModule]:
+        """Build a topologically ordered list of audio components."""
+        graph = defaultdict(set)
+        indegree = defaultdict(int)
+
+        for m in self.modules:
+            indegree[m] = 0
+
+        for src, outp, dst, inp in self.connections:
+            graph[src].add(dst)
+            indegree[dst] += 1
+
+        # topological sort
+        queue = deque([m for m in self.modules if indegree[m] == 0])
+        order = []
+        while queue:
+            m = queue.popleft()
+            order.append(m)
+            for nbr in graph[m]:
+                indegree[nbr] -= 1
+                if indegree[nbr] == 0:
+                    queue.append(nbr)
+
+        return order

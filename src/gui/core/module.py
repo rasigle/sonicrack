@@ -10,7 +10,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 
-from src.engine import AudioComponent
+from src.gui.core.port import Port
+from src.engine.audio_component import AudioComponent
 
 
 class ModuleCategory(StrEnum):
@@ -90,6 +91,9 @@ class AudioModule(ABC):
 
     def __init__(self):
         self.custom_name: str = ""
+
+        self.inputs: dict[str, Port] = {}
+        self.outputs: dict[str, Port] = {}
 
     @abstractmethod
     def create_engine_component(
@@ -224,3 +228,21 @@ class AudioModule(ABC):
             if port.port_name == port_name:
                 return port
         return None
+
+    def add_input(self, name):
+        port = Port("input", name)
+        self.inputs[name] = port
+        return port
+
+    def add_output(self, name):
+        port = Port("output", name)
+        self.outputs[name] = port
+        return port
+
+    def process(self):
+        """Process method placeholder.
+
+        This method can be overridden by subclasses to implement
+        any necessary processing logic specific to the module.
+        """
+        pass

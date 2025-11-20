@@ -35,10 +35,10 @@ class DistortionModule(ModulatedModuleBase):
         )
 
         # Add ports
-        self.in_port = self.add_input_port("In")
-        self.out_port = self.add_output_port("Out")
-        self.mod_port = self.add_input_port("CV_Drive")
-        self.mod_port = self.add_input_port("CV_Mix")
+        self.in_port = self.add_input("In")
+        self.out_port = self.add_output("Out")
+        self.mod_port = self.add_input("CV_Drive")
+        self.mod_port = self.add_input("CV_Mix")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()

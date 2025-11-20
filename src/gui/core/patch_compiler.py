@@ -34,7 +34,9 @@ class PatchCompiler:
         self._module_to_component: dict[AudioModule, AudioComponent] = {}
 
     def set_patch(
-        self, modules: list[AudioModule], connections: list[tuple[PortWidget, PortWidget]]
+        self,
+        modules: list[AudioModule],
+        connections: list[tuple[PortWidget, PortWidget]],
     ):
         """Set the patch to compile.
 
@@ -912,4 +914,3 @@ class PatchCompiler:
             Dictionary representing the patch tree structure
         """
         return self.build_patch_tree()
-

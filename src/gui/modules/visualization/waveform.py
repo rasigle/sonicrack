@@ -49,7 +49,7 @@ class WaveformModule(ModuleWidget):
 
         # Add input port (optional - for patch organization only)
         # The input connection doesn't affect what's displayed
-        self.in_port = self.add_input_port("In")
+        self.in_port = self.add_input("In")
 
         # NO OUTPUT PORT - this is a visualization-only module
 
@@ -112,7 +112,7 @@ class WaveformModule(ModuleWidget):
             view = views[0]
             main_window = view.window()
 
-            if not hasattr(main_window, 'audio_engine'):
+            if not hasattr(main_window, "audio_engine"):
                 return
 
             # Found audio engine!
@@ -139,8 +139,10 @@ class WaveformModule(ModuleWidget):
             samples: Final output samples (mono or stereo)
         """
         try:
-            logger.debug(f"Waveform received {len(samples)} samples, shape={samples.shape}, "
-                        f"min={np.min(samples):.3f}, max={np.max(samples):.3f}")
+            logger.debug(
+                f"Waveform received {len(samples)} samples, shape={samples.shape}, "
+                f"min={np.min(samples):.3f}, max={np.max(samples):.3f}"
+            )
 
             # Convert stereo to mono for display
             if len(samples.shape) == 2:
@@ -201,11 +203,12 @@ class WaveformModule(ModuleWidget):
             )
         else:
             self.input_component = None
-            logger.debug("Waveform display: no input connected (OK - monitors final output)")
+            logger.debug(
+                "Waveform display: no input connected (OK - monitors final output)"
+            )
 
         # Return None - this module has no audio output
         return None
-
 
     def cleanup(self):
         """Clean up resources when module is removed."""
@@ -214,7 +217,9 @@ class WaveformModule(ModuleWidget):
         # Disconnect from audio engine
         if self.audio_engine and self._audio_engine_connected:
             try:
-                self.audio_engine.samples_generated.disconnect(self._on_samples_generated)
+                self.audio_engine.samples_generated.disconnect(
+                    self._on_samples_generated
+                )
                 self.audio_engine.playback_stopped.disconnect(self._on_playback_stopped)
             except Exception as e:
                 logger.debug(f"Error disconnecting from audio engine: {e}")

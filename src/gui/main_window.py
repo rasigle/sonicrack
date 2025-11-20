@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PyQt6 import QtGui, QtWidgets, QtCore
+from PyQt6 import QtGui, QtWidgets
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -37,12 +37,13 @@ from src.gui.dialogs.preset_library_dialog import (
 )
 from src.gui.modules.output.output import OutputModule
 from src.gui.patch_canvas import PatchCanvas
-from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH, DEBOUNCE_TIMER_DELAY_MS
+from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from src.engine import AudioComponent
+    from src.engine.audio_component import AudioComponent
+    from src.gui.widgets.port_widget import PortWidget
 
 
 class ModularSynthWindow(QMainWindow):
@@ -81,13 +82,6 @@ class ModularSynthWindow(QMainWindow):
         # Patch file tracking
         self.current_patch_path = None  # Path to currently loaded patch file
         self.patch_modified = False  # Track if patch has unsaved changes
-
-        # Debounce timer for parameter changes (avoid audio spikes)
-        self.compile_debounce_timer = QtCore.QTimer()
-        self.compile_debounce_timer.setSingleShot(True)
-        self.compile_debounce_timer.timeout.connect(
-            lambda: self._compile_patch()
-        )
 
         # UI setup
         self._setup_ui()
@@ -346,8 +340,7 @@ class ModularSynthWindow(QMainWindow):
         # Mark patch as modified
         self._mark_patch_modified()
 
-        # Auto-compile when module is added
-        self._compile_patch()
+        self.audio_engine.add_module(module_instance)
 
     def _compile_patch(self, show_messages: bool = False) -> bool:
         """Compile the current patch automatically.
@@ -420,12 +413,6 @@ class ModularSynthWindow(QMainWindow):
 
     def _on_play_clicked(self):
         """Handle play button click."""
-        # Auto-compile before playing if patch not set
-        if self.audio_engine.patch is None:
-            if not self._compile_patch():
-                # Compilation failed
-                return
-
         self.audio_engine.start_playback()
 
     def _on_stop_clicked(self):
@@ -449,33 +436,15 @@ class ModularSynthWindow(QMainWindow):
         QMessageBox.critical(self, "Audio Error", f"Audio error occurred:\n{error}")
         self.statusbar.showMessage(f"Error: {error}")
 
-    def _on_cable_connected(self, start_port, end_port):
+    def _on_cable_connected(self, start_port: PortWidget, end_port: PortWidget):
         """Handle cable connection."""
-        logger.debug(f"Cable connected: {start_port.port_name} -> {end_port.port_name}")
 
         # Mark patch as modified
         self._mark_patch_modified()
 
-        # Update UI state of affected modules BEFORE compilation
-        affected_modules = set()
-        if start_port and start_port.parent_module:
-            affected_modules.add(start_port.parent_module)
-        if end_port and end_port.parent_module:
-            affected_modules.add(end_port.parent_module)
+        self.audio_engine.connect(start_port.port, end_port.port)
 
-        for module in affected_modules:
-            if hasattr(module, "update_knob_state"):
-                try:
-                    module.update_knob_state()
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to update knob state for {module.metadata.title}: {e}"
-                    )
-
-        # Auto-compile when connection changes
-        self._compile_patch()
-
-    def _on_cable_disconnected(self, start_port, end_port):
+    def _on_cable_disconnected(self, start_port: PortWidget, end_port: PortWidget):
         """Handle cable disconnection."""
         logger.debug(
             f"Cable disconnected: {start_port.port_name} -> {end_port.port_name}"
@@ -484,42 +453,7 @@ class ModularSynthWindow(QMainWindow):
         # Mark patch as modified
         self._mark_patch_modified()
 
-        # Update UI state of affected modules BEFORE compilation
-        # This ensures knobs update even if compilation fails
-        affected_modules = set()
-        if start_port and start_port.parent_module:
-            affected_modules.add(start_port.parent_module)
-        if end_port and end_port.parent_module:
-            affected_modules.add(end_port.parent_module)
-
-        for module in affected_modules:
-            if hasattr(module, "update_knob_state"):
-                try:
-                    module.update_knob_state()
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to update knob state for {module.metadata.title}: {e}"
-                    )
-
-        # Check if output module was disconnected
-        output_module_class = self.registry.get("Output")
-        if output_module_class and isinstance(
-            end_port.parent_module, output_module_class
-        ):
-            # Output was disconnected - stop playback and clear patch
-            self.audio_engine.stop_playback()
-            self.audio_engine.clear_audiopath()
-            logger.info("Output disconnected - playback stopped")
-
-        # Automatically recompile patch to update audio chain
-        # Even if compilation fails, UI was already updated above
-        logger.info("Cable disconnected - auto-recompiling patch to update audio chain")
-
-        try:
-            self._compile_patch()
-        except Exception as e:
-            logger.error(f"Compilation failed after cable disconnect: {e}")
-            # UI state was already updated, so this is acceptable
+        self.audio_engine.disconnect(start_port, end_port)
 
     def _on_module_deleted(self, module):
         """Handle module deletion.
@@ -531,18 +465,6 @@ class ModularSynthWindow(QMainWindow):
 
         # Mark patch as modified
         self._mark_patch_modified()
-
-        # If Output module was deleted, stop playback immediately
-        if module.metadata.category == ModuleCategory.OUTPUT:
-            self.audio_engine.stop_playback()
-            self.audio_engine.clear_audiopath()
-            logger.info("Output module deleted - playback stopped")
-        else:
-            # For other modules, check if we're playing
-            if self.audio_engine.is_playing:
-                # Recompile to update the patch
-                # If compilation fails (e.g., no output), it will handle stopping
-                self._compile_patch()
 
     def _on_parameter_changed(self, param_name: str, value):
         """Handle module parameter change using hot-swapping (no recompile).
@@ -595,13 +517,6 @@ class ModularSynthWindow(QMainWindow):
                     logger.warning(
                         f"Hot-swap failed for {param_name}, falling back to recompile"
                     )
-                    self.compile_debounce_timer.stop()
-                    self.compile_debounce_timer.start(DEBOUNCE_TIMER_DELAY_MS)
-            else:
-                # Not playing OR requires recompile: use debounced recompile
-                # (Debouncing is less critical when not playing)
-                self.compile_debounce_timer.stop()
-                self.compile_debounce_timer.start(DEBOUNCE_TIMER_DELAY_MS)
 
     def _update_window_title(self):
         """Update window title to show current patch name and modified status."""
@@ -938,7 +853,6 @@ class ModularSynthWindow(QMainWindow):
                     )
 
         # Compile the loaded patch
-        self._compile_patch()
         self.statusbar.showMessage("Preset loaded successfully")
 
     def closeEvent(self, event):

@@ -24,7 +24,8 @@ class Cable(QGraphicsItem):
 
         Args:
             start_port: The output port widget where the cable starts
-            end_port: The input port widget where the cable ends (can be None for dragging)
+            end_port: The input port widget where the cable ends (can be None for
+                dragging)
         """
         super().__init__()
         self.start_port = start_port

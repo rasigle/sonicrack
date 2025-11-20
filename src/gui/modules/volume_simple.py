@@ -30,8 +30,8 @@ class SimpleVolumeModule(ModuleWidget):
         )
 
         # Add ports (no modulation input)
-        self.in_port = self.add_input_port("In")
-        self.out_port = self.add_output_port("Out")
+        self.in_port = self.add_input("In")
+        self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()

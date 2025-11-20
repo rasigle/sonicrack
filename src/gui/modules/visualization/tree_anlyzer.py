@@ -55,7 +55,8 @@ class TreeAnalyzerModule(ModuleWidget):
         self.tree_widget.setColumnWidth(0, 250)
         self.tree_widget.setMinimumHeight(220)
         self.tree_widget.setAlternatingRowColors(True)
-        self.tree_widget.setStyleSheet("""
+        self.tree_widget.setStyleSheet(
+            """
             QTreeWidget {
                 background-color: #1a1a1f;
                 color: #e0e0e0;
@@ -67,7 +68,8 @@ class TreeAnalyzerModule(ModuleWidget):
             QTreeWidget::item:hover {
                 background-color: #2a3a4a;
             }
-        """)
+        """
+        )
         layout.addWidget(self.tree_widget)
 
         self.controls_widget.setLayout(layout)
@@ -102,7 +104,7 @@ class TreeAnalyzerModule(ModuleWidget):
             view = views[0]
             main_window = view.window()
 
-            if not hasattr(main_window, 'patch_compiler'):
+            if not hasattr(main_window, "patch_compiler"):
                 return
 
             # Found patch compiler!
@@ -132,15 +134,15 @@ class TreeAnalyzerModule(ModuleWidget):
 
         try:
             # Get tree data from compiler
-            if hasattr(self.patch_compiler, 'get_tree_structure'):
+            if hasattr(self.patch_compiler, "get_tree_structure"):
                 tree_data = self.patch_compiler.get_tree_structure()
                 self._display_tree(tree_data)
-            elif hasattr(self.patch_compiler, 'compiled_patch'):
+            elif hasattr(self.patch_compiler, "compiled_patch"):
                 # Fallback: build simple tree from compiled patch
                 if self.patch_compiler.compiled_patch:
                     tree_data = {
                         "name": type(self.patch_compiler.compiled_patch).__name__,
-                        "inputs": []
+                        "inputs": [],
                     }
                     self._display_tree(tree_data)
                 else:
@@ -253,7 +255,6 @@ class TreeAnalyzerModule(ModuleWidget):
     def cleanup(self):
         """Clean up resources when module is removed."""
         self.connection_timer.stop()
-        if hasattr(self, 'update_timer'):
+        if hasattr(self, "update_timer"):
             self.update_timer.stop()
         self.tree_widget.clear()
-

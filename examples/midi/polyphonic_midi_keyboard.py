@@ -43,6 +43,7 @@ from engine import (
 )
 from src.constants import DEFAULT_SAMPLE_RATE
 
+
 # ANSI colors
 class Colors:
     GREEN = "\033[92m"

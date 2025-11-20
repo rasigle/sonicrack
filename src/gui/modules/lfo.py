@@ -54,10 +54,10 @@ class LFOModule(ModuleWidget):
         )
 
         # Add four output ports - one for each waveform
-        self.sine_port = self.add_output_port("Sine")
-        self.triangle_port = self.add_output_port("Triangle")
-        self.sawtooth_port = self.add_output_port("Sawtooth")
-        self.square_port = self.add_output_port("Square")
+        self.sine_port = self.add_output("Sine")
+        self.triangle_port = self.add_output("Triangle")
+        self.sawtooth_port = self.add_output("Sawtooth")
+        self.square_port = self.add_output("Square")
 
         # Map port names to port objects for easy lookup
         self.port_map = {

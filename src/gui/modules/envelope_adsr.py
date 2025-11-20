@@ -36,10 +36,10 @@ class ADSRModule(ModuleWidget):
         )
 
         # Add input port for gate signal (optional)
-        self.gate_input = self.add_input_port("Gate")
+        self.gate_input = self.add_input("Gate")
 
         # Add output port
-        self.out_port = self.add_output_port("Out")
+        self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()

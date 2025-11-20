@@ -33,13 +33,13 @@ class MixerModule(ModuleWidget):
         super().__init__(width=220, height=280, color=QColor(100, 150, 100))
 
         # Add multiple input ports
-        self.in1_port = self.add_input_port("In 1")
-        self.in2_port = self.add_input_port("In 2")
-        self.in3_port = self.add_input_port("In 3")
-        self.in4_port = self.add_input_port("In 4")
+        self.in1_port = self.add_input("In 1")
+        self.in2_port = self.add_input("In 2")
+        self.in3_port = self.add_input("In 3")
+        self.in4_port = self.add_input("In 4")
 
         # Add output port
-        self.out_port = self.add_output_port("Out")
+        self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()

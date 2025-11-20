@@ -52,9 +52,9 @@ class VCAModule(ModuleWidget):
         )
 
         # Add ports
-        self.in_port = self.add_input_port("In")
-        self.cv_port = self.add_input_port("CV")
-        self.out_port = self.add_output_port("Out")
+        self.in_port = self.add_input("In")
+        self.cv_port = self.add_input("CV")
+        self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()

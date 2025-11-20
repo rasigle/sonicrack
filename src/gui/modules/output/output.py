@@ -49,7 +49,8 @@ class OutputModule(ModuleWidget):
         )
 
         # Add input port
-        self.in_port = self.add_input_port("In")
+        self.add_input("In")
+        self.in_port = self.add_input("In")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -88,7 +89,9 @@ class OutputModule(ModuleWidget):
         # Linear knob (dB is already logarithmic scale)
         self.volume_knob = Knob("Master (dB)", -60, 6, -3, logarithmic=False)
         self.volume_knob.value_changed.connect(self._on_volume_changed)
-        layout.addWidget(self.volume_knob, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(
+            self.volume_knob, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
+        )
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
@@ -158,3 +161,8 @@ class OutputModule(ModuleWidget):
         """
         return int(self.buffer_size_combo.currentText())
 
+    def process(self):
+        x = self.inputs["In"].read()
+        output = self.get_master_volume() * x
+        print("Output =", x)
+        return output

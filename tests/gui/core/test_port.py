@@ -170,7 +170,7 @@ class TestPortReadConnected:
         output_port = Port("input", "output", mock_parent())
 
         input_port.write(100.0)  # Input port has its own value
-        output_port.write(5.0)    # Output port has different value
+        output_port.write(5.0)  # Output port has different value
         input_port.connect(output_port)
 
         # Should read from connected port, not own value
@@ -310,17 +310,18 @@ class TestPortEdgeCases:
         port = Port("input", "test", mock_parent())
 
         # Test with infinity
-        port.write(float('inf'))
-        assert port.value == float('inf')
+        port.write(float("inf"))
+        assert port.value == float("inf")
 
         # Test with negative infinity
-        port.write(float('-inf'))
-        assert port.value == float('-inf')
+        port.write(float("-inf"))
+        assert port.value == float("-inf")
 
         # Test with NaN
-        port.write(float('nan'))
+        port.write(float("nan"))
         # NaN != NaN, so we check using isnan
         import math
+
         assert math.isnan(port.value)
 
 
@@ -704,12 +705,13 @@ class TestPortModelEdgeCases:
         port = Port("output", "test")
 
         # Test infinity
-        port.write(float('inf'))
-        assert port.value == float('inf')
+        port.write(float("inf"))
+        assert port.value == float("inf")
 
         # Test NaN
-        port.write(float('nan'))
+        port.write(float("nan"))
         import math
+
         assert math.isnan(port.value)
 
     def test_empty_name(self):
@@ -772,7 +774,8 @@ def test_no_qt_dependencies():
 
     # PortModel module should not import PyQt6
     import gui.core.port as port_module
-    assert 'PyQt6' not in sys.modules or 'PyQt6' not in str(port_module.__file__)
+
+    assert "PyQt6" not in sys.modules or "PyQt6" not in str(port_module.__file__)
 
 
 if __name__ == "__main__":

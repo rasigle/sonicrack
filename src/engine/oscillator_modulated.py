@@ -549,6 +549,7 @@ class ModulatedFrequency(ModulatedOscillator):
             >>> lfo = SineOscillator(frequency=5.0, amplitude=50.0)
             >>> fm_osc = ModulatedFrequency(carrier, lfo)
         """
+
         def default_freq_mod(base_freq, mod_val):
             return base_freq + mod_val
 

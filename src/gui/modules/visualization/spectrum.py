@@ -1,7 +1,4 @@
 """Spectrum analyzer module for visualizing audio frequency content."""
-from PyQt6.uic.Compiler.qtproxies import QtCore
-
-"""Real-time spectrum analyzer widget."""
 
 import logging
 from typing import Any
@@ -52,7 +49,7 @@ class SpectrumModule(ModuleWidget):
 
         # Add input port (optional - for patch organization only)
         # The input connection doesn't affect what's displayed
-        self.in_port = self.add_input_port("In")
+        self.in_port = self.add_input("In")
 
         # NO OUTPUT PORT - this is a visualization-only module
 
@@ -118,14 +115,14 @@ class SpectrumModule(ModuleWidget):
             view = views[0]
             main_window = view.window()
 
-            if not hasattr(main_window, 'audio_engine'):
+            if not hasattr(main_window, "audio_engine"):
                 return
 
             # Found audio engine!
             self.audio_engine = main_window.audio_engine
 
             # Get sample rate
-            if hasattr(self.audio_engine, 'sample_rate'):
+            if hasattr(self.audio_engine, "sample_rate"):
                 self.sample_rate = self.audio_engine.sample_rate
 
             # Connect to signals

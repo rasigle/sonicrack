@@ -145,8 +145,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         proxy.setPos(0, self.TITLE_BAR_HEIGHT)
         return proxy
 
-    @staticmethod
-    def _create_standard_layout(spacing: int = 5) -> QVBoxLayout:
+    def _create_standard_layout(self, spacing: int = 5) -> QVBoxLayout:
         """Create a standard vertical layout with default margins.
 
         Args:
@@ -162,10 +161,24 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             layout.addWidget(self.knob2)
             ```
         """
+        self._create_portwidgets()
+
         layout = QVBoxLayout()
         layout.setContentsMargins(spacing, spacing, spacing, spacing)
         layout.setSpacing(spacing)
         return layout
+
+    def _create_portwidgets(self):
+        for in_port in self.inputs.values():
+            port = PortWidget(in_port, self)
+            port.setParentItem(self)
+            self.input_ports.append(port)
+
+        for out_port in self.outputs.values():
+            port = PortWidget(out_port, self)
+            port.setParentItem(self)
+            self.output_ports.append(port)
+        self._update_port_positions()
 
     # === Parameter Management ===
 
@@ -327,36 +340,6 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             port_y = port.pos().y()
             label_rect = QRectF(self.module_width - 55, port_y - 6, 50, 12)
             painter.drawText(label_rect, Qt.AlignmentFlag.AlignRight, port.port_name)
-
-    def add_input_port(self, name: str) -> PortWidget:
-        """Add an input port to the module.
-
-        Args:
-            name: Name of the input port
-
-        Returns:
-            The created port widget
-        """
-        port = PortWidget("input", name, self, len(self.input_ports))
-        port.setParentItem(self)
-        self.input_ports.append(port)
-        self._update_port_positions()
-        return port
-
-    def add_output_port(self, name: str) -> PortWidget:
-        """Add an output port to the module.
-
-        Args:
-            name: Name of the output port
-
-        Returns:
-            The created port widget
-        """
-        port = PortWidget("output", name, self, len(self.output_ports))
-        port.setParentItem(self)
-        self.output_ports.append(port)
-        self._update_port_positions()
-        return port
 
     def _update_port_positions(self):
         """Update the positions of all ports."""

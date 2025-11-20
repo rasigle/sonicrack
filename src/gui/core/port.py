@@ -8,6 +8,7 @@ Architecture:
 - PortWidget (port_widget.py): Qt graphics and interaction
 - Port (port.py): Legacy wrapper for backward compatibility
 """
+
 from __future__ import annotations
 from typing import Optional
 
@@ -87,7 +88,7 @@ class Port:
         Args:
             value: The value to write (will be converted to float)
         """
-        self.value = float(value)
+        self.value = value
 
     @property
     def is_connected(self) -> bool:
@@ -117,4 +118,3 @@ class Port:
             Readable string
         """
         return f"{self.port_type} port '{self.port_name}' = {self.value:.3f}"
-

@@ -45,7 +45,7 @@ class NoiseModule(ModuleWidget):
         )
 
         # Add output port
-        self.out_port = self.add_output_port("Out")
+        self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()

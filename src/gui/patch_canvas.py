@@ -21,15 +21,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-
 class PatchCanvas(QGraphicsView):
     """The main canvas for the modular patching system.
 
     This is where modules are placed and connected with cables.
     """
 
-    cable_connected = pyqtSignal(PortWidget, PortWidget)  # Emitted when a cable is connected
-    cable_disconnected = pyqtSignal(PortWidget, PortWidget)  # Emitted when a cable is disconnected
+    cable_connected = pyqtSignal(
+        PortWidget, PortWidget
+    )  # Emitted when a cable is connected
+    cable_disconnected = pyqtSignal(
+        PortWidget, PortWidget
+    )  # Emitted when a cable is disconnected
     module_deleted = pyqtSignal(object)  # Emitted when a module is deleted
 
     def __init__(self, parent=None):
@@ -126,7 +129,9 @@ class PatchCanvas(QGraphicsView):
 
         super().mouseReleaseEvent(event)
 
-    def _would_create_cycle(self, start_port: PortWidget, end_port: PortWidget) -> str | None:
+    def _would_create_cycle(
+        self, start_port: PortWidget, end_port: PortWidget
+    ) -> str | None:
         """Check if adding a connection would create a cycle.
 
         Args:
@@ -264,7 +269,9 @@ class PatchCanvas(QGraphicsView):
         if emit_signal and start_port and end_port:
             self.cable_disconnected.emit(start_port, end_port)
 
-    def create_connection(self, start_port: PortWidget, end_port: PortWidget) -> Cable | None:
+    def create_connection(
+        self, start_port: PortWidget, end_port: PortWidget
+    ) -> Cable | None:
         """Create a cable connection between two ports.
 
         This is a helper method for programmatically creating cables,

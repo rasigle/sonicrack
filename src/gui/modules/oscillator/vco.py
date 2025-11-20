@@ -54,9 +54,9 @@ class ModulatedOscillatorModule(ModuleWidget):
         )
 
         # Add ports
-        self.freq_input = self.add_input_port("Freq")
-        self.gain_mod_input = self.add_input_port("Gain")
-        self.out_port = self.add_output_port("Out")
+        self.freq_input = self.add_input("Freq")
+        self.gain_mod_input = self.add_input("Gain")
+        self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()

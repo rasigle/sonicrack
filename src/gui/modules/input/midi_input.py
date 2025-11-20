@@ -83,9 +83,9 @@ class MIDIInputModule(ModuleWidget):
         )
 
         # Add output ports
-        self.freq_port = self.add_output_port("Freq")
-        self.gate_port = self.add_output_port("Gate")
-        self.vel_port = self.add_output_port("Vel")
+        self.freq_port = self.add_output("Freq")
+        self.gate_port = self.add_output("Gate")
+        self.vel_port = self.add_output("Vel")
 
         # MIDI components
         self.midi_worker: Optional[MIDIWorkerThread] = None

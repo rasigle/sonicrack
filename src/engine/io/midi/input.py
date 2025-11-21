@@ -4,7 +4,7 @@ This module provides real-time MIDI input functionality using the mido library.
 It handles device enumeration, message reception, and callback-based processing.
 
 Example:
-    >>> from src.engine.midi.input import MIDIInput
+    >>> from engine.io.midi import MIDIInput
     >>>
     >>> def on_message(msg):
     ...     print(f"Received: {msg}")
@@ -17,19 +17,20 @@ Example:
 """
 
 import logging
-from typing import Callable, Optional
-from queue import Queue, Empty
 import threading
+from queue import Queue, Empty
+from typing import Callable, Optional
 
 try:
     import mido
 
     MIDO_AVAILABLE = True
 except ImportError:
+    mido = None
     MIDO_AVAILABLE = False
     logging.warning("mido not installed. Install with: pip install mido python-rtmidi")
 
-from src.engine.midi.messages import (
+from src.engine.io.midi.messages import (
     MIDIMessage,
     NoteOnMessage,
     NoteOffMessage,
@@ -50,7 +51,6 @@ class MIDIInput:
 
     Attributes:
         device_name: Name of the currently opened MIDI device
-        is_running: Whether the input is currently receiving messages
 
     Example:
         >>> # List available devices
@@ -105,7 +105,7 @@ class MIDIInput:
             >>> for i, device in enumerate(devices):
             ...     print(f"{i}: {device}")
         """
-        if not MIDO_AVAILABLE:
+        if not MIDO_AVAILABLE or mido is None:
             raise RuntimeError("mido library not installed")
 
         return mido.get_input_names()

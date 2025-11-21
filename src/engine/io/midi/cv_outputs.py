@@ -5,8 +5,9 @@ These adapters wrap the MIDIToCV converter to provide specific outputs
 """
 
 import numpy as np
+
 from src.engine.audio_component import AudioComponent
-from src.engine.midi.midi_to_cv import MIDIToCV
+from src.engine.io.midi.midi_to_cv import MIDIToCV
 
 
 class CVFrequencyOutput(AudioComponent):

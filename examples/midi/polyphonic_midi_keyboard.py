@@ -26,13 +26,13 @@ except ImportError:
     sys.exit(1)
 
 
-from src.engine.midi import (
+from engine.io.midi import (
     PolyphonicSynth,
     MIDIInput,
     midi_to_note_name,
 )
-from src.engine.midi.input import MIDO_AVAILABLE
-from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
+from engine.io.midi import MIDO_AVAILABLE
+from engine.io.midi import NoteOnMessage, NoteOffMessage
 from engine import (
     SineOscillator,
     SawtoothOscillator,

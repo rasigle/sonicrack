@@ -1,2 +1,1 @@
 """IO module tests."""
-

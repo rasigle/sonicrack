@@ -21,9 +21,8 @@ Audio Mixing:
     - Prevents clipping with multiple voices
 
 Example:
-    >>> from src.engine.midi import PolyphonicSynth
-    >>> from src.engine import SineOscillator, ADSREnvelope, Chain
-    >>> from src.engine.modifier import ModulatedVolume
+    >>> from engine.io.midi import PolyphonicSynth
+    >>> from engine import SineOscillator, ADSREnvelope, Chain, ModulatedVolume
     >>>
     >>> def voice_factory():
     ...     osc = SineOscillator(440)
@@ -57,13 +56,14 @@ See Also:
 """
 
 import logging
-from typing import Callable, Any
 from dataclasses import dataclass
+from typing import Callable, Any
+
 import numpy as np
 
-from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
-from src.engine.midi.utils import midi_to_frequency
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.io.midi.messages import NoteOnMessage, NoteOffMessage
+from src.engine.io.midi.utils import midi_to_frequency
 
 logger = logging.getLogger(__name__)
 
@@ -184,10 +184,13 @@ class PolyphonicSynth:
         - Results in professional mix quality
 
     Attributes:
-        max_voices: Maximum number of simultaneous voices
+        max_voices: Maximum number of simultaneous voices.
         voices: List of pre-allocated Voice objects
 
     Example:
+        >>> from engine.io.midi import PolyphonicSynth
+        >>> from engine import SineOscillator, ADSREnvelope, Chain, ModulatedVolume
+        >>>
         >>> def voice_factory():
         ...     osc = SineOscillator(440, amplitude=0.3)
         ...     env = ADSREnvelope(attack_duration=0.05, release_duration=0.3)
@@ -232,6 +235,9 @@ class PolyphonicSynth:
             sample_rate: Audio sample rate in Hz (default: 44100)
 
         Example:
+            >>> from engine.io.midi import PolyphonicSynth
+            >>> from engine import SineOscillator, ADSREnvelope, Chain, ModulatedVolume
+            >>>
             >>> def make_piano_voice():
             ...     osc = SineOscillator(440)
             ...     env = ADSREnvelope(attack_duration=0.01, release_duration=0.4)

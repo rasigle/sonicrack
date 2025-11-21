@@ -11,7 +11,7 @@ CV Outputs:
     - Expression: 0.0 to 1.0 from CC#11
 
 Example:
-    >>> from src.engine.midi import MIDIToCV, NoteOnMessage
+    >>> from engine.io.midi import MIDIToCV, NoteOnMessage
     >>>
     >>> converter = MIDIToCV()
     >>> msg = NoteOnMessage(timestamp=0.0, channel=0, note=60, velocity=100)
@@ -28,7 +28,7 @@ from typing import Optional
 import numpy as np
 
 from src.engine.audio_component import AudioComponent
-from src.engine.midi.messages import (
+from src.engine.io.midi.messages import (
     MIDIMessage,
     NoteOnMessage,
     NoteOffMessage,

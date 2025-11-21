@@ -1,8 +1,8 @@
 """Tests for monophonic MIDI synthesizer."""
 
 import numpy as np
-from src.engine.midi.monophonic_synth import MonophonicSynth
-from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
+from engine.io.midi import MonophonicSynth
+from engine.io.midi import NoteOnMessage, NoteOffMessage
 from src.engine import SineOscillator
 
 

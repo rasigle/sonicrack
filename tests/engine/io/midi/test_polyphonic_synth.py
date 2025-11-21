@@ -3,8 +3,8 @@
 import numpy as np
 
 from src.engine import SineOscillator
-from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
-from src.engine.midi.polyphonic_synth import PolyphonicSynth, Voice
+from engine.io.midi import NoteOnMessage, NoteOffMessage
+from engine.io.midi import PolyphonicSynth, Voice
 
 
 class DummyVoice:

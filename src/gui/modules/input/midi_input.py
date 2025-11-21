@@ -28,8 +28,8 @@ Example Patch:
     MIDI Input (Vel)  → [Future: velocity-sensitive parameter]
 """
 
-from typing import Any, Optional
 import logging
+from typing import Any, Optional
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QColor
@@ -40,13 +40,19 @@ from PyQt6.QtWidgets import (
     QPushButton,
 )
 
-from src.engine.midi import MIDIToCV, MIDIMessage
-from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
-from src.engine.midi.cv_outputs import CVFrequencyOutput, CVGateOutput, CVVelocityOutput
+from src.engine.io.midi import (
+    MIDIToCV,
+    MIDIMessage,
+    NoteOnMessage,
+    NoteOffMessage,
+    CVFrequencyOutput,
+    CVGateOutput,
+    CVVelocityOutput,
+)
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.core.module_registry import register_module
 from src.gui.modules.input.midi_worker_thread import MIDIWorkerThread
+from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +159,8 @@ class MIDIInputModule(ModuleWidget):
         """Refresh the list of available MIDI devices."""
         try:
             # Import MIDIInput only for device listing
-            from src.engine.midi.input import MIDO_AVAILABLE, MIDIInput
+            from src.engine.io.midi.input import MIDO_AVAILABLE
+            from src.engine.io.midi import MIDIInput
 
             if not MIDO_AVAILABLE:
                 self.device_status_changed.emit("MIDI library not installed")
@@ -274,7 +281,7 @@ class MIDIInputModule(ModuleWidget):
         # Update UI
         if isinstance(msg, NoteOnMessage):
             if msg.velocity > 0:
-                from src.engine.midi.utils import midi_to_note_name
+                from src.engine.io.midi import midi_to_note_name
 
                 note_name = midi_to_note_name(msg.note)
                 self.note_label.setText(f"{note_name} ({msg.note})")

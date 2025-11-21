@@ -1,11 +1,10 @@
-from typing import Any
 import logging
+from typing import Any
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 
-from src.engine import ADSREnvelope
-from engine.modulator import GateTriggeredADSR
+from src.engine.modulator import ADSREnvelope, GateTriggeredADSR
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob

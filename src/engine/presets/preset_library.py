@@ -12,7 +12,7 @@ import json
 from src.utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from engine.presets.preset_builder import PresetBuilder
+    from src.engine.presets.preset_builder import PresetBuilder
 
 logger = get_logger("builder.preset_library")
 
@@ -98,7 +98,7 @@ class PresetLibrary:
             >>> library = PresetLibrary()
             >>> preset = library.load("bass_synth").build()
         """
-        from engine.presets.preset_builder import PresetBuilder
+        from src.engine.presets.preset_builder import PresetBuilder
 
         filepath = self.preset_dir / name
         if not filepath.suffix:

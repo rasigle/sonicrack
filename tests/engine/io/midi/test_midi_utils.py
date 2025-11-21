@@ -1,7 +1,7 @@
 """Tests for MIDI utility functions."""
 
 import pytest
-from src.engine.midi.utils import (
+from engine.io.midi import (
     midi_to_frequency,
     frequency_to_midi,
     note_name_to_midi,

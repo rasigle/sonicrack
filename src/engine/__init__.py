@@ -94,12 +94,14 @@ from src.engine.audio_component_registry import (
     register_component,
     audio_registry,
 )
+
 # Composers
 from src.engine.composer import (
     Composer,
     Chain,
     WaveAdder,
 )
+
 # CV Utilities
 from src.engine.cv_utils import (
     CVScaler,
@@ -107,15 +109,18 @@ from src.engine.cv_utils import (
     unipolar_to_bipolar,
     scale_cv,
 )
+
 # Effects
 from src.engine.effects import (
     Distortion,
     Delay,
     Reverb,
 )
+
 # Filters
 from src.engine.filter import butter, apply_filter, ButterworthFilter
 from src.engine.io.audio_output import AudioOutput
+
 # Modifiers
 from src.engine.modifier import (
     Modifier,
@@ -127,12 +132,14 @@ from src.engine.modifier import (
     Clipper,
     ModulatedClipper,
 )
+
 # Modulators
 from src.engine.modulator import (
     Modulator,
     ADSREnvelope,
     getadsr,
 )
+
 # Noise generators
 from src.engine.noise import (
     white_noise,
@@ -145,6 +152,7 @@ from src.engine.noise import (
     sample_hold_noise,
     NoiseGenerator,
 )
+
 # Oscillators
 from src.engine.oscillator import (
     Oscillator,
@@ -154,8 +162,10 @@ from src.engine.oscillator import (
     SquareOscillator,
     synth,
 )
+
 # Modulated Oscillator
 from src.engine.oscillator_modulated import ModulatedOscillator, ModulatedFrequency
+
 # Presets
 from src.engine.presets.preset_builder import PresetBuilder
 from src.engine.presets.preset_library import PresetLibrary

@@ -265,7 +265,8 @@ class AudioOutput:
             self.stream.start()
             self.is_playing = True
             logger.info(
-                f"Playback started (SR: {self.sample_rate} Hz, Buffer: {self.buffer_size})"
+                f"Playback started (SR: {self.sample_rate} Hz, "
+                f"Buffer: {self.buffer_size})"
             )
 
         except Exception as e:
@@ -320,4 +321,3 @@ class AudioOutput:
         """Clean up resources with graceful fade-out."""
         if self.is_playing:
             self.stop_playback()
-

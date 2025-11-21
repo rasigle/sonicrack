@@ -24,8 +24,8 @@ import time
 
 
 try:
-    from src.engine.midi.input import MIDIInput, MIDO_AVAILABLE
-    from src.engine.midi.messages import (
+    from engine.io.midi import MIDIInput, MIDO_AVAILABLE
+    from engine.io.midi import (
         MIDIMessage,
         NoteOnMessage,
         NoteOffMessage,
@@ -34,7 +34,7 @@ try:
         ProgramChangeMessage,
         AftertouchMessage,
     )
-    from src.engine.midi.utils import midi_to_note_name, midi_to_frequency
+    from engine.io.midi import midi_to_note_name, midi_to_frequency
 except ImportError:
     print("Error: Could not import MIDI modules")
     print("Make sure you're running from the project root directory")

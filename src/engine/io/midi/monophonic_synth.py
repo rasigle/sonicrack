@@ -28,8 +28,8 @@ import logging
 from typing import Callable, Optional, Any
 import numpy as np
 
-from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
-from src.engine.midi.utils import midi_to_frequency
+from src.engine.io.midi.messages import NoteOnMessage, NoteOffMessage
+from src.engine.io.midi.utils import midi_to_frequency
 from src.constants import DEFAULT_SAMPLE_RATE
 
 logger = logging.getLogger(__name__)

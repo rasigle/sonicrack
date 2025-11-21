@@ -9,7 +9,7 @@ from typing import Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from src.engine.midi import MIDIInput
+from src.engine.io.midi import MIDIInput
 
 logger = logging.getLogger(__name__)
 

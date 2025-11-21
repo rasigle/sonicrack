@@ -1,7 +1,7 @@
 """Comprehensive tests for MIDI messages module."""
 
 import pytest
-from src.engine.midi.messages import (
+from engine.io.midi import (
     MIDIMessage,
     NoteOnMessage,
     NoteOffMessage,

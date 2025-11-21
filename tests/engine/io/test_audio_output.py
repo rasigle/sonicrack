@@ -1,12 +1,15 @@
 """Test cases for the AudioOutput module."""
 
-import time
 import unittest
-from unittest.mock import MagicMock, Mock, patch, call
+from unittest.mock import Mock, patch
 
 import numpy as np
 
-from src.engine.io.audio_output import AudioOutput, DEFAULT_FADEOUT_DURATION_MS, DEFAULT_FADEIN_DURATION_MS
+from src.engine.io.audio_output import (
+    AudioOutput,
+    DEFAULT_FADEOUT_DURATION_MS,
+    DEFAULT_FADEIN_DURATION_MS,
+)
 
 
 class TestAudioOutputInitialization(unittest.TestCase):
@@ -25,13 +28,12 @@ class TestAudioOutputInitialization(unittest.TestCase):
 
     def test_custom_initialization(self):
         """Test AudioOutput with custom parameters."""
+
         def dummy_callback(n):
             return np.zeros((n, 2))
 
         audio = AudioOutput(
-            sample_rate=48000,
-            buffer_size=1024,
-            audio_callback=dummy_callback
+            sample_rate=48000, buffer_size=1024, audio_callback=dummy_callback
         )
 
         self.assertEqual(audio.sample_rate, 48000)
@@ -109,7 +111,7 @@ class TestSampleRateAndBufferSize(unittest.TestCase):
         self.assertEqual(audio.buffer_size, 1024)
         self.assertFalse(audio.is_playing)
 
-    @patch('src.engine.io.audio_output.sd.OutputStream')
+    @patch("src.engine.io.audio_output.sd.OutputStream")
     def test_set_sample_rate_while_playing(self, mock_stream_class):
         """Test changing sample rate restarts stream if playing."""
         audio = AudioOutput(sample_rate=44100)
@@ -127,7 +129,7 @@ class TestSampleRateAndBufferSize(unittest.TestCase):
         self.assertTrue(mock_stream.close.called)
         self.assertEqual(audio.sample_rate, 48000)
 
-    @patch('src.engine.io.audio_output.sd.OutputStream')
+    @patch("src.engine.io.audio_output.sd.OutputStream")
     def test_set_buffer_size_while_playing(self, mock_stream_class):
         """Test changing buffer size restarts stream if playing."""
         audio = AudioOutput(buffer_size=2048)
@@ -156,14 +158,10 @@ class TestSampleRateAndBufferSize(unittest.TestCase):
 
         # Fade samples should approximately double
         self.assertAlmostEqual(
-            audio.fade_out_total_samples / original_fade_out,
-            2.0,
-            places=1
+            audio.fade_out_total_samples / original_fade_out, 2.0, places=1
         )
         self.assertAlmostEqual(
-            audio.fade_in_total_samples / original_fade_in,
-            2.0,
-            places=1
+            audio.fade_in_total_samples / original_fade_in, 2.0, places=1
         )
 
 
@@ -207,14 +205,14 @@ class TestVolumeControl(unittest.TestCase):
 
         self.assertEqual(
             audio._master_volume_smoothing_samples,
-            audio._master_volume_smoothing_duration
+            audio._master_volume_smoothing_duration,
         )
 
 
 class TestPlaybackControl(unittest.TestCase):
     """Test playback start/stop functionality."""
 
-    @patch('src.engine.io.audio_output.sd.OutputStream')
+    @patch("src.engine.io.audio_output.sd.OutputStream")
     def test_start_playback(self, mock_stream_class):
         """Test starting playback."""
         mock_stream = Mock()
@@ -238,7 +236,7 @@ class TestPlaybackControl(unittest.TestCase):
         )
         mock_stream.start.assert_called_once()
 
-    @patch('src.engine.io.audio_output.sd.OutputStream')
+    @patch("src.engine.io.audio_output.sd.OutputStream")
     def test_start_playback_already_playing(self, mock_stream_class):
         """Test starting playback when already playing."""
         mock_stream = Mock()
@@ -256,8 +254,8 @@ class TestPlaybackControl(unittest.TestCase):
         # Should not create new stream
         mock_stream_class.assert_not_called()
 
-    @patch('src.engine.io.audio_output.sd.OutputStream')
-    @patch('time.sleep')
+    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("time.sleep")
     def test_stop_playback(self, mock_sleep, mock_stream_class):
         """Test stopping playback."""
         mock_stream = Mock()
@@ -284,8 +282,8 @@ class TestPlaybackControl(unittest.TestCase):
 
         self.assertFalse(audio.is_playing)
 
-    @patch('src.engine.io.audio_output.sd.OutputStream')
-    @patch('time.sleep')
+    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("time.sleep")
     def test_cleanup(self, mock_sleep, mock_stream_class):
         """Test cleanup method."""
         mock_stream = Mock()
@@ -445,6 +443,7 @@ class TestSoundDeviceCallback(unittest.TestCase):
 
     def test_callback_exception_handling(self):
         """Test that exceptions in callback are handled gracefully."""
+
         def failing_callback(n):
             raise RuntimeError("Test error")
 
@@ -460,8 +459,8 @@ class TestSoundDeviceCallback(unittest.TestCase):
 class TestIntegrationScenarios(unittest.TestCase):
     """Integration tests for common usage scenarios."""
 
-    @patch('src.engine.io.audio_output.sd.OutputStream')
-    @patch('time.sleep')
+    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("time.sleep")
     def test_full_playback_cycle(self, mock_sleep, mock_stream_class):
         """Test complete playback start -> change settings -> stop cycle."""
         mock_stream = Mock()
@@ -471,9 +470,7 @@ class TestIntegrationScenarios(unittest.TestCase):
             return np.random.randn(n, 2)
 
         audio = AudioOutput(
-            sample_rate=44100,
-            buffer_size=2048,
-            audio_callback=test_callback
+            sample_rate=44100, buffer_size=2048, audio_callback=test_callback
         )
 
         # Start playback
@@ -488,7 +485,7 @@ class TestIntegrationScenarios(unittest.TestCase):
         audio.stop_playback()
         self.assertFalse(audio.is_playing)
 
-    @patch('src.engine.io.audio_output.sd.OutputStream')
+    @patch("src.engine.io.audio_output.sd.OutputStream")
     def test_multiple_sample_rate_changes(self, mock_stream_class):
         """Test multiple sample rate changes."""
         mock_stream = Mock()
@@ -551,7 +548,7 @@ class TestEdgeCases(unittest.TestCase):
         # Fade samples should scale appropriately
         self.assertGreater(audio.fade_out_total_samples, 0)
 
-    @patch('src.engine.io.audio_output.sd.OutputStream')
+    @patch("src.engine.io.audio_output.sd.OutputStream")
     def test_stream_creation_failure(self, mock_stream_class):
         """Test handling of stream creation failure."""
         mock_stream_class.side_effect = Exception("Failed to create stream")
@@ -565,6 +562,5 @@ class TestEdgeCases(unittest.TestCase):
         self.assertFalse(audio.is_playing)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=2)
-

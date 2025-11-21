@@ -1,10 +1,12 @@
 """Tests for MIDI input module."""
 
-import pytest
 from unittest.mock import Mock, patch
-from src.engine.midi.input import MIDIInput, MIDO_AVAILABLE
-from src.engine.midi.messages import NoteOnMessage, NoteOffMessage
 
+import pytest
+
+from src.engine.io.midi import MIDIInput, NoteOnMessage, NoteOffMessage
+from src.engine.io.midi.input import MIDO_AVAILABLE
+import src.engine.io.midi.input as midi_input_module
 
 # Skip all tests if mido not available
 pytestmark = pytest.mark.skipif(not MIDO_AVAILABLE, reason="mido not installed")
@@ -19,7 +21,7 @@ class TestMIDIInput:
         assert isinstance(devices, list)
         # Can't test specific devices as it depends on system
 
-    @patch("src.engine.midi.input.mido")
+    @patch.object(midi_input_module, "mido")
     def test_init(self, mock_mido):
         """Test initialization."""
         mock_port = Mock()
@@ -30,7 +32,7 @@ class TestMIDIInput:
         assert midi._port is None  # Port not opened until open() called
         assert midi._running is False
 
-    @patch("src.engine.midi.input.mido")
+    @patch.object(midi_input_module, "mido")
     def test_context_manager(self, mock_mido):
         """Test context manager protocol."""
         mock_port = Mock()
@@ -44,7 +46,7 @@ class TestMIDIInput:
         # Verify close was called
         mock_port.close.assert_called_once()
 
-    @patch("src.engine.midi.input.mido")
+    @patch.object(midi_input_module, "mido")
     def test_start_stop(self, mock_mido):
         """Test starting and stopping."""
         mock_port = Mock()
@@ -63,7 +65,7 @@ class TestMIDIInput:
         midi.stop()
         assert midi._running is False
 
-    @patch("src.engine.midi.input.mido")
+    @patch.object(midi_input_module, "mido")
     def test_message_conversion_note_on(self, mock_mido):
         """Test converting note on messages."""
         mock_port = Mock()
@@ -89,7 +91,7 @@ class TestMIDIInput:
         # Timestamp accumulated from delta times
         assert converted.timestamp == 1.5
 
-    @patch("src.engine.midi.input.mido")
+    @patch.object(midi_input_module, "mido")
     def test_message_conversion_note_off(self, mock_mido):
         """Test converting note off messages."""
         mock_port = Mock()
@@ -112,7 +114,7 @@ class TestMIDIInput:
         assert converted.note == 60
         assert converted.timestamp == 2.0
 
-    @patch("src.engine.midi.input.mido")
+    @patch.object(midi_input_module, "mido")
     def test_note_on_velocity_zero_is_note_off(self, mock_mido):
         """Test that note on with velocity 0 converts to note off."""
         mock_port = Mock()

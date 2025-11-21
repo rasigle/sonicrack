@@ -1,168 +1,217 @@
-from typing import Any
+"""Output module UI with sample rate and buffer size controls."""
 
-from PyQt6 import QtCore, QtWidgets
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
+import numpy as np
+from PyQt6 import QtWidgets
 from PyQt6.QtGui import QColor
 
+from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_BUFFER_SIZE
+from src.engine.io.audio_output import AudioOutput
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
-from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
-from src.utils.math import db_to_linear
+
+if TYPE_CHECKING:
+    from src.gui.core.port import Port
+
+logger = logging.getLogger(__name__)
+
+# Standard audio settings
+SAMPLE_RATES = [22050, 44100, 48000, 88200, 96000]
+BUFFER_SIZES = [128, 256, 512, 1024, 2048, 4096]
 
 
 @register_module()
 class OutputModule(ModuleWidget):
-    """Output module (sink for audio) with professional dB volume control.
-
-    Master Volume Control:
-    - Use gain_db for professional audio control (recommended)
-    - Range: -60 dB (very quiet) to +6 dB (boost)
-    - Default: -3 dB (safe headroom for mixing)
-    - Linear knob for dB values (dB is already logarithmic)
-
-    Audio Settings:
-    - Sample Rate: Common rates from 44.1 kHz to 192 kHz
-    - Buffer Size: Common sizes from 64 to 2048 samples
-
-    The knob displays dB values but internally converts to linear
-    amplitude for the audio engine.
-    """
+    """Audio output module with configurable sample rate and buffer size."""
 
     metadata = ModuleMetadata(
         title="Output",
         category=ModuleCategory.OUTPUT,
-        description="Audio output with master volume and audio settings",
+        description="Audio output with configurable sample rate and buffer size",
     )
-
-    # Special signal for master volume changes (bypasses hot-swapping)
-    master_volume_changed = QtCore.pyqtSignal(float)
-    # Signals for audio settings changes
-    sample_rate_changed = QtCore.pyqtSignal(int)
-    buffer_size_changed = QtCore.pyqtSignal(int)
 
     def __init__(self):
         """Initialize output module."""
         super().__init__(
-            width=180,
-            height=220,
+            width=220,
+            height=200,
             color=QColor(200, 80, 80),
         )
 
         # Add input port
-        self.add_input("In")
-        self.in_port = self.add_input("In")
+        self.input_port: Port = self.add_input("In")
 
-        # Use helper methods for UI construction
+        # Create audio output handler
+        self.audio_output = AudioOutput(
+            sample_rate=DEFAULT_SAMPLE_RATE,
+            buffer_size=DEFAULT_BUFFER_SIZE,
+            audio_callback=self._generate_audio,
+        )
+
+        # Build UI
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
-        # Sample Rate Selection
-        sample_rate_container = QtWidgets.QHBoxLayout()
-        sample_rate_label = QtWidgets.QLabel("Sample Rate:")
-        sample_rate_label.setStyleSheet("color: white; font-size: 10px;")
+        # Sample rate selection
+        sr_layout = QtWidgets.QHBoxLayout()
+        sr_label = QtWidgets.QLabel("Sample Rate:")
+        sr_label.setStyleSheet("color: white; font-size: 11px;")
         self.sample_rate_combo = QtWidgets.QComboBox()
-        # Typical sample rates (in Hz)
-        sample_rates = ["44100", "48000", "88200", "96000", "176400", "192000"]
-        self.sample_rate_combo.addItems(sample_rates)
-        self.sample_rate_combo.setCurrentText("48000")  # Default: 48 kHz
-        self.sample_rate_combo.currentTextChanged.connect(self._on_sample_rate_changed)
-        sample_rate_container.addWidget(sample_rate_label)
-        sample_rate_container.addWidget(self.sample_rate_combo)
-        layout.addLayout(sample_rate_container)
 
-        # Buffer Size Selection
-        buffer_size_container = QtWidgets.QHBoxLayout()
-        buffer_size_label = QtWidgets.QLabel("Buffer Size:")
-        buffer_size_label.setStyleSheet("color: white; font-size: 10px;")
+        # Add items first
+        for sr in SAMPLE_RATES:
+            self.sample_rate_combo.addItem(f"{sr} Hz", sr)
+
+        # Set default
+        default_idx = SAMPLE_RATES.index(DEFAULT_SAMPLE_RATE)
+        self.sample_rate_combo.setCurrentIndex(default_idx)
+
+        # Connect signal AFTER setting initial value to avoid triggering callback
+        self.sample_rate_combo.currentIndexChanged.connect(self._on_sample_rate_changed)
+
+        sr_layout.addWidget(sr_label)
+        sr_layout.addWidget(self.sample_rate_combo)
+        sr_layout.addStretch()
+        layout.addLayout(sr_layout)
+
+        # Buffer size selection
+        buf_layout = QtWidgets.QHBoxLayout()
+        buf_label = QtWidgets.QLabel("Buffer Size:")
+        buf_label.setStyleSheet("color: white; font-size: 11px;")
         self.buffer_size_combo = QtWidgets.QComboBox()
-        # Typical buffer sizes (in samples)
-        buffer_sizes = ["64", "128", "256", "512", "1024", "2048"]
-        self.buffer_size_combo.addItems(buffer_sizes)
-        self.buffer_size_combo.setCurrentText("512")  # Default: 512 samples
-        self.buffer_size_combo.currentTextChanged.connect(self._on_buffer_size_changed)
-        buffer_size_container.addWidget(buffer_size_label)
-        buffer_size_container.addWidget(self.buffer_size_combo)
-        layout.addLayout(buffer_size_container)
 
-        # Master volume in dB (professional control)
-        # Range: -60 dB to +6 dB, default: -3 dB (safe headroom)
-        # Linear knob (dB is already logarithmic scale)
-        self.volume_knob = Knob("Master (dB)", -60, 6, -3, logarithmic=False)
-        self.volume_knob.value_changed.connect(self._on_volume_changed)
-        layout.addWidget(
-            self.volume_knob, alignment=QtCore.Qt.AlignmentFlag.AlignCenter
+        # Add items first
+        for bs in BUFFER_SIZES:
+            self.buffer_size_combo.addItem(f"{bs}", bs)
+
+        # Set default
+        default_idx = BUFFER_SIZES.index(DEFAULT_BUFFER_SIZE)
+        self.buffer_size_combo.setCurrentIndex(default_idx)
+
+        # Connect signal AFTER setting initial value to avoid triggering callback
+        self.buffer_size_combo.currentIndexChanged.connect(self._on_buffer_size_changed)
+
+        buf_layout.addWidget(buf_label)
+        buf_layout.addWidget(self.buffer_size_combo)
+        buf_layout.addStretch()
+        layout.addLayout(buf_layout)
+
+        # Status label
+        self.status_label = QtWidgets.QLabel("Stopped")
+        self.status_label.setStyleSheet(
+            "color: #888; font-size: 10px; font-style: italic;"
         )
+        layout.addWidget(self.status_label)
+
+        layout.addStretch()
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
-        # Register parameters for automatic get/set
-        self.register_parameter("master_volume_db", self.volume_knob)
+        # Input component reference
+        self._input_component = None
 
-        self.input_component = None
+        logger.debug("OutputModule initialized")
 
-    def _on_volume_changed(self):
-        """Handle volume knob changes - convert dB to linear and emit."""
-        db_value = self.volume_knob.get_value()
-        self.master_volume_changed.emit(db_to_linear(db_value))
+    def _on_sample_rate_changed(self, index: int):
+        """Handle sample rate selection change."""
+        sample_rate = self.sample_rate_combo.itemData(index)
+        logger.info(f"Sample rate changed to {sample_rate} Hz")
+        self.audio_output.set_sample_rate(sample_rate)
 
-    def _on_sample_rate_changed(self, text: str):
-        """Handle sample rate combo box changes."""
+    def _on_buffer_size_changed(self, index: int):
+        """Handle buffer size selection change."""
+        buffer_size = self.buffer_size_combo.itemData(index)
+        logger.info(f"Buffer size changed to {buffer_size} samples")
+        self.audio_output.set_buffer_size(buffer_size)
+
+    def _generate_audio(self, num_samples: int) -> np.ndarray | None:
+        """Generate audio samples from connected input.
+
+        Args:
+            num_samples: Number of samples to generate
+
+        Returns:
+            Stereo audio array or None
+        """
+        if self._input_component is None:
+            return None
+
         try:
-            sample_rate = int(text)
-            self.sample_rate_changed.emit(sample_rate)
-        except ValueError:
-            pass  # Invalid value, ignore
+            samples = self._input_component.get_samples(num_samples)
 
-    def _on_buffer_size_changed(self, text: str):
-        """Handle buffer size combo box changes."""
-        try:
-            buffer_size = int(text)
-            self.buffer_size_changed.emit(buffer_size)
-        except ValueError:
-            pass  # Invalid value, ignore
+            # Convert to stereo if needed
+            if isinstance(samples, (list, tuple)) and len(samples) == 2:
+                left, right = samples
+                stereo = np.column_stack((left, right))
+            elif isinstance(samples, np.ndarray):
 
-    # AudioModuleInterface implementation
-    def get_required_inputs(self) -> list[str]:
-        """Output requires the In port to be connected."""
-        return ["In"]
+                if len(samples.shape) == 1:
+                    stereo = np.column_stack((samples, samples))
+                else:
+                    stereo = samples
+            else:
+                return None
+
+            return stereo
+
+        except Exception as e:
+            logger.error(f"Error generating audio: {e}", exc_info=True)
+            return None
+
+    def get_output_component(self, port_name: str):
+        """This module has no output component (it's a sink)."""
+        return None
 
     def create_engine_component(
         self,
-        input_components: list[Any] | None = None,
-        modulation_components: dict[str, Any] | None = None,
+        input_components: list | None = None,
+        modulation_components: dict | None = None,
     ):
-        """Output doesn't create a component, it returns the input component."""
-        if input_components and len(input_components) > 0:
-            return input_components[0]
-        return self.input_component
+        """Create the audio output engine component.
 
-    def get_master_volume(self) -> float:
-        """Get the master volume level in linear scale.
-
-        Returns:
-            Linear amplitude (0.0 to 2.0+) converted from dB.
+        Args:
+            input_components: List of input audio components (should be 1)
+            modulation_components: Not used for output module
         """
-        return db_to_linear(self.volume_knob.get_value())
+        if input_components is None or len(input_components) != 1:
+            logger.warning(
+                f"Output module expects 1 input, "
+                f"got {len(input_components) if input_components else 0}"
+            )
+            return None
 
-    def get_sample_rate(self) -> int:
-        """Get the selected sample rate in Hz.
+        self._input_component = input_components[0]
+        logger.info(
+            f"Output module connected to {type(self._input_component).__name__}"
+        )
 
-        Returns:
-            Sample rate in Hz (e.g., 48000)
-        """
-        return int(self.sample_rate_combo.currentText())
+        # Don't return anything - this is a sink module
+        return None
 
-    def get_buffer_size(self) -> int:
-        """Get the selected buffer size in samples.
+    def start_playback(self):
+        """Start audio playback."""
+        if not self.audio_output.is_playing:
+            self.audio_output.start_playback()
+            self.status_label.setText("Playing")
+            self.status_label.setStyleSheet(
+                "color: #4f4; font-size: 10px; font-weight: bold;"
+            )
 
-        Returns:
-            Buffer size in samples (e.g., 512)
-        """
-        return int(self.buffer_size_combo.currentText())
+    def stop_playback(self):
+        """Stop audio playback."""
+        if self.audio_output.is_playing:
+            self.audio_output.stop_playback()
+            self.status_label.setText("Stopped")
+            self.status_label.setStyleSheet(
+                "color: #888; font-size: 10px; font-style: italic;"
+            )
 
-    def process(self):
-        x = self.inputs["In"].read()
-        output = self.get_master_volume() * x
-        print("Output =", x)
-        return output
+    def cleanup(self):
+        """Clean up audio resources."""
+        self.audio_output.cleanup()

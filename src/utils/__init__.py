@@ -37,13 +37,11 @@ __all__ = [
     "load_wave",
     "play_wave",
     "note_to_frequency",
-
     # Audio utilities
     "to_int16",
     "save_wave",
     "load_wave",
     "note_to_frequency",
-
     # Logging
     "setup_logging",
     "get_logger",

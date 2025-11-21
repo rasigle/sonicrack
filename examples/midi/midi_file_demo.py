@@ -15,14 +15,14 @@ import sys
 from pathlib import Path
 
 try:
-    from src.engine.midi import MIDIFile, midi_to_note_name
-    from src.engine.midi.messages import (
+    from engine.io.midi import MIDIFile, midi_to_note_name
+    from engine.io.midi import (
         NoteOnMessage,
         NoteOffMessage,
         ControlChangeMessage,
         PitchBendMessage,
     )
-    from src.engine.midi.file_reader import MIDO_AVAILABLE
+    from engine.io.midi import MIDO_AVAILABLE
 except ImportError:
     print("Error: Could not import MIDI modules")
     print("Make sure you're running from the project root directory")

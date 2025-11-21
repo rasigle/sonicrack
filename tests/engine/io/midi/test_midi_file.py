@@ -1,8 +1,9 @@
 """Tests for MIDI file reader."""
 
 import pytest
-from src.engine.midi.file_reader import MIDIFile, MIDO_AVAILABLE
-from src.engine.midi.messages import ControlChangeMessage
+
+from src.engine.io.midi import MIDIFile, ControlChangeMessage
+from src.engine.io.midi.input import MIDO_AVAILABLE
 
 # Skip all tests if mido not available
 pytestmark = pytest.mark.skipif(not MIDO_AVAILABLE, reason="mido not installed")
@@ -170,7 +171,7 @@ class TestMIDIFileWithComplexFile:
         # Add tempo change
         track.append(mido.MetaMessage("set_tempo", tempo=500000))  # 120 BPM
 
-        # Add notes on different channels
+        # Add notes on different channels (all at time 0)
         for channel in range(2):
             for note in [60, 64, 67]:  # C major chord
                 track.append(
@@ -183,21 +184,27 @@ class TestMIDIFileWithComplexFile:
                     )
                 )
 
-        # Add note offs
-        for channel in range(2):
-            for note in [60, 64, 67]:
-                track.append(
-                    mido.Message(
-                        "note_off", note=note, velocity=0, channel=channel, time=480
-                    )
-                )
-
-        # Add CC message
+        # Add CC message after 240 ticks (delta time from last message)
         track.append(
             mido.Message(
-                "control_change", control=7, value=100, channel=0, time=0  # Volume
+                "control_change", control=7, value=100, channel=0, time=240  # Volume
             )
         )
+
+        # Add note offs after another 240 ticks (total 480 from note_on)
+        for channel in range(2):
+            for i, note in enumerate([60, 64, 67]):
+                # First note_off has delta time 240, rest have 0
+                delta_time = 240 if channel == 0 and i == 0 else 0
+                track.append(
+                    mido.Message(
+                        "note_off",
+                        note=note,
+                        velocity=0,
+                        channel=channel,
+                        time=delta_time,
+                    )
+                )
 
         filepath = tmp_path / "complex.mid"
         mid.save(str(filepath))
@@ -229,11 +236,17 @@ class TestMIDIFileWithComplexFile:
         """Test that CC messages are parsed."""
         midi = MIDIFile(complex_midi_file)
 
+        # Debug: print all message types
+        for msg in midi.messages:
+            print(f"Message type: {type(msg).__name__}, {msg}")
+
         cc_messages = [
             msg for msg in midi.messages if isinstance(msg, ControlChangeMessage)
         ]
 
-        assert len(cc_messages) > 0
+        assert (
+            len(cc_messages) > 0
+        ), f"Expected CC messages but got: {[type(m).__name__ for m in midi.messages]}"
         assert cc_messages[0].controller == 7  # Volume
 
 
@@ -249,12 +262,17 @@ class TestMIDIFileErrors:
         with pytest.raises(IOError):
             MIDIFile(invalid_file)
 
-    def test_mido_not_available(self, monkeypatch):
+    def test_mido_not_available(self, monkeypatch, tmp_path):
         """Test error when mido not available."""
-        # Temporarily make MIDO_AVAILABLE False
-        import src.engine.midi.file_reader
+        # Create a dummy file
+        dummy_file = tmp_path / "dummy.mid"
+        dummy_file.write_bytes(b"MThd" + b"\x00" * 20)  # Fake MIDI header
 
-        monkeypatch.setattr(src.engine.midi.file_reader, "MIDO_AVAILABLE", False)
+        # Patch MIDO_AVAILABLE before importing
+        import src.engine.io.midi.file_reader
+
+        # Need to patch at the module level where it's checked
+        monkeypatch.setattr(src.engine.io.midi.file_reader, "MIDO_AVAILABLE", False)
 
         with pytest.raises(RuntimeError, match="mido.*not installed"):
-            MIDIFile("dummy.mid")
+            MIDIFile(str(dummy_file))

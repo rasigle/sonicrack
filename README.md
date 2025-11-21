@@ -247,14 +247,14 @@ python examples/modular_synth_app.py
 ### **Programmatic Presets** (Builder API)
 
 ```python
-from src.builder import PresetBuilder
+from engine.presets import PresetBuilder
 
 # Create a simple synth preset
 preset = (PresetBuilder()
-         .sine_oscillator(frequency=440, amplitude=0.5)
-         .adsr_envelope(attack=0.1, sustain_level=0.7)
-         .modulated_volume()
-         .build())
+          .sine_oscillator(frequency=440, amplitude=0.5)
+          .adsr_envelope(attack=0.1, sustain_level=0.7)
+          .modulated_volume()
+          .build())
 
 # Generate audio
 samples = preset.get_samples(44100)  # 1 second
@@ -264,6 +264,7 @@ samples = preset.get_samples(44100)  # 1 second
 
 ```python
 # FM synthesis with modulated parameters
+from engine.presets import PresetBuilder
 preset = (PresetBuilder()
     .sine_oscillator(frequency=220)           # Carrier
     .sine_oscillator(frequency=440)           # Modulator

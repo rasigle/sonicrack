@@ -5,7 +5,7 @@ library. It can parse MIDI files, extract notes and events, and provide timeline
 playback.
 
 Example:
-    >>> from src.engine.midi import MIDIFile
+    >>> from engine.io.midi import MIDIFile
     >>>
     >>> # Load a MIDI file
     >>> midi_file = MIDIFile("song.mid")
@@ -21,8 +21,8 @@ Example:
 """
 
 import logging
-from typing import Optional, List
 from pathlib import Path
+from typing import Optional, List
 
 try:
     import mido
@@ -32,7 +32,7 @@ except ImportError:
     MIDO_AVAILABLE = False
     logging.warning("mido not installed. Install with: pip install mido")
 
-from src.engine.midi.messages import (
+from src.engine.io.midi.messages import (
     MIDIMessage,
     NoteOnMessage,
     NoteOffMessage,

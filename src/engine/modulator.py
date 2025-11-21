@@ -127,8 +127,7 @@ class ADSREnvelope(Modulator):
         self._sample_rate = sample_rate
         super().__init__()
 
-        self.stepper = None
-        self.ended = False  # Initialize ended flag
+        self.ended = True  # Start in ended state
         self.val = 0  # Initialize current value
 
         # Pre-compute phase durations in samples (performance optimization)
@@ -144,16 +143,7 @@ class ADSREnvelope(Modulator):
             "idle"  # Current phase: 'idle', 'attack', 'decay', 'sustain', 'release'
         )
         self._phase_position = 0  # Position within current phase (in samples)
-        self.ended = True  # Start in ended state
-
-    def _update_phase_samples(self):
-        """Update pre-computed phase sample counts.
-
-        Called automatically when duration or sample_rate properties change.
-        """
-        self._attack_samples = int(self._attack_duration * self._sample_rate)
-        self._decay_samples = int(self._decay_duration * self._sample_rate)
-        self._release_samples = int(self._release_duration * self._sample_rate)
+        self._stepper = None
 
     @property
     def attack_duration(self) -> float:
@@ -255,7 +245,7 @@ class ADSREnvelope(Modulator):
         if self._phase != "idle":
             self.val = 0
             self.ended = False
-            self.stepper = self._get_ads_stepper()
+            self._stepper = self._get_ads_stepper()
             self._phase = "attack"
         self._phase_position = 0
         return self
@@ -267,10 +257,10 @@ class ADSREnvelope(Modulator):
             return 0.0
 
         # Ensure stepper exists
-        if self.stepper is None:
-            self.stepper = self._get_ads_stepper()
+        if self._stepper is None:
+            self._stepper = self._get_ads_stepper()
 
-        self.val = next(self.stepper)
+        self.val = next(self._stepper)
         self._phase_position += 1
 
         # Update phase tracking using pre-computed values (optimized)
@@ -285,7 +275,7 @@ class ADSREnvelope(Modulator):
 
     def trigger_release(self):
         """Trigger the release phase of the envelope."""
-        self.stepper = self._get_r_stepper()
+        self._stepper = self._get_r_stepper()
         self._phase = "release"
         self._phase_position = 0
 
@@ -307,7 +297,61 @@ class ADSREnvelope(Modulator):
         """
         self.trigger_release()
 
-    def get_samples_iterator(
+    def get_samples(
+        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+    ) -> np.ndarray:
+        """Generate n samples using vectorized computation (recommended).
+
+        This method always uses the high-performance vectorized implementation,
+        providing 50-100x speedup over iterator mode. The 'mode' parameter is
+        kept for API compatibility but all modes use vectorized internally.
+
+        Args:
+            n: Number of samples to produce. Defaults to `DEFAULT_SAMPLE_RATE`.
+            reset: If True, reset the envelope to initial state before generating.
+            mode: Generation mode (kept for compatibility, all use vectorized):
+                - "auto": Uses vectorized (default, recommended)
+                - "vectorized": Uses vectorized
+                - "iterator": Uses vectorized (not iterator despite name)
+
+        Returns:
+            np.ndarray: Generated samples as NumPy array.
+
+        Raises:
+            ValueError: If mode is not one of "auto", "iterator", or "vectorized".
+
+        Examples:
+            >>> env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
+            >>> samples1 = env.get_samples(1000)  # Fast vectorized
+            >>> samples2 = env.get_samples(100, reset=True)  # Also vectorized
+
+        Note:
+            For the reference iterator implementation (75x slower), use
+            get_samples_iterator() directly. This is only useful for testing
+            or educational purposes.
+        """
+        if mode not in ("auto", "iterator", "vectorized"):
+            raise ValueError(
+                f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
+            )
+
+        # Only if iterator mode is explicitly requested, use it
+        if mode == "iterator":
+            return self._get_samples_iterator(n, reset)
+
+        # Use vectorized mode
+        if reset:
+            iter(self)
+        return self._get_samples_vectorized(n)
+
+    def __str__(self):
+        return (
+            f"ADSREnvelope(attack={self.attack_duration}, "
+            f"decay={self.decay_duration}, sustain={self.sustain_level}, "
+            f"release={self.release_duration})"
+        )
+
+    def _get_samples_iterator(
         self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False
     ) -> np.ndarray:
         """Generate n samples using Python iterator (reference implementation).
@@ -335,7 +379,7 @@ class ADSREnvelope(Modulator):
             iter(self)
         return np.array([next(self) for _ in range(n)], np.float32)
 
-    def get_samples_vectorized(self, n: int) -> np.ndarray:
+    def _get_samples_vectorized(self, n: int) -> np.ndarray:
         """Generate n samples using true vectorized NumPy computation.
 
         This is a fully vectorized implementation that computes ADSR envelope
@@ -354,7 +398,7 @@ class ADSREnvelope(Modulator):
         """
 
         # Initialize stepper if needed
-        if self.stepper is None:
+        if self._stepper is None:
             iter(self)
 
         samples = np.zeros(n, dtype=np.float32)
@@ -506,59 +550,14 @@ class ADSREnvelope(Modulator):
 
         return samples
 
-    def get_samples(
-        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
-    ) -> np.ndarray:
-        """Generate n samples using vectorized computation (recommended).
+    def _update_phase_samples(self):
+        """Update pre-computed phase sample counts.
 
-        This method always uses the high-performance vectorized implementation,
-        providing 50-100x speedup over iterator mode. The 'mode' parameter is
-        kept for API compatibility but all modes use vectorized internally.
-
-        Args:
-            n: Number of samples to produce. Defaults to `DEFAULT_SAMPLE_RATE`.
-            reset: If True, reset the envelope to initial state before generating.
-            mode: Generation mode (kept for compatibility, all use vectorized):
-                - "auto": Uses vectorized (default, recommended)
-                - "vectorized": Uses vectorized
-                - "iterator": Uses vectorized (not iterator despite name)
-
-        Returns:
-            np.ndarray: Generated samples as NumPy array.
-
-        Raises:
-            ValueError: If mode is not one of "auto", "iterator", or "vectorized".
-
-        Examples:
-            >>> env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
-            >>> samples1 = env.get_samples(1000)  # Fast vectorized
-            >>> samples2 = env.get_samples(100, reset=True)  # Also vectorized
-
-        Note:
-            For the reference iterator implementation (75x slower), use
-            get_samples_iterator() directly. This is only useful for testing
-            or educational purposes.
+        Called automatically when duration or sample_rate properties change.
         """
-        if mode not in ("auto", "iterator", "vectorized"):
-            raise ValueError(
-                f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
-            )
-
-        # Only if iterator mode is explicitly requested, use it
-        if mode == "iterator":
-            return self.get_samples_iterator(n, reset)
-
-        # Use vectorized mode
-        if reset:
-            iter(self)
-        return self.get_samples_vectorized(n)
-
-    def __str__(self):
-        return (
-            f"ADSREnvelope(attack={self.attack_duration}, "
-            f"decay={self.decay_duration}, sustain={self.sustain_level}, "
-            f"release={self.release_duration})"
-        )
+        self._attack_samples = int(self._attack_duration * self._sample_rate)
+        self._decay_samples = int(self._decay_duration * self._sample_rate)
+        self._release_samples = int(self._release_duration * self._sample_rate)
 
 
 def getadsr(

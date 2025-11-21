@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from builder import PresetBuilder, PresetLibrary
+from engine.presets import PresetBuilder, PresetLibrary
 
 
 def print_section(title: str):

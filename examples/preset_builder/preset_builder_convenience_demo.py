@@ -4,7 +4,7 @@ This script shows how to use the new convenience methods for preset
 inspection and modification.
 """
 
-from builder import PresetBuilder
+from engine.presets import PresetBuilder
 from utils import play_wave
 
 # Create a preset using fluent API

@@ -30,7 +30,7 @@ class TestADSREnvelope(unittest.TestCase):
     def test_attack_phase(self) -> None:
         """Test attack phase ramps from 0 to 1."""
         self.env.trigger_note_on()  # Trigger envelope to start attack phase
-        samples = self.env.get_samples_iterator(int(0.1 * 44100), reset=True)
+        samples = self.env._get_samples_iterator(int(0.1 * 44100), reset=True)
 
         # Should start near 0
         self.assertLess(samples[0], 0.1)
@@ -46,10 +46,10 @@ class TestADSREnvelope(unittest.TestCase):
         self.env.trigger_note_on()  # Trigger envelope
         # Skip attack phase
         attack_samples = int(0.1 * 44100)
-        _ = self.env.get_samples_iterator(attack_samples, reset=True)
+        _ = self.env._get_samples_iterator(attack_samples, reset=True)
 
         # Get decay phase
-        decay_samples = self.env.get_samples_iterator(int(0.2 * 44100))
+        decay_samples = self.env._get_samples_iterator(int(0.2 * 44100))
 
         # Should decrease from ~1.0 to sustain level (0.7)
         self.assertGreater(decay_samples[0], 0.9)
@@ -60,10 +60,10 @@ class TestADSREnvelope(unittest.TestCase):
         self.env.trigger_note_on()  # Trigger envelope
         # Skip to sustain phase
         ads_duration = int((0.1 + 0.2) * 44100)
-        _ = self.env.get_samples_iterator(ads_duration, reset=True)
+        _ = self.env._get_samples_iterator(ads_duration, reset=True)
 
         # Get sustain samples
-        sustain_samples = self.env.get_samples_iterator(1000)
+        sustain_samples = self.env._get_samples_iterator(1000)
 
         # Should all be close to sustain level
         self.assertTrue(np.all(np.abs(np.array(sustain_samples) - 0.7) < 0.05))
@@ -72,13 +72,13 @@ class TestADSREnvelope(unittest.TestCase):
         """Test trigger_release initiates release phase."""
         self.env.trigger_note_on()  # Trigger envelope
         # Get to sustain
-        _ = self.env.get_samples_iterator(int(0.5 * 44100), reset=True)
+        _ = self.env._get_samples_iterator(int(0.5 * 44100), reset=True)
 
         # Trigger release
         self.env.trigger_release()
 
         # Get release samples
-        release_samples = self.env.get_samples_iterator(int(0.3 * 44100))
+        release_samples = self.env._get_samples_iterator(int(0.3 * 44100))
 
         # Should decrease toward 0
         self.assertGreater(release_samples[0], release_samples[-1])
@@ -91,9 +91,9 @@ class TestADSREnvelope(unittest.TestCase):
         self.assertFalse(self.env.ended)
 
         # Go through envelope
-        _ = self.env.get_samples_iterator(int(0.5 * 44100), reset=True)
+        _ = self.env._get_samples_iterator(int(0.5 * 44100), reset=True)
         self.env.trigger_release()
-        _ = self.env.get_samples_iterator(int(0.4 * 44100))
+        _ = self.env._get_samples_iterator(int(0.4 * 44100))
 
         # Should be marked as ended
         self.assertTrue(self.env.ended)
@@ -103,10 +103,10 @@ class TestADSREnvelope(unittest.TestCase):
         env1 = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
         env2 = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
 
-        samples_iter = env1.get_samples_iterator(100, reset=True)
+        samples_iter = env1._get_samples_iterator(100, reset=True)
         # Need to reset env2 first since get_samples_vectorized doesn't auto-reset
         iter(env2)
-        samples_vec = env2.get_samples_vectorized(100)
+        samples_vec = env2._get_samples_vectorized(100)
 
         np.testing.assert_allclose(samples_iter, samples_vec, rtol=1e-7)
 
@@ -131,7 +131,7 @@ class TestADSREnvelope(unittest.TestCase):
         env.trigger_note_on()  # Trigger envelope
 
         # Should jump directly to sustain
-        samples = env.get_samples_iterator(10, reset=True)
+        samples = env._get_samples_iterator(10, reset=True)
         self.assertAlmostEqual(samples[0], 0.7, delta=0.1)
 
 

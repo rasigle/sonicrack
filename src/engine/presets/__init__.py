@@ -1,6 +1,6 @@
-"""High-level preset building and preset management.
+"""High-level audio engine preset building and management.
 
-This package provides fluent API builders and preset management for creating
+This package provides API builders and preset management for creating
 and organizing audio synthesis presets. These are application-level utilities
 that orchestrate the core engine components.
 
@@ -9,7 +9,7 @@ Components:
     PresetLibrary: Manage collections of saved builder
 
 Example:
-    >>> from src.builder import PresetBuilder, PresetLibrary
+    >>> from engine import PresetBuilder, PresetLibrary
     >>>
     >>> # Create preset with fluent API
     >>> preset = (PresetBuilder()
@@ -24,13 +24,10 @@ Example:
     >>> loaded = library.load("leads/my_sound").build()
 """
 
-from src.builder.preset_library import PresetLibrary
-from src.builder.preset_builder import PresetBuilder
-from src.engine.audio_component import ComponentCategory, ComponentDescriptor
+from src.engine.presets.preset_library import PresetLibrary
+from src.engine.presets.preset_builder import PresetBuilder
 
 __all__ = [
     "PresetBuilder",
     "PresetLibrary",
-    "ComponentDescriptor",
-    "ComponentCategory",
 ]

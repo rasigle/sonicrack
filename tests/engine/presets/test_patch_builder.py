@@ -10,7 +10,7 @@ import unittest
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB
-from src.builder import PresetBuilder
+from engine.presets import PresetBuilder
 from src.engine.oscillator import SineOscillator
 
 

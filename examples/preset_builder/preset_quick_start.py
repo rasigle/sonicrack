@@ -4,7 +4,7 @@ This is a simplified introduction to the preset system showing the most
 common use cases.
 """
 
-from builder import PresetBuilder, PresetLibrary
+from engine.presets import PresetBuilder, PresetLibrary
 
 
 def main():

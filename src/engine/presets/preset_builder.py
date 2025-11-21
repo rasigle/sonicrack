@@ -7,7 +7,7 @@ This module provides an optimized PresetBuilder that:
 - Pre-caches component methods for performance
 
 Example:
-    >>> from src.builder import PresetBuilder
+    >>> from engine import PresetBuilder
     >>>
     >>> # Build a preset with fluent API
     >>> preset_builder = (PresetBuilder("My Synth")

@@ -9,7 +9,7 @@ This example shows how the registry system makes it easy to:
 
 import numpy as np
 
-from builder import PresetBuilder, ComponentCategory
+from engine.presets import PresetBuilder, ComponentCategory
 from constants import DEFAULT_SAMPLE_RATE
 from engine import (
     Oscillator,

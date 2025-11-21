@@ -15,13 +15,13 @@ Components:
 
 Performance:
     - Vectorized mode: 50-85x faster than iterator mode
-    - Auto mode: Automatically selects best method based on buffer size
+    - Auto mode: Automatically select the best method based on buffer size
     - Real-time ready: Capable of 512-2048 sample buffers at 44.1kHz
 
 Example - Basic Synthesis:
     >>> from src.engine import SineOscillator
     >>> osc = SineOscillator(frequency=440, amplitude=0.8)
-    >>> samples = osc.get_samples_vectorized(44100)  # 1 second at 44.1kHz
+    >>> samples = osc.get_samples(44100)  # 1 second at 44.1kHz
 
 Example - Modulated Synthesis:
     >>> from src.engine import SineOscillator, ADSREnvelope, ModulatedOscillator
@@ -94,17 +94,28 @@ from src.engine.audio_component_registry import (
     register_component,
     audio_registry,
 )
-
 # Composers
 from src.engine.composer import (
     Composer,
     Chain,
     WaveAdder,
 )
-
+# CV Utilities
+from src.engine.cv_utils import (
+    CVScaler,
+    bipolar_to_unipolar,
+    unipolar_to_bipolar,
+    scale_cv,
+)
+# Effects
+from src.engine.effects import (
+    Distortion,
+    Delay,
+    Reverb,
+)
 # Filters
 from src.engine.filter import butter, apply_filter, ButterworthFilter
-
+from src.engine.io.audio_output import AudioOutput
 # Modifiers
 from src.engine.modifier import (
     Modifier,
@@ -116,25 +127,12 @@ from src.engine.modifier import (
     Clipper,
     ModulatedClipper,
 )
-
-# Modulated Oscillator
-from src.engine.oscillator_modulated import ModulatedOscillator, ModulatedFrequency
-
-# CV Utilities
-from src.engine.cv_utils import (
-    CVScaler,
-    bipolar_to_unipolar,
-    unipolar_to_bipolar,
-    scale_cv,
-)
-
 # Modulators
 from src.engine.modulator import (
     Modulator,
     ADSREnvelope,
     getadsr,
 )
-
 # Noise generators
 from src.engine.noise import (
     white_noise,
@@ -147,7 +145,6 @@ from src.engine.noise import (
     sample_hold_noise,
     NoiseGenerator,
 )
-
 # Oscillators
 from src.engine.oscillator import (
     Oscillator,
@@ -157,15 +154,15 @@ from src.engine.oscillator import (
     SquareOscillator,
     synth,
 )
-
-# Effects
-from src.engine.effects import (
-    Distortion,
-    Delay,
-    Reverb,
-)
+# Modulated Oscillator
+from src.engine.oscillator_modulated import ModulatedOscillator, ModulatedFrequency
+# Presets
+from src.engine.presets.preset_builder import PresetBuilder
+from src.engine.presets.preset_library import PresetLibrary
 
 __all__ = [
+    # IO
+    "AudioOutput",
     # Audio Component Base
     "AudioComponent",
     "ComponentCategory",
@@ -224,4 +221,7 @@ __all__ = [
     "Distortion",
     "Delay",
     "Reverb",
+    # Presets
+    "PresetBuilder",
+    "PresetLibrary",
 ]

@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.builder import PresetBuilder, PresetLibrary
+from engine.presets import PresetBuilder, PresetLibrary
 
 
 class TestPresetSaveLoad(unittest.TestCase):

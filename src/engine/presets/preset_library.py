@@ -12,7 +12,7 @@ import json
 from src.utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from src.builder.preset_builder import PresetBuilder
+    from engine.presets.preset_builder import PresetBuilder
 
 logger = get_logger("builder.preset_library")
 
@@ -28,7 +28,7 @@ class PresetLibrary:
         preset_dir: Directory containing preset files
 
     Example:
-        >>> from src.builder import PresetLibrary, PresetBuilder
+        >>> from engine import PresetLibrary, PresetBuilder
         >>>
         >>> #
         >>> library = PresetLibrary("builder/")
@@ -98,7 +98,7 @@ class PresetLibrary:
             >>> library = PresetLibrary()
             >>> preset = library.load("bass_synth").build()
         """
-        from src.builder.preset_builder import PresetBuilder
+        from engine.presets.preset_builder import PresetBuilder
 
         filepath = self.preset_dir / name
         if not filepath.suffix:
@@ -123,7 +123,7 @@ class PresetLibrary:
                      Note: preset description is automatically included
 
         Example:
-            >>> from src.builder import PresetBuilder, PresetLibrary
+            >>> from engine import PresetBuilder, PresetLibrary
             >>>library = PresetLibrary("builder/")
             >>> builder = (PresetBuilder("Warm Lead")
             ...     .set_description("Smooth lead sound")

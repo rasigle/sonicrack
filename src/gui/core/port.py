@@ -10,25 +10,30 @@ Architecture:
 """
 
 from __future__ import annotations
-from typing import Optional
+
+import logging
+from typing import List, Optional
 
 
 class Port:
-    """Data model for a signal port.
+    """Data model for a signal port supporting multiple connections.
 
     Handles only the logic and data:
     - Value storage and retrieval
-    - Connection management
+    - Connection management (supports multiple connections)
     - Type information
 
     No UI concerns - can be tested without Qt or any graphics framework.
 
     Example:
         >>> input_port = Port("input", "audio_in")
-        >>> output_port = Port("output", "audio_out")
-        >>> input_port.connect(output_port)
-        >>> output_port.write(0.5)
-        >>> input_port.read()
+        >>> output_port1 = Port("output", "audio_out_1")
+        >>> output_port2 = Port("output", "audio_out_2")
+        >>> input_port.connect(output_port1)
+        >>> input_port.connect(output_port2)
+        >>> output_port1.write(0.3)
+        >>> output_port2.write(0.2)
+        >>> input_port.read()  # Returns sum: 0.5
         0.5
     """
 
@@ -51,36 +56,62 @@ class Port:
 
         # Data state
         self.value: float = 0.0
-        self.connected_to: Optional[Port] = None
+        self.connected_to: List[Port] = []
 
     def connect(self, other: Port) -> None:
         """Connect this port to another port.
+
+        Idempotent: connecting the same port twice has no effect.
 
         Args:
             other: The port to connect to
 
         Raises:
-            TypeError: If other is not a PortModel instance
+            TypeError: If other is not a Port instance
+            ValueError: If attempting to connect to self
         """
         if not isinstance(other, Port):
             raise TypeError(
-                f"Can only connect to PortModel, got {type(other).__name__}"
+                f"Can only connect to another Port, got {type(other).__name__}"
             )
-        self.connected_to = other
+        if other is self:
+            raise ValueError("Cannot connect a port to itself")
+        if other in self.connected_to:
+            return  # Already connected, no-op
 
-    def disconnect(self) -> None:
-        """Disconnect from any connected port."""
-        self.connected_to = None
+        logging.debug(f"Port connected: {self.port_name} -> {other.port_name}")
+        self.connected_to.append(other)
+
+    def disconnect(self, other: Optional[Port] = None) -> None:
+        """Disconnect from a specific connected port, or all if other is None.
+
+        Args:
+            other: Specific port to disconnect from, or None to disconnect all
+        """
+        if other is None:
+            if self.connected_to:
+                logging.debug(f"Port disconnected (all): {self.port_name}")
+            self.connected_to.clear()
+            return
+
+        try:
+            self.connected_to.remove(other)
+            logging.debug(f"Port disconnected: {self.port_name} -/-> {other.port_name}")
+        except ValueError:
+            # Port not in list; no-op
+            pass
 
     def read(self) -> float:
-        """Read value from connected port.
+        """Read value from connected ports.
+
+        Returns the sum of values from all connected ports (mixing).
 
         Returns:
-            Value from connected port, or 0.0 if not connected
+            Sum of values from connected ports, or 0.0 if not connected
         """
-        if self.connected_to:
-            return self.connected_to.value
-        return 0.0
+        if not self.connected_to:
+            return 0.0
+        return sum(p.value for p in self.connected_to)
 
     def write(self, value: float) -> None:
         """Write a value to this port.
@@ -92,12 +123,21 @@ class Port:
 
     @property
     def is_connected(self) -> bool:
-        """Check if port is connected to another port.
+        """Check if port is connected to at least one other port.
 
         Returns:
-            True if connected, False otherwise
+            True if connected to one or more ports, False otherwise
         """
-        return self.connected_to is not None
+        return len(self.connected_to) > 0
+
+    @property
+    def connected_ports(self) -> List[Port]:
+        """Get the list of currently connected ports.
+
+        Returns:
+            List of connected Port instances
+        """
+        return self.connected_to
 
     def __repr__(self) -> str:
         """String representation for debugging.
@@ -105,7 +145,8 @@ class Port:
         Returns:
             Debug string with port details
         """
-        conn_status = "connected" if self.is_connected else "disconnected"
+        conn_count = len(self.connected_to)
+        conn_status = f"{conn_count} connection(s)" if conn_count else "disconnected"
         return (
             f"PortModel(name='{self.port_name}', type='{self.port_type}', "
             f"value={self.value:.3f}, {conn_status})"

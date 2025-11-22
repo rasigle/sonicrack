@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict, deque
-from typing import TYPE_CHECKING
 
 import numpy as np
 import sounddevice as sd
@@ -16,9 +15,6 @@ from src.gui.core.module import AudioModule
 logger = logging.getLogger(__name__)
 
 DEFAULT_FADEOUT_DURATION_MS = 50  # Default fade-out duration in milliseconds
-
-if TYPE_CHECKING:
-    from src.gui.core.port import Port
 
 
 class AudioEngine(QtCore.QObject):
@@ -250,14 +246,6 @@ class AudioEngine(QtCore.QObject):
     def add_module(self, mod):
         self.modules.append(mod)
 
-    def connect(self, start_port: Port, target_port: Port):
-        logger.info(
-            f"Cable connected: {start_port.port_name} -> {target_port.port_name}"
-        )
-        start_port.connect(target_port)
-
-    def disconnect(self, start_port: Port, target_port: Port):
-        start_port.disconnect()
 
     def process(self):
         ordered = self._build_graph()

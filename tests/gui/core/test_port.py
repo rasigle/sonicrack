@@ -778,5 +778,234 @@ def test_no_qt_dependencies():
     assert "PyQt6" not in sys.modules or "PyQt6" not in str(port_module.__file__)
 
 
+class TestPortMultipleConnections:
+    """Test multiple connection functionality of Port class."""
+
+    def test_connect_multiple_ports(self):
+        """Test connecting a port to multiple other ports."""
+        input_port = Port("input", "audio_in")
+        output_port1 = Port("output", "audio_out_1")
+        output_port2 = Port("output", "audio_out_2")
+        output_port3 = Port("output", "audio_out_3")
+
+        input_port.connect(output_port1)
+        input_port.connect(output_port2)
+        input_port.connect(output_port3)
+
+        assert input_port.is_connected
+        assert len(input_port.connected_ports) == 3
+        assert output_port1 in input_port.connected_ports
+        assert output_port2 in input_port.connected_ports
+        assert output_port3 in input_port.connected_ports
+
+    def test_idempotent_connection(self):
+        """Test that connecting the same port twice has no effect."""
+        input_port = Port("input", "audio_in")
+        output_port = Port("output", "audio_out")
+
+        input_port.connect(output_port)
+        input_port.connect(output_port)  # Connect again
+
+        assert len(input_port.connected_ports) == 1
+        assert output_port in input_port.connected_ports
+
+    def test_read_sum_from_multiple_ports(self):
+        """Test that reading sums values from all connected ports."""
+        input_port = Port("input", "audio_in")
+        output_port1 = Port("output", "audio_out_1")
+        output_port2 = Port("output", "audio_out_2")
+        output_port3 = Port("output", "audio_out_3")
+
+        input_port.connect(output_port1)
+        input_port.connect(output_port2)
+        input_port.connect(output_port3)
+
+        output_port1.write(0.3)
+        output_port2.write(0.2)
+        output_port3.write(0.1)
+
+        # Should return sum of all connected ports
+        assert input_port.read() == pytest.approx(0.6)
+
+    def test_disconnect_specific_port(self):
+        """Test disconnecting a specific port while keeping others."""
+        input_port = Port("input", "audio_in")
+        output_port1 = Port("output", "audio_out_1")
+        output_port2 = Port("output", "audio_out_2")
+        output_port3 = Port("output", "audio_out_3")
+
+        input_port.connect(output_port1)
+        input_port.connect(output_port2)
+        input_port.connect(output_port3)
+
+        # Disconnect only port2
+        input_port.disconnect(output_port2)
+
+        assert len(input_port.connected_ports) == 2
+        assert output_port1 in input_port.connected_ports
+        assert output_port2 not in input_port.connected_ports
+        assert output_port3 in input_port.connected_ports
+
+    def test_disconnect_all_ports(self):
+        """Test disconnecting all ports at once."""
+        input_port = Port("input", "audio_in")
+        output_port1 = Port("output", "audio_out_1")
+        output_port2 = Port("output", "audio_out_2")
+
+        input_port.connect(output_port1)
+        input_port.connect(output_port2)
+
+        # Disconnect all
+        input_port.disconnect()
+
+        assert not input_port.is_connected
+        assert len(input_port.connected_ports) == 0
+
+    def test_disconnect_nonexistent_port(self):
+        """Test that disconnecting a non-connected port is a no-op."""
+        input_port = Port("input", "audio_in")
+        output_port1 = Port("output", "audio_out_1")
+        output_port2 = Port("output", "audio_out_2")
+
+        input_port.connect(output_port1)
+
+        # Try to disconnect port that was never connected
+        input_port.disconnect(output_port2)  # Should not raise
+
+        assert len(input_port.connected_ports) == 1
+        assert output_port1 in input_port.connected_ports
+
+    def test_read_with_no_connections(self):
+        """Test that reading from unconnected port returns 0.0."""
+        input_port = Port("input", "audio_in")
+        assert input_port.read() == 0.0
+
+    def test_read_after_disconnecting_all(self):
+        """Test that reading returns 0.0 after disconnecting all ports."""
+        input_port = Port("input", "audio_in")
+        output_port1 = Port("output", "audio_out_1")
+        output_port2 = Port("output", "audio_out_2")
+
+        input_port.connect(output_port1)
+        input_port.connect(output_port2)
+        output_port1.write(0.5)
+        output_port2.write(0.3)
+
+        input_port.disconnect()
+
+        assert input_port.read() == 0.0
+
+    def test_mixing_behavior(self):
+        """Test proper mixing behavior with multiple signal sources."""
+        mixer_input = Port("input", "mixer_in")
+        osc1 = Port("output", "oscillator_1")
+        osc2 = Port("output", "oscillator_2")
+        osc3 = Port("output", "oscillator_3")
+
+        mixer_input.connect(osc1)
+        mixer_input.connect(osc2)
+        mixer_input.connect(osc3)
+
+        # Simulate three oscillators outputting different values
+        osc1.write(1.0)
+        osc2.write(-0.5)
+        osc3.write(0.3)
+
+        # Mixed result should be the sum
+        assert mixer_input.read() == pytest.approx(0.8)
+
+    def test_connect_invalid_type(self):
+        """Test that connecting to non-Port raises TypeError."""
+        port = Port("input", "audio_in")
+
+        with pytest.raises(TypeError, match="Can only connect to another Port"):
+            port.connect("not_a_port")
+
+    def test_connect_to_self(self):
+        """Test that connecting to self raises ValueError."""
+        port = Port("input", "audio_in")
+
+        with pytest.raises(ValueError, match="Cannot connect a port to itself"):
+            port.connect(port)
+
+    def test_repr_with_multiple_connections(self):
+        """Test string representation shows connection count."""
+        input_port = Port("input", "audio_in")
+        output_port1 = Port("output", "audio_out_1")
+        output_port2 = Port("output", "audio_out_2")
+
+        # No connections
+        repr_str = repr(input_port)
+        assert "disconnected" in repr_str
+
+        # One connection
+        input_port.connect(output_port1)
+        repr_str = repr(input_port)
+        assert "1 connection(s)" in repr_str
+
+        # Two connections
+        input_port.connect(output_port2)
+        repr_str = repr(input_port)
+        assert "2 connection(s)" in repr_str
+
+    def test_connected_ports_property(self):
+        """Test the connected_ports property returns the correct list."""
+        input_port = Port("input", "audio_in")
+        output_port1 = Port("output", "audio_out_1")
+        output_port2 = Port("output", "audio_out_2")
+
+        assert input_port.connected_ports == []
+
+        input_port.connect(output_port1)
+        input_port.connect(output_port2)
+
+        connected = input_port.connected_ports
+        assert isinstance(connected, list)
+        assert len(connected) == 2
+        assert output_port1 in connected
+        assert output_port2 in connected
+
+    def test_sequential_disconnect(self):
+        """Test disconnecting ports one by one."""
+        input_port = Port("input", "audio_in")
+        ports = [Port("output", f"out_{i}") for i in range(5)]
+
+        # Connect all
+        for port in ports:
+            input_port.connect(port)
+
+        assert len(input_port.connected_ports) == 5
+
+        # Disconnect one by one
+        for i, port in enumerate(ports):
+            input_port.disconnect(port)
+            assert len(input_port.connected_ports) == 5 - (i + 1)
+
+        assert not input_port.is_connected
+
+    def test_value_changes_reflect_in_read(self):
+        """Test that changing values of connected ports reflects in read()."""
+        input_port = Port("input", "audio_in")
+        output_port1 = Port("output", "audio_out_1")
+        output_port2 = Port("output", "audio_out_2")
+
+        input_port.connect(output_port1)
+        input_port.connect(output_port2)
+
+        output_port1.write(0.5)
+        output_port2.write(0.3)
+        assert input_port.read() == pytest.approx(0.8)
+
+        # Change values
+        output_port1.write(1.0)
+        output_port2.write(0.2)
+        assert input_port.read() == pytest.approx(1.2)
+
+        # Change again
+        output_port1.write(0.0)
+        output_port2.write(0.0)
+        assert input_port.read() == pytest.approx(0.0)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

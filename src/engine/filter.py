@@ -39,10 +39,10 @@ Note:
 import numpy as np
 from scipy.signal import filtfilt, butter as scipy_butter, lfilter, lfilter_zi
 
-from src.engine.modifier import Modifier
-from src.engine.audio_component_registry import register_component
-from src.engine.audio_component import ComponentDescriptor, ComponentCategory
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.audio_component import ComponentDescriptor, ComponentCategory
+from src.engine.audio_component_registry import register_component
+from src.engine.modifier import Modifier
 
 
 @register_component()

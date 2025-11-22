@@ -12,20 +12,22 @@ Architecture:
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+
+import numpy as np
 
 
 class Port:
-    """Data model for a signal port supporting multiple connections.
+    """Data model for a signal port supporting multiple connections and numpy arrays.
 
     Handles only the logic and data:
-    - Value storage and retrieval
+    - Value storage and retrieval (float or numpy array)
     - Connection management (supports multiple connections)
     - Type information
 
+    Supports both scalar (float) and vectorized (numpy array) signal processing.
     No UI concerns - can be tested without Qt or any graphics framework.
 
-    Example:
+    Example (scalar):
         >>> input_port = Port("input", "audio_in")
         >>> output_port1 = Port("output", "audio_out_1")
         >>> output_port2 = Port("output", "audio_out_2")
@@ -35,6 +37,14 @@ class Port:
         >>> output_port2.write(0.2)
         >>> input_port.read()  # Returns sum: 0.5
         0.5
+
+    Example (vectorized):
+        >>> input_port = Port("input", "audio_in")
+        >>> output_port = Port("output", "audio_out")
+        >>> input_port.connect(output_port)
+        >>> output_port.write(np.array([0.1, 0.2, 0.3]))
+        >>> input_port.read()
+        array([0.1, 0.2, 0.3])
     """
 
     def __init__(
@@ -52,11 +62,13 @@ class Port:
         """
         self.port_type = port_type
         self.port_name = port_name
+
+        self.connected_to: list[Port] = []
+
         self.index = index
 
-        # Data state
-        self.value: float = 0.0
-        self.connected_to: List[Port] = []
+        # Data state - can be scalar or numpy array
+        self.value: float | np.ndarray = 0.0
 
     def connect(self, other: Port) -> None:
         """Connect this port to another port.
@@ -82,7 +94,7 @@ class Port:
         logging.debug(f"Port connected: {self.port_name} -> {other.port_name}")
         self.connected_to.append(other)
 
-    def disconnect(self, other: Optional[Port] = None) -> None:
+    def disconnect(self, other: Port | None = None) -> None:
         """Disconnect from a specific connected port, or all if other is None.
 
         Args:
@@ -101,25 +113,62 @@ class Port:
             # Port not in list; no-op
             pass
 
-    def read(self) -> float:
+    def read(self) -> float | np.ndarray:
         """Read value from connected ports.
 
         Returns the sum of values from all connected ports (mixing).
+        Supports both scalar and numpy array values.
+
+        For arrays, they must all have the same shape, otherwise a ValueError is raised.
 
         Returns:
-            Sum of values from connected ports, or 0.0 if not connected
+            Sum of values from connected ports (float or np.ndarray), or 0.0 if not connected
         """
         if not self.connected_to:
             return 0.0
-        return sum(p.value for p in self.connected_to)
 
-    def write(self, value: float) -> None:
+        # Collect all values
+        values = [p.value for p in self.connected_to]
+
+        # Check if any value is a numpy array
+        has_arrays = any(isinstance(v, np.ndarray) for v in values)
+
+        if not has_arrays:
+            # All scalars - simple sum
+            return sum(values)
+
+        # Mixed or all arrays - need to handle carefully
+        result = None
+        for value in values:
+            if result is None:
+                # Initialize with first value
+                result = np.array(value) if not isinstance(value, np.ndarray) else value.copy()
+            else:
+                # Add subsequent values
+                if isinstance(value, np.ndarray):
+                    if result.shape != value.shape:
+                        raise ValueError(
+                            f"Cannot mix arrays with different shapes: {result.shape} vs {value.shape}"
+                        )
+                    result = result + value
+                else:
+                    # Scalar - broadcast across array
+                    result = result + value
+
+        return result if result is not None else 0.0
+
+    def write(self, value: float | np.ndarray) -> None:
         """Write a value to this port.
 
+        Accepts both scalar float values and numpy arrays for batch processing.
+
         Args:
-            value: The value to write (will be converted to float)
+            value: The value to write (float or numpy array)
         """
-        self.value = float(value)
+        if isinstance(value, np.ndarray):
+            self.value = value
+        else:
+            self.value = float(value)
 
     @property
     def is_connected(self) -> bool:
@@ -131,7 +180,7 @@ class Port:
         return len(self.connected_to) > 0
 
     @property
-    def connected_ports(self) -> List[Port]:
+    def connected_ports(self) -> list[Port]:
         """Get the list of currently connected ports.
 
         Returns:
@@ -147,9 +196,16 @@ class Port:
         """
         conn_count = len(self.connected_to)
         conn_status = f"{conn_count} connection(s)" if conn_count else "disconnected"
+
+        # Format value display
+        if isinstance(self.value, np.ndarray):
+            value_str = f"array(shape={self.value.shape}, dtype={self.value.dtype})"
+        else:
+            value_str = f"{self.value:.3f}"
+
         return (
             f"PortModel(name='{self.port_name}', type='{self.port_type}', "
-            f"value={self.value:.3f}, {conn_status})"
+            f"value={value_str}, {conn_status})"
         )
 
     def __str__(self) -> str:
@@ -158,4 +214,8 @@ class Port:
         Returns:
             Readable string
         """
-        return f"{self.port_type} port '{self.port_name}' = {self.value:.3f}"
+        if isinstance(self.value, np.ndarray):
+            value_str = f"array(shape={self.value.shape})"
+        else:
+            value_str = f"{self.value:.3f}"
+        return f"{self.port_type} port '{self.port_name}' = {value_str}"

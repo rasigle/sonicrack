@@ -5,9 +5,9 @@ The Port class now uses PortWidget (UI) + Port (logic).
 
 For pure logic tests without Qt, see tests/core/test_port_model.py
 """
-
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from src.gui.core.port import Port
@@ -98,8 +98,7 @@ class TestPortConnection:
 
         input_port.connect(output_port)
 
-        # Check connection via model (connected_to property returns None in PortWidget)
-        assert input_port.connected_to is output_port
+        assert output_port in input_port.connected_to
         assert input_port.is_connected
 
     def test_connect_changes_connected_to(self):
@@ -110,19 +109,21 @@ class TestPortConnection:
         assert not port1.is_connected
         port1.connect(port2)
         assert port1.is_connected
-        assert port1.connected_to is port2
+        assert port2 in port1.connected_to
 
     def test_connect_multiple_times(self):
-        """Test that connecting to different ports updates connection."""
+        """Test that connecting to same port multiple times is idempotent."""
         port1 = Port("input", "port1", mock_parent())
         port2 = Port("output", "port2", mock_parent())
-        port3 = Port("output", "port3", mock_parent())
 
         port1.connect(port2)
-        assert port1.connected_to is port2
+        assert port2 in port1.connected_to
+        assert len(port1.connected_to) == 1
 
-        port1.connect(port3)
-        assert port1.connected_to is port3
+        # Connect again - should be idempotent
+        port1.connect(port2)
+        assert port2 in port1.connected_to
+        assert len(port1.connected_to) == 1  # Still only one connection
 
     def test_is_connected_property(self):
         """Test the is_connected property."""
@@ -200,7 +201,7 @@ class TestPortDisconnect:
 
         port1.disconnect()
         assert not port1.is_connected
-        assert port1.connected_to is None
+        assert port1.connected_to == []
 
     def test_disconnect_clears_connection(self):
         """Test that disconnect clears the connected_to attribute."""
@@ -210,7 +211,7 @@ class TestPortDisconnect:
         port1.connect(port2)
         port1.disconnect()
 
-        assert port1.connected_to is None
+        assert port1.connected_to == []
 
     def test_disconnect_affects_read(self):
         """Test that disconnecting affects read behavior."""
@@ -250,15 +251,14 @@ class TestPortEdgeCases:
     """Test edge cases and special scenarios."""
 
     def test_self_connection(self):
-        """Test connecting a port to itself."""
+        """Test that connecting a port to itself raises ValueError."""
         port = Port("input", "self", mock_parent())
         port.write(5.0)
-        port.connect(port)
 
-        # Port is connected to itself
-        assert port.connected_to is port
-        assert port.is_connected
-        assert port.read() == 5.0
+        # Should raise ValueError
+        with pytest.raises(ValueError, match="Cannot connect a port to itself"):
+            port.connect(port)
+
 
     def test_circular_connection(self):
         """Test circular connections (A->B->A)."""
@@ -272,8 +272,8 @@ class TestPortEdgeCases:
 
         # A reads from B, B reads from A (circular)
         # This is allowed but may cause issues in real usage
-        assert port_a.connected_to is port_b
-        assert port_b.connected_to is port_a
+        assert port_b in port_a.connected_to
+        assert port_a in port_b.connected_to
 
     def test_chain_connection(self):
         """Test chain of connections (A->B->C)."""
@@ -449,12 +449,12 @@ def test_port_connection():
     # Connect
     input_port.connect(output_port)
     assert input_port.is_connected
-    assert input_port.connected_to == output_port
+    assert output_port in input_port.connected_to
 
     # Disconnect
     input_port.disconnect()
     assert not input_port.is_connected
-    assert input_port.connected_to is None
+    assert input_port.connected_to == []
 
 
 def test_port_read_write():
@@ -486,7 +486,7 @@ def test_port_invalid_connection():
     """Test that connecting to non-Port raises TypeError."""
     port = Port("input", "audio_in")
 
-    with pytest.raises(TypeError, match="Can only connect to PortModel"):
+    with pytest.raises(TypeError, match="Can only connect to another Port"):
         port.connect("not a port")
 
 
@@ -514,7 +514,7 @@ class TestPortModelBasics:
         assert port.port_name == "test_port"
         assert port.port_type == "input"
         assert port.value == 0.0
-        assert port.connected_to is None
+        assert port.connected_to == []
         assert not port.is_connected
 
     def test_port_types(self):
@@ -581,14 +581,14 @@ class TestPortModelConnection:
 
         input_port.connect(output_port)
 
-        assert input_port.connected_to is output_port
+        assert output_port in input_port.connected_to
         assert input_port.is_connected
 
     def test_connect_invalid_type_raises_error(self):
-        """Test that connecting to non-PortModel raises TypeError."""
+        """Test that connecting to non-Port raises TypeError."""
         port = Port("input", "test")
 
-        with pytest.raises(TypeError, match="Can only connect to PortModel"):
+        with pytest.raises(TypeError, match="Can only connect to another Port"):
             port.connect("not a port")
 
     def test_read_from_connected_port(self):
@@ -628,7 +628,7 @@ class TestPortModelDisconnect:
 
         port1.disconnect()
         assert not port1.is_connected
-        assert port1.connected_to is None
+        assert port1.connected_to == []
 
     def test_disconnect_affects_read(self):
         """Test that disconnecting affects read behavior."""
@@ -666,7 +666,7 @@ class TestPortModelStringRepresentation:
         port1.connect(port2)
 
         repr_str = repr(port1)
-        assert "connected" in repr_str
+        assert "1 connection(s)" in repr_str
 
     def test_str(self):
         """Test __str__ output."""
@@ -684,14 +684,13 @@ class TestPortModelEdgeCases:
     """Test edge cases."""
 
     def test_self_connection(self):
-        """Test connecting a port to itself."""
+        """Test that connecting a port to itself raises ValueError."""
         port = Port("output", "self")
         port.write(5.0)
-        port.connect(port)
 
-        assert port.connected_to is port
-        assert port.is_connected
-        assert port.read() == 5.0
+        with pytest.raises(ValueError, match="Cannot connect a port to itself"):
+            port.connect(port)
+
 
     def test_large_value(self):
         """Test with large floating point values."""
@@ -1005,6 +1004,277 @@ class TestPortMultipleConnections:
         output_port1.write(0.0)
         output_port2.write(0.0)
         assert input_port.read() == pytest.approx(0.0)
+
+
+class TestPortNumpySupport:
+    """Test numpy array functionality of Port class."""
+
+    def test_write_numpy_array(self):
+        """Test writing a numpy array to a port."""
+        port = Port("output", "audio_out")
+        array = np.array([0.1, 0.2, 0.3, 0.4, 0.5])
+
+        port.write(array)
+
+        assert isinstance(port.value, np.ndarray)
+        np.testing.assert_array_equal(port.value, array)
+
+    def test_read_numpy_array(self):
+        """Test reading a numpy array from connected port."""
+        input_port = Port("input", "audio_in")
+        output_port = Port("output", "audio_out")
+
+        input_port.connect(output_port)
+        array = np.array([0.1, 0.2, 0.3])
+        output_port.write(array)
+
+        result = input_port.read()
+
+        assert isinstance(result, np.ndarray)
+        np.testing.assert_array_equal(result, array)
+
+    def test_mix_multiple_arrays(self):
+        """Test mixing multiple numpy arrays (summing)."""
+        input_port = Port("input", "mixer_in")
+        output1 = Port("output", "out1")
+        output2 = Port("output", "out2")
+        output3 = Port("output", "out3")
+
+        input_port.connect(output1)
+        input_port.connect(output2)
+        input_port.connect(output3)
+
+        array1 = np.array([1.0, 2.0, 3.0])
+        array2 = np.array([0.1, 0.2, 0.3])
+        array3 = np.array([0.01, 0.02, 0.03])
+
+        output1.write(array1)
+        output2.write(array2)
+        output3.write(array3)
+
+        result = input_port.read()
+        expected = np.array([1.11, 2.22, 3.33])
+
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_mix_array_and_scalar(self):
+        """Test mixing a numpy array with a scalar value."""
+        input_port = Port("input", "mixer_in")
+        output_array = Port("output", "out_array")
+        output_scalar = Port("output", "out_scalar")
+
+        input_port.connect(output_array)
+        input_port.connect(output_scalar)
+
+        array = np.array([1.0, 2.0, 3.0])
+        scalar = 0.5
+
+        output_array.write(array)
+        output_scalar.write(scalar)
+
+        result = input_port.read()
+        expected = np.array([1.5, 2.5, 3.5])
+
+        np.testing.assert_array_equal(result, expected)
+
+    def test_mix_multiple_scalars_and_arrays(self):
+        """Test mixing multiple scalars and arrays together."""
+        input_port = Port("input", "mixer_in")
+        ports = [Port("output", f"out{i}") for i in range(5)]
+
+        for port in ports:
+            input_port.connect(port)
+
+        # Write mix of arrays and scalars
+        ports[0].write(np.array([1.0, 2.0, 3.0]))
+        ports[1].write(0.5)
+        ports[2].write(np.array([0.1, 0.2, 0.3]))
+        ports[3].write(0.3)
+        ports[4].write(np.array([0.01, 0.02, 0.03]))
+
+        result = input_port.read()
+        # Expected: [1.0, 2.0, 3.0] + 0.5 + [0.1, 0.2, 0.3] + 0.3 + [0.01, 0.02, 0.03]
+        #         = [1.0, 2.0, 3.0] + [0.1, 0.2, 0.3] + [0.01, 0.02, 0.03] + 0.5 + 0.3
+        #         = [1.11, 2.22, 3.33] + 0.8
+        #         = [1.91, 3.02, 4.13]
+        expected = np.array([1.91, 3.02, 4.13])
+
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_array_shape_mismatch_raises_error(self):
+        """Test that mixing arrays with different shapes raises ValueError."""
+        input_port = Port("input", "mixer_in")
+        output1 = Port("output", "out1")
+        output2 = Port("output", "out2")
+
+        input_port.connect(output1)
+        input_port.connect(output2)
+
+        output1.write(np.array([1.0, 2.0, 3.0]))
+        output2.write(np.array([0.1, 0.2]))  # Different shape
+
+        with pytest.raises(ValueError, match="Cannot mix arrays with different shapes"):
+            input_port.read()
+
+    def test_2d_array_mixing(self):
+        """Test mixing 2D numpy arrays (stereo signals)."""
+        input_port = Port("input", "stereo_mixer")
+        output1 = Port("output", "stereo1")
+        output2 = Port("output", "stereo2")
+
+        input_port.connect(output1)
+        input_port.connect(output2)
+
+        # Stereo arrays: shape (2, num_samples)
+        array1 = np.array([[1.0, 2.0, 3.0], [0.5, 1.0, 1.5]])
+        array2 = np.array([[0.1, 0.2, 0.3], [0.05, 0.1, 0.15]])
+
+        output1.write(array1)
+        output2.write(array2)
+
+        result = input_port.read()
+        expected = np.array([[1.1, 2.2, 3.3], [0.55, 1.1, 1.65]])
+
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_repr_with_array(self):
+        """Test string representation shows array info."""
+        port = Port("output", "audio_out")
+        array = np.array([0.1, 0.2, 0.3])
+        port.write(array)
+
+        repr_str = repr(port)
+
+        assert "array(shape=(3,)" in repr_str
+        assert "dtype=float64" in repr_str
+
+    def test_str_with_array(self):
+        """Test human-readable string shows array info."""
+        port = Port("output", "audio_out")
+        array = np.array([0.1, 0.2, 0.3])
+        port.write(array)
+
+        str_repr = str(port)
+
+        assert "array(shape=(3,))" in str_repr
+
+    def test_scalar_to_array_conversion(self):
+        """Test that scalars can be mixed with arrays."""
+        input_port = Port("input", "mixer_in")
+        output_scalar = Port("output", "scalar_out")
+
+        input_port.connect(output_scalar)
+        output_scalar.write(0.5)
+
+        # First read returns scalar
+        result = input_port.read()
+        assert isinstance(result, (int, float))
+        assert result == 0.5
+
+    def test_empty_array(self):
+        """Test handling of empty arrays."""
+        port = Port("output", "audio_out")
+        empty_array = np.array([])
+
+        port.write(empty_array)
+
+        assert isinstance(port.value, np.ndarray)
+        assert len(port.value) == 0
+
+    def test_large_array_performance(self):
+        """Test handling of large arrays (typical audio buffer size)."""
+        input_port = Port("input", "audio_in")
+        output1 = Port("output", "out1")
+        output2 = Port("output", "out2")
+
+        input_port.connect(output1)
+        input_port.connect(output2)
+
+        # Typical audio buffer: 512 samples
+        buffer_size = 512
+        array1 = np.random.randn(buffer_size)
+        array2 = np.random.randn(buffer_size)
+
+        output1.write(array1)
+        output2.write(array2)
+
+        result = input_port.read()
+        expected = array1 + array2
+
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_stereo_buffer_mixing(self):
+        """Test mixing stereo buffers (2D arrays)."""
+        input_port = Port("input", "stereo_in")
+        output1 = Port("output", "stereo_out1")
+        output2 = Port("output", "stereo_out2")
+
+        input_port.connect(output1)
+        input_port.connect(output2)
+
+        # Stereo buffer: (2, buffer_size)
+        buffer_size = 512
+        stereo1 = np.random.randn(2, buffer_size)
+        stereo2 = np.random.randn(2, buffer_size)
+
+        output1.write(stereo1)
+        output2.write(stereo2)
+
+        result = input_port.read()
+        expected = stereo1 + stereo2
+
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_dtype_preservation(self):
+        """Test that dtype is preserved when writing arrays."""
+        port = Port("output", "audio_out")
+
+        # Test float32
+        array_f32 = np.array([0.1, 0.2, 0.3], dtype=np.float32)
+        port.write(array_f32)
+        assert port.value.dtype == np.float32
+
+        # Test float64
+        array_f64 = np.array([0.1, 0.2, 0.3], dtype=np.float64)
+        port.write(array_f64)
+        assert port.value.dtype == np.float64
+
+    def test_array_copy_behavior(self):
+        """Test that arrays are properly copied to avoid unintended sharing."""
+        input_port = Port("input", "audio_in")
+        output_port = Port("output", "audio_out")
+
+        input_port.connect(output_port)
+
+        original = np.array([1.0, 2.0, 3.0])
+        output_port.write(original)
+
+        result = input_port.read()
+
+        # Modify result - should not affect the port's stored value
+        result[0] = 999.0
+
+        # Original port value should be unchanged
+        assert output_port.value[0] == 1.0
+
+    def test_zero_scalar_with_array(self):
+        """Test mixing arrays with zero-valued scalar."""
+        input_port = Port("input", "mixer_in")
+        output_array = Port("output", "out_array")
+        output_zero = Port("output", "out_zero")
+
+        input_port.connect(output_array)
+        input_port.connect(output_zero)
+
+        array = np.array([1.0, 2.0, 3.0])
+        output_array.write(array)
+        output_zero.write(0.0)
+
+        result = input_port.read()
+
+        # Should equal the array (0 adds nothing)
+        np.testing.assert_array_equal(result, array)
+
 
 
 if __name__ == "__main__":

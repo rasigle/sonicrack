@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QStatusBar,
     QMessageBox,
-    QGroupBox,
     QScrollArea,
     QSplitter,
     QDialog,
@@ -58,21 +57,12 @@ class ModularSynthWindow(QMainWindow):
         """Initialize the main window."""
         super().__init__()
 
-        # Initialize the module registry with all built-in modules
-        print("Main")
-        self.registry = initialize_modules()
-
         self.setWindowTitle(APP_TITLE)
         self.setGeometry(100, 100, 1400, 900)
 
-        # Set application icon
-        if not APP_ICON_PATH.exists():
-            logger.warning(f"App icon not found at {APP_ICON_PATH}")
-        else:
-            self.setWindowIcon(QtGui.QIcon(str(APP_ICON_PATH)))
-
-        # Core components
+        # Initialize core components
         self.audio_engine = AudioEngine()
+        self.registry = initialize_modules()
         self.preset_manager = PresetManager()
 
         # Patch file tracking
@@ -81,6 +71,7 @@ class ModularSynthWindow(QMainWindow):
 
         # UI setup
         self._setup_ui()
+        self._setup_app_icon()
         self._setup_menu()
         self._setup_toolbar()
         self._setup_statusbar()
@@ -115,14 +106,18 @@ class ModularSynthWindow(QMainWindow):
 
         main_splitter.addWidget(canvas_widget)
 
-        # Right panel - Visualizations
-        viz_widget = self._create_visualization_panel()
-        main_splitter.addWidget(viz_widget)
-
         # Set splitter sizes
         main_splitter.setSizes([200, 800, 400])
 
         layout.addWidget(main_splitter)
+
+    def _setup_app_icon(self):
+        """Set up the application icon in the title bar."""
+        if not APP_ICON_PATH.exists():
+            logger.warning(f"App icon not found at {APP_ICON_PATH}")
+            return
+
+        self.setWindowIcon(QtGui.QIcon(str(APP_ICON_PATH)))
 
     def _create_module_library(self) -> QWidget:
         """Create the module library panel.
@@ -159,43 +154,6 @@ class ModularSynthWindow(QMainWindow):
         scroll.setWidget(scroll_content)
         layout.addWidget(scroll)
 
-        return panel
-
-    def _create_visualization_panel(self) -> QWidget:
-        """Create the visualization panel.
-
-        Returns:
-            Widget containing visualizations
-        """
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 5, 5)
-
-        # Control panel
-        controls_group = QGroupBox("Playback")
-        controls_layout = QVBoxLayout()
-
-        # Play/Stop buttons
-        btn_layout = QtWidgets.QHBoxLayout()
-        self.play_btn = QtWidgets.QPushButton("▶ Play")
-        self.play_btn.setMinimumHeight(40)
-        self.play_btn.clicked.connect(self._on_play_clicked)
-        btn_layout.addWidget(self.play_btn)
-
-        self.stop_btn = QtWidgets.QPushButton("⬛ Stop")
-        self.stop_btn.setMinimumHeight(40)
-        self.stop_btn.setEnabled(False)
-        self.stop_btn.clicked.connect(self._on_stop_clicked)
-        btn_layout.addWidget(self.stop_btn)
-
-        controls_layout.addLayout(btn_layout)
-
-        controls_group.setLayout(controls_layout)
-        layout.addWidget(controls_group)
-
-        layout.addStretch()
-
-        panel.setMinimumWidth(350)
         return panel
 
     def _setup_menu(self):
@@ -278,8 +236,6 @@ class ModularSynthWindow(QMainWindow):
     def _connect_signals(self):
         """Connect signals."""
         # Audio engine signals
-        self.audio_engine.playback_started.connect(self._on_playback_started)
-        self.audio_engine.playback_stopped.connect(self._on_playback_stopped)
         self.audio_engine.error_occurred.connect(self._on_audio_error)
 
         # Patch canvas signals
@@ -329,49 +285,20 @@ class ModularSynthWindow(QMainWindow):
 
         self.audio_engine.add_module(module_instance)
 
-    def _on_play_clicked(self):
-        """Handle play button click."""
-        self.audio_engine.start_playback()
-
-    def _on_stop_clicked(self):
-        """Handle stop button click."""
-        self.audio_engine.stop_playback()
-
-    def _on_playback_started(self):
-        """Handle playback started."""
-        self.play_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
-        self.statusbar.showMessage("Playing...")
-
-    def _on_playback_stopped(self):
-        """Handle playback stopped."""
-        self.play_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.statusbar.showMessage("Stopped")
-
     def _on_audio_error(self, error: str):
         """Handle audio error."""
         QMessageBox.critical(self, "Audio Error", f"Audio error occurred:\n{error}")
         self.statusbar.showMessage(f"Error: {error}")
 
-    def _on_cable_connected(self, start_port: PortWidget, end_port: PortWidget):
+    def _on_cable_connected(self, start_port: PortWidget, target_port: PortWidget):
         """Handle cable connection."""
-
-        # Mark patch as modified
+        start_port.port.connect(target_port.port)
         self._mark_patch_modified()
 
-        self.audio_engine.connect(start_port.port, end_port.port)
-
-    def _on_cable_disconnected(self, start_port: PortWidget, end_port: PortWidget):
+    def _on_cable_disconnected(self, start_port: PortWidget, target_port: PortWidget):
         """Handle cable disconnection."""
-        logger.debug(
-            f"Cable disconnected: {start_port.port_name} -> {end_port.port_name}"
-        )
-
-        # Mark patch as modified
+        start_port.port.disconnect(target_port.port)
         self._mark_patch_modified()
-
-        self.audio_engine.disconnect(start_port.port, end_port.port)
 
     def _on_module_deleted(self, module):
         """Handle module deletion.
@@ -380,8 +307,6 @@ class ModularSynthWindow(QMainWindow):
             module: The module that was deleted
         """
         logger.info(f"Module deleted: {module.metadata.title}")
-
-        # Mark patch as modified
         self._mark_patch_modified()
 
     def _on_parameter_changed(self, param_name: str, value):

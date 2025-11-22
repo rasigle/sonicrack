@@ -4,21 +4,20 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict, deque
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 import sounddevice as sd
 from PyQt6 import QtCore
 
-from src.gui.core.module import AudioModule
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.gui.core.module import AudioModule
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_FADEOUT_DURATION_MS = 50  # Default fade-out duration in milliseconds
 
 if TYPE_CHECKING:
-    from src.engine.audio_component import AudioComponent
     from src.gui.core.port import Port
 
 
@@ -29,12 +28,12 @@ class AudioEngine(QtCore.QObject):
     """
 
     # Signals
-    samples_generated = QtCore.pyqtSignal(
-        np.ndarray
-    )  # Emitted when new samples are generated (final output)
-    module_samples_generated = QtCore.pyqtSignal(
-        str, np.ndarray
-    )  # (module_id, samples) for monitoring
+    # Emitted when new samples are generated (final output)
+    samples_generated = QtCore.pyqtSignal(np.ndarray)
+
+    # (module_id, samples) for monitoring
+    module_samples_generated = QtCore.pyqtSignal(str, np.ndarray)
+
     playback_started = QtCore.pyqtSignal()
     playback_stopped = QtCore.pyqtSignal()
     error_occurred = QtCore.pyqtSignal(str)
@@ -56,8 +55,6 @@ class AudioEngine(QtCore.QObject):
 
         # Audio state
         self.is_playing: bool = False
-        self.stream: sd.OutputStream | None = None
-        self.patch: Any | None = None
         self.master_volume: float = 0.7
 
         # Master volume smoothing to prevent clicks
@@ -93,20 +90,6 @@ class AudioEngine(QtCore.QObject):
         self.signal_taps: dict[str, np.ndarray] = {}
         self.enable_signal_monitoring: bool = True  # Can be disabled for performance
 
-    def set_audiopatch(self, patch: AudioComponent):
-        """Set the audio patch to play.
-
-        Args:
-            patch: Audio component (oscillator, chain, etc.)
-        """
-        self.patch = patch
-        logger.debug(f"Patch set: {type(patch).__name__}")
-
-    def clear_audiopath(self):
-        """Clear the current audio patch."""
-        self.patch = None
-        self.signal_taps.clear()
-        logger.debug("Patch cleared")
 
     def register_signal_tap(self, module_id: str):
         """Register a module for signal monitoring.
@@ -163,166 +146,12 @@ class AudioEngine(QtCore.QObject):
             logger.warning(f"Audio callback status: {status}")
 
         self.process()
-        return
-        try:
-            if self.patch is None:
-                # Output silence
-                outdata.fill(0)
-                return
-
-            # If in post-fade silence mode, just output silence
-            if self.post_fade_silence:
-                outdata.fill(0)
-                return
-
-            # Generate samples from patch
-            samples = self.patch.get_samples(frames)
-
-            # Handle different output formats
-            if isinstance(samples, (list, tuple)) and len(samples) == 2:
-                # Stereo output (left, right)
-                left, right = samples
-                if len(left.shape) == 1 and len(right.shape) == 1:
-                    stereo = np.column_stack((left, right))
-                else:
-                    stereo = samples
-
-            elif isinstance(samples, np.ndarray):
-                if len(samples.shape) == 1:
-                    # Mono, duplicate to stereo
-                    stereo = np.column_stack((samples, samples))
-                else:
-                    # Already stereo
-                    stereo = samples
-
-            else:
-                # Fallback to silence
-                outdata.fill(0)
-                return
-
-            # Apply master volume with smoothing (prevents clicks!)
-            if self._master_volume_smoothing_samples > 0:
-                # Calculate how many samples to smooth
-                smooth_count = min(frames, self._master_volume_smoothing_samples)
-
-                # Create smooth volume envelope
-                volume_envelope = np.linspace(
-                    self._current_master_volume,
-                    self._target_master_volume,
-                    smooth_count,
-                )
-
-                # Apply smoothed volume to first part
-                if stereo.shape[0] >= smooth_count:
-                    stereo[:smooth_count] = (
-                        stereo[:smooth_count] * volume_envelope[:, np.newaxis]
-                    )
-
-                    # Apply target volume to rest
-                    if smooth_count < frames:
-                        stereo[smooth_count:] = (
-                            stereo[smooth_count:] * self._target_master_volume
-                        )
-                else:
-                    # Buffer smaller than smooth_count
-                    stereo = stereo * volume_envelope[: stereo.shape[0], np.newaxis]
-
-                # Update smoothing state
-                self._master_volume_smoothing_samples -= smooth_count
-                if self._master_volume_smoothing_samples <= 0:
-                    self._current_master_volume = self._target_master_volume
-                else:
-                    self._current_master_volume = volume_envelope[-1]
-            else:
-                # No smoothing - direct multiplication
-                stereo = stereo * self._target_master_volume
-
-            # Apply fade-in if starting playback
-            if self.is_fading_in and self.fade_in_samples_remaining > 0:
-                # Calculate how many samples to fade in this buffer
-                fade_samples = min(frames, self.fade_in_samples_remaining)
-
-                # Create fade-in curve (linear)
-                fade_start = 1.0 - (
-                    self.fade_in_samples_remaining / self.fade_in_total_samples
-                )
-                fade_end = 1.0 - (
-                    max(0, self.fade_in_samples_remaining - fade_samples)
-                    / self.fade_in_total_samples
-                )
-                fade_curve = np.linspace(fade_start, fade_end, fade_samples)
-
-                # Apply fade to the samples
-                stereo[:fade_samples] *= fade_curve[:, np.newaxis]
-
-                self.fade_in_samples_remaining -= fade_samples
-
-                # If fade-in complete, disable it
-                if self.fade_in_samples_remaining <= 0:
-                    self.is_fading_in = False
-
-            # Apply fade-out if stopping playback
-            if self.is_fading_out and self.fade_out_samples_remaining > 0:
-                # Calculate how many samples to fade in this buffer
-                fade_samples = min(frames, self.fade_out_samples_remaining)
-
-                # Create fade-out curve (linear for simplicity, could use exponential)
-                fade_curve = np.linspace(
-                    self.fade_out_samples_remaining / self.fade_out_total_samples,
-                    max(
-                        0.0,
-                        (self.fade_out_samples_remaining - fade_samples)
-                        / self.fade_out_total_samples,
-                    ),
-                    fade_samples,
-                )
-
-                # Apply fade to the samples
-                stereo[:fade_samples] *= fade_curve[:, np.newaxis]
-
-                # Remaining samples after fade are silent
-                if fade_samples < frames:
-                    stereo[fade_samples:] = 0
-
-                self.fade_out_samples_remaining -= fade_samples
-
-                # If fade-out complete, enter post-fade silence mode
-                if self.fade_out_samples_remaining <= 0:
-                    self.is_fading_out = False
-                    self.post_fade_silence = True
-                    # Fill rest with silence
-                    if fade_samples < frames:
-                        stereo[fade_samples:] = 0
-
-            # Clip to valid range
-            stereo = np.clip(stereo, -1.0, 1.0)
-
-            # Copy to output buffer
-            if len(stereo) >= frames:
-                outdata[:] = stereo[:frames].astype(np.float32)
-            else:
-                outdata[: len(stereo)] = stereo.astype(np.float32)
-                outdata[len(stereo) :] = 0
-
-            # Store for visualization
-            self.current_buffer = stereo[:frames].copy()
-            self.samples_generated.emit(self.current_buffer)
-
-        except Exception as e:
-            logger.error(f"Error in audio callback: {e}", exc_info=True)
-            self.error_occurred.emit(str(e))
-            outdata.fill(0)
 
     def start_playback(self):
         """Start audio playback."""
         if self.is_playing:
             logger.warning("Already playing")
             return
-
-        # if self.patch is None:
-        #     logger.warning("No patch set")
-        #     self.error_occurred.emit("No patch configured")
-        #     return
 
         try:
 
@@ -396,42 +225,6 @@ class AudioEngine(QtCore.QObject):
         except Exception as e:
             logger.error(f"Failed to finalize stop: {e}", exc_info=True)
 
-    def generate_samples(self, num_samples: int) -> np.ndarray | None:
-        """Generate samples from the patch without playback.
-
-        Args:
-            num_samples: Number of samples to generate
-
-        Returns:
-            Generated samples or None
-        """
-        if self.patch is None:
-            return None
-
-        try:
-            samples = self.patch.get_samples(num_samples)
-
-            # Convert to stereo if needed
-            if isinstance(samples, (list, tuple)) and len(samples) == 2:
-                left, right = samples
-                stereo = np.column_stack((left, right))
-            elif isinstance(samples, np.ndarray):
-                if len(samples.shape) == 1:
-                    stereo = np.column_stack((samples, samples))
-                else:
-                    stereo = samples
-            else:
-                return None
-
-            # Apply master volume and clip
-            stereo = np.clip(stereo * self._target_master_volume, -1.0, 1.0)
-
-            return stereo
-
-        except Exception as e:
-            logger.error(f"Failed to generate samples: {e}", exc_info=True)
-            return None
-
     def cleanup(self):
         """Clean up resources with graceful fade-out."""
         if self.is_playing:
@@ -468,7 +261,6 @@ class AudioEngine(QtCore.QObject):
 
     def process(self):
         ordered = self._build_graph()
-        print(ordered)
         for module in ordered:
             module.process()
 

@@ -2,6 +2,6 @@
 
 from .waveform import WaveformModule
 from .spectrum import SpectrumModule
-from .tree_anlyzer import TreeAnalyzerModule
+from .tree_analyzer import TreeAnalyzerModule
 
 __all__ = ["WaveformModule", "SpectrumModule", "TreeAnalyzerModule"]

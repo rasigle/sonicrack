@@ -7,7 +7,6 @@ from src.engine.oscillator import SineOscillator
 from src.gui.core.module import ModuleCategory
 from src.gui.modules.mixer import MixerModule
 from src.gui.modules.oscillator.oscillator import OscillatorModule
-from src.gui.modules.output.output import OutputModule
 from src.gui.modules.volume_mod import VolumeModule
 
 
@@ -105,24 +104,6 @@ def test_mixer_interface(qapp):
         input_components=[osc1, osc2], modulation_components=None
     )
     assert component is not None
-
-
-def test_output_interface(qapp):
-    """Test output implements interface correctly."""
-    module = OutputModule()
-
-    # Check module type (property, not method)
-    assert module.metadata.category == ModuleCategory.OUTPUT
-
-    # Check required inputs
-    assert "In" in module.get_required_inputs()
-
-    # Check component creation (output returns the input)
-    osc = SineOscillator(440)
-    component = module.create_engine_component(
-        input_components=[osc], modulation_components=None
-    )
-    assert component == osc
 
 
 if __name__ == "__main__":

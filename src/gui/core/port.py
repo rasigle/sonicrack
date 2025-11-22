@@ -88,7 +88,7 @@ class Port:
         Args:
             value: The value to write (will be converted to float)
         """
-        self.value = value
+        self.value = float(value)
 
     @property
     def is_connected(self) -> bool:

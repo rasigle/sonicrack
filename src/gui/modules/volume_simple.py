@@ -78,13 +78,7 @@ class SimpleVolumeModule(ModuleWidget):
                 processing)
         """
         # Check if input is connected
-        if not self.in_port.is_connected:
-            # No input - explicitly write silence
-            self.out_port.write(0.0)
-            return
-
-        # Safety check: component must exist
-        if self.component is None:
+        if not self.in_port.is_connected or self.component is None:
             self.out_port.write(0.0)
             return
 

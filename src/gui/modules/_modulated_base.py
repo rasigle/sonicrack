@@ -104,7 +104,7 @@ class ModulatedModuleBase(ModuleWidget):
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,
     ):
-        """Create the component with or without modulation.
+        """Create the engine component with or without modulation.
 
         Subclasses should NOT override this. Instead, implement:
         - create_modulated_component(mod_comp)
@@ -166,3 +166,6 @@ class ModulatedModuleBase(ModuleWidget):
         raise NotImplementedError(
             f"{self.__class__.__name__} must implement create_unmodulated_component()"
         )
+
+    def process(self):
+        pass

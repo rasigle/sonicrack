@@ -307,6 +307,14 @@ class ModularSynthWindow(QMainWindow):
 
     def _on_cable_disconnected(self, start_port: PortWidget, target_port: PortWidget):
         """Handle cable disconnection."""
+        # Safety check: ports might be None during bulk module deletion
+        if start_port is None or target_port is None:
+            # Bulk deletion occurred, just trigger playback check
+            logger.info("Bulk disconnection detected - checking playback state")
+            self._start_output_playback()
+            self._mark_patch_modified()
+            return
+
         start_port.port.disconnect(target_port.port)
         self._mark_patch_modified()
 

@@ -379,17 +379,47 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
         elif action == delete_action:
             # Delete this module
-            if self.scene():
-                # Remove connected cables first
+            scene = self.scene()
+            if scene:
+                # Store references before removing from scene
+                from src.gui.patch_canvas import PatchCanvas
+                canvas = scene.parent() if scene else None
+                views = scene.views() if scene else []
+
+                # Collect all cables to remove
                 cables_to_remove = []
                 for port in self.input_ports + self.output_ports:
                     cables_to_remove.extend(port.cables[:])
 
+                # Remove cables silently (without triggering signals)
+                # This prevents multiple patch recompilations during deletion
                 for cable in cables_to_remove:
-                    cable.remove()
+                    # Disconnect the underlying Port data models
+                    if cable.start_port and cable.end_port:
+                        cable.start_port.port.disconnect(cable.end_port.port)
 
-                # Remove the module
-                self.scene().removeItem(self)
+                    # Remove cable from UI
+                    if cable.start_port:
+                        cable.start_port.remove_cable(cable)
+                    if cable.end_port:
+                        cable.end_port.remove_cable(cable)
+                    if cable.scene():
+                        cable.scene().removeItem(cable)
+
+                # Remove the module from scene (after this, self.scene() becomes None)
+                scene.removeItem(self)
+
+                # Mark patch as modified and trigger update
+                if canvas and isinstance(canvas, PatchCanvas):
+                    # Get main window to trigger patch update if needed
+                    for view in views:
+                        main_window = view.window()
+                        if hasattr(main_window, '_mark_patch_modified'):
+                            main_window._mark_patch_modified()
+                        # Trigger playback check (will recompile if needed)
+                        if hasattr(main_window, '_start_output_playback'):
+                            main_window._start_output_playback()
+                        break
 
         elif action == info_action:
             # Show module info dialog

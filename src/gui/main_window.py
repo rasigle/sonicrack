@@ -630,9 +630,29 @@ class ModularSynthWindow(QMainWindow):
 
     def _clear_canvas(self):
         """Clear the patch canvas."""
+        # Stop audio from old audio_engine (legacy)
         self.audio_engine.stop_playback()
+
+        # Stop all Output modules (process-based architecture)
+        self._stop_all_output_modules()
+
+        # Clear the canvas
         self.patch_canvas.clear_all()
         self.statusbar.showMessage("Canvas cleared")
+
+    def _stop_all_output_modules(self):
+        """Stop playback on all Output modules in the current patch.
+
+        This ensures that when loading a new patch or clearing the canvas,
+        audio from the old patch doesn't continue playing.
+        """
+        from src.gui.modules.output.output import OutputModule
+
+        for module in self.patch_canvas.get_modules():
+            if isinstance(module, OutputModule):
+                if module.audio_output.is_playing:
+                    logger.info(f"Stopping Output module before clearing patch")
+                    module.stop_playback()
 
     def _save_as_library_preset(self):
         """Save the current patch as a preset."""
@@ -682,8 +702,13 @@ class ModularSynthWindow(QMainWindow):
             preset_data: Dictionary containing preset data with 'modules' and
                 'connections'
         """
-        # Clear current patch
+        # Stop audio from old audio_engine (legacy)
         self.audio_engine.stop_playback()
+
+        # Stop all Output modules (process-based architecture)
+        self._stop_all_output_modules()
+
+        # Clear current patch
         self.patch_canvas.clear_all()
 
         # Rebuild modules

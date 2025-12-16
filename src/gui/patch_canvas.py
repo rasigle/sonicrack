@@ -353,6 +353,12 @@ class PatchCanvas(QGraphicsView):
 
     def clear_all(self):
         """Clear all modules and cables from the canvas."""
+        # First, clear all port data to prevent stale audio
+        for module in self.get_modules():
+            for port in module.input_ports + module.output_ports:
+                port.port.clear()
+
+        # Then clear the scene
         self.scene.clear()
         self.dragging_cable = None
         self.drag_start_port = None

@@ -5,12 +5,13 @@ from typing import TYPE_CHECKING
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
-from src.engine.oscillator import SquareOscillator
+from gui.audio_config import audio_config
 from src.engine.composer import WaveAdder
 from src.engine.oscillator import (
     SineOscillator,
     SawtoothOscillator,
     TriangleOscillator,
+    SquareOscillator
 )
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
@@ -23,6 +24,8 @@ from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
 if TYPE_CHECKING:
+    from src.gui.core.port import Port
+
     from src.engine.audio_component import AudioComponent
 
 
@@ -54,10 +57,10 @@ class LFOModule(ModuleWidget):
         )
 
         # Add four output ports - one for each waveform
-        self.sine_port = self.add_output("Sine")
-        self.triangle_port = self.add_output("Triangle")
-        self.sawtooth_port = self.add_output("Sawtooth")
-        self.square_port = self.add_output("Square")
+        self.sine_port: Port = self.add_output("Sine")
+        self.triangle_port: Port = self.add_output("Triangle")
+        self.sawtooth_port: Port = self.add_output("Sawtooth")
+        self.square_port: Port = self.add_output("Square")
 
         # Map port names to port objects for easy lookup
         self.port_map = {
@@ -106,14 +109,30 @@ class LFOModule(ModuleWidget):
 
         # Track individual oscillator components for hotswap
         self._square_oscillator = None
+        # Track all oscillators for sample rate updates
+        self._all_oscillators = []
 
         # Create initial components
         self.component = self.create_engine_component()
 
+        # Register with audio_config to receive sample rate change notifications
+        audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
+
+    def _on_global_sample_rate_changed(self, new_sample_rate: int):
+        """Handle global sample rate changes from audio_config.
+
+        Args:
+            new_sample_rate: New sample rate in Hz
+        """
+        # Update all tracked oscillators
+        for osc in self._all_oscillators:
+            if osc is not None and hasattr(osc, 'sample_rate'):
+                osc.sample_rate = new_sample_rate
+
     # AudioModuleInterface implementation
     def _on_pulsewidth_changed(self):
         """Handle pulse width changes - only update square oscillator if connected."""
-        if len(self.square_port.cables) > 0 and self._square_oscillator is not None:
+        if self.square_port.is_connected and self._square_oscillator is not None:
             # Hotswap: update pulse width directly on the square oscillator
             try:
                 self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
@@ -147,32 +166,45 @@ class LFOModule(ModuleWidget):
         """
         freq = self.freq_knob.get_value()
         pulsewidth = self.pulsewidth_knob.get_value()
+        # Use global sample rate from audio_config
+        sample_rate = audio_config.sample_rate
         components = {}
 
+        # Clear oscillator tracking
+        self._all_oscillators = []
+
         # Create oscillators only for connected outputs
-        if len(self.sine_port.cables) > 0:
-            components["Sine"] = SineOscillator(
-                freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1)
+        if self.sine_port.is_connected:
+            osc = SineOscillator(
+                freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1), sample_rate=sample_rate
             )
+            components["Sine"] = osc
+            self._all_oscillators.append(osc)
 
-        if len(self.triangle_port.cables) > 0:
-            components["Triangle"] = TriangleOscillator(
-                freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1)
+        if self.triangle_port.is_connected:
+            osc = TriangleOscillator(
+                freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1), sample_rate=sample_rate
             )
+            components["Triangle"] = osc
+            self._all_oscillators.append(osc)
 
-        if len(self.sawtooth_port.cables) > 0:
-            components["Sawtooth"] = SawtoothOscillator(
-                freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1)
+        if self.sawtooth_port.is_connected:
+            osc = SawtoothOscillator(
+                freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1), sample_rate=sample_rate
             )
+            components["Sawtooth"] = osc
+            self._all_oscillators.append(osc)
 
-        if len(self.square_port.cables) > 0:
+        if self.square_port.is_connected:
             self._square_oscillator = SquareOscillator(
                 freq,
                 gain_db=LFO_DEFAULT_GAIN_DB,
                 wave_range=(-1, 1),
                 pulsewidth=pulsewidth,
+                sample_rate=sample_rate
             )
             components["Square"] = self._square_oscillator
+            self._all_oscillators.append(self._square_oscillator)
         else:
             # Clear reference when not connected
             self._square_oscillator = None

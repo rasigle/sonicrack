@@ -10,8 +10,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 
-from src.gui.core.port import Port
 from src.engine.audio_component import AudioComponent
+from src.gui.core.port import Port
 
 
 class ModuleCategory(StrEnum):
@@ -229,12 +229,12 @@ class AudioModule(ABC):
                 return port
         return None
 
-    def add_input(self, name):
+    def add_input(self, name: str):
         port = Port("input", name, parent_module=self)
         self.inputs[name] = port
         return port
 
-    def add_output(self, name):
+    def add_output(self, name) -> Port:
         port = Port("output", name, parent_module=self)
         self.outputs[name] = port
         return port

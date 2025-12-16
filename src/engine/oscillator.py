@@ -137,11 +137,14 @@ class Oscillator(Generator):
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
     ):
+        # Initialize _sample_rate BEFORE calling super().__init__
+        # because super().__init__ will call the sample_rate property setter
+        self._sample_rate = sample_rate
+
         super().__init__(sample_rate=sample_rate)
 
         self._freq = frequency
         self._phase = phase
-        self._sample_rate = sample_rate
         self._wave_range = wave_range
         self._initial_amp = _derive_amplitude_from_init(
             self._provided_args, amplitude, gain_db  # noqa
@@ -300,6 +303,30 @@ class Oscillator(Generator):
         self._p = value
         self._post_phase_set()
 
+    @property
+    def sample_rate(self):
+        """float: Current sample rate in Hz.
+
+        Setting this property updates internal calculations that depend on
+        sample rate (period, step, etc.) by calling `_post_sample_rate_set`.
+
+        This allows oscillators to adapt when the audio system's sample rate
+        changes, ensuring correct frequency output regardless of sample rate.
+        """
+        return self._sample_rate
+
+    @sample_rate.setter
+    def sample_rate(self, value):
+        """Update sample rate and recalculate dependent values."""
+        if value != self._sample_rate:
+            self._sample_rate = value
+            # Update amplitude smoothing duration based on new sample rate
+            self._smoothing_samples_duration_total = int(
+                DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS * value / 1000
+            )
+            # Let subclasses update their internal state
+            self._post_sample_rate_set()
+
     def _post_freq_set(self):
         """Hook called after `freq` is changed.
 
@@ -314,6 +341,15 @@ class Oscillator(Generator):
     def _post_phase_set(self):
         """Hook called after `phase` is changed."""
         pass
+
+    def _post_sample_rate_set(self):
+        """Hook called after `sample_rate` is changed.
+
+        Subclasses may override to recompute derived values (period, step, etc.)
+        that depend on sample rate.
+        """
+        # By default, trigger frequency recalculation since it depends on sample_rate
+        self._post_freq_set()
 
     def _initialize_osc(self):
         """Perform any subclass-specific initialization required when iteration starts.

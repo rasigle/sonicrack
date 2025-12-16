@@ -9,6 +9,7 @@ import numpy as np
 from PyQt6 import QtWidgets
 from PyQt6.QtGui import QColor
 
+from gui.audio_config import audio_config
 from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_BUFFER_SIZE
 from src.engine.io.audio_output import AudioOutput
 from src.gui.core.module import ModuleCategory, ModuleMetadata
@@ -119,16 +120,33 @@ class OutputModule(ModuleWidget):
         logger.debug("OutputModule initialized")
 
     def _on_sample_rate_changed(self, index: int):
-        """Handle sample rate selection change."""
+        """Handle sample rate selection change.
+
+        Updates both the audio output and the global audio_config,
+        which will automatically notify all registered listeners (oscillators, etc.).
+        """
         sample_rate = self.sample_rate_combo.itemData(index)
-        logger.info(f"Sample rate changed to {sample_rate} Hz")
+        logger.info(f"Sample rate changed to {sample_rate} Hz (via Output module)")
+
+        # Update audio output
         self.audio_output.set_sample_rate(sample_rate)
 
+        # Update global config - this will notify all listeners automatically!
+        audio_config.sample_rate = sample_rate
+
     def _on_buffer_size_changed(self, index: int):
-        """Handle buffer size selection change."""
+        """Handle buffer size selection change.
+
+        Updates both the audio output and the global audio_config.
+        """
         buffer_size = self.buffer_size_combo.itemData(index)
-        logger.info(f"Buffer size changed to {buffer_size} samples")
+        logger.info(f"Buffer size changed to {buffer_size} samples (via Output module)")
+
+        # Update audio output
         self.audio_output.set_buffer_size(buffer_size)
+
+        # Update global config - this will notify all listeners automatically!
+        audio_config.buffer_size = buffer_size
 
     def _generate_audio(self, num_samples: int) -> np.ndarray | None:
         """Generate audio samples from connected input using process-based approach.
@@ -218,6 +236,62 @@ class OutputModule(ModuleWidget):
 
         # Start processing from our input port
         process_module_recursively(self.input_port)
+
+    def _update_module_sample_rates(self, sample_rate: int):
+        """Propagate sample rate change to all connected modules.
+
+        Walks through the entire signal chain and updates any oscillators
+        or other audio components that need to know about the sample rate.
+
+        Args:
+            sample_rate: New sample rate in Hz
+        """
+        # Track which modules we've already updated
+        updated = set()
+
+        def update_module_recursively(port):
+            """Recursively update modules connected to this port."""
+            if not hasattr(port, 'connected_to'):
+                return
+
+            # Update all modules connected to this port
+            for connected_port in port.connected_to:
+                parent_module = connected_port.parent_module
+
+                # Skip if already updated
+                if parent_module in updated:
+                    continue
+
+                # First, recursively update all inputs to this module
+                if hasattr(parent_module, 'inputs'):
+                    for input_port in parent_module.inputs.values():
+                        update_module_recursively(input_port)
+
+                # Now update this module's oscillators
+                try:
+                    # Check if module has oscillators (e.g., OscillatorModule)
+                    if hasattr(parent_module, 'oscs'):
+                        logger.info(f"Updating sample rate for {parent_module.metadata.title}")
+                        for osc in parent_module.oscs:
+                            if osc is not None and hasattr(osc, 'sample_rate'):
+                                osc.sample_rate = sample_rate
+                        updated.add(parent_module)
+                    # Check if module has a single oscillator
+                    elif hasattr(parent_module, '_oscillator'):
+                        osc = parent_module._oscillator
+                        if osc is not None and hasattr(osc, 'sample_rate'):
+                            logger.info(f"Updating sample rate for {parent_module.metadata.title}")
+                            osc.sample_rate = sample_rate
+                        updated.add(parent_module)
+                except Exception as e:
+                    logger.error(
+                        f"Error updating sample rate for {parent_module.metadata.title}: {e}",
+                        exc_info=True
+                    )
+
+        # Start updating from our input port
+        update_module_recursively(self.input_port)
+        logger.info(f"Updated sample rate to {sample_rate} Hz for {len(updated)} module(s)")
 
     def get_output_component(self, port_name: str):
         """This module has no output component (it's a sink)."""

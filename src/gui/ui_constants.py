@@ -2,9 +2,9 @@ from pathlib import Path
 
 from src.constants import RESOURCES_PATH
 
-APP_ICON_NAME = "icon.png"
-APP_ICON_PATH = RESOURCES_PATH / "icons" / APP_ICON_NAME
-APP_TITLE = "AudioPlayground - Modular Synthesizer"
+APP_TITLE: str = "AudioPlayground - Modular Synthesizer"
+APP_ICON_NAME: str = "icon.png"
+APP_ICON_PATH: Path = RESOURCES_PATH / "icons" / APP_ICON_NAME
 DEFAULT_PRESET_DIRECTORY = Path.home() / ".audioplayground" / "presets"
 
 

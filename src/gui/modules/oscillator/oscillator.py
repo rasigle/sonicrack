@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
+from gui.audio_config import audio_config
 from src.engine.oscillator import (
     SineOscillator,
     SawtoothOscillator,
@@ -108,6 +109,28 @@ class OscillatorModule(ModuleWidget):
             self._square_oscillator,
         ]
 
+        # Register with audio_config to receive sample rate change notifications
+        audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
+
+    def _on_global_sample_rate_changed(self, new_sample_rate: int):
+        """Handle global sample rate changes from audio_config.
+
+        This is called automatically when the sample rate changes anywhere
+        in the system (e.g., from the Output module).
+
+        Args:
+            new_sample_rate: New sample rate in Hz
+        """
+        # Update all oscillators with new sample rate
+        if self._sine_oscillator:
+            self._sine_oscillator.sample_rate = new_sample_rate
+        if self._triangle_oscillator:
+            self._triangle_oscillator.sample_rate = new_sample_rate
+        if self._sawtooth_oscillator:
+            self._sawtooth_oscillator.sample_rate = new_sample_rate
+        if self._square_oscillator:
+            self._square_oscillator.sample_rate = new_sample_rate
+
     def process(self, num_samples: int = 1):
         """Generate and write oscillator samples to output ports.
 
@@ -149,16 +172,24 @@ class OscillatorModule(ModuleWidget):
 
     def _create_oscillators(self):
         freq = self.freq_knob.get_value()
-        pulsewidth = self.pulsewidth_knob.get_value()
+        # Use global sample rate from audio_config
+        sample_rate = audio_config.sample_rate
 
-        # Create oscillators only for connected outputs
-        self._sine_oscillator = SineOscillator(freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB)
+        # Create oscillators with global sample rate
+        self._sine_oscillator = SineOscillator(
+            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
+        )
         self._triangle_oscillator = TriangleOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB
+            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
         )
         self._sawtooth_oscillator = SawtoothOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB
+            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
         )
+
+        pulsewidth = self.pulsewidth_knob.get_value()
         self._square_oscillator = SquareOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, pulsewidth=pulsewidth
+            freq,
+            gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
+            pulsewidth=pulsewidth,
+            sample_rate=sample_rate
         )

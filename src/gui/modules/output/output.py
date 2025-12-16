@@ -9,7 +9,6 @@ import numpy as np
 from PyQt6 import QtWidgets
 from PyQt6.QtGui import QColor
 
-from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_BUFFER_SIZE
 from src.engine.io.audio_output import AudioOutput
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
@@ -21,10 +20,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Standard audio settings
-SAMPLE_RATES = [22050, 44100, 48000, 88200, 96000]
-BUFFER_SIZES = [128, 256, 512, 1024, 2048, 4096]
-
 
 @register_module()
 class OutputModule(ModuleWidget):
@@ -33,7 +28,7 @@ class OutputModule(ModuleWidget):
     metadata = ModuleMetadata(
         title="Output",
         category=ModuleCategory.OUTPUT,
-        description="Audio output with configurable sample rate and buffer size",
+        description="Audio output",
     )
 
     def __init__(self):
@@ -47,68 +42,27 @@ class OutputModule(ModuleWidget):
         # Add input port
         self.input_port: Port = self.add_input("In")
 
-        # Create audio output handler
+        # Create audio output handler using global settings
         self.audio_output = AudioOutput(
-            sample_rate=DEFAULT_SAMPLE_RATE,
-            buffer_size=DEFAULT_BUFFER_SIZE,
+            sample_rate=audio_config.sample_rate,
+            buffer_size=audio_config.buffer_size,
             audio_callback=self._generate_audio,
         )
+
+        # Register for global audio setting changes
+        audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
+        audio_config.add_buffer_size_listener(self._on_global_buffer_size_changed)
 
         # Build UI
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
-        # Sample rate selection
-        sr_layout = QtWidgets.QHBoxLayout()
-        sr_label = QtWidgets.QLabel("Sample Rate:")
-        sr_label.setStyleSheet("color: white; font-size: 11px;")
-        self.sample_rate_combo = QtWidgets.QComboBox()
-
-        # Add items first
-        for sr in SAMPLE_RATES:
-            self.sample_rate_combo.addItem(f"{sr} Hz", sr)
-
-        # Set default
-        default_idx = SAMPLE_RATES.index(DEFAULT_SAMPLE_RATE)
-        self.sample_rate_combo.setCurrentIndex(default_idx)
-
-        # Connect signal AFTER setting initial value to avoid triggering callback
-        self.sample_rate_combo.currentIndexChanged.connect(self._on_sample_rate_changed)
-
-        sr_layout.addWidget(sr_label)
-        sr_layout.addWidget(self.sample_rate_combo)
-        sr_layout.addStretch()
-        layout.addLayout(sr_layout)
-
-        # Buffer size selection
-        buf_layout = QtWidgets.QHBoxLayout()
-        buf_label = QtWidgets.QLabel("Buffer Size:")
-        buf_label.setStyleSheet("color: white; font-size: 11px;")
-        self.buffer_size_combo = QtWidgets.QComboBox()
-
-        # Add items first
-        for bs in BUFFER_SIZES:
-            self.buffer_size_combo.addItem(f"{bs}", bs)
-
-        # Set default
-        default_idx = BUFFER_SIZES.index(DEFAULT_BUFFER_SIZE)
-        self.buffer_size_combo.setCurrentIndex(default_idx)
-
-        # Connect signal AFTER setting initial value to avoid triggering callback
-        self.buffer_size_combo.currentIndexChanged.connect(self._on_buffer_size_changed)
-
-        buf_layout.addWidget(buf_label)
-        buf_layout.addWidget(self.buffer_size_combo)
-        buf_layout.addStretch()
-        layout.addLayout(buf_layout)
-
-        # Status label
+        # Status label only; sample/buffer configured globally
         self.status_label = QtWidgets.QLabel("Stopped")
         self.status_label.setStyleSheet(
             "color: #888; font-size: 10px; font-style: italic;"
         )
         layout.addWidget(self.status_label)
-
         layout.addStretch()
 
         self.controls_widget.setLayout(layout)
@@ -122,34 +76,15 @@ class OutputModule(ModuleWidget):
 
         logger.debug("OutputModule initialized")
 
-    def _on_sample_rate_changed(self, index: int):
-        """Handle sample rate selection change.
-
-        Updates both the audio output and the global audio_config,
-        which will automatically notify all registered listeners (oscillators, etc.).
-        """
-        sample_rate = self.sample_rate_combo.itemData(index)
-        logger.info(f"Sample rate changed to {sample_rate} Hz (via Output module)")
-
-        # Update audio output
+    def _on_global_sample_rate_changed(self, sample_rate: int):
+        """Sync audio output with global sample rate changes."""
+        logger.info(f"Output module updating sample rate to {sample_rate} Hz")
         self.audio_output.set_sample_rate(sample_rate)
 
-        # Update global config - this will notify all listeners automatically!
-        audio_config.sample_rate = sample_rate
-
-    def _on_buffer_size_changed(self, index: int):
-        """Handle buffer size selection change.
-
-        Updates both the audio output and the global audio_config.
-        """
-        buffer_size = self.buffer_size_combo.itemData(index)
-        logger.info(f"Buffer size changed to {buffer_size} samples (via Output module)")
-
-        # Update audio output
+    def _on_global_buffer_size_changed(self, buffer_size: int):
+        """Sync audio output with global buffer size changes."""
+        logger.info(f"Output module updating buffer size to {buffer_size} samples")
         self.audio_output.set_buffer_size(buffer_size)
-
-        # Update global config - this will notify all listeners automatically!
-        audio_config.buffer_size = buffer_size
 
     def _generate_audio(self, num_samples: int) -> np.ndarray | None:
         """Generate audio samples from connected input using process-based approach.
@@ -169,7 +104,6 @@ class OutputModule(ModuleWidget):
             return None
 
         return np.asarray(self.input_port.read())
-
 
     def get_output_component(self, port_name: str):
         """This module has no output component (it's a sink)."""
@@ -222,6 +156,8 @@ class OutputModule(ModuleWidget):
 
     def cleanup(self):
         """Clean up audio resources."""
+        audio_config.remove_sample_rate_listener(self._on_global_sample_rate_changed)
+        audio_config.remove_buffer_size_listener(self._on_global_buffer_size_changed)
         self.audio_output.cleanup()
 
     def process(self):

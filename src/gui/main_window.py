@@ -205,14 +205,18 @@ class ModularSynthWindow(QMainWindow):
 
         # Edit menu
         edit_menu = menubar.addMenu("&Edit")
-
         clear_action = QtGui.QAction("&Clear Canvas", self)
         clear_action.triggered.connect(self._clear_canvas)
         edit_menu.addAction(clear_action)
 
+        # Settings action
+        settings_action = QtGui.QAction("&Settings", self)
+        settings_action.setShortcut("Ctrl+,")
+        settings_action.triggered.connect(self._open_settings_dialog)
+        menubar.addAction(settings_action)
+
         # Help menu
         help_menu = menubar.addMenu("&Help")
-
         about_action = QtGui.QAction("&About", self)
         about_action.triggered.connect(lambda: show_about(self, version=version))
         help_menu.addAction(about_action)
@@ -451,6 +455,13 @@ class ModularSynthWindow(QMainWindow):
             title = f"*{title}"
 
         self.setWindowTitle(title)
+
+    def _open_settings_dialog(self):
+        """Open global application settings dialog (audio, etc.)."""
+        from src.gui.dialogs.audio_settings_dialog import AudioSettingsDialog
+
+        dialog = AudioSettingsDialog(self)
+        dialog.exec()
 
     def _mark_patch_modified(self):
         """Mark the patch as modified (has unsaved changes)."""

@@ -60,6 +60,33 @@ class PannerModule(ModulatedModuleBase):
         """Panner requires the In port to be connected."""
         return ["In"]
 
+    def process(self, num_samples: int = 1):
+        """Process audio through the panner.
+
+        Args:
+            num_samples: Number of samples to process
+        """
+        if self.in_port.is_connected:
+            samples = self.in_port.read()
+            if samples is not None:
+                # Apply panning (simplified for process-based flow)
+                import numpy as np
+                position = self.pan_knob.get_value()
+
+                # Convert to stereo if mono
+                if samples.ndim == 1:
+                    samples = np.column_stack([samples, samples])
+
+                # Apply pan law
+                left_gain = np.sqrt(0.5 * (1.0 - position))
+                right_gain = np.sqrt(0.5 * (1.0 + position))
+
+                panned = samples.copy()
+                panned[:, 0] *= left_gain
+                panned[:, 1] *= right_gain
+
+                self.out_port.write(panned)
+
     def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
         """Panner expects bipolar CV range [-1, 1] for pan position.
 

@@ -304,6 +304,30 @@ class MIDIInputModule(ModuleWidget):
         """
         self.status_label.setText(status)
 
+    def process(self, num_samples: int = 1):
+        """Process MIDI input and write CV outputs to ports.
+
+        The MIDI module generates control voltages based on the current
+        MIDI state (active notes, velocity, etc.).
+
+        Args:
+            num_samples: Number of samples to generate
+        """
+        # Generate frequency CV
+        if self.freq_port.is_connected:
+            freq_samples = self.freq_output.get_samples(num_samples)
+            self.freq_port.write(freq_samples)
+
+        # Generate gate CV
+        if self.gate_port.is_connected:
+            gate_samples = self.gate_output.get_samples(num_samples)
+            self.gate_port.write(gate_samples)
+
+        # Generate velocity CV
+        if self.vel_port.is_connected:
+            vel_samples = self.vel_output.get_samples(num_samples)
+            self.vel_port.write(vel_samples)
+
     def create_engine_component(
         self,
         input_components: list[Any] | None = None,

@@ -63,6 +63,21 @@ class VolumeModule(ModulatedModuleBase):
         """Volume requires the In port to be connected."""
         return ["In"]
 
+    def process(self, num_samples: int = 1):
+        """Process audio through the volume control.
+
+        Args:
+            num_samples: Number of samples to process
+        """
+        if self.in_port.is_connected:
+            samples = self.in_port.read()
+            if samples is not None:
+                # Apply gain (simplified for process-based flow)
+                from src.utils.math import db_to_linear
+                gain_linear = db_to_linear(self.gain_knob.get_value())
+                amplified = samples * gain_linear
+                self.out_port.write(amplified)
+
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
         """Create ModulatedVolume with modulation."""

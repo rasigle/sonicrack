@@ -132,6 +132,25 @@ class ModulatedOscillatorModule(ModuleWidget):
         them."""
         return []  # No required inputs - Freq and Gain are optional
 
+    def process(self, num_samples: int = 1):
+        """Process audio through the VCO.
+
+        The VCO generates audio samples based on its current state
+        (frequency, waveform, modulation).
+
+        Args:
+            num_samples: Number of samples to generate
+        """
+        # For process-based flow, we'd read modulation inputs and generate samples
+        # This is a placeholder as we currently rely on create_engine_component
+        if self.out_port.is_connected:
+            # In a full process-based implementation, we would:
+            # 1. Read freq_input if connected
+            # 2. Read gain_mod_input if connected
+            # 3. Generate samples with modulation
+            # 4. Write to out_port
+            pass
+
     def get_modulation_inputs(self) -> list[str]:
         """VCO accepts modulation on Gain port."""
         return ["Gain"]

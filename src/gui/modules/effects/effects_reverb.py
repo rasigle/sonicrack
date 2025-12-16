@@ -75,24 +75,37 @@ class ReverbModule(ModulatedModuleBase):
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
-        """Panner requires the In port to be connected."""
+        """Reverb requires the In port to be connected."""
         return ["In"]
 
+    def process(self, num_samples: int = 1):
+        """Process audio through the reverb effect.
+
+        Args:
+            num_samples: Number of samples to process
+        """
+        if self.in_port.is_connected:
+            samples = self.in_port.read()
+            if samples is not None:
+                # For process-based flow, we'd need to maintain reverb state
+                # This is a simplified placeholder
+                self.out_port.write(samples)
+
     def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
-        """Panner expects bipolar CV range [-1, 1] for pan position.
+        """Reverb expects bipolar CV range [-1, 1].
 
         Returns:
-            (-1.0, 1.0) - bipolar range for pan control
+            (-1.0, 1.0) - bipolar range
         """
         return -1.0, 1.0
 
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
-        """Create ModulatedPanner with modulation."""
+        """Create modulated reverb (not implemented yet)."""
         pass
 
     def create_unmodulated_component(self):
-        """Create simple Panner without modulation."""
+        """Create simple Reverb without modulation."""
         room_size = self.room_size_knob.get_value()
         damping = self.damping_knob.get_value()
         mix = self.mix_knob.get_value()

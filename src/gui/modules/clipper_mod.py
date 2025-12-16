@@ -65,6 +65,25 @@ class ClipperModulatedModule(ModulatedModuleBase):
         """Clipper requires the In port to be connected."""
         return ["In"]
 
+    def process(self, num_samples: int = 1):
+        """Process audio through the clipper.
+
+        This is called by the process-based architecture to generate samples.
+        Currently not used as we rely on create_engine_component for the
+        compiled audio chain.
+
+        Args:
+            num_samples: Number of samples to process
+        """
+        # Process-based architecture: read from input, process, write to output
+        if self.in_port.is_connected:
+            samples = self.in_port.read()
+            if samples is not None:
+                # Apply clipping (simplified version for process-based flow)
+                threshold = self.threshold_knob.get_value()
+                clipped = samples.clip(-threshold, threshold)
+                self.out_port.write(clipped)
+
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
         """Create ModulatedClipper with modulation.

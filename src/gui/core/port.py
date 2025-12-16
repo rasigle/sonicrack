@@ -118,6 +118,8 @@ class Port:
                     except ValueError:
                         pass
             self.connected_to.clear()
+            # Clear port data to prevent stale audio
+            self.clear()
             return
 
         try:
@@ -126,9 +128,20 @@ class Port:
             if self in other.connected_to:
                 other.connected_to.remove(self)
             logging.debug(f"Port disconnected: {self.port_name} <-/-> {other.port_name}")
+            # Clear port data to prevent stale audio
+            self.clear()
         except ValueError:
             # Port not in list; no-op
             pass
+
+    def clear(self) -> None:
+        """Clear the port's data value.
+
+        This is called when disconnecting to prevent stale audio data
+        from continuing to play after a module is deleted.
+        """
+        self.value = 0.0
+        logging.debug(f"Port data cleared: {self.port_name}")
 
     def read(self) -> float | np.ndarray:
         """Read value from connected ports.

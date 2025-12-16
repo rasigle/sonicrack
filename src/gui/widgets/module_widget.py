@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from abc import ABCMeta
 from typing import Any, TYPE_CHECKING
 
@@ -18,6 +19,8 @@ from PyQt6.QtWidgets import (
 from src.gui.core.module import AudioModule
 from src.gui.widgets.port_widget import PortWidget
 from src.gui.dialogs.module_info_dialog import ModuleInfoDialog
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     pass
@@ -386,6 +389,10 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 canvas = scene.parent() if scene else None
                 views = scene.views() if scene else []
 
+                # Clear all port data to prevent stale audio
+                for port in self.input_ports + self.output_ports:
+                    port.port.clear()
+
                 # Collect all cables to remove
                 cables_to_remove = []
                 for port in self.input_ports + self.output_ports:
@@ -409,15 +416,21 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 # Remove the module from scene (after this, self.scene() becomes None)
                 scene.removeItem(self)
 
-                # Mark patch as modified and trigger update
+                # Mark patch as modified and trigger playback restart
                 if canvas and isinstance(canvas, PatchCanvas):
-                    # Get main window to trigger patch update if needed
+                    # Get main window to trigger patch update
                     for view in views:
                         main_window = view.window()
                         if hasattr(main_window, '_mark_patch_modified'):
                             main_window._mark_patch_modified()
-                        # Trigger playback check (will recompile if needed)
-                        if hasattr(main_window, '_start_output_playback'):
+
+                        # Stop and restart playback to refresh audio callback
+                        # This ensures we're not using stale connections/components
+                        if hasattr(main_window, '_restart_output_playback'):
+                            logger.info("Module deleted - restarting playback to refresh audio")
+                            main_window._restart_output_playback()
+                        elif hasattr(main_window, '_start_output_playback'):
+                            # Fallback: just call start (which should detect disconnections)
                             main_window._start_output_playback()
                         break
 

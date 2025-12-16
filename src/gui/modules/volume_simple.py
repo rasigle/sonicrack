@@ -74,25 +74,30 @@ class SimpleVolumeModule(ModuleWidget):
         Reads from the input port, applies gain control, and writes to the output port.
 
         Args:
-            num_samples: Number of samples to process (default: 1 for per-sample processing)
-
-        Note:
-            In the current architecture, this method is not actively called during playback.
-            The audio engine directly calls get_samples() on the compiled AudioComponents.
-            This method exists to satisfy the AudioModule interface.
+            num_samples: Number of samples to process (default: 1 for per-sample
+                processing)
         """
+        # Check if input is connected
         if not self.in_port.is_connected:
+            # No input - explicitly write silence
+            self.out_port.write(0.0)
             return
 
-        # Read input signal
-        input_signal = self.in_port.read()
+        # Safety check: component must exist
+        if self.component is None:
+            self.out_port.write(0.0)
+            return
 
-        # Apply gain (convert dB to linear amplitude)
-        import numpy as np
+        # Read input signal and make sure we get valid data
+        input_signal = self.in_port.read()
+        if input_signal is None:
+            self.out_port.write(0.0)
+            return
+
+        # Process
         gain_db = self.gain_knob.get_value()
-        gain_linear = 10 ** (gain_db / 20)
-        output_signal = input_signal * gain_linear
+        self.component.gain_db = gain_db
+        output_signal = self.component(input_signal)
 
         # Write to output port
         self.out_port.write(output_signal)
-

@@ -360,6 +360,50 @@ class ModularSynthWindow(QMainWindow):
             logger.error(f"Failed to start playback: {e}", exc_info=True)
             self.statusbar.showMessage(f"Playback error: {e}")
 
+    def _restart_output_playback(self):
+        """Restart playback to refresh audio callback with current connections.
+
+        This is called when modules are deleted to ensure stale connections
+        don't continue generating audio.
+        """
+        from src.gui.modules.output.output import OutputModule
+
+        logger.info("=== Restarting playback (refreshing audio callback) ===")
+
+        # Find the Output module
+        output_module = None
+        for module in self.patch_canvas.get_modules():
+            if isinstance(module, OutputModule):
+                output_module = module
+                break
+
+        if not output_module:
+            logger.debug("No Output module found")
+            return
+
+        # Stop playback first (if running)
+        if output_module.audio_output.is_playing:
+            logger.info("Stopping playback to refresh audio callback")
+            output_module.stop_playback()
+
+        # Small delay to ensure clean stop
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, lambda: self._delayed_start_playback(output_module))
+
+    def _delayed_start_playback(self, output_module):
+        """Start playback after a short delay.
+
+        Args:
+            output_module: The OutputModule to start playback on
+        """
+        try:
+            logger.info("Restarting playback with refreshed connections")
+            output_module.start_playback()
+            self.statusbar.showMessage("Playback restarted (refreshed)")
+        except Exception as e:
+            logger.error(f"Failed to restart playback: {e}", exc_info=True)
+            self.statusbar.showMessage(f"Playback error: {e}")
+
     def _on_module_deleted(self, module):
         """Handle module deletion.
 

@@ -230,19 +230,19 @@ class AudioModule(ABC):
         return None
 
     def add_input(self, name):
-        port = Port("input", name)
+        port = Port("input", name, parent_module=self)
         self.inputs[name] = port
         return port
 
     def add_output(self, name):
-        port = Port("output", name)
+        port = Port("output", name, parent_module=self)
         self.outputs[name] = port
         return port
 
+    @abstractmethod
     def process(self):
         """Process method placeholder.
 
         This method can be overridden by subclasses to implement
         any necessary processing logic specific to the module.
         """
-        pass

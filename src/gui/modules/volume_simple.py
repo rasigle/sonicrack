@@ -67,3 +67,32 @@ class SimpleVolumeModule(ModuleWidget):
         """Create the volume component."""
         gain_db = self.gain_knob.get_value()
         return Volume(gain_db=gain_db)
+
+    def process(self, num_samples: int = 1):
+        """Apply volume/gain to input signal.
+
+        Reads from the input port, applies gain control, and writes to the output port.
+
+        Args:
+            num_samples: Number of samples to process (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface.
+        """
+        if not self.in_port.is_connected:
+            return
+
+        # Read input signal
+        input_signal = self.in_port.read()
+
+        # Apply gain (convert dB to linear amplitude)
+        import numpy as np
+        gain_db = self.gain_knob.get_value()
+        gain_linear = 10 ** (gain_db / 20)
+        output_signal = input_signal * gain_linear
+
+        # Write to output port
+        self.out_port.write(output_signal)
+

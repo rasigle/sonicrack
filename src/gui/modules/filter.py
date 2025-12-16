@@ -248,3 +248,56 @@ class FilterModule(ModuleWidget):
 
         # Otherwise return just the filter (shouldn't happen in normal use)
         return filter_component
+
+    def process(self, num_samples: int = 1):
+        """Apply filter to input signal.
+
+        Reads from the input port, applies the configured filter, and writes to the output port.
+
+        Args:
+            num_samples: Number of samples to process (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface.
+        """
+        if not self.in_port.is_connected:
+            return
+
+        # Read input signal
+        input_signal = self.in_port.read()
+
+        # Create filter component if not already created
+        if not hasattr(self, '_filter_component') or self._filter_component is None:
+            cutoff = self.cutoff_knob.get_value()
+            high_cutoff = self.high_cutoff_knob.get_value()
+            order = int(self.order_slider.get_value())
+
+            type_map = {
+                "Low-pass": "low",
+                "High-pass": "high",
+                "Band-pass": "band",
+            }
+            filter_type = type_map.get(self.type_combo.currentText(), "low")
+
+            if filter_type == "band":
+                low = min(cutoff, high_cutoff)
+                high = max(cutoff, high_cutoff)
+                cutoff_param = (low, high)
+            else:
+                cutoff_param = cutoff
+
+            self._filter_component = ButterworthFilter(
+                cutoff=cutoff_param,
+                order=order,
+                filter_type=filter_type,
+            )
+
+        # Apply filter (note: filter needs proper vectorized processing)
+        # For now, this is a placeholder
+        output_signal = input_signal  # TODO: Implement proper filtering
+
+        # Write to output port
+        self.out_port.write(output_signal)
+

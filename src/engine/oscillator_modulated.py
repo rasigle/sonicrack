@@ -36,7 +36,7 @@ Example:
     >>> mod_osc.trigger_release()
 
 Example - Frequency Modulation (Vibrato):
-    >>> from src.engine.modulated_oscillator import ModulatedFrequency
+    >>> from src.engine.oscillator_modulated import ModulatedFrequency
     >>>
     >>> # Carrier oscillator
     >>> carrier = SineOscillator(frequency=440, amplitude=0.5)
@@ -87,11 +87,7 @@ class ModulatedOscillator(Generator):
         category=ComponentCategory.OSCILLATOR,
         description="Oscillator with modulation support (amplitude, frequency, phase)",
         tags=["oscillator", "modulated", "advanced"],
-        config_params=[
-            "gain_db",
-            "frequency",
-            "phase",
-        ],  # Forwarded to underlying oscillator
+        config_params=["gain_db", "frequency", "phase",],
     )
 
     def __init__(

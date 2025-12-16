@@ -64,3 +64,43 @@ class SimplePannerModule(ModuleWidget):
         """Create the panner component."""
         pan = self.pan_knob.get_value()
         return Panner(pan)
+
+    def process(self, num_samples: int = 1):
+        """Apply stereo panning to input signal.
+
+        Reads from the input port, applies panning control, and writes to the output port.
+
+        Args:
+            num_samples: Number of samples to process (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface.
+        """
+        if not self.in_port.is_connected:
+            return
+
+        # Read input signal
+        input_signal = self.in_port.read()
+
+        # Apply panning (simple implementation)
+        import numpy as np
+        pan = self.pan_knob.get_value()  # -1 (left) to +1 (right)
+
+        # Convert pan position to left/right gains
+        left_gain = np.sqrt(0.5 * (1 - pan))
+        right_gain = np.sqrt(0.5 * (1 + pan))
+
+        # Create stereo output
+        if isinstance(input_signal, np.ndarray):
+            if len(input_signal.shape) == 1:  # Mono input
+                output_signal = np.stack([input_signal * left_gain, input_signal * right_gain], axis=-1)
+            else:  # Already stereo
+                output_signal = input_signal
+        else:  # Scalar
+            output_signal = np.array([input_signal * left_gain, input_signal * right_gain])
+
+        # Write to output port
+        self.out_port.write(output_signal)
+

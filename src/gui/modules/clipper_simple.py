@@ -67,3 +67,31 @@ class ClipperModule(ModuleWidget):
         """Create the clipper component."""
         threshold = self.threshold_knob.get_value()
         return Clipper((-threshold, threshold))
+
+    def process(self, num_samples: int = 1):
+        """Apply clipping/limiting to input signal.
+
+        Reads from the input port, applies clipping based on threshold, and writes to the output port.
+
+        Args:
+            num_samples: Number of samples to process (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface.
+        """
+        if not self.in_port.is_connected:
+            return
+
+        # Read input signal
+        input_signal = self.in_port.read()
+
+        # Apply clipping
+        import numpy as np
+        threshold = self.threshold_knob.get_value()
+        output_signal = np.clip(input_signal, -threshold, threshold)
+
+        # Write to output port
+        self.out_port.write(output_signal)
+

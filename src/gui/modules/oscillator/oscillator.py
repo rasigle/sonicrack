@@ -108,12 +108,27 @@ class OscillatorModule(ModuleWidget):
             self._square_oscillator,
         ]
 
-    def process(self):
-        """Process the oscillator output and return it as a waveform.
-        # This method is not used since oscillators generate continuous signals."""
+    def process(self, num_samples: int = 1):
+        """Generate and write oscillator samples to output ports.
+
+        This method generates audio samples from each oscillator and writes
+        them to the corresponding output ports if they are connected.
+
+        Args:
+            num_samples: Number of samples to generate (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface and for potential
+            future use in a more modular processing pipeline.
+        """
+        # Generate samples for each connected output
         for port, osc in zip(self.ports, self.oscs):
             if port.is_connected and osc is not None:
-                samples = osc.get_samples()
+                # Generate samples from oscillator
+                samples = osc.get_samples(num_samples)
+                # Write to port for downstream modules
                 port.write(samples)
 
     # AudioModuleInterface implementation

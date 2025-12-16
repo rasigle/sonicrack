@@ -194,3 +194,39 @@ class VCAModule(ModuleWidget):
             f"type={type(volume_component).__name__}"
         )
         return volume_component
+
+    def process(self, num_samples: int = 1):
+        """Process VCA: apply amplitude control to input signal.
+
+        Reads from the audio input port, applies amplitude modulation (either from
+        the CV port or the amplitude knob), and writes the result to the output port.
+
+        Args:
+            num_samples: Number of samples to process (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface and for potential
+            future use in a more modular processing pipeline.
+        """
+        # Read input signal
+        if not self.in_port.is_connected:
+            return
+
+        input_signal = self.in_port.read()
+
+        # Determine amplitude (from CV or knob)
+        if self.cv_port.is_connected:
+            # Use CV to control amplitude
+            amplitude = self.cv_port.read()
+        else:
+            # Use knob value
+            amplitude = self.amp_knob.get_value()
+
+        # Apply amplitude modulation
+        output_signal = input_signal * amplitude
+
+        # Write to output port
+        self.out_port.write(output_signal)
+

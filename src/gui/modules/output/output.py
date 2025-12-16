@@ -131,7 +131,12 @@ class OutputModule(ModuleWidget):
         self.audio_output.set_buffer_size(buffer_size)
 
     def _generate_audio(self, num_samples: int) -> np.ndarray | None:
-        """Generate audio samples from connected input.
+        """Generate audio samples from connected input using process-based approach.
+
+        This is the NEW process-based architecture:
+        1. Output module triggers processing on all connected source modules
+        2. Each module processes its inputs and writes to its output ports
+        3. Output module reads from its input port
 
         Args:
             num_samples: Number of samples to generate
@@ -139,18 +144,24 @@ class OutputModule(ModuleWidget):
         Returns:
             Stereo audio array or None
         """
-        if self._input_component is None:
+        if not self.input_port.is_connected:
             return None
 
         try:
-            samples = self._input_component.get_samples(num_samples)
+            # NEW APPROACH: Trigger processing on all connected modules
+            self._trigger_processing_chain(num_samples)
+
+            # Read the processed result from our input port
+            samples = self.input_port.read()
+
+            if samples is None:
+                return None
 
             # Convert to stereo if needed
             if isinstance(samples, (list, tuple)) and len(samples) == 2:
                 left, right = samples
                 stereo = np.column_stack((left, right))
             elif isinstance(samples, np.ndarray):
-
                 if len(samples.shape) == 1:
                     stereo = np.column_stack((samples, samples))
                 else:
@@ -164,6 +175,50 @@ class OutputModule(ModuleWidget):
             logger.error(f"Error generating audio: {e}", exc_info=True)
             return None
 
+    def _trigger_processing_chain(self, num_samples: int):
+        """Trigger processing on all connected modules in the signal chain.
+
+        Walks backwards from the Output module through all connections,
+        calling process() on each module in dependency order.
+
+        Args:
+            num_samples: Number of samples to process
+        """
+        # Track which modules we've already processed to avoid duplicates
+        processed = set()
+
+        def process_module_recursively(port):
+            """Recursively process modules connected to this port."""
+            if not hasattr(port, 'connected_to'):
+                return
+
+            # Process all modules connected to this port
+            for connected_port in port.connected_to:
+                parent_module = connected_port.parent_module
+
+                # Skip if already processed
+                if parent_module in processed:
+                    continue
+
+                # First, recursively process all inputs to this module
+                if hasattr(parent_module, 'inputs'):
+                    for input_port in parent_module.inputs.values():
+                        process_module_recursively(input_port)
+
+                # Now process this module
+                try:
+                    if hasattr(parent_module, 'process'):
+                        parent_module.process(num_samples)
+                        processed.add(parent_module)
+                except Exception as e:
+                    logger.error(
+                        f"Error processing module {parent_module.metadata.title}: {e}",
+                        exc_info=True
+                    )
+
+        # Start processing from our input port
+        process_module_recursively(self.input_port)
+
     def get_output_component(self, port_name: str):
         """This module has no output component (it's a sink)."""
         return None
@@ -175,28 +230,37 @@ class OutputModule(ModuleWidget):
     ):
         """Create the audio output engine component.
 
+        NOTE: This is kept for compatibility but is NOT used in the new
+        process-based architecture. The OutputModule now triggers processing
+        directly through module connections.
+
         Args:
-            input_components: List of input audio components (should be 1)
+            input_components: List of input audio components (not used)
             modulation_components: Not used for output module
         """
-        if input_components is None or len(input_components) != 1:
-            logger.warning(
-                f"Output module expects 1 input, "
-                f"got {len(input_components) if input_components else 0}"
-            )
-            return None
-
-        self._input_component = input_components[0]
-        logger.info(
-            f"Output module connected to {type(self._input_component).__name__}"
-        )
-
-        # Don't return anything - this is a sink module
+        logger.info("OutputModule.create_engine_component called (compatibility mode)")
+        logger.info("Using NEW process-based architecture instead of compiled components")
         return None
 
     def start_playback(self):
-        """Start audio playback."""
+        """Start audio playback using process-based architecture."""
         if not self.audio_output.is_playing:
+            # Debug: Check connection status
+            logger.info(f"OutputModule.start_playback() called")
+            logger.info(f"  input_port.is_connected = {self.input_port.is_connected}")
+            logger.info(f"  input_port.connected_to = {self.input_port.connected_to}")
+            logger.info(f"  Number of connections: {len(self.input_port.connected_to)}")
+
+            # Check if we have any connections
+            if not self.input_port.is_connected:
+                logger.warning("Output module has no connections - cannot start playback")
+                self.status_label.setText("No input")
+                self.status_label.setStyleSheet(
+                    "color: #f80; font-size: 10px; font-style: italic;"
+                )
+                return
+
+            logger.info("Starting playback using PROCESS-BASED architecture")
             self.audio_output.start_playback()
             self.status_label.setText("Playing")
             self.status_label.setStyleSheet(
@@ -215,3 +279,14 @@ class OutputModule(ModuleWidget):
     def cleanup(self):
         """Clean up audio resources."""
         self.audio_output.cleanup()
+
+    def process(self):
+        """Process method for OutputModule.
+
+        The OutputModule is a sink - it doesn't process per-sample data through ports.
+        Instead, it pulls audio from the compiled patch via the audio callback.
+        This method exists to satisfy the AudioModule interface but is not used.
+        """
+        # Output module doesn't need per-sample processing
+        # Audio generation happens via _generate_audio callback
+        pass

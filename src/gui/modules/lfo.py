@@ -185,3 +185,42 @@ class LFOModule(ModuleWidget):
             return next(iter(components.values()))
 
         return WaveAdder(*components.values())
+
+    def process(self, num_samples: int = 1):
+        """Generate LFO signals and write to output ports.
+
+        Generates low-frequency modulation signals from each oscillator type
+        and writes them to the corresponding output ports if connected.
+
+        Args:
+            num_samples: Number of samples to generate (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface and for potential
+            future use in a more modular processing pipeline.
+        """
+        freq = self.freq_knob.get_value()
+        pulsewidth = self.pulsewidth_knob.get_value()
+
+        # Generate and write samples for each connected output
+        port_oscillators = {
+            "Sine": (self.sine_port, lambda: SineOscillator(freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1))),
+            "Triangle": (self.triangle_port, lambda: TriangleOscillator(freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1))),
+            "Sawtooth": (self.sawtooth_port, lambda: SawtoothOscillator(freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1))),
+            "Square": (self.square_port, lambda: SquareOscillator(freq, gain_db=LFO_DEFAULT_GAIN_DB, wave_range=(-1, 1), pulsewidth=pulsewidth)),
+        }
+
+        for port_name, (port, osc_factory) in port_oscillators.items():
+            if port.is_connected:
+                # Get or create oscillator
+                if port_name == "Square" and self._square_oscillator is not None:
+                    osc = self._square_oscillator
+                else:
+                    osc = osc_factory()
+
+                # Generate and write samples
+                samples = osc.get_samples(num_samples)
+                port.write(samples)
+

@@ -202,3 +202,23 @@ class ADSRModule(ModuleWidget):
             self._adsr_component = adsr
 
         return self._adsr_component
+
+    def process(self, num_samples: int = 1):
+        """Generate ADSR envelope output.
+
+        Generates envelope values based on current ADSR state and writes to the output port.
+        Can be triggered by gate input or manual trigger button.
+
+        Args:
+            num_samples: Number of samples to generate (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface.
+        """
+        if self.out_port.is_connected and hasattr(self, '_adsr_component'):
+            # Generate envelope samples
+            samples = self._adsr_component.get_samples(num_samples)
+            self.out_port.write(samples)
+

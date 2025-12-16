@@ -225,3 +225,42 @@ class MixerModule(ModuleWidget):
             return WaveAdder(*processed_inputs, mix_mode="sum")
 
         return None
+
+    def process(self, num_samples: int = 1):
+        """Mix input signals and write to output port.
+
+        Reads from all connected input ports, applies channel gains, mixes them together,
+        and writes the result to the output port.
+
+        Args:
+            num_samples: Number of samples to process (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface and for potential
+            future use in a more modular processing pipeline.
+        """
+        # Read from all connected input ports
+        input_ports = [self.in1_port, self.in2_port, self.in3_port, self.in4_port]
+        gain_knobs = [self.gain1_knob, self.gain2_knob, self.gain3_knob, self.gain4_knob]
+
+        mixed_signal = None
+
+        for port, knob in zip(input_ports, gain_knobs):
+            if port.is_connected:
+                # Read signal from port
+                signal = port.read()
+                # Apply channel gain
+                gained_signal = signal * knob.get_value()
+
+                # Mix signals (sum)
+                if mixed_signal is None:
+                    mixed_signal = gained_signal
+                else:
+                    mixed_signal = mixed_signal + gained_signal
+
+        # Write mixed signal to output
+        if mixed_signal is not None:
+            self.out_port.write(mixed_signal)
+

@@ -52,6 +52,7 @@ class Port:
         port_type: str,  # "input" or "output"
         port_name: str,
         index: int = 0,
+        parent_module=None,  # Reference to the module that owns this port
     ):
         """Initialize a port model.
 
@@ -59,9 +60,11 @@ class Port:
             port_type: Type of port ("input" or "output")
             port_name: Name identifier for the port
             index: Optional index for ordering multiple ports
+            parent_module: Reference to the module that owns this port
         """
         self.port_type = port_type
         self.port_name = port_name
+        self.parent_module = parent_module
 
         self.connected_to: list[Port] = []
 
@@ -71,9 +74,10 @@ class Port:
         self.value: float | np.ndarray = 0.0
 
     def connect(self, other: Port) -> None:
-        """Connect this port to another port.
+        """Connect this port to another port (bidirectional).
 
         Idempotent: connecting the same port twice has no effect.
+        Creates a bidirectional connection so both ports know they're connected.
 
         Args:
             other: The port to connect to
@@ -91,11 +95,15 @@ class Port:
         if other in self.connected_to:
             return  # Already connected, no-op
 
-        logging.debug(f"Port connected: {self.port_name} -> {other.port_name}")
+        logging.debug(f"Port connected: {self.port_name} <-> {other.port_name}")
+
+        # Bidirectional connection: both ports track the connection
         self.connected_to.append(other)
+        if self not in other.connected_to:
+            other.connected_to.append(self)
 
     def disconnect(self, other: Port | None = None) -> None:
-        """Disconnect from a specific connected port, or all if other is None.
+        """Disconnect from a specific connected port (bidirectional), or all if other is None.
 
         Args:
             other: Specific port to disconnect from, or None to disconnect all
@@ -103,12 +111,21 @@ class Port:
         if other is None:
             if self.connected_to:
                 logging.debug(f"Port disconnected (all): {self.port_name}")
+                # Remove this port from all connected ports
+                for connected_port in self.connected_to:
+                    try:
+                        connected_port.connected_to.remove(self)
+                    except ValueError:
+                        pass
             self.connected_to.clear()
             return
 
         try:
             self.connected_to.remove(other)
-            logging.debug(f"Port disconnected: {self.port_name} -/-> {other.port_name}")
+            # Also remove from other side (bidirectional)
+            if self in other.connected_to:
+                other.connected_to.remove(self)
+            logging.debug(f"Port disconnected: {self.port_name} <-/-> {other.port_name}")
         except ValueError:
             # Port not in list; no-op
             pass

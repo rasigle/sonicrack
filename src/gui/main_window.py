@@ -295,10 +295,62 @@ class ModularSynthWindow(QMainWindow):
         start_port.port.connect(target_port.port)
         self._mark_patch_modified()
 
+        # Check if this connection involves an Output module
+        from src.gui.modules.output.output import OutputModule
+        start_module = start_port.parent_module
+        target_module = target_port.parent_module
+
+        # If connecting to/from Output module, start playback (NEW process-based approach)
+        if isinstance(start_module, OutputModule) or isinstance(target_module, OutputModule):
+            logger.info("Connection to/from Output module detected - starting playback")
+            self._start_output_playback()
+
     def _on_cable_disconnected(self, start_port: PortWidget, target_port: PortWidget):
         """Handle cable disconnection."""
         start_port.port.disconnect(target_port.port)
         self._mark_patch_modified()
+
+        # Check if this disconnection involves an Output module
+        from src.gui.modules.output.output import OutputModule
+        start_module = start_port.parent_module
+        target_module = target_port.parent_module
+
+        # If disconnecting from Output module, check if we should stop playback
+        if isinstance(start_module, OutputModule) or isinstance(target_module, OutputModule):
+            logger.info("Disconnection from Output module detected - checking playback state")
+            self._start_output_playback()  # Will check connections and stop if none
+
+    def _start_output_playback(self):
+        """Start playback on the Output module using NEW process-based architecture.
+
+        No compilation needed - modules process audio through their ports directly!
+        """
+        from src.gui.modules.output.output import OutputModule
+
+        logger.info("=== Starting process-based playback ===")
+
+        # Find the Output module
+        output_module = None
+        for module in self.patch_canvas.get_modules():
+            if isinstance(module, OutputModule):
+                output_module = module
+                break
+
+        if not output_module:
+            logger.debug("No Output module found")
+            return
+
+        logger.info(f"Found Output module: {output_module}")
+
+        # Simply start playback - the Output module's process chain will handle everything
+        try:
+            output_module.start_playback()
+            self.statusbar.showMessage("Playback started (process-based)")
+            logger.info("✓ Process-based playback started")
+
+        except Exception as e:
+            logger.error(f"Failed to start playback: {e}", exc_info=True)
+            self.statusbar.showMessage(f"Playback error: {e}")
 
     def _on_module_deleted(self, module):
         """Handle module deletion.

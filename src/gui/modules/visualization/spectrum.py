@@ -266,6 +266,24 @@ class SpectrumModule(ModuleWidget):
 
         self.spectrum_display.clear()
 
+    def process(self, num_samples: int = 1):
+        """Process method for SpectrumModule.
+
+        Spectrum analyzer is a pure visualization module - it reads from the input port
+        (if connected) and updates the FFT display, but doesn't write to any output port.
+
+        Args:
+            num_samples: Number of samples to process (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, visualization happens via the audio engine's
+            samples_generated signal. This method exists to satisfy the AudioModule
+            interface and for potential future use in a more modular processing pipeline.
+        """
+        # Visualization modules don't process per-sample data
+        # They receive updates via audio engine signals
+        pass
+
 
 class SpectrumAnalyzer(QWidget):
     """Widget for displaying audio spectrum in real-time.

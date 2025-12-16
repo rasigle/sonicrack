@@ -95,3 +95,23 @@ class NoiseModule(ModuleWidget):
         noise_type = self.type_combo.currentText()
         gain_db = self.gain_knob.get_value()
         return NoiseGenerator(noise_type=noise_type, gain_db=gain_db)
+
+    def process(self, num_samples: int = 1):
+        """Generate noise and write to output port.
+
+        Generates noise samples based on the selected type and writes them to the output port.
+
+        Args:
+            num_samples: Number of samples to generate (default: 1 for per-sample processing)
+
+        Note:
+            In the current architecture, this method is not actively called during playback.
+            The audio engine directly calls get_samples() on the compiled AudioComponents.
+            This method exists to satisfy the AudioModule interface.
+        """
+        if self.out_port.is_connected:
+            # Generate noise samples
+            if self.component:
+                samples = self.component.get_samples(num_samples)
+                self.out_port.write(samples)
+

@@ -1,14 +1,13 @@
 """Spectrum analyzer module for visualizing audio frequency content."""
 
 import logging
-from typing import Any
 
 import numpy as np
-from PyQt6 import QtCore
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout
 
+from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets.module_widget import ModuleWidget
@@ -20,16 +19,13 @@ logger = logging.getLogger(__name__)
 class SpectrumModule(ModuleWidget):
     """Spectrum analyzer module for real-time frequency visualization.
 
-    This is a pure visualization module - it only displays the frequency
-    spectrum and does NOT pass signals through. It has no output port.
-
-    **Important:** This module visualizes the FINAL OUTPUT after all processing.
-    It connects to the audio engine's output signal to show the frequency
-    content of what's being sent to the speakers.
+    This is a visualization module that displays the frequency spectrum
+    of the input signal. Connect it after your audio processing chain
+    to see the frequency content.
 
     **Usage:**
-    - Add to your patch (no connections required)
-    - The display always shows the frequency spectrum of final output
+    - Connect audio signal to the "In" port
+    - The display shows the frequency spectrum of the input signal
     - Great for analyzing frequency content and monitoring mix
     """
 
@@ -47,8 +43,7 @@ class SpectrumModule(ModuleWidget):
             color=QColor(100, 80, 120),
         )
 
-        # Add input port (optional - for patch organization only)
-        # The input connection doesn't affect what's displayed
+        # Add input port
         self.in_port = self.add_input("In")
 
         # NO OUTPUT PORT - this is a visualization-only module
@@ -80,72 +75,29 @@ class SpectrumModule(ModuleWidget):
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
-        # Store reference to input component
-        self.input_component = None
-
-        # Audio engine connection
-        self.audio_engine = None
-        self._audio_engine_connected = False
-
-        # Use timer to find and connect to audio engine
-        self.connection_timer = QtCore.QTimer()
-        self.connection_timer.timeout.connect(self._try_connect_audio_engine)
-        self.connection_timer.setInterval(100)  # Try every 100ms
-        self.connection_timer.start()
-
         # Sample rate for frequency calculation
-        self.sample_rate = 44100
+        self.sample_rate = audio_config.sample_rate
 
-    def _try_connect_audio_engine(self):
-        """Try to find and connect to the audio engine via scene/parent chain."""
-        if self._audio_engine_connected:
-            self.connection_timer.stop()
-            return
+        # Register for sample rate updates
+        audio_config.add_sample_rate_listener(self._on_sample_rate_changed)
 
-        try:
-            # Navigate: Module → Scene → View (PatchCanvas) → Window (MainWindow)
-            scene = self.scene()
-            if scene is None:
-                return
-
-            views = scene.views()
-            if not views:
-                return
-
-            view = views[0]
-            main_window = view.window()
-
-            if not hasattr(main_window, "audio_engine"):
-                return
-
-            # Found audio engine!
-            self.audio_engine = main_window.audio_engine
-
-            # Get sample rate
-            if hasattr(self.audio_engine, "sample_rate"):
-                self.sample_rate = self.audio_engine.sample_rate
-
-            # Connect to signals
-            self.audio_engine.samples_generated.connect(self._on_samples_generated)
-            self.audio_engine.playback_stopped.connect(self._on_playback_stopped)
-
-            self._audio_engine_connected = True
-            self.connection_timer.stop()
-
-            logger.info("✓ Spectrum analyzer connected to audio engine")
-
-        except Exception as e:
-            logger.debug(f"Waiting for audio engine: {e}")
-
-    def _on_samples_generated(self, samples: np.ndarray):
-        """Handle audio samples from the audio engine.
-
-        This receives the FINAL output signal (after all processing).
+    def _on_sample_rate_changed(self, new_sample_rate: int):
+        """Handle sample rate changes.
 
         Args:
-            samples: Final output samples (mono or stereo)
+            new_sample_rate: New sample rate in Hz
+        """
+        self.sample_rate = new_sample_rate
+
+    def _update_samples(self, samples: np.ndarray):
+        """Update the display with new audio samples.
+
+        Args:
+            samples: Audio samples (mono or stereo)
         """
         try:
+            logger.debug(f"Spectrum: Updating with {len(samples)} samples, shape={samples.shape}")
+
             # Convert stereo to mono for FFT
             if len(samples.shape) == 2:
                 samples = np.mean(samples, axis=1)
@@ -201,88 +153,44 @@ class SpectrumModule(ModuleWidget):
         except Exception as e:
             logger.debug(f"Error calculating peak frequency: {e}")
 
-    def _on_playback_stopped(self):
-        """Clear display when playback stops."""
-        self.spectrum_display.clear()
-        self.peak_freq_label.setText("Peak: -- Hz")
-        self.level_label.setText("Level: -- dB")
-
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
-        """Spectrum analyzer has no required inputs.
-
-        The input port is optional - it doesn't affect what's displayed.
-        The spectrum always shows the final audio engine output.
-        """
-        return []  # No required inputs
-
-    def create_engine_component(
-        self,
-        input_components: list[Any] | None = None,
-        modulation_components: dict[str, Any] | None = None,
-    ):
-        """Create the engine component.
-
-        Spectrum analyzer is a pure visualization module with no audio processing.
-        It stores the input component reference for validation but doesn't
-        use it (the display shows the final audio engine output).
-
-        Args:
-            input_components: List of input audio components (optional)
-            modulation_components: Dict of modulation components (not used)
+        """Spectrum analyzer requires input to visualize.
 
         Returns:
-            None (visualization modules don't produce audio output)
+            List of required input port names
         """
-        # Store reference for validation/debugging, but don't use it
-        if input_components and len(input_components) > 0:
-            self.input_component = input_components[0]
-            logger.debug(
-                f"Spectrum analyzer input connected: "
-                f"{type(self.input_component).__name__}"
-            )
-        else:
-            self.input_component = None
-            logger.debug(
-                "Spectrum analyzer: no input connected (OK - monitors final output)"
-            )
-
-        # Return None - this module has no audio output
-        return None
-
-    def cleanup(self):
-        """Clean up resources when module is removed."""
-        self.connection_timer.stop()
-
-        # Disconnect from audio engine
-        if self.audio_engine and self._audio_engine_connected:
-            try:
-                self.audio_engine.samples_generated.disconnect(
-                    self._on_samples_generated
-                )
-                self.audio_engine.playback_stopped.disconnect(self._on_playback_stopped)
-            except Exception as e:
-                logger.debug(f"Error disconnecting from audio engine: {e}")
-
-        self.spectrum_display.clear()
+        return []  # Optional input - show "No Signal" if not connected
 
     def process(self, num_samples: int = 1):
-        """Process method for SpectrumModule.
+        """Process audio data and update spectrum display.
 
-        Spectrum analyzer is a pure visualization module - it reads from the input port
-        (if connected) and updates the FFT display, but doesn't write to any output port.
+        Reads from the input port and updates the FFT display with
+        the incoming audio signal.
 
         Args:
-            num_samples: Number of samples to process (default: 1 for per-sample processing)
-
-        Note:
-            In the current architecture, visualization happens via the audio engine's
-            samples_generated signal. This method exists to satisfy the AudioModule
-            interface and for potential future use in a more modular processing pipeline.
+            num_samples: Number of samples to process
         """
-        # Visualization modules don't process per-sample data
-        # They receive updates via audio engine signals
-        pass
+        logger.debug(f"Spectrum: process() called, in_port.is_connected={self.in_port.is_connected}")
+
+        # Check if input is connected
+        if not self.in_port.is_connected:
+            # No input - clear display
+            self.spectrum_display.clear()
+            self.peak_freq_label.setText("Peak: -- Hz")
+            self.level_label.setText("Level: -- dB")
+            return
+
+        # Read input samples
+        samples = self.in_port.read()
+        logger.debug(f"Spectrum: Read samples: {samples is not None}, type={type(samples) if samples is not None else None}")
+
+        if samples is None:
+            self.spectrum_display.clear()
+            return
+
+        # Update display with new samples
+        self._update_samples(samples)
 
 
 class SpectrumAnalyzer(QWidget):

@@ -235,8 +235,6 @@ class ModularSynthWindow(QMainWindow):
 
     def _connect_signals(self):
         """Connect signals."""
-        # Audio engine signals
-        self.audio_engine.error_occurred.connect(self._on_audio_error)
 
         # Patch canvas signals
         self.patch_canvas.cable_connected.connect(self._on_cable_connected)
@@ -284,6 +282,11 @@ class ModularSynthWindow(QMainWindow):
         self._mark_patch_modified()
 
         self.audio_engine.add_module(module_instance)
+
+        # If this is an Output module, give it a reference to the audio engine
+        if module_class.metadata.category == ModuleCategory.OUTPUT:
+            module_instance.audio_engine = self.audio_engine
+            logger.debug("Set audio_engine reference on Output module")
 
     def _on_audio_error(self, error: str):
         """Handle audio error."""
@@ -789,5 +792,4 @@ class ModularSynthWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event."""
-        self.audio_engine.cleanup()
         event.accept()

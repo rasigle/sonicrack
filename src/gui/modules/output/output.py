@@ -9,9 +9,9 @@ import numpy as np
 from PyQt6 import QtWidgets
 from PyQt6.QtGui import QColor
 
-from gui.audio_config import audio_config
 from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_BUFFER_SIZE
 from src.engine.io.audio_output import AudioOutput
+from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets.module_widget import ModuleWidget
@@ -117,6 +117,9 @@ class OutputModule(ModuleWidget):
         # Input component reference
         self._input_component = None
 
+        # Reference to audio engine (set by main window)
+        self.audio_engine = None
+
         logger.debug("OutputModule initialized")
 
     def _on_sample_rate_changed(self, index: int):
@@ -151,8 +154,8 @@ class OutputModule(ModuleWidget):
     def _generate_audio(self, num_samples: int) -> np.ndarray | None:
         """Generate audio samples from connected input using process-based approach.
 
-        This is the NEW process-based architecture:
-        1. Output module triggers processing on all connected source modules
+        This uses the audio_engine to coordinate module processing:
+        1. Audio engine processes all modules in topological order
         2. Each module processes its inputs and writes to its output ports
         3. Output module reads from its input port
 
@@ -165,156 +168,13 @@ class OutputModule(ModuleWidget):
         if not self.input_port.is_connected:
             return None
 
-        try:
-            # NEW APPROACH: Trigger processing on all connected modules
-            self._trigger_processing_chain(num_samples)
+        return np.asarray(self.input_port.read())
 
-            # Read the processed result from our input port
-            samples = self.input_port.read()
-
-            if samples is None:
-                return None
-
-            # Convert to stereo if needed
-            if isinstance(samples, (list, tuple)) and len(samples) == 2:
-                left, right = samples
-                stereo = np.column_stack((left, right))
-            elif isinstance(samples, np.ndarray):
-                if len(samples.shape) == 1:
-                    stereo = np.column_stack((samples, samples))
-                else:
-                    stereo = samples
-            else:
-                return None
-
-            return stereo
-
-        except Exception as e:
-            logger.error(f"Error generating audio: {e}", exc_info=True)
-            return None
-
-    def _trigger_processing_chain(self, num_samples: int):
-        """Trigger processing on all connected modules in the signal chain.
-
-        Walks backwards from the Output module through all connections,
-        calling process() on each module in dependency order.
-
-        Args:
-            num_samples: Number of samples to process
-        """
-        # Track which modules we've already processed to avoid duplicates
-        processed = set()
-
-        def process_module_recursively(port):
-            """Recursively process modules connected to this port."""
-            if not hasattr(port, 'connected_to'):
-                return
-
-            # Process all modules connected to this port
-            for connected_port in port.connected_to:
-                parent_module = connected_port.parent_module
-
-                # Skip if already processed
-                if parent_module in processed:
-                    continue
-
-                # First, recursively process all inputs to this module
-                if hasattr(parent_module, 'inputs'):
-                    for input_port in parent_module.inputs.values():
-                        process_module_recursively(input_port)
-
-                # Now process this module
-                try:
-                    if hasattr(parent_module, 'process'):
-                        parent_module.process(num_samples)
-                        processed.add(parent_module)
-                except Exception as e:
-                    logger.error(
-                        f"Error processing module {parent_module.metadata.title}: {e}",
-                        exc_info=True
-                    )
-
-        # Start processing from our input port
-        process_module_recursively(self.input_port)
-
-    def _update_module_sample_rates(self, sample_rate: int):
-        """Propagate sample rate change to all connected modules.
-
-        Walks through the entire signal chain and updates any oscillators
-        or other audio components that need to know about the sample rate.
-
-        Args:
-            sample_rate: New sample rate in Hz
-        """
-        # Track which modules we've already updated
-        updated = set()
-
-        def update_module_recursively(port):
-            """Recursively update modules connected to this port."""
-            if not hasattr(port, 'connected_to'):
-                return
-
-            # Update all modules connected to this port
-            for connected_port in port.connected_to:
-                parent_module = connected_port.parent_module
-
-                # Skip if already updated
-                if parent_module in updated:
-                    continue
-
-                # First, recursively update all inputs to this module
-                if hasattr(parent_module, 'inputs'):
-                    for input_port in parent_module.inputs.values():
-                        update_module_recursively(input_port)
-
-                # Now update this module's oscillators
-                try:
-                    # Check if module has oscillators (e.g., OscillatorModule)
-                    if hasattr(parent_module, 'oscs'):
-                        logger.info(f"Updating sample rate for {parent_module.metadata.title}")
-                        for osc in parent_module.oscs:
-                            if osc is not None and hasattr(osc, 'sample_rate'):
-                                osc.sample_rate = sample_rate
-                        updated.add(parent_module)
-                    # Check if module has a single oscillator
-                    elif hasattr(parent_module, '_oscillator'):
-                        osc = parent_module._oscillator
-                        if osc is not None and hasattr(osc, 'sample_rate'):
-                            logger.info(f"Updating sample rate for {parent_module.metadata.title}")
-                            osc.sample_rate = sample_rate
-                        updated.add(parent_module)
-                except Exception as e:
-                    logger.error(
-                        f"Error updating sample rate for {parent_module.metadata.title}: {e}",
-                        exc_info=True
-                    )
-
-        # Start updating from our input port
-        update_module_recursively(self.input_port)
-        logger.info(f"Updated sample rate to {sample_rate} Hz for {len(updated)} module(s)")
 
     def get_output_component(self, port_name: str):
         """This module has no output component (it's a sink)."""
         return None
 
-    def create_engine_component(
-        self,
-        input_components: list | None = None,
-        modulation_components: dict | None = None,
-    ):
-        """Create the audio output engine component.
-
-        NOTE: This is kept for compatibility but is NOT used in the new
-        process-based architecture. The OutputModule now triggers processing
-        directly through module connections.
-
-        Args:
-            input_components: List of input audio components (not used)
-            modulation_components: Not used for output module
-        """
-        logger.info("OutputModule.create_engine_component called (compatibility mode)")
-        logger.info("Using NEW process-based architecture instead of compiled components")
-        return None
 
     def start_playback(self):
         """Start audio playback using process-based architecture.

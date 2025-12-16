@@ -1,10 +1,8 @@
 """Waveform display module for visualizing audio signals."""
 
 import logging
-from typing import Any
 
 import numpy as np
-from PyQt6 import QtCore
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath
 from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout
@@ -20,23 +18,19 @@ logger = logging.getLogger(__name__)
 class WaveformModule(ModuleWidget):
     """Waveform display module for real-time audio visualization.
 
-    This is a pure visualization module - it only displays the signal and
-    does NOT pass it through. It has no output port.
-
-    **Important:** This module visualizes the FINAL OUTPUT after all processing.
-    It connects to the audio engine's output signal to show what's actually
-    being sent to the speakers.
+    This is a visualization module that displays the waveform of the input signal.
+    Connect it anywhere in your signal chain to visualize the audio.
 
     **Usage:**
-    - Connect any module to the Waveform's input (optional - for validation)
-    - The display always shows the final output signal
-    - Place anywhere in your patch for monitoring
+    - Connect audio signal to the "In" port
+    - The display shows the waveform of the input signal
+    - Great for monitoring signal levels and debugging
     """
 
     metadata = ModuleMetadata(
         title="Waveform",
         category=ModuleCategory.VISUALIZATION,
-        description="Real-time waveform visualization (monitors final output)",
+        description="Real-time waveform visualization",
     )
 
     def __init__(self):
@@ -47,11 +41,9 @@ class WaveformModule(ModuleWidget):
             color=QColor(80, 80, 120),
         )
 
-        # Add input port (optional - for patch organization only)
-        # The input connection doesn't affect what's displayed
+        # Add input and output ports - pass signal through!
         self.in_port = self.add_input("In")
-
-        # NO OUTPUT PORT - this is a visualization-only module
+        self.out_port = self.add_output("Out")  # Pass-through output
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -80,170 +72,119 @@ class WaveformModule(ModuleWidget):
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
-        # Store reference to input component
-        self.input_component = None
-
-        # Audio engine connection
-        self.audio_engine = None
-        self._audio_engine_connected = False
-
-        # Use timer to find and connect to audio engine
-        self.connection_timer = QtCore.QTimer()
-        self.connection_timer.timeout.connect(self._try_connect_audio_engine)
-        self.connection_timer.setInterval(100)  # Try every 100ms
-        self.connection_timer.start()
-
-    def _try_connect_audio_engine(self):
-        """Try to find and connect to the audio engine via scene/parent chain."""
-        if self._audio_engine_connected:
-            self.connection_timer.stop()
-            return
-
-        try:
-            # Navigate: Module → Scene → View (PatchCanvas) → Window (MainWindow)
-            scene = self.scene()
-            if scene is None:
-                return
-
-            views = scene.views()
-            if not views:
-                return
-
-            view = views[0]
-            main_window = view.window()
-
-            if not hasattr(main_window, "audio_engine"):
-                return
-
-            # Found audio engine!
-            self.audio_engine = main_window.audio_engine
-
-            # Connect to signals
-            self.audio_engine.samples_generated.connect(self._on_samples_generated)
-            self.audio_engine.playback_stopped.connect(self._on_playback_stopped)
-
-            self._audio_engine_connected = True
-            self.connection_timer.stop()
-
-            logger.info("✓ Waveform module connected to audio engine")
-
-        except Exception as e:
-            logger.debug(f"Waiting for audio engine: {e}")
-
-    def _on_samples_generated(self, samples: np.ndarray):
-        """Handle audio samples from the audio engine.
-
-        This receives the FINAL output signal (after all processing).
+    def _update_samples(self, samples: np.ndarray):
+        """Update the display with new audio samples.
 
         Args:
-            samples: Final output samples (mono or stereo)
+            samples: Audio samples (mono or stereo) in a flexible set of formats:
+                     - 1D array: (N,)
+                     - 2D array sample-major: (N, 2)
+                     - 2D array channel-major: (2, N)
+                     - list or tuple of channel arrays: [left_arr, right_arr]
         """
         try:
-            logger.debug(
-                f"Waveform received {len(samples)} samples, shape={samples.shape}, "
-                f"min={np.min(samples):.3f}, max={np.max(samples):.3f}"
-            )
+            if samples is None:
+                self.waveform_display.clear()
+                self.min_label.setText("Min: 0.000")
+                self.max_label.setText("Max: 0.000")
+                return
 
-            # Convert stereo to mono for display
-            if len(samples.shape) == 2:
+            # Convert lists/tuples of channel-arrays -> (N, 2)
+            if isinstance(samples, (list, tuple)) and len(samples) >= 1:
+                # If each element is an array-like channel, stack them as columns
+                if all(isinstance(ch, (np.ndarray, list, tuple)) for ch in samples):
+                    try:
+                        samples = np.stack([np.asarray(ch).ravel() for ch in samples], axis=1)
+                    except Exception:
+                        samples = np.asarray(samples)
+                else:
+                    samples = np.asarray(samples)
+
+            samples = np.asarray(samples)
+
+            # If channel-major (2, N) convert to (N, 2)
+            if samples.ndim == 2 and samples.shape[0] == 2 and samples.shape[1] > 2:
+                samples = samples.T
+
+            # If many channels (>2), downmix to stereo/mono: average across channels
+            if samples.ndim == 2 and samples.shape[1] > 2:
+                # Average channels into stereo if exactly 2 groups? fallback to mono average
                 samples = np.mean(samples, axis=1)
 
-            # Update display
-            self.waveform_display.set_samples(samples)
-
-            # Update min/max
-            if len(samples) > 0:
-                min_val = np.min(samples)
-                max_val = np.max(samples)
-                self.min_label.setText(f"Min: {min_val:+.3f}")
-                self.max_label.setText(f"Max: {max_val:+.3f}")
+            # If stereo as (N,2) keep stereo; if 2D but shape (2,) or other small shapes, flatten
+            if samples.ndim == 1:
+                display_samples = samples.astype(np.float32)
+                self.waveform_display.set_samples(display_samples)
+                if display_samples.size > 0:
+                    self.min_label.setText(f"Min: {np.min(display_samples):.3f}")
+                    self.max_label.setText(f"Max: {np.max(display_samples):.3f}")
+                else:
+                    self.min_label.setText("Min: 0.000")
+                    self.max_label.setText("Max: 0.000")
+            elif samples.ndim == 2 and samples.shape[1] == 2:
+                display_samples = samples.astype(np.float32)
+                self.waveform_display.set_samples(display_samples)
+                if display_samples.size > 0:
+                    # compute min/max across both channels
+                    min_val = float(np.min(display_samples))
+                    max_val = float(np.max(display_samples))
+                    self.min_label.setText(f"Min: {min_val:.3f}")
+                    self.max_label.setText(f"Max: {max_val:.3f}")
+                else:
+                    self.min_label.setText("Min: 0.000")
+                    self.max_label.setText("Max: 0.000")
+            else:
+                # Fallback: try flattening / treating as mono
+                display_samples = samples.ravel().astype(np.float32)
+                self.waveform_display.set_samples(display_samples)
+                if display_samples.size > 0:
+                    self.min_label.setText(f"Min: {np.min(display_samples):.3f}")
+                    self.max_label.setText(f"Max: {np.max(display_samples):.3f}")
+                else:
+                    self.min_label.setText("Min: 0.000")
+                    self.max_label.setText("Max: 0.000")
 
         except Exception as e:
-            logger.error(f"Error updating waveform: {e}", exc_info=True)
-
-    def _on_playback_stopped(self):
-        """Clear display when playback stops."""
-        self.waveform_display.clear()
-        self.min_label.setText("Min: 0.000")
-        self.max_label.setText("Max: 0.000")
+            logger.warning(f"Error updating waveform: {e}")
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
-        """Waveform display has no required inputs.
-
-        The input port is optional - it doesn't affect what's displayed.
-        The waveform always shows the final audio engine output.
-        """
-        return []  # No required inputs
-
-    def create_engine_component(
-        self,
-        input_components: list[Any] | None = None,
-        modulation_components: dict[str, Any] | None = None,
-    ):
-        """Create the engine component.
-
-        Waveform is a pure visualization module with no audio processing.
-        It stores the input component reference for validation but doesn't
-        use it (the display shows the final audio engine output).
-
-        Args:
-            input_components: List of input audio components (optional)
-            modulation_components: Dict of modulation components (not used)
+        """Waveform requires input to visualize.
 
         Returns:
-            None (visualization modules don't produce audio output)
+            List of required input port names
         """
-        # Store reference for validation/debugging, but don't use it
-        if input_components and len(input_components) > 0:
-            self.input_component = input_components[0]
-            logger.debug(
-                f"Waveform display input connected: "
-                f"{type(self.input_component).__name__}"
-            )
-        else:
-            self.input_component = None
-            logger.debug(
-                "Waveform display: no input connected (OK - monitors final output)"
-            )
-
-        # Return None - this module has no audio output
-        return None
-
-    def cleanup(self):
-        """Clean up resources when module is removed."""
-        self.connection_timer.stop()
-
-        # Disconnect from audio engine
-        if self.audio_engine and self._audio_engine_connected:
-            try:
-                self.audio_engine.samples_generated.disconnect(
-                    self._on_samples_generated
-                )
-                self.audio_engine.playback_stopped.disconnect(self._on_playback_stopped)
-            except Exception as e:
-                logger.debug(f"Error disconnecting from audio engine: {e}")
-
-        self.waveform_display.clear()
-        self.waveform_display.clear()
+        return []  # Optional input - show "No Signal" if not connected
 
     def process(self, num_samples: int = 1):
-        """Process method for WaveformModule.
+        """Process audio data and update waveform display.
 
-        Waveform is a pure visualization module - it reads from the input port
-        (if connected) and updates the display, but doesn't write to any output port.
+        Reads from the input port and updates the waveform display with
+        the incoming audio signal.
 
         Args:
-            num_samples: Number of samples to process (default: 1 for per-sample processing)
-
-        Note:
-            In the current architecture, visualization happens via the audio engine's
-            samples_generated signal. This method exists to satisfy the AudioModule
-            interface and for potential future use in a more modular processing pipeline.
+            num_samples: Number of samples to process
         """
-        # Visualization modules don't process per-sample data
-        # They receive updates via audio engine signals
-        pass
+        logger.debug(f"Waveform: process() called, in_port.is_connected={self.in_port.is_connected}")
+
+        # Check if input is connected
+        if not self.in_port.is_connected:
+            # No input - clear display
+            self.waveform_display.clear()
+            self.min_label.setText("Min: 0.000")
+            self.max_label.setText("Max: 0.000")
+            return
+
+        # Read input samples
+        samples = self.in_port.read()
+        logger.debug(f"Waveform: Read samples: {samples is not None}, type={type(samples) if samples is not None else None}")
+
+        if samples is None:
+            self.waveform_display.clear()
+            return
+
+        # Update display with new samples
+        self._update_samples(samples)
 
 
 class WaveformDisplay(QWidget):
@@ -279,21 +220,42 @@ class WaveformDisplay(QWidget):
         Args:
             samples: Audio samples array (can be mono or stereo)
         """
-        if samples is None or len(samples) == 0:
+        # Accept None or empty
+        if samples is None or samples.size == 0:
             self.samples = None
             self.is_stereo = False
             self.update()
             return
 
-        # Check if stereo
-        self.is_stereo = len(samples.shape) > 1 and samples.shape[1] == 2
+        samples = np.asarray(samples)
 
-        # Downsample if needed
-        if len(samples) > self.display_samples:
-            step = len(samples) // self.display_samples
-            self.samples = samples[::step][: self.display_samples]
+        # If channel-major (2, N) convert to (N, 2)
+        if samples.ndim == 2 and samples.shape[0] == 2 and samples.shape[1] > 2:
+            samples = samples.T
+
+        # Determine stereo vs mono: expect (N,2) for stereo
+        if samples.ndim == 2 and samples.shape[1] == 2:
+            self.is_stereo = True
         else:
-            self.samples = samples
+            # If 2D but second dimension isn't 2, flatten to 1D
+            if samples.ndim == 2:
+                samples = samples.ravel()
+            self.is_stereo = False
+
+        # Downsample if needed (preserve columns for stereo)
+        if not self.is_stereo:
+            if samples.size > self.display_samples:
+                step = samples.size // self.display_samples
+                self.samples = samples[::step][: self.display_samples]
+            else:
+                self.samples = samples
+        else:
+            # stereo: samples shape is (N,2)
+            if samples.shape[0] > self.display_samples:
+                step = samples.shape[0] // self.display_samples
+                self.samples = samples[::step][: self.display_samples, :]
+            else:
+                self.samples = samples
 
         self.update()
 
@@ -336,7 +298,7 @@ class WaveformDisplay(QWidget):
 
         # Draw waveform
         if self.samples is not None and len(self.samples) > 0:
-            x_scale = width / len(self.samples)
+            x_scale = width / max(1, len(self.samples))
 
             if self.is_stereo:
                 # Draw stereo waveforms

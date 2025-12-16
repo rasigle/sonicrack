@@ -361,6 +361,10 @@ class ModularSynthWindow(QMainWindow):
         logger.info(f"Module deleted: {module.metadata.title}")
         self._mark_patch_modified()
 
+        # Check if we need to stop/update playback
+        # (This will stop playback if Output module has no more connections)
+        self._start_output_playback()
+
     def _on_parameter_changed(self, param_name: str, value):
         """Handle module parameter change using hot-swapping (no recompile).
 

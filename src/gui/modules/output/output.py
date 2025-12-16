@@ -243,23 +243,33 @@ class OutputModule(ModuleWidget):
         return None
 
     def start_playback(self):
-        """Start audio playback using process-based architecture."""
+        """Start audio playback using process-based architecture.
+
+        Also stops playback if there are no connections.
+        """
+        # Debug: Check connection status
+        logger.info(f"OutputModule.start_playback() called")
+        logger.info(f"  input_port.is_connected = {self.input_port.is_connected}")
+        logger.info(f"  input_port.connected_to = {self.input_port.connected_to}")
+        logger.info(f"  Number of connections: {len(self.input_port.connected_to)}")
+
+        # Check if we have any connections
+        if not self.input_port.is_connected:
+            logger.warning("Output module has no connections")
+
+            # Stop playback if it's running
+            if self.audio_output.is_playing:
+                logger.info("Stopping playback - no connections")
+                self.stop_playback()
+
+            self.status_label.setText("No input")
+            self.status_label.setStyleSheet(
+                "color: #f80; font-size: 10px; font-style: italic;"
+            )
+            return
+
+        # We have connections - start playback if not already playing
         if not self.audio_output.is_playing:
-            # Debug: Check connection status
-            logger.info(f"OutputModule.start_playback() called")
-            logger.info(f"  input_port.is_connected = {self.input_port.is_connected}")
-            logger.info(f"  input_port.connected_to = {self.input_port.connected_to}")
-            logger.info(f"  Number of connections: {len(self.input_port.connected_to)}")
-
-            # Check if we have any connections
-            if not self.input_port.is_connected:
-                logger.warning("Output module has no connections - cannot start playback")
-                self.status_label.setText("No input")
-                self.status_label.setStyleSheet(
-                    "color: #f80; font-size: 10px; font-style: italic;"
-                )
-                return
-
             logger.info("Starting playback using PROCESS-BASED architecture")
             self.audio_output.start_playback()
             self.status_label.setText("Playing")

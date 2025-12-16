@@ -156,6 +156,11 @@ class Cable(QGraphicsItem):
 
     def remove(self):
         """Remove this cable from the scene and disconnect from ports."""
+        # Disconnect the underlying Port data models FIRST
+        if self.start_port and self.end_port:
+            self.start_port.port.disconnect(self.end_port.port)
+
+        # Then remove cable from UI
         if self.start_port:
             self.start_port.remove_cable(self)
         if self.end_port:

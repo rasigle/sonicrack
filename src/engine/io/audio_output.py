@@ -165,9 +165,24 @@ class AudioOutput:
                 outdata.fill(0)
                 return
 
+            samples = np.asarray(samples)
+            if samples.ndim == 0:
+                samples = np.atleast_1d(samples)
+
             # Ensure stereo format
-            if len(samples.shape) == 1:
+            if samples.ndim == 1:
                 samples = np.column_stack((samples, samples))
+            elif samples.ndim == 2 and samples.shape[1] == 1:
+                samples = np.repeat(samples, 2, axis=1)
+            else:
+                samples = samples.copy()
+
+            # Clip samples to expected frame length
+            if samples.shape[0] != frames:
+                resized = np.zeros((frames, 2), dtype=samples.dtype)
+                length = min(samples.shape[0], frames)
+                resized[:length] = samples[:length]
+                samples = resized
 
             # Apply master volume smoothing
             if self._master_volume_smoothing_samples > 0:
@@ -193,23 +208,25 @@ class AudioOutput:
                 num_fade = min(self.fade_in_samples_remaining, frames)
                 num_fade = min(num_fade, samples.shape[0])
                 if num_fade > 0:
-                    fade_curve = np.linspace(
-                        1.0 - (self.fade_in_samples_remaining / self.fade_in_total_samples),
-                        1.0
-                        - (
-                            (self.fade_in_samples_remaining - num_fade)
-                            / self.fade_in_total_samples
-                        ),
-                        num_fade,
-                    )
-                    fade_curve_stereo = fade_curve[:, np.newaxis]
                     segment = samples[:num_fade]
-                    np.multiply(segment, fade_curve_stereo, out=segment)
-                    self.fade_in_samples_remaining -= num_fade
+                    actual_len = segment.shape[0]
+                    if actual_len > 0:
+                        fade_curve = np.linspace(
+                            1.0 - (self.fade_in_samples_remaining / self.fade_in_total_samples),
+                            1.0
+                            - (
+                                (self.fade_in_samples_remaining - actual_len)
+                                / self.fade_in_total_samples
+                            ),
+                            actual_len,
+                        )
+                        fade_curve_stereo = fade_curve[:, np.newaxis]
+                        np.multiply(segment, fade_curve_stereo, out=segment)
+                        self.fade_in_samples_remaining -= actual_len
 
-                    if self.fade_in_samples_remaining <= 0:
-                        self.is_fading_in = False
-                        logger.debug("Fade-in complete")
+                        if self.fade_in_samples_remaining <= 0:
+                            self.is_fading_in = False
+                            logger.debug("Fade-in complete")
 
             # Apply fade-out
             if self.is_fading_out and not self.post_fade_silence:
@@ -217,20 +234,22 @@ class AudioOutput:
                     num_fade = min(self.fade_out_samples_remaining, frames)
                     num_fade = min(num_fade, samples.shape[0])
                     if num_fade > 0:
-                        fade_curve = np.linspace(
-                            self.fade_out_samples_remaining / self.fade_out_total_samples,
-                            (self.fade_out_samples_remaining - num_fade)
-                            / self.fade_out_total_samples,
-                            num_fade,
-                        )
-                        fade_curve_stereo = fade_curve[:, np.newaxis]
                         segment = samples[:num_fade]
-                        np.multiply(segment, fade_curve_stereo, out=segment)
-                        self.fade_out_samples_remaining -= num_fade
+                        actual_len = segment.shape[0]
+                        if actual_len > 0:
+                            fade_curve = np.linspace(
+                                self.fade_out_samples_remaining / self.fade_out_total_samples,
+                                (self.fade_out_samples_remaining - actual_len)
+                                / self.fade_out_total_samples,
+                                actual_len,
+                            )
+                            fade_curve_stereo = fade_curve[:, np.newaxis]
+                            np.multiply(segment, fade_curve_stereo, out=segment)
+                            self.fade_out_samples_remaining -= actual_len
 
-                        if self.fade_out_samples_remaining <= 0:
-                            self.post_fade_silence = True
-                            logger.debug("Fade-out complete, entering silence mode")
+                            if self.fade_out_samples_remaining <= 0:
+                                self.post_fade_silence = True
+                                logger.debug("Fade-out complete, entering silence mode")
 
                         if frames > num_fade:
                             samples[num_fade:] = 0

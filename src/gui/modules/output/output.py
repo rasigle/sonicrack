@@ -13,6 +13,7 @@ from src.engine.io.audio_output import AudioOutput
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
 if TYPE_CHECKING:
@@ -35,7 +36,7 @@ class OutputModule(ModuleWidget):
         """Initialize output module."""
         super().__init__(
             width=220,
-            height=200,
+            height=260,
             color=QColor(200, 80, 80),
         )
 
@@ -56,6 +57,17 @@ class OutputModule(ModuleWidget):
         # Build UI
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
+
+        # Master gain control
+        self.gain_db = 0.0  # Initialize at 0 dB
+        self.gain_knob = Knob(
+            label="Master Gain",
+            min_value=-80.0,  # Effectively -infinity
+            max_value=12.0,
+            default_value=0.0,
+            callback=self._on_gain_changed,
+        )
+        layout.addWidget(self.gain_knob)  # Add knob to layout
 
         # Status label only; sample/buffer configured globally
         self.status_label = QtWidgets.QLabel("Stopped")
@@ -85,6 +97,11 @@ class OutputModule(ModuleWidget):
         """Sync audio output with global buffer size changes."""
         logger.info(f"Output module updating buffer size to {buffer_size} samples")
         self.audio_output.set_buffer_size(buffer_size)
+
+    def _on_gain_changed(self, value: float):
+        """Update master gain when knob changes."""
+        self.gain_db = value
+        logger.debug(f"Master gain changed to {value:.1f} dB")
 
     def _generate_audio(self, num_samples: int) -> np.ndarray | None:
         """Generate audio samples from connected input using process-based approach.
@@ -172,6 +189,14 @@ class OutputModule(ModuleWidget):
         samples = np.asarray(samples)
         if samples.size == 0:
             return
+
+        # Apply master gain (convert dB to linear)
+        if self.gain_db <= -80.0:
+            # Treat -80 dB as silence (effectively -infinity)
+            return
+        elif self.gain_db != 0.0:
+            linear_gain = 10.0 ** (self.gain_db / 20.0)
+            samples = samples * linear_gain
 
         self.audio_output.write(_ensure_stereo(samples).astype(np.float32))
 

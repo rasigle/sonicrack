@@ -1,9 +1,11 @@
 """Rotary knob widget for parameter control."""
 
 import math
-from PyQt6.QtWidgets import QWidget
+from typing import Callable
+
 from PyQt6.QtCore import Qt, QPointF, pyqtSignal, QRectF
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
+from PyQt6.QtWidgets import QWidget
 
 
 class Knob(QWidget):
@@ -21,6 +23,7 @@ class Knob(QWidget):
         max_value: float = 1.0,
         default_value: float | None = None,
         logarithmic: bool = False,
+        callback: Callable[[float], None] | None = None,
         parent: QWidget | None = None,
     ):
         """Initialize the knob.
@@ -31,6 +34,7 @@ class Knob(QWidget):
             max_value: Maximum value
             default_value: Default value (defaults to min_value)
             logarithmic: If True, use logarithmic scaling (useful for frequency)
+            callback: Optional callback function called with the new value when changed
             parent: Parent widget
         """
         super().__init__(parent)
@@ -39,6 +43,7 @@ class Knob(QWidget):
         self.min_value = min_value
         self.max_value = max_value
         self.logarithmic = logarithmic
+        self.callback = callback
         self._value = default_value if default_value is not None else min_value
 
         # Visual properties
@@ -68,6 +73,9 @@ class Knob(QWidget):
             self._value = value
             self.update()
             self.value_changed.emit(self.get_normalized_value())
+            # Call the callback function if provided
+            if self.callback is not None:
+                self.callback(self._value)
 
     def _value_to_normalized(self, value: float) -> float:
         """Convert a value to normalized (0.0-1.0) considering logarithmic scaling.

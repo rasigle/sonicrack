@@ -64,6 +64,7 @@ class ModularSynthWindow(QMainWindow):
         self.audio_engine = AudioEngine()
         self.registry = initialize_modules()
         self.preset_manager = PresetManager()
+        self.audio_engine.start()
 
         # Patch file tracking
         self.current_patch_path = None  # Path to currently loaded patch file
@@ -644,11 +645,9 @@ class ModularSynthWindow(QMainWindow):
 
     def _clear_canvas(self):
         """Clear the patch canvas."""
-        # Stop audio from old audio_engine (legacy)
-        self.audio_engine.stop_playback()
-
         # Stop all Output modules (process-based architecture)
         self._stop_all_output_modules()
+        self.audio_engine.stop()
 
         # Clear the canvas
         self.patch_canvas.clear_all()
@@ -716,9 +715,6 @@ class ModularSynthWindow(QMainWindow):
             preset_data: Dictionary containing preset data with 'modules' and
                 'connections'
         """
-        # Stop audio from old audio_engine (legacy)
-        self.audio_engine.stop_playback()
-
         # Stop all Output modules (process-based architecture)
         self._stop_all_output_modules()
 

@@ -46,7 +46,7 @@ class OutputModule(ModuleWidget):
         self.audio_output = AudioOutput(
             sample_rate=audio_config.sample_rate,
             buffer_size=audio_config.buffer_size,
-            audio_callback=self._generate_audio,
+            audio_callback=None,
         )
 
         # Register for global audio setting changes
@@ -160,13 +160,54 @@ class OutputModule(ModuleWidget):
         audio_config.remove_buffer_size_listener(self._on_global_buffer_size_changed)
         self.audio_output.cleanup()
 
-    def process(self):
-        """Process method for OutputModule.
+    def process(self, num_samples: int):
+        """Push audio from the input port into AudioOutput with proper shape."""
+        if not self.input_port.is_connected:
+            return
 
-        The OutputModule is a sink - it doesn't process per-sample data through ports.
-        Instead, it pulls audio from the compiled patch via the audio callback.
-        This method exists to satisfy the AudioModule interface but is not used.
-        """
-        # Output module doesn't need per-sample processing
-        # Audio generation happens via _generate_audio callback
-        pass
+        samples = self.input_port.read()
+        if samples is None:
+            return
+
+        samples = np.asarray(samples)
+        if samples.size == 0:
+            return
+
+        self.audio_output.write(_ensure_stereo(samples).astype(np.float32))
+
+
+def _ensure_stereo(samples: np.ndarray) -> np.ndarray:
+    if samples.ndim == 0:
+        val = float(samples)
+        samples = np.array([[val, val]])
+
+    elif samples.ndim == 1:
+        if samples.size == 1:
+            val = float(samples[0])
+            samples = np.array([[val, val]])
+        else:
+            samples = np.column_stack((samples, samples))
+
+    elif samples.ndim == 2:
+        rows, cols = samples.shape
+        if cols == 2:
+            pass
+        elif rows == 2 and cols != 2:
+            samples = samples.T
+        elif cols == 1:
+            samples = np.repeat(samples, 2, axis=1)
+        elif rows == 1:
+            samples = np.repeat(samples.T, 2, axis=1)
+        else:
+            mean_vals = samples.mean(axis=1)
+            samples = np.column_stack((mean_vals, mean_vals))
+    else:
+        flat = samples.reshape(-1)
+        if flat.size == 1:
+            val = float(flat[0])
+            samples = np.array([[val, val]])
+        else:
+            if flat.size % 2 != 0:
+                flat = np.pad(flat, (0, 1), mode="constant")
+            samples = flat.reshape(-1, 2)
+    return samples

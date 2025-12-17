@@ -36,8 +36,8 @@ class AudioOutput:
         Args:
             sample_rate: Sample rate in Hz (e.g., 44100, 48000)
             buffer_size: Audio buffer size in samples (e.g., 512, 1024, 2048)
-            audio_callback: Callback function that generates audio samples
-                           Should accept num_samples and return stereo array
+            audio_callback: Callback function that generates audio samples.
+                Should accept num_samples and return stereo array.
         """
         self.sample_rate = sample_rate
         self.buffer_size = buffer_size
@@ -72,6 +72,21 @@ class AudioOutput:
 
         # Track if we're in post-fade silence mode
         self.post_fade_silence: bool = False
+
+    def write(self, samples: np.ndarray):
+        """Write audio samples directly to the output stream.
+
+        Args:
+            samples: Stereo audio samples to write
+        """
+        if not self.is_playing or self.stream is None:
+            logger.warning("AudioOutput.write() called while not playing")
+            return
+
+        try:
+            self.stream.write(samples.astype(np.float32))
+        except Exception as e:
+            logger.error(f"Error writing audio samples: {e}", exc_info=True)
 
     def set_audio_callback(self, callback: Callable[[int], np.ndarray | None]):
         """Set the audio generation callback.
@@ -283,7 +298,7 @@ class AudioOutput:
                 samplerate=self.sample_rate,
                 channels=2,
                 blocksize=self.buffer_size,
-                callback=self._sounddevice_callback,
+                callback=self._sounddevice_callback if self.audio_callback else None,
                 dtype=np.float32,
             )
 

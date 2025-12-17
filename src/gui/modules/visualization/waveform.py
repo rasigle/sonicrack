@@ -43,7 +43,6 @@ class WaveformModule(ModuleWidget):
 
         # Add input and output ports - pass signal through!
         self.in_port = self.add_input("In")
-        self.out_port = self.add_output("Out")  # Pass-through output
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()

@@ -112,6 +112,15 @@ class OscillatorModule(ModuleWidget):
         # Register with audio_config to receive sample rate change notifications
         audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
 
+    def process(self, num_samples: int | None = None):
+        if num_samples is None:
+            num_samples = audio_config.buffer_size
+
+        for port, osc in zip(self.ports, self.oscs):
+            if port.is_connected and osc is not None:
+                samples = osc.get_samples(num_samples)
+                port.write(samples)
+
     def _on_global_sample_rate_changed(self, new_sample_rate: int):
         """Handle global sample rate changes from audio_config.
 
@@ -130,29 +139,6 @@ class OscillatorModule(ModuleWidget):
             self._sawtooth_oscillator.sample_rate = new_sample_rate
         if self._square_oscillator:
             self._square_oscillator.sample_rate = new_sample_rate
-
-    def process(self, num_samples: int = 1):
-        """Generate and write oscillator samples to output ports.
-
-        This method generates audio samples from each oscillator and writes
-        them to the corresponding output ports if they are connected.
-
-        Args:
-            num_samples: Number of samples to generate (default: 1 for per-sample processing)
-
-        Note:
-            In the current architecture, this method is not actively called during playback.
-            The audio engine directly calls get_samples() on the compiled AudioComponents.
-            This method exists to satisfy the AudioModule interface and for potential
-            future use in a more modular processing pipeline.
-        """
-        # Generate samples for each connected output
-        for port, osc in zip(self.ports, self.oscs):
-            if port.is_connected and osc is not None:
-                # Generate samples from oscillator
-                samples = osc.get_samples(num_samples)
-                # Write to port for downstream modules
-                port.write(samples)
 
     # AudioModuleInterface implementation
     def _on_frequency_changed(self):

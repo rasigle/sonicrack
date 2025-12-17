@@ -76,7 +76,7 @@ class SpectrumModule(ModuleWidget):
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
         # Sample rate for frequency calculation
-        self.sample_rate = audio_config.sample_rate
+        self._sample_rate = audio_config.sample_rate
 
         # Register for sample rate updates
         audio_config.add_sample_rate_listener(self._on_sample_rate_changed)
@@ -87,7 +87,7 @@ class SpectrumModule(ModuleWidget):
         Args:
             new_sample_rate: New sample rate in Hz
         """
-        self.sample_rate = new_sample_rate
+        self._sample_rate = new_sample_rate
 
     def _update_samples(self, samples: np.ndarray):
         """Update the display with new audio samples.
@@ -96,7 +96,9 @@ class SpectrumModule(ModuleWidget):
             samples: Audio samples (mono or stereo)
         """
         try:
-            logger.debug(f"Spectrum: Updating with {len(samples)} samples, shape={samples.shape}")
+            logger.debug(
+                f"Spectrum: Updating with {len(samples)} samples, shape={samples.shape}"
+            )
 
             # Convert stereo to mono for FFT
             if len(samples.shape) == 2:
@@ -136,7 +138,7 @@ class SpectrumModule(ModuleWidget):
             peak_idx = np.argmax(magnitude)
 
             # Convert to frequency
-            freq_resolution = self.sample_rate / (2 * len(magnitude))
+            freq_resolution = self._sample_rate / (2 * len(magnitude))
             peak_freq = peak_idx * freq_resolution
 
             # Calculate level in dB
@@ -162,7 +164,7 @@ class SpectrumModule(ModuleWidget):
         """
         return []  # Optional input - show "No Signal" if not connected
 
-    def process(self, num_samples: int = 1):
+    def process(self, num_samples: int | None = None):
         """Process audio data and update spectrum display.
 
         Reads from the input port and updates the FFT display with
@@ -172,6 +174,9 @@ class SpectrumModule(ModuleWidget):
             num_samples: Number of samples to process
         """
         logger.debug(f"Spectrum: process() called, in_port.is_connected={self.in_port.is_connected}")
+
+        if num_samples is None:
+            num_samples = audio_config.buffer_size
 
         # Check if input is connected
         if not self.in_port.is_connected:

@@ -129,8 +129,11 @@ class WaveformModule(ModuleWidget):
                 display_samples = samples.astype(np.float32)
                 self.waveform_display.set_samples(display_samples)
                 if display_samples.size > 0:
+                    # Calculate peak level in dB (to match spectrum analyzer)
+                    peak_amplitude = np.max(np.abs(display_samples))
+                    peak_db = 20 * np.log10(peak_amplitude + 1e-10) if peak_amplitude > 0 else -100.0
                     self.min_label.setText(f"Min: {np.min(display_samples):.3f}")
-                    self.max_label.setText(f"Max: {np.max(display_samples):.3f}")
+                    self.max_label.setText(f"Max: {np.max(display_samples):.3f} ({peak_db:.1f} dB)")
                 else:
                     self.min_label.setText("Min: 0.000")
                     self.max_label.setText("Max: 0.000")
@@ -141,8 +144,11 @@ class WaveformModule(ModuleWidget):
                     # compute min/max across both channels
                     min_val = float(np.min(display_samples))
                     max_val = float(np.max(display_samples))
+                    # Calculate peak level in dB (to match spectrum analyzer)
+                    peak_amplitude = np.max(np.abs(display_samples))
+                    peak_db = 20 * np.log10(peak_amplitude + 1e-10) if peak_amplitude > 0 else -100.0
                     self.min_label.setText(f"Min: {min_val:.3f}")
-                    self.max_label.setText(f"Max: {max_val:.3f}")
+                    self.max_label.setText(f"Max: {max_val:.3f} ({peak_db:.1f} dB)")
                 else:
                     self.min_label.setText("Min: 0.000")
                     self.max_label.setText("Max: 0.000")

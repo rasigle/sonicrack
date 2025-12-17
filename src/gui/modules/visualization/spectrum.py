@@ -129,9 +129,14 @@ class SpectrumModule(ModuleWidget):
             samples: Audio samples
         """
         try:
+            # Calculate level in dB from time-domain peak amplitude (to match waveform)
+            peak_amplitude = np.max(np.abs(samples))
+            peak_level = 20 * np.log10(peak_amplitude + 1e-10) if peak_amplitude > 0 else -100.0
+
             # Compute FFT
             n = min(len(samples), 4096)
             if n < 256:
+                self.level_label.setText(f"Level: {peak_level:.1f} dB")
                 return
 
             # Apply window
@@ -149,8 +154,6 @@ class SpectrumModule(ModuleWidget):
             freq_resolution = self._sample_rate / (2 * len(magnitude))
             peak_freq = peak_idx * freq_resolution
 
-            # Calculate level in dB
-            peak_level = 20 * np.log10(np.max(magnitude) + 1e-10)
 
             # Update labels
             if peak_freq < 1000:

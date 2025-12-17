@@ -9,13 +9,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.utils import (
+from src.constants import DEFAULT_SAMPLE_RATE
+from src.utils.audio_utils import (
     to_int16,
     save_wave,
     load_wave,
     note_to_frequency,
+    mono_to_stereo,
+    combine_lr_to_stereo
 )
-from src.constants import DEFAULT_SAMPLE_RATE
 
 
 class TestToInt16:
@@ -312,6 +314,225 @@ class TestEdgeCases:
 
             result = save_wave(audio, filename=str(filepath))
             assert Path(result).exists()
+
+
+class TestMonoToStereo:
+    """Tests for mono_to_stereo function."""
+
+    def test_scalar_input(self):
+        """Test scalar input is duplicated to stereo."""
+        result = mono_to_stereo(np.array(0.5))
+        assert result.shape == (1, 2)
+        assert np.allclose(result, [[0.5, 0.5]])
+
+    def test_single_sample_1d(self):
+        """Test single sample 1D array."""
+        result = mono_to_stereo(np.array([0.5]))
+        assert result.shape == (1, 2)
+        assert np.allclose(result, [[0.5, 0.5]])
+
+    def test_multiple_samples_1d(self):
+        """Test multiple samples in 1D array."""
+        input_samples = np.array([0.1, 0.2, 0.3, 0.4])
+        result = mono_to_stereo(input_samples)
+        assert result.shape == (4, 2)
+        assert np.allclose(result[:, 0], input_samples)
+        assert np.allclose(result[:, 1], input_samples)
+
+    def test_already_stereo_2d(self):
+        """Test 2D array that's already stereo (N, 2)."""
+        input_samples = np.array([[0.1, 0.2], [0.3, 0.4]])
+        result = mono_to_stereo(input_samples)
+        assert result.shape == (2, 2)
+        assert np.allclose(result, input_samples)
+
+    def test_transposed_stereo_2d(self):
+        """Test 2D array that's transposed stereo (2, N)."""
+        input_samples = np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        result = mono_to_stereo(input_samples)
+        assert result.shape == (3, 2)
+        assert np.allclose(result, [[0.1, 0.4], [0.2, 0.5], [0.3, 0.6]])
+
+    def test_single_column_2d(self):
+        """Test 2D array with single column (N, 1)."""
+        input_samples = np.array([[0.1], [0.2], [0.3]])
+        result = mono_to_stereo(input_samples)
+        assert result.shape == (3, 2)
+        assert np.allclose(result[:, 0], [0.1, 0.2, 0.3])
+        assert np.allclose(result[:, 1], [0.1, 0.2, 0.3])
+
+    def test_single_row_2d(self):
+        """Test 2D array with single row (1, N)."""
+        input_samples = np.array([[0.1, 0.2, 0.3]])
+        result = mono_to_stereo(input_samples)
+        assert result.shape == (3, 2)
+        assert np.allclose(result[:, 0], [0.1, 0.2, 0.3])
+        assert np.allclose(result[:, 1], [0.1, 0.2, 0.3])
+
+    def test_averaging_multiple_rows_and_columns(self):
+        """Test 2D array with (>2, >2) shape - averaged and duplicated."""
+        input_samples = np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]])
+        result = mono_to_stereo(input_samples)
+        assert result.shape == (3, 2)
+        expected_avg = np.array([0.2, 0.5, 0.8])
+        assert np.allclose(result[:, 0], expected_avg, rtol=1e-5)
+        assert np.allclose(result[:, 1], expected_avg, rtol=1e-5)
+
+    def test_3d_array_flattened(self):
+        """Test 3D array is flattened then duplicated."""
+        input_samples = np.array([[[0.1, 0.2]], [[0.3, 0.4]]])
+        result = mono_to_stereo(input_samples)
+        assert result.shape == (4, 2)
+        flat = np.array([0.1, 0.2, 0.3, 0.4])
+        assert np.allclose(result[:, 0], flat)
+        assert np.allclose(result[:, 1], flat)
+
+    def test_sine_wave_duplication(self):
+        """Test that a sine wave is correctly duplicated to stereo."""
+        t = np.linspace(0, 1, 100)
+        sine = np.sin(2 * np.pi * 440 * t)
+        result = mono_to_stereo(sine)
+
+        assert result.shape == (100, 2)
+        assert np.allclose(result[:, 0], sine)
+        assert np.allclose(result[:, 1], sine)
+
+    def test_zero_samples(self):
+        """Test silence is correctly converted to stereo."""
+        zeros = np.zeros(50)
+        result = mono_to_stereo(zeros)
+
+        assert result.shape == (50, 2)
+        assert np.allclose(result, 0.0)
+
+    def test_negative_values(self):
+        """Test negative values are preserved in stereo conversion."""
+        negative = np.array([-0.5, -0.3, -0.1])
+        result = mono_to_stereo(negative)
+
+        assert result.shape == (3, 2)
+        assert np.allclose(result[:, 0], negative)
+        assert np.allclose(result[:, 1], negative)
+
+
+class TestCombineLRToStereo:
+    """Tests for combine_lr_to_stereo function."""
+
+    def test_same_length_1d(self):
+        """Test combining two 1D arrays of same length."""
+        left = np.array([0.1, 0.2, 0.3])
+        right = np.array([0.4, 0.5, 0.6])
+        result = combine_lr_to_stereo(left, right)
+        assert result.shape == (3, 2)
+        assert np.allclose(result[:, 0], left)
+        assert np.allclose(result[:, 1], right)
+
+    def test_left_longer(self):
+        """Test when left array is longer (right is zero-padded)."""
+        left = np.array([0.1, 0.2, 0.3, 0.4])
+        right = np.array([0.5, 0.6])
+        result = combine_lr_to_stereo(left, right)
+        assert result.shape == (4, 2)
+        assert np.allclose(result[:, 0], left)
+        assert np.allclose(result[:, 1], [0.5, 0.6, 0.0, 0.0])
+
+    def test_right_longer(self):
+        """Test when right array is longer (left is zero-padded)."""
+        left = np.array([0.1, 0.2])
+        right = np.array([0.3, 0.4, 0.5, 0.6])
+        result = combine_lr_to_stereo(left, right)
+        assert result.shape == (4, 2)
+        assert np.allclose(result[:, 0], [0.1, 0.2, 0.0, 0.0])
+        assert np.allclose(result[:, 1], right)
+
+    def test_scalar_inputs(self):
+        """Test scalar inputs."""
+        left = np.array(0.1)
+        right = np.array(0.2)
+        result = combine_lr_to_stereo(left, right)
+        assert result.shape == (1, 2)
+        assert np.allclose(result, [[0.1, 0.2]])
+
+    def test_single_sample_each(self):
+        """Test single sample in each channel."""
+        left = np.array([0.1])
+        right = np.array([0.2])
+        result = combine_lr_to_stereo(left, right)
+        assert result.shape == (1, 2)
+        assert np.allclose(result, [[0.1, 0.2]])
+
+    def test_2d_arrays_flattened(self):
+        """Test 2D arrays are flattened before combining."""
+        left = np.array([[0.1, 0.2], [0.3, 0.4]])
+        right = np.array([[0.5, 0.6], [0.7, 0.8]])
+        result = combine_lr_to_stereo(left, right)
+        assert result.shape == (4, 2)
+        assert np.allclose(result[:, 0], [0.1, 0.2, 0.3, 0.4])
+        assert np.allclose(result[:, 1], [0.5, 0.6, 0.7, 0.8])
+
+    def test_empty_arrays(self):
+        """Test empty arrays."""
+        left = np.array([])
+        right = np.array([])
+        result = combine_lr_to_stereo(left, right)
+        assert result.shape == (0, 2)
+
+    def test_sine_waves_different_frequencies(self):
+        """Test combining two sine waves of different frequencies."""
+        t = np.linspace(0, 1, 100)
+        left_sine = np.sin(2 * np.pi * 440 * t)
+        right_sine = np.sin(2 * np.pi * 880 * t)
+        result = combine_lr_to_stereo(left_sine, right_sine)
+
+        assert result.shape == (100, 2)
+        assert np.allclose(result[:, 0], left_sine)
+        assert np.allclose(result[:, 1], right_sine)
+
+    def test_silence_and_signal(self):
+        """Test combining silence with signal."""
+        silence = np.zeros(50)
+        signal = np.sin(2 * np.pi * 440 * np.linspace(0, 1, 50))
+        result = combine_lr_to_stereo(silence, signal)
+
+        assert result.shape == (50, 2)
+        assert np.allclose(result[:, 0], 0.0)
+        assert np.allclose(result[:, 1], signal)
+
+    def test_extreme_length_mismatch(self):
+        """Test with extreme length mismatch."""
+        left = np.array([0.5])
+        right = np.arange(100) / 100.0
+        result = combine_lr_to_stereo(left, right)
+
+        assert result.shape == (100, 2)
+        assert result[0, 0] == 0.5
+        assert np.allclose(result[1:, 0], 0.0)  # Rest is padded
+        assert np.allclose(result[:, 1], right)
+
+    def test_negative_values_preserved(self):
+        """Test that negative values are preserved in both channels."""
+        left = np.array([-0.5, -0.3, -0.1])
+        right = np.array([-0.2, -0.4, -0.6])
+        result = combine_lr_to_stereo(left, right)
+
+        assert result.shape == (3, 2)
+        assert np.allclose(result[:, 0], left)
+        assert np.allclose(result[:, 1], right)
+
+    def test_pan_effect_simulation(self):
+        """Test simulating a panning effect."""
+        signal = np.sin(2 * np.pi * 440 * np.linspace(0, 1, 100))
+        left = signal * 0.8  # 80% volume left
+        right = signal * 0.2  # 20% volume right
+        result = combine_lr_to_stereo(left, right)
+
+        assert result.shape == (100, 2)
+        assert np.allclose(result[:, 0], left)
+        assert np.allclose(result[:, 1], right)
+        # Verify panning ratio where values are non-zero
+        non_zero_mask = np.abs(right) > 1e-10
+        ratio = result[non_zero_mask, 0] / result[non_zero_mask, 1]
+        assert np.allclose(ratio, 4.0, rtol=0.01)
 
 
 if __name__ == "__main__":

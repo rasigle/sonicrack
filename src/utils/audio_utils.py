@@ -195,3 +195,114 @@ def note_to_frequency(note: str) -> float:
         standard Western music notation with equal temperament tuning.
     """
     return float(librosa.note_to_hz(note))
+
+
+def mono_to_stereo(samples: np.ndarray) -> np.ndarray:
+    """Convert mono samples to stereo by duplicating to both channels.
+
+    Args:
+        samples: Mono audio samples (any shape)
+
+    Returns:
+        Stereo samples as (N, 2) array where both channels are identical
+
+    Example:
+        >>> mono = np.array([0.1, 0.2, 0.3])
+        >>> stereo = mono_to_stereo(mono)
+        >>> stereo.shape
+        (3, 2)
+        >>> np.allclose(stereo[:, 0], stereo[:, 1])
+        True
+    """
+    # Handle scalar
+    if samples.ndim == 0:
+        val = float(samples)
+        return np.array([[val, val]])
+
+    # Handle 1D array (most common case)
+    if samples.ndim == 1:
+        if samples.size == 1:
+            val = float(samples[0])
+            return np.array([[val, val]])
+        else:
+            # Duplicate to stereo: (N,) -> (N, 2)
+            return np.column_stack((samples, samples))
+
+    # Handle 2D array
+    if samples.ndim == 2:
+        rows, cols = samples.shape
+
+        # Already stereo (N, 2)
+        if cols == 2:
+            return samples
+
+        # Transposed stereo (2, N) -> (N, 2)
+        if rows == 2 and cols != 2:
+            return samples.T
+
+        # Single column (N, 1) -> (N, 2)
+        if cols == 1:
+            return np.repeat(samples, 2, axis=1)
+
+        # Single row (1, N) -> (N, 2)
+        if rows == 1:
+            return np.repeat(samples.T, 2, axis=1)
+
+        # Multiple columns: average and duplicate
+        mean_vals = samples.mean(axis=1)
+        return np.column_stack((mean_vals, mean_vals))
+
+    # Handle higher dimensions: flatten first
+    flat = samples.reshape(-1)
+    if flat.size == 1:
+        val = float(flat[0])
+        return np.array([[val, val]])
+    else:
+        return np.column_stack((flat, flat))
+
+
+def combine_lr_to_stereo(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+    """Combine left and right mono signals into stereo output.
+
+    Args:
+        left: Left channel samples (any shape)
+        right: Right channel samples (any shape)
+
+    Returns:
+        Stereo samples as (N, 2) array with left in column 0, right in column 1
+
+    Example:
+        >>> left = np.array([0.1, 0.2, 0.3])
+        >>> right = np.array([0.4, 0.5, 0.6])
+        >>> stereo = combine_lr_to_stereo(left, right)
+        >>> stereo.shape
+        (3, 2)
+        >>> np.allclose(stereo[:, 0], left)
+        True
+        >>> np.allclose(stereo[:, 1], right)
+        True
+
+    Note:
+        If left and right have different lengths, the shorter one is
+        zero-padded to match the longer one.
+    """
+    # Flatten both to 1D arrays
+    left_flat = np.asarray(left).reshape(-1)
+    right_flat = np.asarray(right).reshape(-1)
+
+    # Handle empty arrays
+    if left_flat.size == 0 and right_flat.size == 0:
+        return np.zeros((0, 2), dtype=np.float32)
+
+    # Determine the length (use max, pad shorter one)
+    max_len = max(left_flat.size, right_flat.size)
+
+    # Pad shorter array with zeros if needed
+    if left_flat.size < max_len:
+        left_flat = np.pad(left_flat, (0, max_len - left_flat.size), mode='constant')
+    if right_flat.size < max_len:
+        right_flat = np.pad(right_flat, (0, max_len - right_flat.size), mode='constant')
+
+    # Combine into stereo: (N, 2)
+    return np.column_stack((left_flat, right_flat))
+

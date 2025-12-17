@@ -15,6 +15,7 @@ from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
+from src.utils.audio_utils import mono_to_stereo, combine_lr_to_stereo
 
 if TYPE_CHECKING:
     from src.gui.core.port import Port
@@ -40,8 +41,9 @@ class OutputModule(ModuleWidget):
             color=QColor(200, 80, 80),
         )
 
-        # Add input port
-        self.input_port: Port = self.add_input("In")
+        # Add input ports
+        self.inp_port_l: Port = self.add_input("Left/Mono")
+        self.inp_port_r: Port = self.add_input("Right")
 
         # Create audio output handler using global settings
         self.audio_output = AudioOutput(
@@ -80,12 +82,6 @@ class OutputModule(ModuleWidget):
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
-        # Input component reference
-        self._input_component = None
-
-        # Reference to audio engine (set by main window)
-        self.audio_engine = None
-
         logger.debug("OutputModule initialized")
 
     def _on_global_sample_rate_changed(self, sample_rate: int):
@@ -103,29 +99,9 @@ class OutputModule(ModuleWidget):
         self.gain_db = value
         logger.debug(f"Master gain changed to {value:.1f} dB")
 
-    def _generate_audio(self, num_samples: int) -> np.ndarray | None:
-        """Generate audio samples from connected input using process-based approach.
-
-        This uses the audio_engine to coordinate module processing:
-        1. Audio engine processes all modules in topological order
-        2. Each module processes its inputs and writes to its output ports
-        3. Output module reads from its input port
-
-        Args:
-            num_samples: Number of samples to generate
-
-        Returns:
-            Stereo audio array or None
-        """
-        if not self.input_port.is_connected:
-            return None
-
-        return np.asarray(self.input_port.read())
-
     def get_output_component(self, port_name: str):
         """This module has no output component (it's a sink)."""
         return None
-
 
     def start_playback(self):
         """Start audio playback using process-based architecture.
@@ -134,12 +110,12 @@ class OutputModule(ModuleWidget):
         """
         # Debug: Check connection status
         logger.info(f"OutputModule.start_playback() called")
-        logger.info(f"  input_port.is_connected = {self.input_port.is_connected}")
-        logger.info(f"  input_port.connected_to = {self.input_port.connected_to}")
-        logger.info(f"  Number of connections: {len(self.input_port.connected_to)}")
+        logger.info(f"  input_port.is_connected = {self.inp_port_l.is_connected}")
+        logger.info(f"  input_port.connected_to = {self.inp_port_l.connected_to}")
+        logger.info(f"  Number of connections: {len(self.inp_port_l.connected_to)}")
 
         # Check if we have any connections
-        if not self.input_port.is_connected:
+        if not self.inp_port_l.is_connected:
             logger.warning("Output module has no connections")
 
             # Stop playback if it's running
@@ -171,24 +147,51 @@ class OutputModule(ModuleWidget):
                 "color: #888; font-size: 10px; font-style: italic;"
             )
 
-    def cleanup(self):
-        """Clean up audio resources."""
-        audio_config.remove_sample_rate_listener(self._on_global_sample_rate_changed)
-        audio_config.remove_buffer_size_listener(self._on_global_buffer_size_changed)
-        self.audio_output.cleanup()
-
     def process(self, num_samples: int):
-        """Push audio from the input port into AudioOutput with proper shape."""
-        if not self.input_port.is_connected:
+        """Push audio from the input port into AudioOutput with proper shape.
+
+        Routing behavior:
+        - Only L connected: L signal duplicated to both stereo channels
+        - Only R connected: R signal duplicated to both stereo channels
+        - Both L+R connected: L to left channel, R to right channel
+        - Neither connected: No output
+        """
+        # Check which ports are connected
+        l_connected = self.inp_port_l.is_connected
+        r_connected = self.inp_port_r.is_connected
+
+        if not l_connected and not r_connected:
+            return  # No input
+
+        # Read from connected ports
+        left_samples = self.inp_port_l.read() if l_connected else None
+        right_samples = self.inp_port_r.read() if r_connected else None
+
+        # Convert to numpy arrays and handle None/empty cases
+        if left_samples is not None:
+            left_samples = np.asarray(left_samples)
+            if left_samples.size == 0:
+                left_samples = None
+
+        if right_samples is not None:
+            right_samples = np.asarray(right_samples)
+            if right_samples.size == 0:
+                right_samples = None
+
+        # If both are None/empty after conversion, nothing to output
+        if left_samples is None and right_samples is None:
             return
 
-        samples = self.input_port.read()
-        if samples is None:
-            return
-
-        samples = np.asarray(samples)
-        if samples.size == 0:
-            return
+        # Build stereo output based on what's connected
+        if left_samples is not None and right_samples is not None:
+            # Both connected: use L for left channel, R for right channel
+            stereo_samples = combine_lr_to_stereo(left_samples, right_samples)
+        elif left_samples is not None:
+            # Only L connected: duplicate to both channels
+            stereo_samples = mono_to_stereo(left_samples)
+        else:
+            # Only R connected: duplicate to both channels
+            stereo_samples = mono_to_stereo(right_samples)
 
         # Apply master gain (convert dB to linear)
         if self.gain_db <= -80.0:
@@ -196,43 +199,6 @@ class OutputModule(ModuleWidget):
             return
         elif self.gain_db != 0.0:
             linear_gain = 10.0 ** (self.gain_db / 20.0)
-            samples = samples * linear_gain
+            stereo_samples = stereo_samples * linear_gain
 
-        self.audio_output.write(_ensure_stereo(samples).astype(np.float32))
-
-
-def _ensure_stereo(samples: np.ndarray) -> np.ndarray:
-    if samples.ndim == 0:
-        val = float(samples)
-        samples = np.array([[val, val]])
-
-    elif samples.ndim == 1:
-        if samples.size == 1:
-            val = float(samples[0])
-            samples = np.array([[val, val]])
-        else:
-            samples = np.column_stack((samples, samples))
-
-    elif samples.ndim == 2:
-        rows, cols = samples.shape
-        if cols == 2:
-            pass
-        elif rows == 2 and cols != 2:
-            samples = samples.T
-        elif cols == 1:
-            samples = np.repeat(samples, 2, axis=1)
-        elif rows == 1:
-            samples = np.repeat(samples.T, 2, axis=1)
-        else:
-            mean_vals = samples.mean(axis=1)
-            samples = np.column_stack((mean_vals, mean_vals))
-    else:
-        flat = samples.reshape(-1)
-        if flat.size == 1:
-            val = float(flat[0])
-            samples = np.array([[val, val]])
-        else:
-            if flat.size % 2 != 0:
-                flat = np.pad(flat, (0, 1), mode="constant")
-            samples = flat.reshape(-1, 2)
-    return samples
+        self.audio_output.write(stereo_samples.astype(np.float32))

@@ -44,7 +44,8 @@ class Knob(QWidget):
         self.max_value = max_value
         self.logarithmic = logarithmic
         self.callback = callback
-        self._value = default_value if default_value is not None else min_value
+        self.default_value = default_value if default_value is not None else min_value
+        self._value = self.default_value
 
         # Visual properties
         self.knob_size = 50
@@ -281,6 +282,13 @@ class Knob(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging = False
             self.setCursor(Qt.CursorShape.ArrowCursor)
+            event.accept()
+
+    def mouseDoubleClickEvent(self, event):
+        """Handle double-click to reset to default value."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.set_value(self.default_value)
+            self.setToolTip(f"{self.label}: {self.default_value:.3f} (default)")
             event.accept()
 
     def wheelEvent(self, event):

@@ -90,6 +90,11 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self.custom_name = ""
         self.component = None
 
+        # Caching for pull-based architecture (Phase 3)
+        self._cache_valid = False
+        self._cached_samples = None
+        self._cache_num_samples = 0
+
         # Ports
         self.input_ports: list[PortWidget] = []
         self.output_ports: list[PortWidget] = []
@@ -242,6 +247,42 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 widget, _, setter = self._parameters[name]
                 if hasattr(widget, setter):
                     getattr(widget, setter)(value)
+
+    # === Pull-Based Audio Processing (Caching) ===
+
+    def ensure_samples_ready(self, num_samples: int):
+        """Ensure audio samples are generated for this processing cycle.
+
+        This method implements the pull-based architecture with caching:
+        1. Check if samples are already cached for this cycle
+        2. If not, call process() to generate samples
+        3. Cache the result to prevent redundant processing
+
+        This is called by Port.read() when downstream modules request samples.
+
+        Args:
+            num_samples: Number of samples to generate
+        """
+        # Check if cache is valid and has the right number of samples
+        if self._cache_valid and self._cache_num_samples == num_samples:
+            return  # Already generated for this cycle
+
+        # Generate samples by calling process()
+        self.process(num_samples)
+
+        # Mark cache as valid
+        self._cache_valid = True
+        self._cache_num_samples = num_samples
+
+    def invalidate_cache(self):
+        """Invalidate the sample cache at the start of each audio cycle.
+
+        This should be called by the audio engine at the start of each
+        processing cycle to ensure all modules regenerate their samples.
+        """
+        self._cache_valid = False
+        self._cache_num_samples = 0
+        self._cached_samples = None
 
     # === Naming ===
 

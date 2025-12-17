@@ -81,6 +81,14 @@ class SpectrumModule(ModuleWidget):
         # Register for sample rate updates
         audio_config.add_sample_rate_listener(self._on_sample_rate_changed)
 
+        # Independent visualization timer (30 FPS, independent of audio)
+        from PyQt6.QtCore import QTimer
+        self._viz_timer = QTimer()
+        self._viz_timer.setInterval(33)  # ~30 FPS
+        self._viz_timer.timeout.connect(self._update_display)
+        self._viz_timer.start()
+        logger.info("Spectrum visualization timer started at 30 FPS")
+
     def _on_sample_rate_changed(self, new_sample_rate: int):
         """Handle sample rate changes.
 
@@ -164,23 +172,12 @@ class SpectrumModule(ModuleWidget):
         """
         return []  # Optional input - show "No Signal" if not connected
 
-    def process(self, num_samples: int | None = None):
-        """Process audio data and update spectrum display.
+    def _update_display(self):
+        """Update the spectrum display at 30 FPS (independent of audio rate).
 
-        Reads from the input port and updates the FFT display with
-        the incoming audio signal.
-
-        Args:
-            num_samples: Number of samples to process
+        This is called by the visualization timer and actively pulls samples
+        from the input port to trigger upstream generation.
         """
-        logger.debug(
-            f"Spectrum: process() called, "
-            f"in_port.is_connected={self.in_port.is_connected}"
-        )
-
-        if num_samples is None:
-            num_samples = audio_config.buffer_size
-
         # Check if input is connected
         if not self.in_port.is_connected:
             # No input - clear display
@@ -189,19 +186,34 @@ class SpectrumModule(ModuleWidget):
             self.level_label.setText("Level: -- dB")
             return
 
-        # Read input samples
-        samples = self.in_port.read()
-        logger.debug(
-            f"Spectrum: Read samples: {samples is not None}, "
-            f"type={type(samples) if samples is not None else None}"
-        )
+        # Invalidate cache of connected modules so they regenerate samples
+        # This is needed when there's no audio output driving the cache invalidation
+        for connected_port in self.in_port.connected_to:
+            if connected_port.parent_module and hasattr(connected_port.parent_module, 'invalidate_cache'):
+                connected_port.parent_module.invalidate_cache()
 
-        if samples is None:
+        # Pull samples to trigger upstream generation
+        # FFT needs at least 512 samples for decent frequency resolution
+        num_samples = 1024
+        samples = self.in_port.read(num_samples)
+
+        if samples is None or (isinstance(samples, (int, float)) and samples == 0.0):
             self.spectrum_display.clear()
             return
 
         # Update display with new samples
         self._update_samples(samples)
+
+    def process(self, num_samples: int | None = None):
+        """Process method for audio path.
+
+        Visualization modules don't process in the audio path - they update
+        independently via their own timer to avoid affecting audio performance.
+
+        Args:
+            num_samples: Number of samples (ignored)
+        """
+        pass  # No-op - visualization updates independently via _viz_timer
 
 
 class SpectrumAnalyzer(QWidget):

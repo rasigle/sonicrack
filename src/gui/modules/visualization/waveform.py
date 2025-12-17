@@ -44,6 +44,16 @@ class WaveformModule(ModuleWidget):
         # Add input and output ports - pass signal through!
         self.in_port = self.add_input("In")
 
+        # Independent visualization timer (30 FPS, independent of audio)
+        # This allows visualization to update at a comfortable rate without
+        # affecting audio processing
+        from PyQt6.QtCore import QTimer
+        self._viz_timer = QTimer()
+        self._viz_timer.setInterval(33)  # ~30 FPS
+        self._viz_timer.timeout.connect(self._update_display)
+        self._viz_timer.start()
+        logger.info("Waveform visualization timer started at 30 FPS")
+
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
@@ -159,20 +169,12 @@ class WaveformModule(ModuleWidget):
         """
         return []  # Optional input - show "No Signal" if not connected
 
-    def process(self, num_samples: int = 1):
-        """Process audio data and update waveform display.
+    def _update_display(self):
+        """Update the waveform display at 30 FPS (independent of audio rate).
 
-        Reads from the input port and updates the waveform display with
-        the incoming audio signal.
-
-        Args:
-            num_samples: Number of samples to process
+        This is called by the visualization timer and actively pulls samples
+        from the input port to trigger upstream generation.
         """
-        logger.debug(
-            f"Waveform: process() called, "
-            f"in_port.is_connected={self.in_port.is_connected}"
-        )
-
         # Check if input is connected
         if not self.in_port.is_connected:
             # No input - clear display
@@ -181,19 +183,35 @@ class WaveformModule(ModuleWidget):
             self.max_label.setText("Max: 0.000")
             return
 
-        # Read input samples
-        samples = self.in_port.read()
-        logger.debug(
-            f"Waveform: Read samples: {samples is not None}, "
-            f"type={type(samples) if samples is not None else None}"
-        )
+        # Invalidate cache of connected modules so they regenerate samples
+        # This is needed when there's no audio output driving the cache invalidation
+        for connected_port in self.in_port.connected_to:
+            if connected_port.parent_module and hasattr(connected_port.parent_module, 'invalidate_cache'):
+                connected_port.parent_module.invalidate_cache()
 
-        if samples is None:
+        # Pull samples to trigger upstream generation
+        # Use a reasonable buffer size for visualization (1024 samples ~ 23ms @ 44.1kHz)
+        from src.gui.audio_config import audio_config
+        num_samples = min(1024, audio_config.buffer_size * 2)
+        samples = self.in_port.read(num_samples)
+
+        if samples is None or (isinstance(samples, (int, float)) and samples == 0.0):
             self.waveform_display.clear()
             return
 
         # Update display with new samples
         self._update_samples(samples)
+
+    def process(self, num_samples: int = 1):
+        """Process method for audio path.
+
+        Visualization modules don't process in the audio path - they update
+        independently via their own timer to avoid affecting audio performance.
+
+        Args:
+            num_samples: Number of samples (ignored)
+        """
+        pass  # No-op - visualization updates independently via _viz_timer
 
 
 class WaveformDisplay(QWidget):

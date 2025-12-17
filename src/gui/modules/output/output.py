@@ -49,7 +49,7 @@ class OutputModule(ModuleWidget):
         self.audio_output = AudioOutput(
             sample_rate=audio_config.sample_rate,
             buffer_size=audio_config.buffer_size,
-            audio_callback=None,
+            audio_callback=self._generate_samples,  # Callback pulls samples
         )
 
         # Register for global audio setting changes
@@ -147,25 +147,40 @@ class OutputModule(ModuleWidget):
                 "color: #888; font-size: 10px; font-style: italic;"
             )
 
-    def process(self, num_samples: int):
-        """Push audio from the input port into AudioOutput with proper shape.
+    def _generate_samples(self, num_samples: int) -> np.ndarray:
+        """Generate audio samples by pulling from input ports.
+
+        This is called directly by the audio callback in the real-time audio thread.
+        It pulls samples from connected input ports and converts them to stereo.
 
         Routing behavior:
         - Only L connected: L signal duplicated to both stereo channels
         - Only R connected: R signal duplicated to both stereo channels
         - Both L+R connected: L to left channel, R to right channel
-        - Neither connected: No output
+        - Neither connected: Return silence
+
+        Args:
+            num_samples: Number of samples requested by audio callback
+
+        Returns:
+            Stereo audio samples as (N, 2) numpy array
         """
+        # Invalidate all module caches at the start of each audio cycle
+        # This ensures all modules regenerate their samples for this cycle
+        if hasattr(self, 'audio_engine') and self.audio_engine:
+            self.audio_engine.invalidate_all_caches()
+
         # Check which ports are connected
         l_connected = self.inp_port_l.is_connected
         r_connected = self.inp_port_r.is_connected
 
         if not l_connected and not r_connected:
-            return  # No input
+            # No input - return silence
+            return np.zeros((num_samples, 2), dtype=np.float32)
 
-        # Read from connected ports
-        left_samples = self.inp_port_l.read() if l_connected else None
-        right_samples = self.inp_port_r.read() if r_connected else None
+        # Read from connected ports (with num_samples to trigger upstream generation)
+        left_samples = self.inp_port_l.read(num_samples) if l_connected else None
+        right_samples = self.inp_port_r.read(num_samples) if r_connected else None
 
         # Convert to numpy arrays and handle None/empty cases
         if left_samples is not None:
@@ -178,9 +193,9 @@ class OutputModule(ModuleWidget):
             if right_samples.size == 0:
                 right_samples = None
 
-        # If both are None/empty after conversion, nothing to output
+        # If both are None/empty after conversion, return silence
         if left_samples is None and right_samples is None:
-            return
+            return np.zeros((num_samples, 2), dtype=np.float32)
 
         # Build stereo output based on what's connected
         if left_samples is not None and right_samples is not None:
@@ -196,9 +211,25 @@ class OutputModule(ModuleWidget):
         # Apply master gain (convert dB to linear)
         if self.gain_db <= -80.0:
             # Treat -80 dB as silence (effectively -infinity)
-            return
+            return np.zeros((num_samples, 2), dtype=np.float32)
         elif self.gain_db != 0.0:
             linear_gain = 10.0 ** (self.gain_db / 20.0)
             stereo_samples = stereo_samples * linear_gain
 
-        self.audio_output.write(stereo_samples.astype(np.float32))
+        # Ensure correct length (pad or trim if needed)
+        if stereo_samples.shape[0] != num_samples:
+            result = np.zeros((num_samples, 2), dtype=np.float32)
+            length = min(stereo_samples.shape[0], num_samples)
+            result[:length] = stereo_samples[:length]
+            return result
+
+        return stereo_samples.astype(np.float32)
+
+    def process(self, num_samples: int):
+        """Process method for compatibility with QTimer-based architecture.
+
+        NOTE: This method is no longer used when using callback-based pulling.
+        The audio callback directly calls _generate_samples() instead.
+        Kept for backward compatibility during transition.
+        """
+        pass  # No-op - audio callback drives everything now

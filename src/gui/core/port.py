@@ -146,20 +146,40 @@ class Port:
         self.value = 0.0
         logging.debug(f"Port data cleared: {self.port_name}")
 
-    def read(self) -> float | np.ndarray:
-        """Read value from connected ports.
+    def read(self, num_samples: int | None = None) -> float | np.ndarray:
+        """Read value from connected ports, triggering upstream generation if needed.
 
-        Returns the sum of values from all connected ports (mixing).
-        Supports both scalar and numpy array values.
+        This method now supports the pull-based architecture by:
+        1. Triggering upstream modules to generate samples (if num_samples provided)
+        2. Reading and mixing values from all connected ports
 
-        For arrays, they must all have the same shape, otherwise a ValueError is raised.
+        Args:
+            num_samples: Number of samples to request from upstream modules.
+                If None, just returns cached values (legacy behavior).
 
         Returns:
             Sum of values from connected ports (float or np.ndarray), or 0.0 if not
             connected
         """
         if not self.connected_to:
+            if num_samples is not None and num_samples > 0:
+                # Return zeros with correct shape for audio processing
+                return np.zeros(num_samples, dtype=np.float32)
             return 0.0
+
+        # Trigger upstream module generation if num_samples is provided
+        if num_samples is not None:
+            for connected_port in self.connected_to:
+                if connected_port.parent_module and hasattr(
+                    connected_port.parent_module, "ensure_samples_ready"
+                ):
+                    # Pull-based: ask upstream module to generate samples
+                    connected_port.parent_module.ensure_samples_ready(num_samples)
+                elif connected_port.parent_module and hasattr(
+                    connected_port.parent_module, "process"
+                ):
+                    # Fallback: call process() for modules not yet updated
+                    connected_port.parent_module.process(num_samples)
 
         # Collect all values
         values = [p.value for p in self.connected_to]
@@ -208,6 +228,20 @@ class Port:
             self.value = value
         else:
             self.value = float(value)
+
+    def peek_recent(self, num_samples: int | None = None) -> float | np.ndarray:
+        """Peek at recent samples without triggering upstream generation.
+
+        This is useful for visualization modules that want to read samples
+        without affecting the audio processing pipeline.
+
+        Args:
+            num_samples: Optional hint for desired sample count (not enforced)
+
+        Returns:
+            Current cached value from the port
+        """
+        return self.read(num_samples=None)  # Read without triggering generation
 
     @property
     def is_connected(self) -> bool:

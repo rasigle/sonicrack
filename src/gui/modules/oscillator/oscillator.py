@@ -116,6 +116,8 @@ class OscillatorModule(ModuleWidget):
         if num_samples is None:
             num_samples = audio_config.buffer_size
 
+        # Generate samples for all ports that are connected
+        # This ensures visualization modules can pull samples even without audio output
         for port, osc in zip(self.ports, self.oscs):
             if port.is_connected and osc is not None:
                 samples = osc.get_samples(num_samples)

@@ -767,27 +767,6 @@ class PatchCompiler:
         if not has_output:
             errors.append("No output module in patch.")
 
-        # Validate connections only for modules that are part of the signal path
-        # Disconnected modules are allowed and will be ignored during compilation
-
-        # Find all modules that are part of the signal path to output
-        output_module = None
-        for m in self.modules:
-            if m.metadata.category == ModuleCategory.OUTPUT:
-                output_module = m
-                break
-
-        if output_module:
-            # Build set of modules in the signal path
-            # Only validate modules that are in the signal path
-            signal_path_modules = self._get_signal_path_modules(output_module)
-        else:
-            # No output module, so validate all modules (for completeness)
-            signal_path_modules = self.modules
-
-        # Note: Disconnected modules are intentionally NOT reported as errors
-        # They remain on the canvas but are ignored during compilation
-
         # Check for invalid connections
         for start_port, end_port in self.connections:
             if start_port.port_type != "output":

@@ -10,7 +10,7 @@ The AudioConfig singleton ensures:
 - Easy integration with GUI controls
 
 Example:
-    >>> from src.audio_config import audio_config
+    >>> from src.gui.audio_config import audio_config
     >>>
     >>> # Get current settings
     >>> sr = audio_config.sample_rate
@@ -41,12 +41,6 @@ class AudioConfig:
     Features:
     - Observer pattern: register callbacks to be notified of changes
     - Thread-safe: uses property setters with validation
-    - Type hints for IDE support
-    - Logging of all changes for debugging
-
-    Attributes:
-        sample_rate: Current sample rate in Hz (e.g., 44100, 48000)
-        buffer_size: Current buffer size in samples (e.g., 512, 1024)
     """
 
     _instance = None
@@ -110,7 +104,7 @@ class AudioConfig:
                 except Exception as e:
                     logger.error(
                         f"Error in sample rate listener {listener.__name__}: {e}",
-                        exc_info=True
+                        exc_info=True,
                     )
 
     @property
@@ -147,7 +141,7 @@ class AudioConfig:
                 except Exception as e:
                     logger.error(
                         f"Error in buffer size listener {listener.__name__}: {e}",
-                        exc_info=True
+                        exc_info=True,
                     )
 
     def add_sample_rate_listener(self, callback: Callable[[int], None]):
@@ -226,6 +220,7 @@ class AudioConfig:
 # Global singleton instance
 audio_config = AudioConfig()
 
+
 # Convenience accessor functions (optional, for cleaner code)
 def get_sample_rate() -> int:
     """Get current global sample rate.
@@ -265,4 +260,3 @@ def set_buffer_size(value: int):
         value: New buffer size in samples
     """
     audio_config.buffer_size = value
-

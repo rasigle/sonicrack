@@ -217,8 +217,7 @@ class ADSRModule(ModuleWidget):
             The audio engine directly calls get_samples() on the compiled AudioComponents.
             This method exists to satisfy the AudioModule interface.
         """
-        if self.out_port.is_connected and hasattr(self, '_adsr_component'):
+        if self.out_port.is_connected and hasattr(self, "_adsr_component"):
             # Generate envelope samples
             samples = self._adsr_component.get_samples(num_samples)
             self.out_port.write(samples)
-

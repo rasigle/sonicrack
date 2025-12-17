@@ -229,4 +229,3 @@ class VCAModule(ModuleWidget):
 
         # Write to output port
         self.out_port.write(output_signal)
-

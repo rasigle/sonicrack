@@ -299,10 +299,9 @@ def combine_lr_to_stereo(left: np.ndarray, right: np.ndarray) -> np.ndarray:
 
     # Pad shorter array with zeros if needed
     if left_flat.size < max_len:
-        left_flat = np.pad(left_flat, (0, max_len - left_flat.size), mode='constant')
+        left_flat = np.pad(left_flat, (0, max_len - left_flat.size), mode="constant")
     if right_flat.size < max_len:
-        right_flat = np.pad(right_flat, (0, max_len - right_flat.size), mode='constant')
+        right_flat = np.pad(right_flat, (0, max_len - right_flat.size), mode="constant")
 
     # Combine into stereo: (N, 2)
     return np.column_stack((left_flat, right_flat))
-

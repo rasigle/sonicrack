@@ -16,7 +16,7 @@ from src.utils.audio_utils import (
     load_wave,
     note_to_frequency,
     mono_to_stereo,
-    combine_lr_to_stereo
+    combine_lr_to_stereo,
 )
 
 

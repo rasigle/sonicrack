@@ -3,17 +3,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Sequence
 
 from PyQt6 import QtWidgets
 
 from src.gui.audio_config import audio_config
+from src.gui.ui_constants import DEFAULT_SAMPLE_RATES, DEFAULT_BUFFER_SIZES
 
 logger = logging.getLogger(__name__)
-
-# Default options (can be extended later or loaded from config file)
-DEFAULT_SAMPLE_RATES: Sequence[int] = (22050, 44100, 48000, 88200, 96000)
-DEFAULT_BUFFER_SIZES: Sequence[int] = (128, 256, 512, 1024, 2048, 4096)
 
 
 class AudioSettingsDialog(QtWidgets.QDialog):
@@ -79,4 +75,3 @@ class AudioSettingsDialog(QtWidgets.QDialog):
         audio_config.buffer_size = int(new_buffer_size)
 
         self.accept()
-

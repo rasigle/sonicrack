@@ -98,8 +98,6 @@ def test_oscillator_integration():
     audio_config.sample_rate = 44100
     osc = SineOscillator(frequency=440, sample_rate=audio_config.sample_rate)
 
-    initial_sr = osc.sample_rate
-
     # Register callback to update oscillator
     def update_osc_sample_rate(new_rate):
         osc.sample_rate = new_rate
@@ -111,9 +109,6 @@ def test_oscillator_integration():
 
     # Verify oscillator was updated
     assert osc.sample_rate == 48000, "Oscillator should be updated"
-
-    # Generate samples and verify frequency is correct
-    samples = osc.get_samples_vectorized(480)  # 0.01 seconds at 48kHz
 
     # Cleanup
     audio_config.remove_sample_rate_listener(update_osc_sample_rate)
@@ -172,7 +167,9 @@ def test_listener_exception_handling():
     # Should not raise, and good listener should still be called
     audio_config.sample_rate = 96000
 
-    assert len(notifications) == 1, "Good listener should be called despite bad listener"
+    assert (
+        len(notifications) == 1
+    ), "Good listener should be called despite bad listener"
     assert notifications[0] == 96000
 
     # Cleanup
@@ -182,6 +179,7 @@ def test_listener_exception_handling():
 
 def test_remove_nonexistent_listener():
     """Test removing a listener that was never added."""
+
     def listener(new_rate):
         pass
 

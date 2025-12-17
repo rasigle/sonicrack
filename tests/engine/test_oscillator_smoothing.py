@@ -106,12 +106,8 @@ def test_oscillator_smoothing_prevents_instant_jump(osc_class, name):
     # Complete initial smoothing
     osc.get_samples_vectorized(osc._smoothing_samples_remaining)
 
-    # Get initial amplitude (should be ~0.1 for -20dB)
-    initial_amp = osc._current_amplitude
-
     # Change gain to -6dB (should trigger smoothing)
     osc.gain_db = -6  # Target amplitude ~0.5
-    target_amp = osc._target_amplitude
 
     # Generate samples during smoothing
     smoothing_duration = osc._smoothing_samples_remaining
@@ -214,9 +210,6 @@ def test_oscillator_smoothing_completes(osc_class, name):
     assert (
         abs(osc._current_amplitude - osc._target_amplitude) < 1e-6
     ), f"{name} current amplitude doesn't match target after smoothing!"
-
-    # Generate more samples (should be at constant amplitude now)
-    samples_after = osc.get_samples_vectorized(100)
 
     # No more smoothing should be active
     assert (

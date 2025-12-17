@@ -386,6 +386,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             if scene:
                 # Store references before removing from scene
                 from src.gui.patch_canvas import PatchCanvas
+
                 canvas = scene.parent() if scene else None
                 views = scene.views() if scene else []
 
@@ -421,16 +422,19 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                     # Get main window to trigger patch update
                     for view in views:
                         main_window = view.window()
-                        if hasattr(main_window, '_mark_patch_modified'):
+                        if hasattr(main_window, "_mark_patch_modified"):
                             main_window._mark_patch_modified()
 
                         # Stop and restart playback to refresh audio callback
                         # This ensures we're not using stale connections/components
-                        if hasattr(main_window, '_restart_output_playback'):
-                            logger.info("Module deleted - restarting playback to refresh audio")
+                        if hasattr(main_window, "_restart_output_playback"):
+                            logger.info(
+                                "Module deleted - restarting playback to refresh audio"
+                            )
                             main_window._restart_output_playback()
-                        elif hasattr(main_window, '_start_output_playback'):
-                            # Fallback: just call start (which should detect disconnections)
+                        elif hasattr(main_window, "_start_output_playback"):
+                            # Fallback: just call start (which should detect
+                            # disconnections)
                             main_window._start_output_playback()
                         break
 

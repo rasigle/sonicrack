@@ -177,5 +177,5 @@ class OscillatorModule(ModuleWidget):
             freq,
             gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
             pulsewidth=pulsewidth,
-            sample_rate=sample_rate
+            sample_rate=sample_rate,
         )

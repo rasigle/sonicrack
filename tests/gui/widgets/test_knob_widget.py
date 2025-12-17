@@ -1,4 +1,5 @@
 """Unit tests for knob callback functionality."""
+
 from unittest.mock import Mock
 
 import pytest
@@ -23,7 +24,7 @@ def test_knob_callback_on_set_value(app):
         min_value=0.0,
         max_value=100.0,
         default_value=50.0,
-        callback=callback
+        callback=callback,
     )
 
     # Set a new value
@@ -41,7 +42,7 @@ def test_knob_callback_multiple_calls(app):
         min_value=0.0,
         max_value=100.0,
         default_value=0.0,
-        callback=callback
+        callback=callback,
     )
 
     # Change value multiple times
@@ -64,7 +65,7 @@ def test_knob_no_callback_on_same_value(app):
         min_value=0.0,
         max_value=100.0,
         default_value=50.0,
-        callback=callback
+        callback=callback,
     )
 
     # Set the same value
@@ -76,12 +77,7 @@ def test_knob_no_callback_on_same_value(app):
 
 def test_knob_without_callback(app):
     """Test that knob works without a callback."""
-    knob = Knob(
-        label="Test",
-        min_value=0.0,
-        max_value=100.0,
-        default_value=50.0
-    )
+    knob = Knob(label="Test", min_value=0.0, max_value=100.0, default_value=50.0)
 
     # Should not raise any errors
     knob.set_value(75.0)
@@ -96,7 +92,7 @@ def test_knob_callback_with_clamping(app):
         min_value=0.0,
         max_value=100.0,
         default_value=50.0,
-        callback=callback
+        callback=callback,
     )
 
     # Set value beyond max
@@ -126,7 +122,7 @@ def test_knob_callback_with_db_range(app):
         min_value=-80.0,
         max_value=12.0,
         default_value=0.0,
-        callback=on_gain_changed
+        callback=on_gain_changed,
     )
 
     # Test various gain values
@@ -145,7 +141,7 @@ def test_knob_double_click_reset(app):
         min_value=0.0,
         max_value=100.0,
         default_value=50.0,
-        callback=callback
+        callback=callback,
     )
 
     # Change value away from default
@@ -156,7 +152,9 @@ def test_knob_double_click_reset(app):
 
     # Simulate double-click at center of widget
     center = knob.rect().center()
-    QTest.mouseDClick(knob, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, center)
+    QTest.mouseDClick(
+        knob, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, center
+    )
 
     # Should reset to default
     assert knob.get_value() == 50.0
@@ -171,7 +169,7 @@ def test_knob_double_click_with_custom_default(app):
         min_value=-80.0,
         max_value=12.0,
         default_value=0.0,  # Custom default (not midpoint)
-        callback=callback
+        callback=callback,
     )
 
     # Change to different value
@@ -182,10 +180,7 @@ def test_knob_double_click_with_custom_default(app):
     # Double-click should reset to 0.0, not midpoint (-34.0)
     center = knob.rect().center()
     QTest.mouseDClick(
-        knob,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-        center
+        knob, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, center
     )
 
     assert knob.get_value() == 0.0
@@ -200,16 +195,13 @@ def test_knob_double_click_at_default(app):
         min_value=0.0,
         max_value=100.0,
         default_value=50.0,
-        callback=callback
+        callback=callback,
     )
 
     # Already at default, double-click should not call callback
     center = knob.rect().center()
     QTest.mouseDClick(
-        knob,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-        center
+        knob, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, center
     )
 
     # Callback should not be called since value didn't change
@@ -219,12 +211,7 @@ def test_knob_double_click_at_default(app):
 
 def test_knob_default_value_storage(app):
     """Test that default_value is properly stored."""
-    knob = Knob(
-        label="Test",
-        min_value=0.0,
-        max_value=100.0,
-        default_value=75.0
-    )
+    knob = Knob(label="Test", min_value=0.0, max_value=100.0, default_value=75.0)
 
     # Check default value is stored
     assert knob.default_value == 75.0
@@ -240,12 +227,7 @@ def test_knob_default_value_storage(app):
 
 def test_knob_default_value_none(app):
     """Test that default_value defaults to min_value when None."""
-    knob = Knob(
-        label="Test",
-        min_value=10.0,
-        max_value=100.0,
-        default_value=None
-    )
+    knob = Knob(label="Test", min_value=10.0, max_value=100.0, default_value=None)
 
     # Should default to min_value
     assert knob.default_value == 10.0
@@ -254,12 +236,7 @@ def test_knob_default_value_none(app):
 
 def test_knob_double_click_with_min_default(app):
     """Test double-click reset when default is min_value."""
-    knob = Knob(
-        label="Test",
-        min_value=0.0,
-        max_value=100.0,
-        default_value=0.0
-    )
+    knob = Knob(label="Test", min_value=0.0, max_value=100.0, default_value=0.0)
 
     # Change to max
     knob.set_value(100.0)
@@ -267,11 +244,12 @@ def test_knob_double_click_with_min_default(app):
 
     # Double-click should reset to min (0.0)
     center = knob.rect().center()
-    QTest.mouseDClick(knob, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, center)
+    QTest.mouseDClick(
+        knob, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, center
+    )
 
     assert knob.get_value() == 0.0
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

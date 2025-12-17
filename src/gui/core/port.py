@@ -103,7 +103,8 @@ class Port:
             other.connected_to.append(self)
 
     def disconnect(self, other: Port | None = None) -> None:
-        """Disconnect from a specific connected port (bidirectional), or all if other is None.
+        """Disconnect from a specific connected port (bidirectional), or all if other
+        is None.
 
         Args:
             other: Specific port to disconnect from, or None to disconnect all
@@ -127,7 +128,9 @@ class Port:
             # Also remove from other side (bidirectional)
             if self in other.connected_to:
                 other.connected_to.remove(self)
-            logging.debug(f"Port disconnected: {self.port_name} <-/-> {other.port_name}")
+            logging.debug(
+                f"Port disconnected: {self.port_name} <-/-> {other.port_name}"
+            )
             # Clear port data to prevent stale audio
             self.clear()
         except ValueError:
@@ -152,7 +155,8 @@ class Port:
         For arrays, they must all have the same shape, otherwise a ValueError is raised.
 
         Returns:
-            Sum of values from connected ports (float or np.ndarray), or 0.0 if not connected
+            Sum of values from connected ports (float or np.ndarray), or 0.0 if not
+            connected
         """
         if not self.connected_to:
             return 0.0
@@ -172,13 +176,18 @@ class Port:
         for value in values:
             if result is None:
                 # Initialize with first value
-                result = np.array(value) if not isinstance(value, np.ndarray) else value.copy()
+                result = (
+                    np.array(value)
+                    if not isinstance(value, np.ndarray)
+                    else value.copy()
+                )
             else:
                 # Add subsequent values
                 if isinstance(value, np.ndarray):
                     if result.shape != value.shape:
                         raise ValueError(
-                            f"Cannot mix arrays with different shapes: {result.shape} vs {value.shape}"
+                            f"Cannot mix arrays with different shapes: {result.shape} "
+                            f"vs {value.shape}"
                         )
                     result = result + value
                 else:

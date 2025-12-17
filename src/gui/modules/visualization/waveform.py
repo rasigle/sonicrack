@@ -93,7 +93,9 @@ class WaveformModule(ModuleWidget):
                 # If each element is an array-like channel, stack them as columns
                 if all(isinstance(ch, (np.ndarray, list, tuple)) for ch in samples):
                     try:
-                        samples = np.stack([np.asarray(ch).ravel() for ch in samples], axis=1)
+                        samples = np.stack(
+                            [np.asarray(ch).ravel() for ch in samples], axis=1
+                        )
                     except Exception:
                         samples = np.asarray(samples)
                 else:
@@ -107,10 +109,12 @@ class WaveformModule(ModuleWidget):
 
             # If many channels (>2), downmix to stereo/mono: average across channels
             if samples.ndim == 2 and samples.shape[1] > 2:
-                # Average channels into stereo if exactly 2 groups? fallback to mono average
+                # Average channels into stereo if exactly 2 groups? fallback to mono
+                # average
                 samples = np.mean(samples, axis=1)
 
-            # If stereo as (N,2) keep stereo; if 2D but shape (2,) or other small shapes, flatten
+            # If stereo as (N,2) keep stereo; if 2D but shape (2,) or other small
+            # shapes, flatten
             if samples.ndim == 1:
                 display_samples = samples.astype(np.float32)
                 self.waveform_display.set_samples(display_samples)
@@ -164,7 +168,10 @@ class WaveformModule(ModuleWidget):
         Args:
             num_samples: Number of samples to process
         """
-        logger.debug(f"Waveform: process() called, in_port.is_connected={self.in_port.is_connected}")
+        logger.debug(
+            f"Waveform: process() called, "
+            f"in_port.is_connected={self.in_port.is_connected}"
+        )
 
         # Check if input is connected
         if not self.in_port.is_connected:
@@ -176,7 +183,10 @@ class WaveformModule(ModuleWidget):
 
         # Read input samples
         samples = self.in_port.read()
-        logger.debug(f"Waveform: Read samples: {samples is not None}, type={type(samples) if samples is not None else None}")
+        logger.debug(
+            f"Waveform: Read samples: {samples is not None}, "
+            f"type={type(samples) if samples is not None else None}"
+        )
 
         if samples is None:
             self.waveform_display.clear()

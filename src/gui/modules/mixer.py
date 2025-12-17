@@ -243,7 +243,12 @@ class MixerModule(ModuleWidget):
         """
         # Read from all connected input ports
         input_ports = [self.in1_port, self.in2_port, self.in3_port, self.in4_port]
-        gain_knobs = [self.gain1_knob, self.gain2_knob, self.gain3_knob, self.gain4_knob]
+        gain_knobs = [
+            self.gain1_knob,
+            self.gain2_knob,
+            self.gain3_knob,
+            self.gain4_knob,
+        ]
 
         mixed_signal = None
 
@@ -263,4 +268,3 @@ class MixerModule(ModuleWidget):
         # Write mixed signal to output
         if mixed_signal is not None:
             self.out_port.write(mixed_signal)
-

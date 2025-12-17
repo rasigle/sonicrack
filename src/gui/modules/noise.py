@@ -114,4 +114,3 @@ class NoiseModule(ModuleWidget):
             if self.component:
                 samples = self.component.get_samples(num_samples)
                 self.out_port.write(samples)
-

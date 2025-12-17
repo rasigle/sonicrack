@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QPointF, pyqtSignal
+from PyQt6 import QtCore
+from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import QPainter, QColor
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene
+from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QMessageBox
 
 from src.gui.widgets.cable_widget import Cable
 from src.gui.widgets.port_widget import PortWidget
@@ -27,13 +28,14 @@ class PatchCanvas(QGraphicsView):
     This is where modules are placed and connected with cables.
     """
 
-    cable_connected = pyqtSignal(
-        PortWidget, PortWidget
-    )  # Emitted when a cable is connected
-    cable_disconnected = pyqtSignal(
-        PortWidget, PortWidget
-    )  # Emitted when a cable is disconnected
-    module_deleted = pyqtSignal(object)  # Emitted when a module is deleted
+    # Emitted when a cable is connected
+    cable_connected = QtCore.pyqtSignal(PortWidget, PortWidget)
+
+    # Emitted when a cable is disconnected
+    cable_disconnected = QtCore.pyqtSignal(PortWidget, PortWidget)
+
+    # Emitted when a module is deleted
+    module_deleted = QtCore.pyqtSignal(object)
 
     def __init__(self, parent=None):
         """Initialize the patch canvas."""
@@ -89,8 +91,6 @@ class PatchCanvas(QGraphicsView):
                 # Check if trying to connect to the same module
                 if item.parent_module == self.drag_start_port.parent_module:
                     # Self-connection not allowed - show error
-                    from PyQt6.QtWidgets import QMessageBox
-
                     QMessageBox.warning(
                         self,
                         "Invalid Connection",
@@ -104,10 +104,9 @@ class PatchCanvas(QGraphicsView):
                     cycle_info = self._would_create_cycle(self.drag_start_port, item)
                     if cycle_info:
                         # Connection would create a cycle - show error
-                        from PyQt6.QtWidgets import QMessageBox
-
                         QMessageBox.warning(
                             self,
+                            "Invalid Connection",
                             "Infinite Loop Detected. This connection would create an "
                             "infinite feedback loop:\n\n{cycle_info}\n\n"
                             "Please check your connections and avoid creating cycles.",

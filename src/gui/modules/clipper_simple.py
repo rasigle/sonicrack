@@ -71,7 +71,8 @@ class ClipperModule(ModuleWidget):
     def process(self, num_samples: int = 1):
         """Apply clipping/limiting to input signal.
 
-        Reads from the input port, applies clipping based on threshold, and writes to the output port.
+        Reads from the input port, applies clipping based on threshold, and writes to
+        the output port.
 
         Args:
             num_samples: Number of samples to process (default: 1 for per-sample processing)
@@ -89,9 +90,9 @@ class ClipperModule(ModuleWidget):
 
         # Apply clipping
         import numpy as np
+
         threshold = self.threshold_knob.get_value()
         output_signal = np.clip(input_signal, -threshold, threshold)
 
         # Write to output port
         self.out_port.write(output_signal)
-

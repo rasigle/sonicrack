@@ -305,11 +305,14 @@ class ModularSynthWindow(QMainWindow):
 
         # Check if this connection involves an Output module
         from src.gui.modules.output.output import OutputModule
+
         start_module = start_port.parent_module
         target_module = target_port.parent_module
 
-        # If connecting to/from Output module, start playback (NEW process-based approach)
-        if isinstance(start_module, OutputModule) or isinstance(target_module, OutputModule):
+        # If connecting to/from Output module, start playback
+        if isinstance(start_module, OutputModule) or isinstance(
+            target_module, OutputModule
+        ):
             logger.info("Connection to/from Output module detected - starting playback")
             self._start_output_playback()
 
@@ -328,12 +331,17 @@ class ModularSynthWindow(QMainWindow):
 
         # Check if this disconnection involves an Output module
         from src.gui.modules.output.output import OutputModule
+
         start_module = start_port.parent_module
         target_module = target_port.parent_module
 
         # If disconnecting from Output module, check if we should stop playback
-        if isinstance(start_module, OutputModule) or isinstance(target_module, OutputModule):
-            logger.info("Disconnection from Output module detected - checking playback state")
+        if isinstance(start_module, OutputModule) or isinstance(
+            target_module, OutputModule
+        ):
+            logger.info(
+                "Disconnection from Output module detected - checking playback state"
+            )
             self._start_output_playback()  # Will check connections and stop if none
 
     def _start_output_playback(self):
@@ -358,7 +366,8 @@ class ModularSynthWindow(QMainWindow):
 
         logger.info(f"Found Output module: {output_module}")
 
-        # Simply start playback - the Output module's process chain will handle everything
+        # Simply start playback - the Output module's process chain will handle
+        # everything
         try:
             output_module.start_playback()
             self.statusbar.showMessage("Playback started (process-based)")
@@ -396,6 +405,7 @@ class ModularSynthWindow(QMainWindow):
 
         # Small delay to ensure clean stop
         from PyQt6.QtCore import QTimer
+
         QTimer.singleShot(100, lambda: self._delayed_start_playback(output_module))
 
     def _delayed_start_playback(self, output_module):
@@ -664,7 +674,7 @@ class ModularSynthWindow(QMainWindow):
         for module in self.patch_canvas.get_modules():
             if isinstance(module, OutputModule):
                 if module.audio_output.is_playing:
-                    logger.info(f"Stopping Output module before clearing patch")
+                    logger.info("Stopping Output module before clearing patch")
                     module.stop_playback()
 
     def _save_as_library_preset(self):

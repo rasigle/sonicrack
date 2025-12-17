@@ -269,7 +269,7 @@ class FilterModule(ModuleWidget):
         input_signal = self.in_port.read()
 
         # Create filter component if not already created
-        if not hasattr(self, '_filter_component') or self._filter_component is None:
+        if not hasattr(self, "_filter_component") or self._filter_component is None:
             cutoff = self.cutoff_knob.get_value()
             high_cutoff = self.high_cutoff_knob.get_value()
             order = int(self.order_slider.get_value())
@@ -300,4 +300,3 @@ class FilterModule(ModuleWidget):
 
         # Write to output port
         self.out_port.write(output_signal)
-

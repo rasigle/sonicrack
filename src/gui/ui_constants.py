@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 from src.constants import RESOURCES_PATH
@@ -16,3 +17,8 @@ DEBOUNCE_TIMER_DELAY_MS = 50
 MIN_PW_PERCENTAGE_VALUE = 1
 MAX_PW_PERCENTAGE_VALUE = 99
 DEFAULT_PW_PERCENTAGE_VALUE = 50
+
+
+# Default options (can be extended later or loaded from config file)
+DEFAULT_SAMPLE_RATES: Sequence[int] = (22050, 44100, 48000, 88200, 96000)
+DEFAULT_BUFFER_SIZES: Sequence[int] = (128, 256, 512, 1024, 2048, 4096)

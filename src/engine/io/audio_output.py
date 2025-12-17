@@ -227,7 +227,11 @@ class AudioOutput:
                     actual_len = segment.shape[0]
                     if actual_len > 0:
                         fade_curve = np.linspace(
-                            1.0 - (self.fade_in_samples_remaining / self.fade_in_total_samples),
+                            1.0
+                            - (
+                                self.fade_in_samples_remaining
+                                / self.fade_in_total_samples
+                            ),
                             1.0
                             - (
                                 (self.fade_in_samples_remaining - actual_len)
@@ -253,7 +257,8 @@ class AudioOutput:
                         actual_len = segment.shape[0]
                         if actual_len > 0:
                             fade_curve = np.linspace(
-                                self.fade_out_samples_remaining / self.fade_out_total_samples,
+                                self.fade_out_samples_remaining
+                                / self.fade_out_total_samples,
                                 (self.fade_out_samples_remaining - actual_len)
                                 / self.fade_out_total_samples,
                                 actual_len,

@@ -5,6 +5,7 @@ The Port class now uses PortWidget (UI) + Port (logic).
 
 For pure logic tests without Qt, see tests/core/test_port_model.py
 """
+
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -258,7 +259,6 @@ class TestPortEdgeCases:
         # Should raise ValueError
         with pytest.raises(ValueError, match="Cannot connect a port to itself"):
             port.connect(port)
-
 
     def test_circular_connection(self):
         """Test circular connections (A->B->A)."""
@@ -690,7 +690,6 @@ class TestPortModelEdgeCases:
 
         with pytest.raises(ValueError, match="Cannot connect a port to itself"):
             port.connect(port)
-
 
     def test_large_value(self):
         """Test with large floating point values."""
@@ -1274,7 +1273,6 @@ class TestPortNumpySupport:
 
         # Should equal the array (0 adds nothing)
         np.testing.assert_array_equal(result, array)
-
 
 
 if __name__ == "__main__":

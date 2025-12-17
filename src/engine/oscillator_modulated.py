@@ -87,7 +87,11 @@ class ModulatedOscillator(Generator):
         category=ComponentCategory.OSCILLATOR,
         description="Oscillator with modulation support (amplitude, frequency, phase)",
         tags=["oscillator", "modulated", "advanced"],
-        config_params=["gain_db", "frequency", "phase",],
+        config_params=[
+            "gain_db",
+            "frequency",
+            "phase",
+        ],
     )
 
     def __init__(

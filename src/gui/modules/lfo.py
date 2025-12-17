@@ -10,7 +10,7 @@ from src.engine.oscillator import (
     SineOscillator,
     SawtoothOscillator,
     TriangleOscillator,
-    SquareOscillator
+    SquareOscillator,
 )
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
@@ -24,7 +24,6 @@ from src.gui.widgets.module_widget import ModuleWidget
 
 if TYPE_CHECKING:
     from src.gui.core.port import Port
-
 
 
 LFO_MIN_FREQUENCY = 0.01
@@ -168,26 +167,26 @@ class LFOModule(ModuleWidget):
             freq,
             gain_db=LFO_DEFAULT_GAIN_DB,
             wave_range=(-1, 1),
-            sample_rate=sample_rate
+            sample_rate=sample_rate,
         )
         self._triangle_oscillator = TriangleOscillator(
             freq,
             gain_db=LFO_DEFAULT_GAIN_DB,
             wave_range=(-1, 1),
-            sample_rate=sample_rate
+            sample_rate=sample_rate,
         )
         self._sawtooth_oscillator = SawtoothOscillator(
             freq,
             gain_db=LFO_DEFAULT_GAIN_DB,
             wave_range=(-1, 1),
-            sample_rate=sample_rate
+            sample_rate=sample_rate,
         )
         self._square_oscillator = SquareOscillator(
             freq,
             gain_db=LFO_DEFAULT_GAIN_DB,
             wave_range=(-1, 1),
             pulsewidth=pulsewidth,
-            sample_rate=sample_rate
+            sample_rate=sample_rate,
         )
 
     @staticmethod
@@ -215,4 +214,3 @@ class LFOModule(ModuleWidget):
                 samples = osc.get_samples(num_samples)
                 # Write to port for downstream modules
                 port.write(samples)
-

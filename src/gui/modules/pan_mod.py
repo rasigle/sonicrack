@@ -71,6 +71,7 @@ class PannerModule(ModulatedModuleBase):
             if samples is not None:
                 # Apply panning (simplified for process-based flow)
                 import numpy as np
+
                 position = self.pan_knob.get_value()
 
                 # Convert to stereo if mono

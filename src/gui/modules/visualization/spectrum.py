@@ -173,7 +173,10 @@ class SpectrumModule(ModuleWidget):
         Args:
             num_samples: Number of samples to process
         """
-        logger.debug(f"Spectrum: process() called, in_port.is_connected={self.in_port.is_connected}")
+        logger.debug(
+            f"Spectrum: process() called, "
+            f"in_port.is_connected={self.in_port.is_connected}"
+        )
 
         if num_samples is None:
             num_samples = audio_config.buffer_size
@@ -188,7 +191,10 @@ class SpectrumModule(ModuleWidget):
 
         # Read input samples
         samples = self.in_port.read()
-        logger.debug(f"Spectrum: Read samples: {samples is not None}, type={type(samples) if samples is not None else None}")
+        logger.debug(
+            f"Spectrum: Read samples: {samples is not None}, "
+            f"type={type(samples) if samples is not None else None}"
+        )
 
         if samples is None:
             self.spectrum_display.clear()

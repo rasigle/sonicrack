@@ -109,7 +109,7 @@ class OutputModule(ModuleWidget):
         Also stops playback if there are no connections.
         """
         # Debug: Check connection status
-        logger.info(f"OutputModule.start_playback() called")
+        logger.info("OutputModule.start_playback() called")
         logger.info(f"  input_port.is_connected = {self.inp_port_l.is_connected}")
         logger.info(f"  input_port.connected_to = {self.inp_port_l.connected_to}")
         logger.info(f"  Number of connections: {len(self.inp_port_l.connected_to)}")

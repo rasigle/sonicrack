@@ -105,6 +105,7 @@ class VolumeModule(ModulatedModuleBase):
                     Implements the iterator protocol and get_samples() method
                     that ModulatedVolume expects.
                     """
+
                     def __init__(self, port):
                         self.port = port
 
@@ -117,11 +118,16 @@ class VolumeModule(ModulatedModuleBase):
                         value = self.port.read()
                         if value is None:
                             return 0.0
-                        return float(value) if not hasattr(value, '__len__') else float(value[0])
+                        return (
+                            float(value)
+                            if not hasattr(value, "__len__")
+                            else float(value[0])
+                        )
 
                     def get_samples(self, n, reset=False, mode="vectorized"):
                         """Read samples from port (vectorized interface)."""
                         import numpy as np
+
                         value = self.port.read()
                         if value is None:
                             return np.zeros(n, dtype=np.float32)
@@ -135,7 +141,7 @@ class VolumeModule(ModulatedModuleBase):
                             else:
                                 # Pad with zeros
                                 result = np.zeros(n, dtype=np.float32)
-                                result[:len(value)] = value
+                                result[: len(value)] = value
                                 return result
                         else:
                             # Scalar - repeat n times

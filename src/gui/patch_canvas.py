@@ -196,29 +196,62 @@ class PatchCanvas(QGraphicsView):
             # Get selected items
             selected_items = self.scene.selectedItems()
 
-            # Delete selected cables
+            # Collect all cables and modules to delete
+            cables_to_delete = []
+            modules_to_delete = []
+
             for item in selected_items:
                 if isinstance(item, Cable):
-                    self.delete_cable(item, emit_signal=True)
+                    cables_to_delete.append(item)
+                elif isinstance(item, ModuleWidget):
+                    modules_to_delete.append(item)
 
-            # Delete selected modules (and their connected cables)
-            from src.gui.widgets.module_widget import ModuleWidget
+            # Delete cables for selected modules FIRST (collect their cables)
+            for module in modules_to_delete:
+                for port in module.input_ports + module.output_ports:
+                    # Add cables to deletion list (avoid duplicates)
+                    for cable in port.cables[:]:
+                        if cable not in cables_to_delete:
+                            cables_to_delete.append(cable)
 
-            for item in selected_items:
-                if isinstance(item, ModuleWidget):
-                    # First, remove all cables connected to this module's ports
-                    cables_to_remove = []
-                    for port in item.input_ports + item.output_ports:
-                        cables_to_remove.extend(port.cables[:])  # Copy list
+            # Now delete all cables at once WITHOUT emitting signals yet
+            disconnected_ports = []
+            for cable in cables_to_delete:
+                # Store port references for later signal emission
+                if cable.start_port and cable.end_port:
+                    disconnected_ports.append((cable.start_port, cable.end_port))
+                # Remove cable WITHOUT emitting signal
+                cable.remove()
 
-                    for cable in cables_to_remove:
-                        self.delete_cable(cable, emit_signal=True)
+            # Delete all modules
+            for module in modules_to_delete:
+                # Clear port data to prevent stale audio
+                for port in module.input_ports + module.output_ports:
+                    try:
+                        port.port.clear()
+                    except (RuntimeError, AttributeError):
+                        pass  # Port might already be cleared
 
-                    # Emit signal that module is being deleted
-                    self.module_deleted.emit(item)
+                # Emit signal that module is being deleted
+                self.module_deleted.emit(module)
 
-                    # Remove the module itself
-                    self.scene.removeItem(item)
+                # Remove the module itself
+                try:
+                    self.scene.removeItem(module)
+                except RuntimeError:
+                    pass  # Already removed
+
+            # NOW emit disconnection signals (after all deletions complete)
+            # This triggers a SINGLE audio recompilation instead of many
+            if disconnected_ports:
+                # Just emit the first one - this will trigger recompilation
+                # which will discover all the changes
+                start_port, end_port = disconnected_ports[0]
+                try:
+                    if start_port and end_port:
+                        self.cable_disconnected.emit(start_port, end_port)
+                except (RuntimeError, AttributeError):
+                    pass  # Ports might be deleted
 
             event.accept()
             return

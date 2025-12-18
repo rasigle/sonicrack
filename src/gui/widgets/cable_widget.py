@@ -155,18 +155,50 @@ class Cable(QGraphicsItem):
         return stroker.createStroke(path)
 
     def remove(self):
-        """Remove this cable from the scene and disconnect from ports."""
-        # Disconnect the underlying Port data models FIRST
-        if self.start_port and self.end_port:
-            self.start_port.port.disconnect(self.end_port.port)
+        """Remove this cable from the scene and disconnect from ports.
 
-        # Then remove cable from UI
-        if self.start_port:
-            self.start_port.remove_cable(self)
-        if self.end_port:
-            self.end_port.remove_cable(self)
-        if self.scene():
-            self.scene().removeItem(self)
+        This method is defensive against race conditions and handles cases where
+        ports might already be deleted or None.
+        """
+        # Store local references to avoid accessing potentially deleted objects
+        start = self.start_port
+        end = self.end_port
+
+        # Disconnect the underlying Port data models FIRST
+        # Use try-except to handle cases where ports might be deleted
+        if start and end:
+            try:
+                # Check if ports still exist and have valid port models
+                if hasattr(start, 'port') and hasattr(end, 'port'):
+                    if start.port and end.port:
+                        start.port.disconnect(end.port)
+            except (RuntimeError, AttributeError) as e:
+                # Port might have been deleted - this is okay during cleanup
+                pass
+
+        # Remove cable from port widget's cable list
+        if start:
+            try:
+                start.remove_cable(self)
+            except (RuntimeError, AttributeError):
+                pass  # Port might be deleted
+
+        if end:
+            try:
+                end.remove_cable(self)
+            except (RuntimeError, AttributeError):
+                pass  # Port might be deleted
+
+        # Remove from scene
+        try:
+            if self.scene():
+                self.scene().removeItem(self)
+        except RuntimeError:
+            pass  # Already removed or scene deleted
+
+        # Clear references to help garbage collection
+        self.start_port = None
+        self.end_port = None
 
     def hoverEnterEvent(self, event):
         """Handle mouse hover enter."""

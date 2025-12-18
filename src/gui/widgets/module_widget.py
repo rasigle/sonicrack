@@ -433,30 +433,48 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
                 # Clear all port data to prevent stale audio
                 for port in self.input_ports + self.output_ports:
-                    port.port.clear()
+                    try:
+                        if hasattr(port, 'port') and port.port:
+                            port.port.clear()
+                    except (RuntimeError, AttributeError):
+                        pass  # Port might already be cleared or deleted
 
                 # Collect all cables to remove
                 cables_to_remove = []
                 for port in self.input_ports + self.output_ports:
-                    cables_to_remove.extend(port.cables[:])
+                    try:
+                        cables_to_remove.extend(port.cables[:])
+                    except (RuntimeError, AttributeError):
+                        pass  # Port might be deleted
 
                 # Remove cables silently (without triggering signals)
                 # This prevents multiple patch recompilations during deletion
                 for cable in cables_to_remove:
-                    # Disconnect the underlying Port data models
-                    if cable.start_port and cable.end_port:
-                        cable.start_port.port.disconnect(cable.end_port.port)
+                    try:
+                        # Disconnect the underlying Port data models
+                        if cable.start_port and cable.end_port:
+                            if (hasattr(cable.start_port, 'port') and
+                                hasattr(cable.end_port, 'port')):
+                                if cable.start_port.port and cable.end_port.port:
+                                    cable.start_port.port.disconnect(cable.end_port.port)
 
-                    # Remove cable from UI
-                    if cable.start_port:
-                        cable.start_port.remove_cable(cable)
-                    if cable.end_port:
-                        cable.end_port.remove_cable(cable)
-                    if cable.scene():
-                        cable.scene().removeItem(cable)
+                        # Remove cable from UI
+                        if cable.start_port:
+                            cable.start_port.remove_cable(cable)
+                        if cable.end_port:
+                            cable.end_port.remove_cable(cable)
+                        if cable.scene():
+                            cable.scene().removeItem(cable)
+                    except (RuntimeError, AttributeError) as e:
+                        # Cable or port might already be deleted - this is okay
+                        logger.debug(f"Ignoring error during cable cleanup: {e}")
+                        pass
 
                 # Remove the module from scene (after this, self.scene() becomes None)
-                scene.removeItem(self)
+                try:
+                    scene.removeItem(self)
+                except RuntimeError:
+                    pass  # Already removed
 
                 # Mark patch as modified and trigger playback restart
                 if canvas and isinstance(canvas, PatchCanvas):

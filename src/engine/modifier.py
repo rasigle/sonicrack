@@ -197,6 +197,7 @@ class Panner(Modifier):
         """Set pan position and update gains with smoothing."""
         self._position = np.clip(value, -1.0, 1.0)
         self._update_gains()
+
         # Initiate smooth transition (prevents clicks)
         self._target_left_gain = self._left_gain
         self._target_right_gain = self._right_gain

@@ -276,9 +276,6 @@ class ModularSynthWindow(QMainWindow):
         # Initialize the module to add with default parameters
         module_instance = module_class()
 
-        # Connect parameter change signal to auto-compile
-        module_instance.parameter_changed.connect(self._on_parameter_changed)
-
         self.patch_canvas.add_module(module_instance)
         self.statusbar.showMessage(f"Added {module_name}")
         logger.info(f"Added module: {module_name}")
@@ -756,9 +753,6 @@ class ModularSynthWindow(QMainWindow):
                         module_instance.set_parameter(param_name, param_value)
                     except Exception as e:
                         logger.warning(f"Failed to set parameter {param_name}: {e}")
-
-            # Connect parameter change signal
-            module_instance.parameter_changed.connect(self._on_parameter_changed)
 
             # Add to canvas
             self.patch_canvas.add_module(module_instance)

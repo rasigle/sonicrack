@@ -7,7 +7,8 @@ by an external CV source (like MIDI Input). Perfect for MIDI-controlled synthesi
 from typing import Any
 
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QComboBox
+from PyQt6 import QtWidgets
+from PyQt6.QtWidgets import QHBoxLayout, QLabel
 
 from src.constants import DEFAULT_GAIN_DB
 from src.engine import (
@@ -53,10 +54,21 @@ class ModulatedOscillatorModule(ModuleWidget):
             color=QColor(100, 140, 220),
         )
 
-        # Add ports
+        # Initialize default parameters FIRST (before creating component)
+        self._waveform = "Sine"
+        self._base_frequency = 440.0
+        self._gain_db = DEFAULT_GAIN_DB
+        self._phase = 0.0
+
+        # Create the base oscillator component FIRST
+        self.component = self._create_base_oscillator()
+
+        # Add ports with component reference
+        # Note: Input ports don't have components (they receive signals)
+        # Output port has the component reference
         self.freq_input = self.add_input("Freq")
         self.gain_mod_input = self.add_input("Gain")
-        self.out_port = self.add_output("Out")
+        self.out_port = self.add_output("Out", component=self.component)
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -65,23 +77,21 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Waveform selector
         wave_layout = QHBoxLayout()
         wave_layout.addWidget(QLabel("Wave:"))
-        self.wave_combo = QComboBox()
+        self.wave_combo = QtWidgets.QComboBox()
         self.wave_combo.addItems(["Sine", "Square", "Sawtooth", "Triangle"])
+        self.wave_combo.setCurrentText(self._waveform)
         self.wave_combo.currentTextChanged.connect(self._on_wave_changed)
         wave_layout.addWidget(self.wave_combo)
         layout.addLayout(wave_layout)
 
         # Frequency control (base frequency when no modulation)
         knobs_layout = QHBoxLayout()
-        self.freq_knob = Knob("Base Hz", 20, 2000, 440)
+        self.freq_knob = Knob("Base Hz", 20, 2000, self._base_frequency)
         self.freq_knob.setToolTip(
             "Base frequency (Hz)\n"
-            "Active when Freq input is disconnected\n"
-            "Recompile patch after connection changes"
+            "Active when Freq input is disconnected"
         )
-        self.freq_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("frequency", self.freq_knob.get_value())
-        )
+        self.freq_knob.value_changed.connect(self._on_frequency_changed)
         knobs_layout.addWidget(self.freq_knob)
 
         # Gain in dB
@@ -114,17 +124,83 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         self.component = self.create_engine_component()
 
+    def _create_base_oscillator(self):
+        """Create the base oscillator component based on current waveform."""
+        if self._waveform == "Sine":
+            return SineOscillator(
+                self._base_frequency,
+                gain_db=self._gain_db,
+                phase=self._phase
+            )
+        elif self._waveform == "Square":
+            return SquareOscillator(
+                self._base_frequency,
+                gain_db=self._gain_db,
+                phase=self._phase
+            )
+        elif self._waveform == "Sawtooth":
+            return SawtoothOscillator(
+                self._base_frequency,
+                gain_db=self._gain_db,
+                phase=self._phase
+            )
+        elif self._waveform == "Triangle":
+            return TriangleOscillator(
+                self._base_frequency,
+                gain_db=self._gain_db,
+                phase=self._phase
+            )
+        else:
+            # Default to sine
+            return SineOscillator(
+                self._base_frequency,
+                gain_db=self._gain_db,
+                phase=self._phase
+            )
+
     def _on_wave_changed(self, wave_type: str):
-        """Handle waveform type change."""
+        """Handle waveform type change by recreating the component."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        self._waveform = wave_type
+        logger.debug(f"VCO: Waveform changed to {wave_type}")
+
+        # Recreate the base oscillator with new waveform
+        self.component = self._create_base_oscillator()
+        # Update the port's component reference
+        self.out_port.component = self.component
+
         self.parameter_changed.emit("waveform", wave_type)
 
-    def _on_gain_changed(self):
-        """Handle gain knob change."""
+    def _on_frequency_changed(self):
+        """Handle frequency knob change by updating the component."""
         import logging
-
         logger = logging.getLogger(__name__)
+
+        new_freq = self.freq_knob.get_value()
+        self._base_frequency = new_freq
+        logger.debug(f"VCO: Frequency changed to {new_freq} Hz")
+
+        # Hotswap: update frequency directly on the component if possible
+        if hasattr(self.component, 'frequency'):
+            self.component.frequency = new_freq
+
+        self.parameter_changed.emit("frequency", new_freq)
+
+    def _on_gain_changed(self):
+        """Handle gain knob change by updating the component."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         gain_value = self.gain_knob.get_value()
-        logger.debug(f"VCO Gain changed to {gain_value} dB")
+        self._gain_db = gain_value
+        logger.debug(f"VCO: Gain changed to {gain_value} dB")
+
+        # Hotswap: update gain_db directly on the component if possible
+        if hasattr(self.component, 'gain_db'):
+            self.component.gain_db = gain_value
+
         self.parameter_changed.emit("gain_db", gain_value)
 
     def get_required_inputs(self) -> list[str]:
@@ -133,23 +209,84 @@ class ModulatedOscillatorModule(ModuleWidget):
         return []  # No required inputs - Freq and Gain are optional
 
     def process(self, num_samples: int = 1):
-        """Process audio through the VCO.
+        """Process audio through the VCO with optional frequency and gain modulation.
 
-        The VCO generates audio samples based on its current state
-        (frequency, waveform, modulation).
+        The VCO generates audio samples based on its current state and any
+        connected modulation sources.
 
         Args:
             num_samples: Number of samples to generate
         """
-        # For process-based flow, we'd read modulation inputs and generate samples
-        # This is a placeholder as we currently rely on create_engine_component
-        if self.out_port.is_connected:
-            # In a full process-based implementation, we would:
-            # 1. Read freq_input if connected
-            # 2. Read gain_mod_input if connected
-            # 3. Generate samples with modulation
-            # 4. Write to out_port
-            pass
+        import logging
+        import numpy as np
+
+        logger = logging.getLogger(__name__)
+
+        # Check if output is needed
+        if not self.out_port.is_connected:
+            return
+
+        # Check for modulation inputs
+        has_freq_mod = self.freq_input.is_connected
+        has_gain_mod = self.gain_mod_input.is_connected
+
+        # Read modulation signals if connected
+        freq_signal = None
+        gain_signal = None
+
+        if has_freq_mod:
+            freq_signal = self.freq_input.read(num_samples)
+            logger.debug(f"VCO: Read freq modulation, shape={np.shape(freq_signal) if freq_signal is not None else None}")
+
+        if has_gain_mod:
+            gain_signal = self.gain_mod_input.read(num_samples)
+            logger.debug(f"VCO: Read gain modulation, shape={np.shape(gain_signal) if gain_signal is not None else None}")
+
+        # Generate samples based on modulation state
+        if has_freq_mod or has_gain_mod:
+            # Create ModulatedOscillator for this processing cycle
+            modulators = []
+            amp_mod = None
+            freq_mod = None
+
+            # Helper class to wrap signals for ModulatedOscillator
+            class SignalGenerator:
+                def __init__(self, signal):
+                    self.signal = signal
+                    self.idx = 0
+
+                def get_samples(self, n):
+                    if isinstance(self.signal, (int, float)):
+                        return np.full(n, self.signal)
+                    result = self.signal[self.idx:self.idx + n]
+                    self.idx += n
+                    return result
+
+            if has_gain_mod and gain_signal is not None:
+                gain_gen = SignalGenerator(gain_signal)
+                modulators.append(gain_gen)
+                amp_mod = lambda base_amp, cv_amp: base_amp * cv_amp
+
+            if has_freq_mod and freq_signal is not None:
+                freq_gen = SignalGenerator(freq_signal)
+                modulators.append(freq_gen)
+                freq_mod = lambda base_freq, cv_freq: cv_freq  # Use CV frequency directly
+
+            # Create modulated oscillator
+            modulated_osc = ModulatedOscillator(
+                self.component,
+                *modulators,
+                amp_mod=amp_mod,
+                freq_mod=freq_mod
+            )
+
+            samples = modulated_osc.get_samples(num_samples)
+        else:
+            # No modulation - use base oscillator
+            samples = self.component.get_samples(num_samples)
+
+        # Write to output port
+        self.out_port.write(samples)
 
     def get_modulation_inputs(self) -> list[str]:
         """VCO accepts modulation on Gain port."""
@@ -166,26 +303,17 @@ class ModulatedOscillatorModule(ModuleWidget):
     def update_knob_state(self):
         """Update knob enabled state based on port connections.
 
-        This is called when connections change to provide immediate visual feedback,
-        even if compilation fails.
+        This is called when connections change to provide immediate visual feedback.
         """
         import logging
 
         logger = logging.getLogger(__name__)
 
-        # Check Freq port
-        freq_port = None
-        for port in self.input_ports:
-            if port.port_name == "Freq":
-                freq_port = port
-                break
-
-        has_freq_cv = freq_port and len(freq_port.cables) > 0
+        # Check if Freq input is connected
+        has_freq_cv = self.freq_input.is_connected
 
         logger.debug(
-            f"VCO update_knob_state: Freq port has "
-            f"{len(freq_port.cables) if freq_port else 0} cables, "
-            f"has_freq_cv={has_freq_cv}"
+            f"VCO update_knob_state: Freq port connected={has_freq_cv}"
         )
 
         if has_freq_cv:
@@ -201,19 +329,11 @@ class ModulatedOscillatorModule(ModuleWidget):
             self.freq_knob.setToolTip("Manual frequency control (Hz)")
             logger.debug("VCO: Freq knob ENABLED")
 
-        # Check Gain port
-        gain_port = None
-        for port in self.input_ports:
-            if port.port_name == "Gain":
-                gain_port = port
-                break
-
-        has_gain_cv = gain_port and len(gain_port.cables) > 0
+        # Check if Gain input is connected
+        has_gain_cv = self.gain_mod_input.is_connected
 
         logger.debug(
-            f"VCO update_knob_state: Gain port has "
-            f"{len(gain_port.cables) if gain_port else 0} cables, "
-            f"has_gain_cv={has_gain_cv}"
+            f"VCO update_knob_state: Gain port connected={has_gain_cv}"
         )
 
         if has_gain_cv:

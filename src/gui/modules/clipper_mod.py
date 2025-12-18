@@ -2,6 +2,7 @@
 
 import logging
 
+import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
@@ -75,14 +76,19 @@ class ClipperModulatedModule(ModulatedModuleBase):
         Args:
             num_samples: Number of samples to process
         """
-        # Process-based architecture: read from input, process, write to output
-        if self.in_port.is_connected:
-            samples = self.in_port.read()
-            if samples is not None:
-                # Apply clipping (simplified version for process-based flow)
-                threshold = self.threshold_knob.get_value()
-                clipped = samples.clip(-threshold, threshold)
-                self.out_port.write(clipped)
+        if not self.in_port.is_connected:
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+            return
+
+        samples = self.in_port.read(num_samples)
+        if samples is None:
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+            return
+            
+        # Apply clipping (simplified version for process-based flow)
+        threshold = self.threshold_knob.get_value()
+        clipped = samples.clip(-threshold, threshold)
+        self.out_port.write(clipped)
 
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):

@@ -1,5 +1,9 @@
-import logging
+from __future__ import annotations
 
+import logging
+from typing import TYPE_CHECKING
+
+import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
@@ -9,6 +13,9 @@ from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
 from src.gui.widgets import Knob
+
+if TYPE_CHECKING:
+    from src.gui.core.port import Port
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +39,9 @@ class VolumeModule(ModulatedModuleBase):
         )
 
         # Add ports
-        self.in_port = self.add_input("In")
-        self.mod_port = self.add_input("Mod")
-        self.out_port = self.add_output("Out")
+        self.in_port: Port = self.add_input("In")
+        self.mod_port: Port = self.add_input("Mod")
+        self.out_port: Port = self.add_output("Out")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -80,13 +87,13 @@ class VolumeModule(ModulatedModuleBase):
         """
         # Check if input is connected
         if not self.in_port.is_connected:
-            self.out_port.write(0.0)
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
             return
 
-        # Read input signal
-        input_signal = self.in_port.read()
+        # Read input signal - MUST pass num_samples to trigger upstream generation
+        input_signal = self.in_port.read(num_samples)
         if input_signal is None:
-            self.out_port.write(0.0)
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
             return
 
         # Check if modulation connection state changed
@@ -97,58 +104,23 @@ class VolumeModule(ModulatedModuleBase):
             logger.info(f"VolumeModule: Modulation state changed to {is_modulated}")
 
             if is_modulated:
-                # Modulation just connected - create ModulatedVolume
-                # Create a modulator that reads from the mod port
-                class PortModulator:
-                    """Simple modulator that reads from a port.
+                # Modulation just connected - get component from connected port
+                connected_ports = list(self.mod_port.connected_to)
+                if connected_ports:
+                    connected_port = connected_ports[0]
 
-                    Implements the iterator protocol and get_samples() method
-                    that ModulatedVolume expects.
-                    """
+                    # Direct access to the engine component via port.component
+                    modulator_component = connected_port.component
 
-                    def __init__(self, port):
-                        self.port = port
-
-                    def __iter__(self):
-                        """Make this iterable."""
-                        return self
-
-                    def __next__(self):
-                        """Iterator protocol - return next sample."""
-                        value = self.port.read()
-                        if value is None:
-                            return 0.0
-                        return (
-                            float(value)
-                            if not hasattr(value, "__len__")
-                            else float(value[0])
-                        )
-
-                    def get_samples(self, n, reset=False, mode="vectorized"):
-                        """Read samples from port (vectorized interface)."""
-                        import numpy as np
-
-                        value = self.port.read()
-                        if value is None:
-                            return np.zeros(n, dtype=np.float32)
-
-                        # If value is already an array with correct size, return it
-                        if isinstance(value, np.ndarray):
-                            if len(value) == n:
-                                return value.astype(np.float32)
-                            elif len(value) > n:
-                                return value[:n].astype(np.float32)
-                            else:
-                                # Pad with zeros
-                                result = np.zeros(n, dtype=np.float32)
-                                result[: len(value)] = value
-                                return result
-                        else:
-                            # Scalar - repeat n times
-                            return np.full(n, float(value), dtype=np.float32)
-
-                mod_comp = PortModulator(self.mod_port)
-                self.component = self.create_modulated_component(mod_comp)
+                    if modulator_component:
+                        logger.info(f"VolumeModule: Creating ModulatedVolume with {type(modulator_component).__name__}")
+                        self.component = self.create_modulated_component(modulator_component)
+                    else:
+                        logger.warning("VolumeModule: Connected port has no component - using unmodulated")
+                        self.component = self.create_unmodulated_component()
+                else:
+                    logger.warning("VolumeModule: Mod port connected but no ports found")
+                    self.component = self.create_unmodulated_component()
 
                 # Disable knob
                 self.gain_knob.setEnabled(False)
@@ -167,7 +139,7 @@ class VolumeModule(ModulatedModuleBase):
 
         # Safety check: component must exist
         if self.component is None:
-            self.out_port.write(0.0)
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
             return
 
         # Update component parameters if not modulated
@@ -177,6 +149,9 @@ class VolumeModule(ModulatedModuleBase):
             self.component.gain_db = gain_db
 
         # Process through the component (Volume or ModulatedVolume)
+
+        # Both Volume and ModulatedVolume use __call__ for processing
+        # ModulatedVolume automatically handles vectorized processing
         output_signal = self.component(input_signal)
 
         # Write to output port
@@ -194,6 +169,7 @@ class VolumeModule(ModulatedModuleBase):
             ModulatedVolume instance
         """
         logger.info(f"VolumeModule: Creating ModulatedVolume with modulator {mod_comp}")
+
         # ModulatedVolume expects a generator as the modulation source
         # The modulation will control the gain_db parameter
         return ModulatedVolume(mod_comp, modulation_target="gain_db")

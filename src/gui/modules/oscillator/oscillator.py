@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 OSCILLATOR_DEFAULT_GAIN_DB = 0.0
 OSCILLATOR_DEFAULT_FREQUENCY = 120
 OSCILLATOR_MIN_FREQUENCY = 20
-OSCILLATOR_MAX_FREQUENCY = 2000
+OSCILLATOR_MAX_FREQUENCY = 6000
 
 
 @register_module()
@@ -49,17 +49,48 @@ class OscillatorModule(ModuleWidget):
             color=QColor(80, 120, 200),
         )
 
+        # Create oscillator components FIRST (before creating ports)
+        # This allows us to pass component references to ports
+        freq = OSCILLATOR_DEFAULT_FREQUENCY
+        sample_rate = audio_config.sample_rate
+        pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
+
+        self._sine_oscillator = SineOscillator(
+            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
+        )
+        self._triangle_oscillator = TriangleOscillator(
+            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
+        )
+        self._sawtooth_oscillator = SawtoothOscillator(
+            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
+        )
+        self._square_oscillator = SquareOscillator(
+            freq,
+            gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
+            pulsewidth=pulsewidth,
+            sample_rate=sample_rate,
+        )
+
         # Add four output ports - one for each waveform
-        self.sine_port: Port = self.add_output("Sine")
-        self.triangle_port: Port = self.add_output("Triangle")
-        self.sawtooth_port: Port = self.add_output("Sawtooth")
-        self.square_port: Port = self.add_output("Square")
+        # Pass component references so ports know their associated engine components
+        self.sine_port: Port = self.add_output("Sine", component=self._sine_oscillator)
+        self.triangle_port: Port = self.add_output("Triangle", component=self._triangle_oscillator)
+        self.sawtooth_port: Port = self.add_output("Sawtooth", component=self._sawtooth_oscillator)
+        self.square_port: Port = self.add_output("Square", component=self._square_oscillator)
+
         self.ports = [
             self.sine_port,
             self.triangle_port,
             self.sawtooth_port,
             self.square_port,
         ]
+        self.oscs = [
+            self._sine_oscillator,
+            self._triangle_oscillator,
+            self._sawtooth_oscillator,
+            self._square_oscillator,
+        ]
+
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -95,19 +126,6 @@ class OscillatorModule(ModuleWidget):
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
-        # Track individual oscillator components for hotswap
-        self._sine_oscillator = None
-        self._triangle_oscillator = None
-        self._sawtooth_oscillator = None
-        self._square_oscillator = None
-
-        self._create_oscillators()
-        self.oscs = [
-            self._sine_oscillator,
-            self._triangle_oscillator,
-            self._sawtooth_oscillator,
-            self._square_oscillator,
-        ]
 
         # Register with audio_config to receive sample rate change notifications
         audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
@@ -158,26 +176,3 @@ class OscillatorModule(ModuleWidget):
         if self.square_port.is_connected:
             self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
 
-    def _create_oscillators(self):
-        freq = self.freq_knob.get_value()
-        # Use global sample rate from audio_config
-        sample_rate = audio_config.sample_rate
-
-        # Create oscillators with global sample rate
-        self._sine_oscillator = SineOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
-        )
-        self._triangle_oscillator = TriangleOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
-        )
-        self._sawtooth_oscillator = SawtoothOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
-        )
-
-        pulsewidth = self.pulsewidth_knob.get_value()
-        self._square_oscillator = SquareOscillator(
-            freq,
-            gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
-            pulsewidth=pulsewidth,
-            sample_rate=sample_rate,
-        )

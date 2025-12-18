@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from PyQt6.QtCore import Qt
@@ -6,9 +7,11 @@ from PyQt6.QtGui import QColor
 from src.constants import DEFAULT_GAIN_DB
 from src.engine import Volume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.core.module_registry import register_module
+
+logger = logging.getLogger(__name__)
 
 
 @register_module()
@@ -44,6 +47,7 @@ class SimpleVolumeModule(ModuleWidget):
         self.gain_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("gain_db", self.gain_knob.get_value())
         )
+        self.gain_knob.value_changed.connect(lambda: self._on_gain_changed)
         layout.addWidget(self.gain_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.controls_widget.setLayout(layout)
@@ -53,6 +57,20 @@ class SimpleVolumeModule(ModuleWidget):
         self.register_parameter("gain_db", self.gain_knob)
 
         self.component = self.create_engine_component()
+
+    def _on_gain_changed(self, channel_index: int):
+        """Handle gain knob changes by updating Volume component amplitude.
+
+        Args:
+            channel_index: Index of the channel (0-3)
+        """
+        new_gain = self.gain_knob.get_value()
+
+        # Update the Volume component amplitude (click-free)
+        self.component.amplitude = new_gain
+
+        logger.debug(f"🎚️ Volume: gain set to {new_gain:.3f}")
+
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -83,7 +101,7 @@ class SimpleVolumeModule(ModuleWidget):
             return
 
         # Read input signal and make sure we get valid data
-        input_signal = self.in_port.read()
+        input_signal = self.in_port.read(num_samples)
         if input_signal is None:
             self.out_port.write(0.0)
             return

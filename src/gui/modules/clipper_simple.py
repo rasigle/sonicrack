@@ -1,5 +1,7 @@
+import logging
 from typing import Any
 
+import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
@@ -8,6 +10,8 @@ from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.core.module_registry import register_module
+
+logger = logging.getLogger(__name__)
 
 
 @register_module()
@@ -37,13 +41,8 @@ class ClipperModule(ModuleWidget):
         layout = self._create_standard_layout()
 
         # Threshold knob
-        self.threshold_knob = Knob("Threshold", 0.1, 1.0, 1.0)
-        self.threshold_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "wave_range",
-                (-self.threshold_knob.get_value(), self.threshold_knob.get_value()),
-            )
-        )
+        self.threshold_knob = Knob("Threshold", 0.0, 1.0, 1.0)
+        self.threshold_knob.value_changed.connect(self._on_threshold_changed)
         layout.addWidget(self.threshold_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.controls_widget.setLayout(layout)
@@ -53,6 +52,20 @@ class ClipperModule(ModuleWidget):
         self.register_parameter("threshold", self.threshold_knob)
 
         self.component = self.create_engine_component()
+
+    def _on_threshold_changed(self):
+        """Handle threshold knob changes by updating Clipper component wave_range.
+
+        This method is called whenever the threshold knob value changes.
+        It updates the clipper's wave range to [-threshold, +threshold].
+        """
+        new_threshold = self.threshold_knob.get_value()
+        logger.debug(f"Clipper: threshold knob changed to {new_threshold:.3f}")
+
+        # Update the Clipper component wave_range (click-free)
+        if self.component:
+            self.component.wave_range = (-new_threshold, new_threshold)
+            logger.debug(f"Clipper: wave_range set to +/- {new_threshold:.3f}")
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -75,24 +88,23 @@ class ClipperModule(ModuleWidget):
         the output port.
 
         Args:
-            num_samples: Number of samples to process (default: 1 for per-sample processing)
+            num_samples: Number of samples to process
 
         Note:
-            In the current architecture, this method is not actively called during playback.
-            The audio engine directly calls get_samples() on the compiled AudioComponents.
-            This method exists to satisfy the AudioModule interface.
+            This method is called in the pull-based architecture to generate output samples.
         """
         if not self.in_port.is_connected:
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
             return
 
-        # Read input signal
-        input_signal = self.in_port.read()
+        # Read input signal - MUST pass num_samples to trigger upstream generation
+        input_signal = self.in_port.read(num_samples)
+        if input_signal is None:
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+            return
 
-        # Apply clipping
-        import numpy as np
-
-        threshold = self.threshold_knob.get_value()
-        output_signal = np.clip(input_signal, -threshold, threshold)
+        # Apply clipping through the component
+        output_signal = self.component(input_signal)
 
         # Write to output port
         self.out_port.write(output_signal)

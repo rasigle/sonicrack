@@ -53,11 +53,44 @@ class LFOModule(ModuleWidget):
             color=QColor(100, 140, 200),
         )
 
+        # Create oscillator components FIRST (before creating ports)
+        freq = LFO_DEFAULT_FREQUENCY
+        pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
+        sample_rate = audio_config.sample_rate
+
+        # Create oscillators with bipolar output for modulation
+        self._sine_oscillator = SineOscillator(
+            freq,
+            gain_db=LFO_DEFAULT_GAIN_DB,
+            wave_range=(-1, 1),
+            sample_rate=sample_rate,
+        )
+        self._triangle_oscillator = TriangleOscillator(
+            freq,
+            gain_db=LFO_DEFAULT_GAIN_DB,
+            wave_range=(-1, 1),
+            sample_rate=sample_rate,
+        )
+        self._sawtooth_oscillator = SawtoothOscillator(
+            freq,
+            gain_db=LFO_DEFAULT_GAIN_DB,
+            wave_range=(-1, 1),
+            sample_rate=sample_rate,
+        )
+        self._square_oscillator = SquareOscillator(
+            freq,
+            gain_db=LFO_DEFAULT_GAIN_DB,
+            wave_range=(-1, 1),
+            pulsewidth=pulsewidth,
+            sample_rate=sample_rate,
+        )
+
         # Add four output ports - one for each waveform
-        self.sine_port: Port = self.add_output("Sine")
-        self.triangle_port: Port = self.add_output("Triangle")
-        self.sawtooth_port: Port = self.add_output("Sawtooth")
-        self.square_port: Port = self.add_output("Square")
+        # Pass component references so ports know their associated engine components
+        self.sine_port: Port = self.add_output("Sine", component=self._sine_oscillator)
+        self.triangle_port: Port = self.add_output("Triangle", component=self._triangle_oscillator)
+        self.sawtooth_port: Port = self.add_output("Sawtooth", component=self._sawtooth_oscillator)
+        self.square_port: Port = self.add_output("Square", component=self._square_oscillator)
 
         # Store ports for easy iteration
         self.ports = [
@@ -65,6 +98,14 @@ class LFOModule(ModuleWidget):
             self.triangle_port,
             self.sawtooth_port,
             self.square_port,
+        ]
+
+        # Store oscillators for easy iteration
+        self.oscs = [
+            self._sine_oscillator,
+            self._triangle_oscillator,
+            self._sawtooth_oscillator,
+            self._square_oscillator,
         ]
 
         # Use helper methods for UI construction
@@ -102,22 +143,6 @@ class LFOModule(ModuleWidget):
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
-        # Track individual oscillator components
-        self._sine_oscillator = None
-        self._triangle_oscillator = None
-        self._sawtooth_oscillator = None
-        self._square_oscillator = None
-
-        # Create all oscillators
-        self._create_oscillators()
-
-        # Store oscillators for easy iteration
-        self.oscs = [
-            self._sine_oscillator,
-            self._triangle_oscillator,
-            self._sawtooth_oscillator,
-            self._square_oscillator,
-        ]
 
         # Register with audio_config to receive sample rate change notifications
         audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
@@ -155,39 +180,6 @@ class LFOModule(ModuleWidget):
         """Handle pulse width changes - only update square oscillator."""
         self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
 
-    def _create_oscillators(self):
-        """Create all LFO oscillators with bipolar output [-1, 1]."""
-        freq = self.freq_knob.get_value()
-        pulsewidth = self.pulsewidth_knob.get_value()
-        # Use global sample rate from audio_config
-        sample_rate = audio_config.sample_rate
-
-        # Create oscillators with bipolar output for modulation
-        self._sine_oscillator = SineOscillator(
-            freq,
-            gain_db=LFO_DEFAULT_GAIN_DB,
-            wave_range=(-1, 1),
-            sample_rate=sample_rate,
-        )
-        self._triangle_oscillator = TriangleOscillator(
-            freq,
-            gain_db=LFO_DEFAULT_GAIN_DB,
-            wave_range=(-1, 1),
-            sample_rate=sample_rate,
-        )
-        self._sawtooth_oscillator = SawtoothOscillator(
-            freq,
-            gain_db=LFO_DEFAULT_GAIN_DB,
-            wave_range=(-1, 1),
-            sample_rate=sample_rate,
-        )
-        self._square_oscillator = SquareOscillator(
-            freq,
-            gain_db=LFO_DEFAULT_GAIN_DB,
-            wave_range=(-1, 1),
-            pulsewidth=pulsewidth,
-            sample_rate=sample_rate,
-        )
 
     @staticmethod
     def get_cv_output_range() -> tuple[float, float]:
@@ -205,7 +197,8 @@ class LFOModule(ModuleWidget):
         and writes them to the corresponding output ports if connected.
 
         Args:
-            num_samples: Number of samples to generate (default: 1 for per-sample processing)
+            num_samples: Number of samples to generate (default: 1 for per-sample
+                processing)
         """
         # Generate samples for each connected output
         for port, osc in zip(self.ports, self.oscs):

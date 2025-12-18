@@ -192,24 +192,41 @@ class Port:
             return sum(values)
 
         # Mixed or all arrays - need to handle carefully
+        # If num_samples was requested, ensure all arrays match that size
         result = None
         for value in values:
             if result is None:
                 # Initialize with first value
-                result = (
-                    np.array(value)
-                    if not isinstance(value, np.ndarray)
-                    else value.copy()
-                )
+                if isinstance(value, np.ndarray):
+                    # If num_samples specified and array size doesn't match, adjust it
+                    if num_samples is not None and len(value) != num_samples:
+                        if len(value) < num_samples:
+                            # Pad with zeros
+                            padded = np.zeros(num_samples, dtype=value.dtype)
+                            padded[:len(value)] = value
+                            result = padded
+                        else:
+                            # Truncate to requested size
+                            result = value[:num_samples].copy()
+                    else:
+                        result = value.copy()
+                else:
+                    result = np.array(value)
             else:
                 # Add subsequent values
                 if isinstance(value, np.ndarray):
+                    # Adjust array size to match result if needed
                     if result.shape != value.shape:
-                        raise ValueError(
-                            f"Cannot mix arrays with different shapes: {result.shape} "
-                            f"vs {value.shape}"
-                        )
-                    result = result + value
+                        if len(value) < len(result):
+                            # Pad with zeros
+                            padded = np.zeros(len(result), dtype=value.dtype)
+                            padded[:len(value)] = value
+                            result = result + padded
+                        else:
+                            # Truncate to match result size
+                            result = result + value[:len(result)]
+                    else:
+                        result = result + value
                 else:
                     # Scalar - broadcast across array
                     result = result + value

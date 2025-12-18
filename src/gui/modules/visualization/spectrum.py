@@ -178,8 +178,11 @@ class SpectrumModule(ModuleWidget):
     def _update_display(self):
         """Update the spectrum display at 30 FPS (independent of audio rate).
 
-        This is called by the visualization timer and actively pulls samples
-        from the input port to trigger upstream generation.
+        This is called by the visualization timer. It uses a hybrid approach:
+        - First checks if samples are already cached (output module is pulling)
+        - Only actively pulls if no cached samples exist (no output driving)
+
+        This prevents conflicts when both visualizer and output pull with different block sizes.
         """
         # Check if input is connected
         if not self.in_port.is_connected:
@@ -189,16 +192,54 @@ class SpectrumModule(ModuleWidget):
             self.level_label.setText("Level: -- dB")
             return
 
-        # Invalidate cache of connected modules so they regenerate samples
-        # This is needed when there's no audio output driving the cache invalidation
-        for connected_port in self.in_port.connected_to:
-            if connected_port.parent_module and hasattr(connected_port.parent_module, 'invalidate_cache'):
-                connected_port.parent_module.invalidate_cache()
-
-        # Pull samples to trigger upstream generation
         # FFT needs at least 512 samples for decent frequency resolution
         num_samples = 1024
-        samples = self.in_port.read(num_samples)
+
+        # Check if there's an actively playing output module in the scene
+        # If so, use passive mode (read cached samples), otherwise use active mode
+        output_is_playing = False
+        if hasattr(self, 'scene') and self.scene():
+            for item in self.scene().items():
+                if hasattr(item, 'module') and item.module:
+                    module = item.module
+                    # Check if it's an output module that's playing
+                    if (hasattr(module, 'audio_output') and
+                        hasattr(module.audio_output, 'is_playing') and
+                        module.audio_output.is_playing):
+                        output_is_playing = True
+                        break
+
+        samples = None
+
+        # PASSIVE MODE: Output module is driving - use cached samples
+        if output_is_playing:
+            # Check if any upstream module has valid cached samples
+            for connected_port in self.in_port.connected_to:
+                if connected_port.parent_module:
+                    module = connected_port.parent_module
+                    # Check if module has valid cached samples
+                    if (hasattr(module, '_cache_valid') and module._cache_valid and
+                        hasattr(module, '_cache_num_samples') and module._cache_num_samples > 0):
+                        # Module has valid cache - use it without triggering regeneration
+                        cached_value = connected_port.value
+                        # Check if it's actual audio data (not just a default 0.0)
+                        if isinstance(cached_value, np.ndarray) and cached_value.size > 0:
+                            # Use cached samples - output is driving
+                            samples = cached_value[:num_samples] if cached_value.size >= num_samples else cached_value
+                            logger.debug("Spectrum: Using cached samples from output module")
+                            break
+
+        # ACTIVE MODE: No output or no cached samples - actively pull
+        if samples is None:
+            logger.debug("Spectrum: Actively pulling samples")
+
+            # Always invalidate cache in active mode to ensure fresh samples
+            for connected_port in self.in_port.connected_to:
+                if connected_port.parent_module and hasattr(connected_port.parent_module, 'invalidate_cache'):
+                    connected_port.parent_module.invalidate_cache()
+
+            # Pull samples to trigger upstream generation
+            samples = self.in_port.read(num_samples)
 
         if samples is None or (isinstance(samples, (int, float)) and samples == 0.0):
             self.spectrum_display.clear()

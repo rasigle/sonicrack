@@ -1,10 +1,10 @@
 import logging
-from typing import Any
 
+import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
-from src.engine import Chain, Volume, WaveAdder
+from src.engine import Volume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
@@ -12,7 +12,7 @@ from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CHANNEL_VOLUME = 0.0  # Default no gain for newly connected channels
+DEFAULT_CHANNEL_VOLUME = 0.7  # Default 70% gain for newly connected channels
 
 
 @register_module()
@@ -46,39 +46,43 @@ class MixerModule(ModuleWidget):
         layout = self._create_standard_layout()
 
         # First row of knobs (Ch 1 & 2)
-        knobs_row1 = QHBoxLayout()
-
         self.gain1_knob = Knob(
             "Ch 1", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
         )
         self.gain1_knob.value_changed.connect(lambda: self._on_gain_changed(0))
-        knobs_row1.addWidget(self.gain1_knob)
 
         self.gain2_knob = Knob(
             "Ch 2", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
         )
         self.gain2_knob.value_changed.connect(lambda: self._on_gain_changed(1))
+
+        knobs_row1 = QHBoxLayout()
+        knobs_row1.addWidget(self.gain1_knob)
         knobs_row1.addWidget(self.gain2_knob)
-
         layout.addLayout(knobs_row1)
-
-        # Second row of knobs (Ch 3 & 4)
-        knobs_row2 = QHBoxLayout()
 
         self.gain3_knob = Knob(
             "Ch 3", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
         )
         self.gain3_knob.value_changed.connect(lambda: self._on_gain_changed(2))
-        knobs_row2.addWidget(self.gain3_knob)
 
         self.gain4_knob = Knob(
             "Ch 4", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
         )
         self.gain4_knob.value_changed.connect(lambda: self._on_gain_changed(3))
+
+        self.gain_knobs = [
+            self.gain1_knob,
+            self.gain2_knob,
+            self.gain3_knob,
+            self.gain4_knob,
+        ]
+
+        # Second row of knobs (Ch 3 & 4)
+        knobs_row2 = QHBoxLayout()
+        knobs_row2.addWidget(self.gain3_knob)
         knobs_row2.addWidget(self.gain4_knob)
-
         layout.addLayout(knobs_row2)
-
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
@@ -88,183 +92,70 @@ class MixerModule(ModuleWidget):
         self.register_parameter("gain3", self.gain3_knob)
         self.register_parameter("gain4", self.gain4_knob)
 
-        # Track individual Volume components for each channel (for hot-swapping)
-        self._volume_components = [None, None, None, None]
+        # Create Volume components for each channel (for gain control)
+        self._volume_components = [
+            Volume(amplitude=DEFAULT_CHANNEL_VOLUME),
+            Volume(amplitude=DEFAULT_CHANNEL_VOLUME),
+            Volume(amplitude=DEFAULT_CHANNEL_VOLUME),
+            Volume(amplitude=DEFAULT_CHANNEL_VOLUME),
+        ]
 
-        self.component = self.create_engine_component()
+        logger.debug("Mixer initialized with 4 channels")
 
     def _on_gain_changed(self, channel_index: int):
-        """Handle gain knob changes using hot-swapping (no recompile).
+        """Handle gain knob changes by updating Volume component amplitude.
 
         Args:
             channel_index: Index of the channel (0-3)
         """
-        gain_knobs = [
-            self.gain1_knob,
-            self.gain2_knob,
-            self.gain3_knob,
-            self.gain4_knob,
-        ]
+        if channel_index < 0 or channel_index >= len(self.gain_knobs):
+            logger.error(f"Invalid channel index {channel_index} for gain change")
+            return
 
-        # Get the input port for this channel
-        input_ports = [self.in1_port, self.in2_port, self.in3_port, self.in4_port]
+        new_gain = self.gain_knobs[channel_index].get_value()
 
-        new_gain = gain_knobs[channel_index].get_value()
-        is_connected = len(input_ports[channel_index].cables) > 0
-        has_volume_comp = self._volume_components[channel_index] is not None
+        # Update the Volume component amplitude (click-free)
+        self._volume_components[channel_index].amplitude = new_gain
 
         logger.debug(
-            f"🎚️ MIXER: Ch {channel_index + 1} gain knob changed to {new_gain:.3f} "
-            f"(connected={is_connected}, has_comp={has_volume_comp})"
+            f"🎚️ Mixer: Ch {channel_index + 1} gain set to {new_gain:.3f}"
         )
-
-        # Only hot-swap if the input is connected and Volume component exists
-        if is_connected and has_volume_comp:
-            # Hot-swap: update amplitude directly on the Volume component
-            try:
-                vol_comp = self._volume_components[channel_index]
-                old_amp = vol_comp.amplitude
-                vol_comp.amplitude = new_gain
-                logger.debug(
-                    f"✓ Hot-swapped Ch {channel_index + 1} Volume: {old_amp:.3f} → "
-                    f"{new_gain:.3f} (Volume obj id={id(vol_comp)})"
-                )
-            except (AttributeError, ValueError) as e:
-                logger.warning(
-                    f"❌ Failed to hotswap gain for Ch {channel_index + 1}: {e}"
-                )
-        else:
-            logger.debug(
-                f"⏭️ Skipping hot-swap for Ch {channel_index + 1}: "
-                f"not connected or no Volume component"
-            )
-
-    # AudioModuleInterface implementation
-    def create_engine_component(
-        self,
-        input_components: list[Any] | None = None,
-        modulation_components: dict[str, Any] | None = None,
-    ):
-        """Create the mixer component with per-channel gain control.
-
-        Applies a Volume modifier to each input channel before mixing them together.
-        Only creates Volume components for channels with connected inputs.
-        Stores Volume references for hot-swapping to prevent clicks.
-        """
-        if input_components and len(input_components) > 0:
-            # Get input ports and knobs
-            input_ports = [self.in1_port, self.in2_port, self.in3_port, self.in4_port]
-            gain_knobs = [
-                self.gain1_knob,
-                self.gain2_knob,
-                self.gain3_knob,
-                self.gain4_knob,
-            ]
-
-            # Log all knob values for debugging
-            all_gains = [k.get_value() for k in gain_knobs]
-            logger.debug(
-                f"Mixer knob values at compilation: Ch1={all_gains[0]:.3f}, "
-                f"Ch2={all_gains[1]:.3f}, Ch3={all_gains[2]:.3f}, "
-                f"Ch4={all_gains[3]:.3f}"
-            )
-
-            # Map each input_component to its corresponding port index
-            # The patch compiler provides components in the order of connected ports
-            port_indices = []
-            for port_idx, port in enumerate(input_ports):
-                if len(port.cables) > 0:
-                    port_indices.append(port_idx)
-                    logger.debug(
-                        f"  Port {port_idx} ({port.port_name}) has "
-                        f"{len(port.cables)} cable(s)"
-                    )
-
-            logger.debug(
-                f"Mixer creating components: {len(input_components)} inputs, "
-                f"connected ports (0-indexed): {port_indices} = "
-                f"{[p+1 for p in port_indices]} (1-indexed)"
-            )
-
-            # Reset all volume components
-            self._volume_components = [None, None, None, None]
-
-            # Apply volume to each available input
-            processed_inputs = []
-            for comp_idx, input_comp in enumerate(input_components):
-                # Get the actual port index for this component
-                if comp_idx < len(port_indices):
-                    port_idx = port_indices[comp_idx]
-
-                    # Get the corresponding gain knob
-                    gain = gain_knobs[port_idx].get_value()
-
-                    # Create Volume component and store reference for hot-swapping
-                    volume_comp = Volume(amplitude=gain)
-                    self._volume_components[port_idx] = volume_comp
-
-                    # Chain input with volume control
-                    processed_inputs.append(Chain(input_comp, volume_comp))
-
-                    logger.info(
-                        f"  Ch {port_idx + 1}: Created Volume with gain={gain:.3f} "
-                        f"(Volume obj id={id(volume_comp)})"
-                    )
-                else:
-                    # Shouldn't happen, but handle gracefully
-                    processed_inputs.append(input_comp)
-                    logger.warning(
-                        f"  Comp {comp_idx}: No port mapping, passing through"
-                    )
-
-            # Use mix_mode='sum' for standard mixer behavior (maintains volume levels)
-            logger.info(
-                f"Creating WaveAdder with mix_mode='sum' for {len(processed_inputs)} "
-                f"inputs"
-            )
-            return WaveAdder(*processed_inputs, mix_mode="sum")
-
-        return None
 
     def process(self, num_samples: int = 1):
         """Mix input signals and write to output port.
 
-        Reads from all connected input ports, applies channel gains, mixes them together,
-        and writes the result to the output port.
+        Reads from all connected input ports, applies channel Volume components,
+        mixes them together, and writes the result to the output port.
+
+        Called automatically via ensure_samples_ready() when downstream modules request
+        samples in the pull-based architecture.
 
         Args:
-            num_samples: Number of samples to process (default: 1 for per-sample processing)
-
-        Note:
-            In the current architecture, this method is not actively called during playback.
-            The audio engine directly calls get_samples() on the compiled AudioComponents.
-            This method exists to satisfy the AudioModule interface and for potential
-            future use in a more modular processing pipeline.
+            num_samples: Number of samples to process
         """
-        # Read from all connected input ports
         input_ports = [self.in1_port, self.in2_port, self.in3_port, self.in4_port]
-        gain_knobs = [
-            self.gain1_knob,
-            self.gain2_knob,
-            self.gain3_knob,
-            self.gain4_knob,
-        ]
 
         mixed_signal = None
 
-        for port, knob in zip(input_ports, gain_knobs):
+        for channel_idx, port in enumerate(input_ports):
             if port.is_connected:
-                # Read signal from port
-                signal = port.read()
-                # Apply channel gain
-                gained_signal = signal * knob.get_value()
+                # Read signal from port (triggers upstream generation)
+                signal = port.read(num_samples)
 
-                # Mix signals (sum)
-                if mixed_signal is None:
-                    mixed_signal = gained_signal
-                else:
-                    mixed_signal = mixed_signal + gained_signal
+                if signal is not None:
+                    # Apply channel gain using Volume component (Volume is callable)
+                    gained_signal = self._volume_components[channel_idx](signal)
+
+                    # Mix signals (sum)
+                    if mixed_signal is None:
+                        mixed_signal = gained_signal
+                    else:
+                        # Ensure proper addition (handle both arrays and scalars)
+                        mixed_signal = np.add(mixed_signal, gained_signal)
 
         # Write mixed signal to output
         if mixed_signal is not None:
             self.out_port.write(mixed_signal)
+        else:
+            # No inputs connected, write silence
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))

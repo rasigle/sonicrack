@@ -13,6 +13,8 @@ import logging
 import sys
 from pathlib import Path
 
+from src.constants import LOG_DIRECTORY
+
 # Default log level
 DEFAULT_LOG_LEVEL = logging.INFO
 
@@ -21,11 +23,6 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DETAILED_FORMAT = (
     "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
 )
-
-# Create logs directory if it doesn't exist
-LOGS_DIR = Path(__file__).parent / "logs"
-LOGS_DIR.mkdir(exist_ok=True)
-
 
 def setup_logging(
     level: int = DEFAULT_LOG_LEVEL,
@@ -47,28 +44,38 @@ def setup_logging(
     # Clear any existing handlers
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
-    root_logger.setLevel(level)
+
+    # Set root logger to DEBUG if file logging is enabled (allows file to capture all
+    # levels). Otherwise set to the requested level
+    root_logger.setLevel(logging.DEBUG if log_file else level)
 
     # Choose format
     log_format = DETAILED_FORMAT if detailed else LOG_FORMAT
     formatter = logging.Formatter(log_format)
 
-    # Console handler
+    # Console handler - filters to requested level
     if console_output:
         console_handler = logging.StreamHandler(sys.stderr)
         console_handler.setLevel(level)
         console_handler.setFormatter(formatter)
         root_logger.addHandler(console_handler)
 
-    # File handler
+    # File handler - always captures DEBUG and above
     if log_file:
-        file_path = (
-            LOGS_DIR / log_file if not Path(log_file).is_absolute() else Path(log_file)
-        )
-        file_handler = logging.FileHandler(file_path, mode="a", encoding="utf-8")
-        file_handler.setLevel(level)
+        if not Path(log_file).is_absolute():
+            file_path = LOG_DIRECTORY / log_file
+            LOG_DIRECTORY.mkdir(exist_ok=True)
+        else:
+            file_path = Path(log_file)
+        file_handler = logging.FileHandler(file_path, mode="w", encoding="utf-8")
+        file_handler.setLevel(logging.DEBUG)  # File gets all DEBUG messages
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
+
+    logging.debug(
+        f"Set up logging: level={level}, log_file={log_file}, "
+        f"console_output={console_output}, detailed={detailed}"
+    )
 
 
 def get_logger(name: str, level: int | None = None) -> logging.Logger:
@@ -92,10 +99,6 @@ def get_logger(name: str, level: int | None = None) -> logging.Logger:
     if level is not None:
         logger.setLevel(level)
     return logger
-
-
-# Pre-configure logging with defaults
-setup_logging(level=DEFAULT_LOG_LEVEL, console_output=True, detailed=False)
 
 
 # Convenience function for engine modules

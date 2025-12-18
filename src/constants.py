@@ -6,6 +6,10 @@ and other audio-related values.
 
 from pathlib import Path
 
+# Logging
+LOG_FILENAME = "mod_synth.log"
+LOG_DIRECTORY: Path = Path(__file__).parent.parent
+
 # Standard library paths
 RESOURCES_PATH = Path(__file__).parent.parent / "resources"
 SPLASH_PATH = Path(RESOURCES_PATH) / "splash" / "splash.png"

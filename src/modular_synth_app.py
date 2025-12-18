@@ -11,7 +11,7 @@ import sys
 
 from PyQt6.QtWidgets import QApplication
 
-from src.constants import SPLASH_PATH
+from src.constants import SPLASH_PATH, LOG_FILENAME
 from src.gui.main_window import ModularSynthWindow
 from src.utils import setup_logging
 
@@ -30,7 +30,7 @@ def activate_ui_exception_logging():
 
 def main():
     """Main entry point for the modular synthesizer application."""
-    setup_logging()
+    setup_logging(log_file=LOG_FILENAME, console_output=True, detailed=False)
     activate_ui_exception_logging()
 
     # Create application

@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from src.engine import SineOscillator, TriangleOscillator
 from src.gui.core.port import Port
 
 
@@ -1273,6 +1274,227 @@ class TestPortNumpySupport:
 
         # Should equal the array (0 adds nothing)
         np.testing.assert_array_equal(result, array)
+
+
+class TestPortComponentParameter:
+    """Test the component parameter in Port initialization."""
+
+    def test_port_created_without_component(self):
+        """Test port can be created without component (backward compatibility)."""
+        port = Port("output", "test", parent_module=MagicMock())
+        assert port.component is None
+
+    def test_port_created_with_component(self):
+        """Test port can be created with a component reference."""
+        oscillator = SineOscillator(440)
+        port = Port("output", "sine", parent_module=MagicMock(), component=oscillator)
+        assert port.component is oscillator
+
+    def test_port_component_attribute_accessible(self):
+        """Test that component attribute can be accessed."""
+        oscillator = SineOscillator(440)
+        port = Port("output", "sine", parent_module=MagicMock(), component=oscillator)
+        assert hasattr(port, "component")
+        assert isinstance(port.component, SineOscillator)
+
+    def test_port_component_can_be_none(self):
+        """Test that component can explicitly be set to None."""
+        port = Port("output", "test", parent_module=MagicMock(), component=None)
+        assert port.component is None
+
+    def test_different_components_for_different_ports(self):
+        """Test that different ports can have different components."""
+        sine_osc = SineOscillator(440)
+        triangle_osc = TriangleOscillator(440)
+
+        sine_port = Port("output", "sine", parent_module=MagicMock(), component=sine_osc)
+        triangle_port = Port("output", "triangle", parent_module=MagicMock(), component=triangle_osc)
+
+        assert sine_port.component is sine_osc
+        assert triangle_port.component is triangle_osc
+        assert sine_port.component is not triangle_port.component
+
+
+class TestPortComponentAccess:
+    """Test accessing component through connected ports."""
+
+    def test_get_component_from_connected_port(self):
+        """Test retrieving component from a connected output port."""
+        # Create oscillator
+        oscillator = SineOscillator(440)
+
+        # Create output port with component
+        output_port = Port("output", "sine", parent_module=MagicMock(), component=oscillator)
+
+        # Create input port
+        input_port = Port("input", "mod", parent_module=MagicMock())
+
+        # Connect ports
+        input_port.connect(output_port)
+
+        # Access component through connection
+        connected_ports = list(input_port.connected_to)
+        assert len(connected_ports) == 1
+        assert connected_ports[0].component is oscillator
+
+    def test_multiple_connections_different_components(self):
+        """Test that multiple connections can have different components."""
+        sine_osc = SineOscillator(440)
+        triangle_osc = TriangleOscillator(440)
+
+        sine_port = Port("output", "sine", parent_module=MagicMock(), component=sine_osc)
+        triangle_port = Port("output", "triangle", parent_module=MagicMock(), component=triangle_osc)
+
+        input_port = Port("input", "mod", parent_module=MagicMock())
+
+        # Connect both
+        input_port.connect(sine_port)
+        input_port.connect(triangle_port)
+
+        # Check we can access both components
+        connected_components = [p.component for p in input_port.connected_to]
+        assert sine_osc in connected_components
+        assert triangle_osc in connected_components
+
+    def test_component_none_when_not_set(self):
+        """Test that component is None when not set during creation."""
+        output_port = Port("output", "test", parent_module=MagicMock())
+        input_port = Port("input", "in", parent_module=MagicMock())
+
+        input_port.connect(output_port)
+
+        connected_port = list(input_port.connected_to)[0]
+        assert connected_port.component is None
+
+
+class TestPortComponentIntegration:
+    """Integration tests for port-component mapping."""
+
+    def test_typical_oscillator_usage_pattern(self):
+        """Test the typical usage pattern for oscillator modules."""
+        # Simulate OscillatorModule pattern
+        sine_oscillator = SineOscillator(440)
+        triangle_oscillator = TriangleOscillator(440)
+
+        # Create ports with component references (as done in OscillatorModule.__init__)
+        sine_port = Port("output", "Sine", parent_module=MagicMock(), component=sine_oscillator)
+        triangle_port = Port("output", "Triangle", parent_module=MagicMock(), component=triangle_oscillator)
+
+        # Verify components are accessible
+        assert sine_port.component.frequency == 440
+        assert triangle_port.component.frequency == 440
+
+    def test_volume_module_modulation_pattern(self):
+        """Test the typical pattern for volume module getting modulator component."""
+        # Simulate LFO output
+        lfo = SineOscillator(1.0, wave_range=(-1, 1))
+        lfo_output = Port("output", "Sine", parent_module=MagicMock(), component=lfo)
+
+        # Simulate Volume module's Mod input
+        mod_input = Port("input", "Mod", parent_module=MagicMock())
+
+        # Connect LFO to Volume
+        mod_input.connect(lfo_output)
+
+        # Volume module retrieves component (simplified)
+        connected_ports = list(mod_input.connected_to)
+        modulator_component = connected_ports[0].component
+
+        # Verify we got the LFO component
+        assert modulator_component is lfo
+        assert modulator_component.wave_range == (-1, 1)
+
+    def test_component_survives_disconnect_reconnect(self):
+        """Test that component reference persists through disconnect/reconnect."""
+        oscillator = SineOscillator(440)
+        output_port = Port("output", "test", parent_module=MagicMock(), component=oscillator)
+        input_port = Port("input", "in", parent_module=MagicMock())
+
+        # Connect
+        input_port.connect(output_port)
+        assert list(input_port.connected_to)[0].component is oscillator
+
+        # Disconnect
+        input_port.disconnect(output_port)
+
+        # Component still exists on output port
+        assert output_port.component is oscillator
+
+        # Reconnect
+        input_port.connect(output_port)
+        assert list(input_port.connected_to)[0].component is oscillator
+
+
+class TestPortComponentBackwardCompatibility:
+    """Test backward compatibility - existing code should still work."""
+
+    def test_old_port_creation_still_works(self):
+        """Test that ports created without component parameter still work."""
+        # Old style - no component parameter
+        port = Port("output", "test", parent_module=MagicMock())
+        assert port.port_name == "test"
+        assert port.component is None
+
+    def test_old_connection_pattern_still_works(self):
+        """Test that old connection patterns still work."""
+        port1 = Port("input", "in", parent_module=MagicMock())
+        port2 = Port("output", "out", parent_module=MagicMock())
+
+        port1.connect(port2)
+        port2.write(5.0)
+
+        assert port1.read() == 5.0
+        assert port2.component is None  # No component set
+
+    def test_mixed_old_and_new_style(self):
+        """Test mixing old-style ports (no component) with new-style (with component)."""
+        osc = SineOscillator(440)
+
+        # New style - with component
+        new_port = Port("output", "new", parent_module=MagicMock(), component=osc)
+
+        # Old style - without component
+        old_port = Port("input", "old", parent_module=MagicMock())
+
+        # Connect
+        old_port.connect(new_port)
+
+        # Old port can access new port's component
+        assert list(old_port.connected_to)[0].component is osc
+
+
+class TestPortComponentEdgeCases:
+    """Test edge cases for port-component mapping."""
+
+    def test_component_can_be_any_object(self):
+        """Test that component can be any object, not just oscillators."""
+        mock_component = MagicMock()
+        mock_component.test_attribute = "test_value"
+
+        port = Port("output", "test", parent_module=MagicMock(), component=mock_component)
+        assert port.component.test_attribute == "test_value"
+
+    def test_multiple_ports_same_component(self):
+        """Test that multiple ports can reference the same component."""
+        oscillator = SineOscillator(440)
+
+        port1 = Port("output", "out1", parent_module=MagicMock(), component=oscillator)
+        port2 = Port("output", "out2", parent_module=MagicMock(), component=oscillator)
+
+        assert port1.component is port2.component
+
+    def test_component_with_all_port_types(self):
+        """Test component parameter works with both input and output ports."""
+        osc = SineOscillator(440)
+
+        # Component on output port (typical)
+        output_port = Port("output", "out", parent_module=MagicMock(), component=osc)
+        assert output_port.component is osc
+
+        # Component on input port (unusual but allowed)
+        input_port = Port("input", "in", parent_module=MagicMock(), component=osc)
+        assert input_port.component is osc
+
 
 
 if __name__ == "__main__":

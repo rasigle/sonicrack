@@ -229,13 +229,32 @@ class AudioModule(ABC):
                 return port
         return None
 
-    def add_input(self, name: str):
-        port = Port("input", name, parent_module=self)
+    def add_input(self, name: str, component=None):
+        """Add an input port to this module.
+
+        Args:
+            name: Name of the input port
+            component: Optional engine component associated with this port
+
+        Returns:
+            The created Port instance
+        """
+        port = Port("input", name, parent_module=self, component=component)
         self.inputs[name] = port
         return port
 
-    def add_output(self, name) -> Port:
-        port = Port("output", name, parent_module=self)
+    def add_output(self, name: str, component=None) -> Port:
+        """Add an output port to this module.
+
+        Args:
+            name: Name of the output port
+            component: Optional engine component associated with this port
+                      (e.g., SineOscillator for a "Sine" output)
+
+        Returns:
+            The created Port instance
+        """
+        port = Port("output", name, parent_module=self, component=component)
         self.outputs[name] = port
         return port
 

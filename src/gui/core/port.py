@@ -12,6 +12,7 @@ Architecture:
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -53,6 +54,7 @@ class Port:
         port_name: str,
         index: int = 0,
         parent_module=None,  # Reference to the module that owns this port
+        component=None,  # Reference to the engine component (e.g., SineOscillator)
     ):
         """Initialize a port model.
 
@@ -61,10 +63,13 @@ class Port:
             port_name: Name identifier for the port
             index: Optional index for ordering multiple ports
             parent_module: Reference to the module that owns this port
+            component: Optional reference to the engine component associated with this
+                port (e.g., SineOscillator for a "Sine" output port)
         """
         self.port_type = port_type
         self.port_name = port_name
         self.parent_module = parent_module
+        self.component = component  # Direct reference to engine component
 
         self.connected_to: list[Port] = []
 
@@ -243,8 +248,14 @@ class Port:
         """
         if isinstance(value, np.ndarray):
             self.value = value
-        else:
+        elif isinstance(value, (float, int)):
             self.value = float(value)
+        elif isinstance(value, Sequence):
+            self.value = np.array(value, dtype=np.float32)
+        else:
+            raise TypeError(
+                f"Port write value must be float or np.ndarray, got {type(value).__name__}"
+            )
 
     def peek_recent(self, num_samples: int | None = None) -> float | np.ndarray:
         """Peek at recent samples without triggering upstream generation.

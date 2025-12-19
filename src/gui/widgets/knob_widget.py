@@ -3,7 +3,8 @@
 import math
 from typing import Callable
 
-from PyQt6.QtCore import Qt, QPointF, pyqtSignal, QRectF
+from PyQt6 import QtCore
+from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
 from PyQt6.QtWidgets import QWidget
 
@@ -14,7 +15,7 @@ class Knob(QWidget):
     Similar to hardware synth knobs with visual feedback.
     """
 
-    value_changed = pyqtSignal(float)  # Emits normalized value (0.0 to 1.0)
+    value_changed = QtCore.pyqtSignal(float)  # Emits normalized value (0.0 to 1.0)
 
     def __init__(
         self,

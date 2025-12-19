@@ -62,7 +62,15 @@ def get_samples_passive_mode(input_port) -> Optional[np.ndarray]:
             if connected_port.value is not None:
                 if isinstance(connected_port.value, np.ndarray) and connected_port.value.size > 0:
                     # Make a copy to avoid any threading issues
-                    return connected_port.value.copy()
+                    samples = connected_port.value.copy()
+                    logger.debug(f"PASSIVE: Got {len(samples)} samples from port {connected_port.port_name}, value_id={id(connected_port.value)}")
+                    return samples
+                elif isinstance(connected_port.value, (int, float)):
+                    # Scalar value - convert to small array for visualization
+                    samples = np.array([connected_port.value], dtype=np.float32)
+                    logger.debug(f"PASSIVE: Got scalar {connected_port.value} from port {connected_port.port_name}")
+                    return samples
+        logger.debug("PASSIVE: No valid samples found in connected ports")
     except Exception as e:
         logger.debug(f"Error reading cached samples in passive mode: {e}")
 
@@ -90,6 +98,7 @@ def get_samples_active_mode(input_port, num_samples: int = 1024) -> Optional[np.
         # (can't use port.read() because visualizers are marked non-processing)
         for connected_port in input_port.connected_to:
             if connected_port.parent_module:
+                logger.debug(f"ACTIVE: Triggering process({num_samples}) on {connected_port.parent_module.__class__.__name__}")
                 # Call process() directly on upstream module
                 if hasattr(connected_port.parent_module, 'process'):
                     connected_port.parent_module.process(num_samples)
@@ -98,18 +107,22 @@ def get_samples_active_mode(input_port, num_samples: int = 1024) -> Optional[np.
                 if connected_port.value is not None:
                     if isinstance(connected_port.value, np.ndarray) and connected_port.value.size > 0:
                         samples = connected_port.value
+                        logger.debug(f"ACTIVE: Got {len(samples)} samples from {connected_port.port_name}")
                         break
 
         # Fallback: try port.read() if direct call didn't work
         if samples is None:
+            logger.debug(f"ACTIVE: Fallback to port.read({num_samples})")
             samples = input_port.read(num_samples)
             if not isinstance(samples, np.ndarray) or samples.size == 0:
                 samples = None
+            else:
+                logger.debug(f"ACTIVE: Fallback got {len(samples) if samples is not None else 0} samples")
 
         return samples
 
     except Exception as e:
-        logger.debug(f"Error pulling samples in active mode: {e}")
+        logger.warning(f"Error pulling samples in active mode: {e}", exc_info=True)
         return None
 
 
@@ -145,11 +158,15 @@ def get_samples_hybrid(visualizer_module, input_port, num_samples: int = 1024) -
     # Determine mode based on output module presence
     output_exists = check_output_module_exists(visualizer_module)
 
+    logger.debug(f"get_samples_hybrid: output_exists={output_exists}, num_samples={num_samples}")
+
     if output_exists:
         # PASSIVE MODE: Read cached value (no generation)
+        logger.debug("Using PASSIVE mode")
         return get_samples_passive_mode(input_port)
     else:
         # ACTIVE MODE: Generate samples (standalone)
+        logger.debug("Using ACTIVE mode")
         return get_samples_active_mode(input_port, num_samples)
 
 

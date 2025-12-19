@@ -10,11 +10,11 @@ from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import QPainter, QColor
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QMessageBox
 
+from src.gui.core.module import ModuleCategory
 from src.gui.widgets.cable_widget import Cable
 from src.gui.widgets.port_widget import PortWidget
 
 if TYPE_CHECKING:
-    from src.gui.core.module import ModuleCategory
     from src.gui.modules.output.output import OutputModule
     from src.gui.widgets.module_widget import ModuleWidget
 
@@ -376,11 +376,9 @@ class PatchCanvas(QGraphicsView):
         Returns:
             The OutputModule instance, or None if not found
         """
-        from src.gui.modules.output.output import OutputModule
-
         for module in self.get_modules():
-            if isinstance(module, OutputModule):
-                return module
+            if module.metadata.category == ModuleCategory.OUTPUT:
+                return module  # noqa
         return None
 
     def clear_all(self):

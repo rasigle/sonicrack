@@ -323,7 +323,7 @@ def discover_modules(
 
 
 def load_module(module_path: str) -> bool:
-    """Load a module from an external plugin file.
+    """Loads a module from an external plugin Python file.
 
     This allows loading modules from external Python files,
     enabling a true plugin system.
@@ -358,12 +358,12 @@ def load_module(module_path: str) -> bool:
         return False
 
 
-def initialize_modules() -> ModuleRegistry:
-    """Initialize the module registry.
+def initialize_module_registry() -> ModuleRegistry:
+    """Initialize the module registry and discovers all available modules.
 
     This function:
     1. Auto-discovers and registers all modules in the modules package
-    2. Can load external plugins if configured
+    2. Loads external plugins if configured
 
     Call this at application startup.
     """
@@ -384,7 +384,7 @@ __all__ = [
     "register_module",
     "discover_modules",
     "load_module",
-    "initialize_modules",
+    "initialize_module_registry",
 ]
 
 

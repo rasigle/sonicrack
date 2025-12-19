@@ -12,7 +12,7 @@ from src.gui.core.module_registry import (
     register_module,
     discover_modules,
     load_module,
-    initialize_modules,
+    initialize_module_registry,
 )
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -442,7 +442,7 @@ class TestInitializeModules:
         """Test module initialization process."""
         mock_discover.return_value = 10
 
-        registry = initialize_modules()
+        registry = initialize_module_registry()
 
         # Should call discover_modules with recursive=True
         mock_discover.assert_called_once_with("src.gui.modules", recursive=True)

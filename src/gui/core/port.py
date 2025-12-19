@@ -16,6 +16,8 @@ from collections.abc import Sequence
 
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 
 class Port:
     """Data model for a signal port supporting multiple connections and numpy arrays.
@@ -66,14 +68,14 @@ class Port:
             component: Optional reference to the engine component associated with this
                 port (e.g., SineOscillator for a "Sine" output port)
         """
-        self.port_type = port_type
-        self.port_name = port_name
+        self.port_type: str = port_type
+        self.port_name: str = port_name
         self.parent_module = parent_module
         self.component = component  # Direct reference to engine component
 
         self.connected_to: list[Port] = []
 
-        self.index = index
+        self.index: int = index
 
         # Data state - can be scalar or numpy array
         self.value: float | np.ndarray = 0.0
@@ -101,7 +103,7 @@ class Port:
         if other in self.connected_to:
             return  # Already connected, no-op
 
-        logging.debug(f"Port connected: {self.port_name} <-> {other.port_name}")
+        logger.debug(f"Port connected: {self.port_name} <-> {other.port_name}")
 
         # Bidirectional connection: both ports track the connection
         self.connected_to.append(other)
@@ -117,7 +119,7 @@ class Port:
         """
         if other is None:
             if self.connected_to:
-                logging.debug(f"Port disconnected (all): {self.port_name}")
+                logger.debug(f"Port disconnected (all): {self.port_name}")
                 # Remove this port from all connected ports
                 for connected_port in self.connected_to:
                     try:
@@ -134,7 +136,7 @@ class Port:
             # Also remove from other side (bidirectional)
             if self in other.connected_to:
                 other.connected_to.remove(self)
-            logging.debug(
+            logger.debug(
                 f"Port disconnected: {self.port_name} <-/-> {other.port_name}"
             )
             # Clear port data to prevent stale audio
@@ -150,7 +152,7 @@ class Port:
         from continuing to play after a module is deleted.
         """
         self.value = 0.0
-        logging.debug(f"Port data cleared: {self.port_name}")
+        logger.debug(f"Port data cleared: {self.port_name}")
 
     def read(self, num_samples: int | None = None) -> float | np.ndarray:
         """Read value from connected ports, triggering upstream generation if needed.
@@ -176,7 +178,8 @@ class Port:
         # Trigger upstream module generation if num_samples is provided
         if num_samples is not None:
             for connected_port in self.connected_to:
-                # Safety check: ensure parent_module still exists (not deleted during shutdown)
+                # Safety check: ensure parent_module still exists (not deleted during
+                # shutdown)
                 try:
                     if not connected_port.parent_module:
                         continue
@@ -266,7 +269,8 @@ class Port:
             self.value = np.array(value, dtype=np.float32)
         else:
             raise TypeError(
-                f"Port write value must be float or np.ndarray, got {type(value).__name__}"
+                f"Port write value must be float or np.ndarray, "
+                f"got {type(value).__name__}"
             )
         # Note: Visualizers poll port.value directly - no notifications needed!
         # This ensures ZERO interference with audio thread

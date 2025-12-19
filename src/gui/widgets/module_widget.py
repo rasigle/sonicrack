@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABCMeta
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 from PyQt6.QtCore import Qt, QRectF, pyqtSignal
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient, QFont
@@ -17,19 +17,15 @@ from PyQt6.QtWidgets import (
 )
 
 from src.gui.core.module import AudioModule
-from src.gui.widgets.port_widget import PortWidget
 from src.gui.dialogs.module_info_dialog import ModuleInfoDialog
+from src.gui.widgets.port_widget import PortWidget
 
 logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    pass
 
 
 # Create a compatible metaclass that combines QGraphicsWidget's metaclass with ABCMeta
 class ModuleWidgetMeta(type(QGraphicsWidget), ABCMeta):
     """Combined metaclass for QGraphicsWidget and ABC."""
-
     pass
 
 
@@ -39,10 +35,12 @@ MODULE_CATEGORY_FONT = QFont("Arial", 7)
 
 
 class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
-    """Base class for all modular synth modules.
+    """Base class for all modular synth audio modules.
 
-    Each module represents an audio component (oscillator, envelope, etc.)
-    with visual controls and connection ports.
+    Each module represents a component able to perform audio. This could be oscillators,
+    filters, envelope, effects, ... or visualization modules.
+
+    Each module contains visual controls and connection ports.
 
     Implements AudioModuleInterface to enable generic patch compilation.
     """
@@ -86,9 +84,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self.module_height = height
         self.module_color = color or QColor(80, 120, 180)
 
-        # FIX: Initialize missing attributes
         self.custom_name = ""
-        self.component = None
 
         # Caching for pull-based architecture (Phase 3)
         self._cache_valid = False
@@ -547,12 +543,6 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
     def mouseReleaseEvent(self, event):
         """Handle mouse release."""
         super().mouseReleaseEvent(event)
-
-    def update_component(self):
-        """Update the audio component with current parameter values."""
-        if self.component:
-            # Subclasses should implement parameter updates
-            pass
 
     def create_engine_component(
         self,

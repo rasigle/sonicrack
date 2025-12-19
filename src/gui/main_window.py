@@ -26,7 +26,7 @@ from src import version
 from src.constants import PRESET_FILE_EXTENSION
 from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory
-from src.gui.core.module_registry import initialize_modules
+from src.gui.core.module_registry import initialize_module_registry
 from src.gui.core.preset_manager import PresetManager
 from src.gui.dialogs.about_dialog import show_about
 from src.gui.dialogs.preset_library_dialog import (
@@ -36,41 +36,43 @@ from src.gui.dialogs.preset_library_dialog import (
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH
 
-logger = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
+    from src.gui.core.module_registry import ModuleRegistry
     from src.gui.widgets.port_widget import PortWidget
+
+logger = logging.getLogger(__name__)
 
 
 class ModularSynthWindow(QMainWindow):
     """Main window for the modular synthesizer application.
 
-    Provides a complete modular synthesis environment with:
-    - Patch canvas for visual module patching
+    Provides a modular audio synthesis environment with:
+    - Patch canvas for visual module patching and editing
     - Module library
     - Real-time audio playback
-    - Waveform and spectrum visualization
-    - Preset management (future)
+    - Preset management
     """
 
     def __init__(self):
         """Initialize the main window."""
         super().__init__()
 
-        self.setWindowTitle(APP_TITLE)
-        self.setGeometry(100, 100, 1400, 900)
-
-        # Initialize core components
-        self.audio_engine = AudioEngine()
-        self.registry = initialize_modules()
-        self.preset_manager = PresetManager()
-        self.audio_engine.start()
-
         # Patch file tracking
         self.current_patch_path = None  # Path to currently loaded patch file
-        self.patch_modified = False  # Track if patch has unsaved changes
+        self.patch_modified: bool = False  # Track if patch has unsaved changes
+
+        # Initialize core components
+        logger.debug("Initializing ModularSynthWindow core components")
+        self.audio_engine: AudioEngine = AudioEngine()
+        self.registry: ModuleRegistry = initialize_module_registry()
+        self.preset_manager: PresetManager = PresetManager()
+
+        # UI elements
+        self.patch_canvas: PatchCanvas | None = None
+        self.statusbar: QStatusBar | None = None
 
         # UI setup
+        logger.debug("Initializing UI components")
         self._setup_ui()
         self._setup_app_icon()
         self._setup_menu()
@@ -78,11 +80,14 @@ class ModularSynthWindow(QMainWindow):
         self._setup_statusbar()
         self._connect_signals()
 
-        logger.info("Modular Synth Window initialized")
+        logger.debug("Modular Synth Window initialized")
 
     def _setup_ui(self):
         """Setup the user interface."""
         # Central widget with splitter
+        self.setWindowTitle(APP_TITLE)
+        self.setGeometry(100, 100, 1400, 900)
+
         central = QWidget()
         self.setCentralWidget(central)
 
@@ -93,8 +98,8 @@ class ModularSynthWindow(QMainWindow):
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Left panel - Module Library
-        self.module_library = self._create_module_library()
-        main_splitter.addWidget(self.module_library)
+        module_library = self._create_module_library_panel()
+        main_splitter.addWidget(module_library)
 
         # Center - Patch Canvas
         canvas_widget = QWidget()
@@ -120,7 +125,7 @@ class ModularSynthWindow(QMainWindow):
 
         self.setWindowIcon(QtGui.QIcon(str(APP_ICON_PATH)))
 
-    def _create_module_library(self) -> QWidget:
+    def _create_module_library_panel(self) -> QWidget:
         """Create the module library panel.
 
         Returns:
@@ -654,7 +659,6 @@ class ModularSynthWindow(QMainWindow):
         """Clear the patch canvas."""
         # Stop all Output modules (process-based architecture)
         self._stop_all_output_modules()
-        self.audio_engine.stop()
 
         # Clear the canvas
         self.patch_canvas.clear_all()
@@ -666,13 +670,16 @@ class ModularSynthWindow(QMainWindow):
         This ensures that when loading a new patch or clearing the canvas,
         audio from the old patch doesn't continue playing.
         """
-        from src.gui.modules.output.output import OutputModule
+        if self.patch_canvas is None:
+            return
 
-        for module in self.patch_canvas.get_modules():
-            if isinstance(module, OutputModule):
-                if module.audio_output.is_playing:
-                    logger.info("Stopping Output module before clearing patch")
-                    module.stop_playback()
+        output_module = self.patch_canvas.get_output_module()
+        if output_module is None:
+            return
+
+        if output_module.audio_output.is_playing:
+            logger.info("Stopping Output module before clearing patch")
+            output_module.stop_playback()
 
     def _save_as_library_preset(self):
         """Save the current patch as a preset."""

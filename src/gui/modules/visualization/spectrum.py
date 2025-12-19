@@ -1,6 +1,7 @@
 """Spectrum analyzer module for visualizing audio frequency content."""
 
 import logging
+import threading
 
 import numpy as np
 from PyQt6.QtCore import Qt
@@ -11,6 +12,7 @@ from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets.module_widget import ModuleWidget
+from src.gui.modules.visualization.visualizer_utils import get_samples_hybrid, validate_samples
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,9 @@ class SpectrumModule(ModuleWidget):
         description="Real-time frequency spectrum display (FFT analyzer)",
     )
 
+    # Mark as non-processing to exclude from audio chain pulling
+    is_processing_module = False
+
     def __init__(self):
         """Initialize spectrum analyzer module."""
         super().__init__(
@@ -46,7 +51,14 @@ class SpectrumModule(ModuleWidget):
         # Add input port
         self.in_port = self.add_input("In")
 
-        # NO OUTPUT PORT - this is a visualization-only module
+        # Thread-safe buffer for audio samples
+        self._sample_buffer = None
+        self._buffer_lock = None
+        try:
+            self._buffer_lock = threading.Lock()
+        except ImportError:
+            self._buffer_lock = None
+            logger.warning("Threading not available - spectrum may have issues")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -81,13 +93,14 @@ class SpectrumModule(ModuleWidget):
         # Register for sample rate updates
         audio_config.add_sample_rate_listener(self._on_sample_rate_changed)
 
-        # Independent visualization timer (30 FPS, independent of audio)
+        # Visualization timer (20 Hz = 50ms, on UI thread)
+        # Using QTimer is simpler and works correctly with Qt event loop
         from PyQt6.QtCore import QTimer
         self._viz_timer = QTimer()
-        self._viz_timer.setInterval(33)  # ~30 FPS
+        self._viz_timer.setInterval(50)  # 50ms = 20 Hz
         self._viz_timer.timeout.connect(self._update_display)
         self._viz_timer.start()
-        logger.info("Spectrum visualization timer started at 30 FPS")
+        logger.info("Spectrum visualization timer started (20 Hz / 50ms)")
 
     def _on_sample_rate_changed(self, new_sample_rate: int):
         """Handle sample rate changes.
@@ -96,6 +109,7 @@ class SpectrumModule(ModuleWidget):
             new_sample_rate: New sample rate in Hz
         """
         self._sample_rate = new_sample_rate
+
 
     def _update_samples(self, samples: np.ndarray):
         """Update the display with new audio samples.
@@ -178,11 +192,9 @@ class SpectrumModule(ModuleWidget):
     def _update_display(self):
         """Update the spectrum display at 30 FPS (independent of audio rate).
 
-        This is called by the visualization timer. It uses a hybrid approach:
-        - First checks if samples are already cached (output module is pulling)
-        - Only actively pulls if no cached samples exist (no output driving)
-
-        This prevents conflicts when both visualizer and output pull with different block sizes.
+        HYBRID MODE:
+        - PASSIVE when output module is playing: reads buffered samples (no interference)
+        - ACTIVE when standalone: actively pulls samples (enables visualization without output)
         """
         # Check if input is connected
         if not self.in_port.is_connected:
@@ -192,72 +204,32 @@ class SpectrumModule(ModuleWidget):
             self.level_label.setText("Level: -- dB")
             return
 
-        # FFT needs at least 512 samples for decent frequency resolution
-        num_samples = 1024
+        # Use shared utility to get samples (handles active/passive mode automatically)
+        # FFT needs at least 1024 samples for good frequency resolution
+        samples = get_samples_hybrid(self, self.in_port, num_samples=1024)
 
-        # Check if there's an actively playing output module in the scene
-        # If so, use passive mode (read cached samples), otherwise use active mode
-        output_is_playing = False
-        if hasattr(self, 'scene') and self.scene():
-            for item in self.scene().items():
-                if hasattr(item, 'module') and item.module:
-                    module = item.module
-                    # Check if it's an output module that's playing
-                    if (hasattr(module, 'audio_output') and
-                        hasattr(module.audio_output, 'is_playing') and
-                        module.audio_output.is_playing):
-                        output_is_playing = True
-                        break
-
-        samples = None
-
-        # PASSIVE MODE: Output module is driving - use cached samples
-        if output_is_playing:
-            # Check if any upstream module has valid cached samples
-            for connected_port in self.in_port.connected_to:
-                if connected_port.parent_module:
-                    module = connected_port.parent_module
-                    # Check if module has valid cached samples
-                    if (hasattr(module, '_cache_valid') and module._cache_valid and
-                        hasattr(module, '_cache_num_samples') and module._cache_num_samples > 0):
-                        # Module has valid cache - use it without triggering regeneration
-                        cached_value = connected_port.value
-                        # Check if it's actual audio data (not just a default 0.0)
-                        if isinstance(cached_value, np.ndarray) and cached_value.size > 0:
-                            # Use cached samples - output is driving
-                            samples = cached_value[:num_samples] if cached_value.size >= num_samples else cached_value
-                            logger.debug("Spectrum: Using cached samples from output module")
-                            break
-
-        # ACTIVE MODE: No output or no cached samples - actively pull
-        if samples is None:
-            logger.debug("Spectrum: Actively pulling samples")
-
-            # Always invalidate cache in active mode to ensure fresh samples
-            for connected_port in self.in_port.connected_to:
-                if connected_port.parent_module and hasattr(connected_port.parent_module, 'invalidate_cache'):
-                    connected_port.parent_module.invalidate_cache()
-
-            # Pull samples to trigger upstream generation
-            samples = self.in_port.read(num_samples)
-
-        if samples is None or (isinstance(samples, (int, float)) and samples == 0.0):
+        # Validate and display samples
+        if not validate_samples(samples):
             self.spectrum_display.clear()
+            self.peak_freq_label.setText("Peak: -- Hz")
+            self.level_label.setText("Level: -- dB")
             return
 
-        # Update display with new samples
+        # Update display with samples
         self._update_samples(samples)
 
     def process(self, num_samples: int | None = None):
         """Process method for audio path.
 
-        Visualization modules don't process in the audio path - they update
-        independently via their own timer to avoid affecting audio performance.
+        For visualizers: This is a NO-OP. Visualizers observe samples via observe_samples()
+        which is called explicitly by modules that want to share their output.
+
+        Visualizers are NOT part of the audio processing chain to avoid any interference.
 
         Args:
             num_samples: Number of samples (ignored)
         """
-        pass  # No-op - visualization updates independently via _viz_timer
+        pass  # Visualizers don't process - they only observe
 
 
 class SpectrumAnalyzer(QWidget):

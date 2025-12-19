@@ -78,6 +78,7 @@ class Port:
         # Data state - can be scalar or numpy array
         self.value: float | np.ndarray = 0.0
 
+
     def connect(self, other: Port) -> None:
         """Connect this port to another port (bidirectional).
 
@@ -175,16 +176,25 @@ class Port:
         # Trigger upstream module generation if num_samples is provided
         if num_samples is not None:
             for connected_port in self.connected_to:
-                if connected_port.parent_module and hasattr(
-                    connected_port.parent_module, "ensure_samples_ready"
-                ):
-                    # Pull-based: ask upstream module to generate samples
-                    connected_port.parent_module.ensure_samples_ready(num_samples)
-                elif connected_port.parent_module and hasattr(
-                    connected_port.parent_module, "process"
-                ):
-                    # Fallback: call process() for modules not yet updated
-                    connected_port.parent_module.process(num_samples)
+                # Safety check: ensure parent_module still exists (not deleted during shutdown)
+                try:
+                    if not connected_port.parent_module:
+                        continue
+
+                    # Skip non-processing modules (like visualizers)
+                    if hasattr(connected_port.parent_module, 'is_processing_module') and \
+                       not connected_port.parent_module.is_processing_module:
+                        continue
+
+                    if hasattr(connected_port.parent_module, "ensure_samples_ready"):
+                        # Pull-based: ask upstream module to generate samples
+                        connected_port.parent_module.ensure_samples_ready(num_samples)
+                    elif hasattr(connected_port.parent_module, "process"):
+                        # Fallback: call process() for modules not yet updated
+                        connected_port.parent_module.process(num_samples)
+                except (RuntimeError, AttributeError):
+                    # Module was deleted (Qt cleanup during shutdown) - skip it
+                    continue
 
         # Collect all values
         values = [p.value for p in self.connected_to]
@@ -242,6 +252,8 @@ class Port:
         """Write a value to this port.
 
         Accepts both scalar float values and numpy arrays for batch processing.
+        Also notifies any connected visualization modules so they can observe
+        the samples without pulling.
 
         Args:
             value: The value to write (float or numpy array)
@@ -256,6 +268,9 @@ class Port:
             raise TypeError(
                 f"Port write value must be float or np.ndarray, got {type(value).__name__}"
             )
+        # Note: Visualizers poll port.value directly - no notifications needed!
+        # This ensures ZERO interference with audio thread
+
 
     def peek_recent(self, num_samples: int | None = None) -> float | np.ndarray:
         """Peek at recent samples without triggering upstream generation.

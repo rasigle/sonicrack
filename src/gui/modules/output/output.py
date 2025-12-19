@@ -147,6 +147,17 @@ class OutputModule(ModuleWidget):
                 "color: #888; font-size: 10px; font-style: italic;"
             )
 
+    def closeEvent(self, event):
+        """Handle module close/deletion - ensure audio stops first."""
+        logger.debug("OutputModule closing - stopping audio")
+        # Stop audio output before Qt deletes the module
+        if hasattr(self, 'audio_output') and self.audio_output:
+            try:
+                self.audio_output.stop_playback()
+            except Exception as e:
+                logger.debug(f"Error stopping audio on close: {e}")
+        super().closeEvent(event)
+
     def _generate_samples(self, num_samples: int) -> np.ndarray:
         """Generate audio samples by pulling from input ports.
 

@@ -113,13 +113,23 @@ class VolumeModule(ModulatedModuleBase):
                     modulator_component = connected_port.component
 
                     if modulator_component:
-                        logger.info(f"VolumeModule: Creating ModulatedVolume with {type(modulator_component).__name__}")
-                        self.component = self.create_modulated_component(modulator_component)
+                        logger.info(
+                            f"VolumeModule: Creating ModulatedVolume with "
+                            f"{type(modulator_component).__name__}"
+                        )
+                        self.component = self.create_modulated_component(
+                            modulator_component
+                        )
                     else:
-                        logger.warning("VolumeModule: Connected port has no component - using unmodulated")
+                        logger.warning(
+                            "VolumeModule: Connected port has no component - "
+                            "using unmodulated"
+                        )
                         self.component = self.create_unmodulated_component()
                 else:
-                    logger.warning("VolumeModule: Mod port connected but no ports found")
+                    logger.warning(
+                        "VolumeModule: Mod port connected but no ports found"
+                    )
                     self.component = self.create_unmodulated_component()
 
                 # Disable knob

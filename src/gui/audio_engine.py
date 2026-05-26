@@ -7,7 +7,6 @@ NOTE: This engine now uses a pull-based architecture where the audio callback
 from __future__ import annotations
 
 import logging
-from collections import defaultdict, deque
 from typing import TYPE_CHECKING
 
 from PyQt6 import QtCore
@@ -16,7 +15,7 @@ from src.constants import DEFAULT_SAMPLE_RATE
 from src.gui.audio_config import audio_config
 
 if TYPE_CHECKING:
-    from src.gui.core.module import AudioModule
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +58,9 @@ class AudioEngine(QtCore.QObject):
         """
         self.sample_rate = audio_config.sample_rate
         self.buffer_size = audio_config.buffer_size
-        logger.debug(f"AudioEngine config updated: SR={self.sample_rate}, BS={self.buffer_size}")
+        logger.debug(
+            f"AudioEngine config updated: SR={self.sample_rate}, BS={self.buffer_size}"
+        )
 
     def invalidate_all_caches(self):
         """Invalidate all module caches.
@@ -67,5 +68,5 @@ class AudioEngine(QtCore.QObject):
         Called at the start of each audio processing cycle by OutputModule.
         """
         for module in self.modules:
-            if hasattr(module, 'invalidate_cache'):
+            if hasattr(module, "invalidate_cache"):
                 module.invalidate_cache()

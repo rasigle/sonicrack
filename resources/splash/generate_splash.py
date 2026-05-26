@@ -283,8 +283,7 @@ if __name__ == "__main__":
     print("  2. Use QSplashScreen(QPixmap('resources/splash.png'))")
     print("  3. Display for 2-3 seconds or until modules loaded")
     print("\nExample code:")
-    print(
-        """
+    print("""
     from PyQt6.QtWidgets import QSplashScreen
     from PyQt6.QtGui import QPixmap
     from PyQt6.QtCore import Qt
@@ -296,5 +295,4 @@ if __name__ == "__main__":
     # ... load modules ...
     
     splash.finish(main_window)
-    """
-    )
+    """)

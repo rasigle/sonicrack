@@ -98,8 +98,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         knobs_layout = QHBoxLayout()
         self.freq_knob = Knob("Base Hz", 20, 2000, self._base_frequency)
         self.freq_knob.setToolTip(
-            "Base frequency (Hz)\n"
-            "Active when Freq input is disconnected"
+            "Base frequency (Hz)\n" "Active when Freq input is disconnected"
         )
         self.freq_knob.value_changed.connect(self._on_frequency_changed)
         knobs_layout.addWidget(self.freq_knob)
@@ -221,6 +220,7 @@ class ModulatedOscillatorModule(ModuleWidget):
     def _on_wave_changed(self, wave_type: str):
         """Handle waveform type change by recreating the component."""
         import logging
+
         logger = logging.getLogger(__name__)
 
         self._waveform = wave_type
@@ -254,6 +254,7 @@ class ModulatedOscillatorModule(ModuleWidget):
     def _on_frequency_changed(self):
         """Handle frequency knob change by updating the component."""
         import logging
+
         logger = logging.getLogger(__name__)
 
         new_freq = self.freq_knob.get_value()
@@ -261,7 +262,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         logger.debug(f"VCO: Frequency changed to {new_freq} Hz")
 
         # Hotswap: update frequency directly on the component if possible
-        if hasattr(self.component, 'frequency'):
+        if hasattr(self.component, "frequency"):
             self.component.frequency = new_freq
 
         self.parameter_changed.emit("frequency", new_freq)
@@ -269,6 +270,7 @@ class ModulatedOscillatorModule(ModuleWidget):
     def _on_gain_changed(self):
         """Handle gain knob change by updating the component."""
         import logging
+
         logger = logging.getLogger(__name__)
 
         gain_value = self.gain_knob.get_value()
@@ -276,7 +278,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         logger.debug(f"VCO: Gain changed to {gain_value} dB")
 
         # Hotswap: update gain_db directly on the component if possible
-        if hasattr(self.component, 'gain_db'):
+        if hasattr(self.component, "gain_db"):
             self.component.gain_db = gain_value
 
         self.parameter_changed.emit("gain_db", gain_value)
@@ -314,11 +316,17 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         if has_freq_mod:
             freq_signal = self.freq_input.read(num_samples)
-            logger.debug(f"VCO: Read freq modulation, shape={np.shape(freq_signal) if freq_signal is not None else None}")
+            logger.debug(
+                f"VCO: Read freq modulation, "
+                f"shape={np.shape(freq_signal) if freq_signal is not None else None}"
+            )
 
         if has_gain_mod:
             gain_signal = self.gain_mod_input.read(num_samples)
-            logger.debug(f"VCO: Read gain modulation, shape={np.shape(gain_signal) if gain_signal is not None else None}")
+            logger.debug(
+                f"VCO: Read gain modulation, "
+                f"shape={np.shape(gain_signal) if gain_signal is not None else None}"
+            )
 
         # Generate samples based on modulation state
         if has_freq_mod or has_gain_mod:
@@ -336,7 +344,7 @@ class ModulatedOscillatorModule(ModuleWidget):
                 def get_samples(self, n):
                     if isinstance(self.signal, (int, float)):
                         return np.full(n, self.signal)
-                    result = self.signal[self.idx:self.idx + n]
+                    result = self.signal[self.idx : self.idx + n]
                     self.idx += n
                     return result
 
@@ -348,14 +356,13 @@ class ModulatedOscillatorModule(ModuleWidget):
             if has_freq_mod and freq_signal is not None:
                 freq_gen = SignalGenerator(freq_signal)
                 modulators.append(freq_gen)
-                freq_mod = lambda base_freq, cv_freq: cv_freq  # Use CV frequency directly
+                freq_mod = (
+                    lambda base_freq, cv_freq: cv_freq
+                )  # Use CV frequency directly
 
             # Create modulated oscillator
             modulated_osc = ModulatedOscillator(
-                self.component,
-                *modulators,
-                amp_mod=amp_mod,
-                freq_mod=freq_mod
+                self.component, *modulators, amp_mod=amp_mod, freq_mod=freq_mod
             )
 
             samples = modulated_osc.get_samples(num_samples)
@@ -390,9 +397,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Check if Freq input is connected
         has_freq_cv = self.freq_input.is_connected
 
-        logger.debug(
-            f"VCO update_knob_state: Freq port connected={has_freq_cv}"
-        )
+        logger.debug(f"VCO update_knob_state: Freq port connected={has_freq_cv}")
 
         if has_freq_cv:
             # Frequency controlled by CV - disable knob
@@ -410,9 +415,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Check if Gain input is connected
         has_gain_cv = self.gain_mod_input.is_connected
 
-        logger.debug(
-            f"VCO update_knob_state: Gain port connected={has_gain_cv}"
-        )
+        logger.debug(f"VCO update_knob_state: Gain port connected={has_gain_cv}")
 
         if has_gain_cv:
             # Gain controlled by CV - disable knob

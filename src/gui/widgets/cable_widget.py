@@ -169,10 +169,10 @@ class Cable(QGraphicsItem):
         if start and end:
             try:
                 # Check if ports still exist and have valid port models
-                if hasattr(start, 'port') and hasattr(end, 'port'):
+                if hasattr(start, "port") and hasattr(end, "port"):
                     if start.port and end.port:
                         start.port.disconnect(end.port)
-            except (RuntimeError, AttributeError) as e:
+            except (RuntimeError, AttributeError):
                 # Port might have been deleted - this is okay during cleanup
                 pass
 

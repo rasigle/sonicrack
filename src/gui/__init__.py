@@ -11,7 +11,6 @@ synthesis engine, featuring:
 
 from src.gui.main_window import ModularSynthWindow
 
-
 __version__ = "0.1.0"
 
 

@@ -1307,8 +1307,12 @@ class TestPortComponentParameter:
         sine_osc = SineOscillator(440)
         triangle_osc = TriangleOscillator(440)
 
-        sine_port = Port("output", "sine", parent_module=MagicMock(), component=sine_osc)
-        triangle_port = Port("output", "triangle", parent_module=MagicMock(), component=triangle_osc)
+        sine_port = Port(
+            "output", "sine", parent_module=MagicMock(), component=sine_osc
+        )
+        triangle_port = Port(
+            "output", "triangle", parent_module=MagicMock(), component=triangle_osc
+        )
 
         assert sine_port.component is sine_osc
         assert triangle_port.component is triangle_osc
@@ -1324,7 +1328,9 @@ class TestPortComponentAccess:
         oscillator = SineOscillator(440)
 
         # Create output port with component
-        output_port = Port("output", "sine", parent_module=MagicMock(), component=oscillator)
+        output_port = Port(
+            "output", "sine", parent_module=MagicMock(), component=oscillator
+        )
 
         # Create input port
         input_port = Port("input", "mod", parent_module=MagicMock())
@@ -1342,8 +1348,12 @@ class TestPortComponentAccess:
         sine_osc = SineOscillator(440)
         triangle_osc = TriangleOscillator(440)
 
-        sine_port = Port("output", "sine", parent_module=MagicMock(), component=sine_osc)
-        triangle_port = Port("output", "triangle", parent_module=MagicMock(), component=triangle_osc)
+        sine_port = Port(
+            "output", "sine", parent_module=MagicMock(), component=sine_osc
+        )
+        triangle_port = Port(
+            "output", "triangle", parent_module=MagicMock(), component=triangle_osc
+        )
 
         input_port = Port("input", "mod", parent_module=MagicMock())
 
@@ -1377,8 +1387,15 @@ class TestPortComponentIntegration:
         triangle_oscillator = TriangleOscillator(440)
 
         # Create ports with component references (as done in OscillatorModule.__init__)
-        sine_port = Port("output", "Sine", parent_module=MagicMock(), component=sine_oscillator)
-        triangle_port = Port("output", "Triangle", parent_module=MagicMock(), component=triangle_oscillator)
+        sine_port = Port(
+            "output", "Sine", parent_module=MagicMock(), component=sine_oscillator
+        )
+        triangle_port = Port(
+            "output",
+            "Triangle",
+            parent_module=MagicMock(),
+            component=triangle_oscillator,
+        )
 
         # Verify components are accessible
         assert sine_port.component.frequency == 440
@@ -1407,7 +1424,9 @@ class TestPortComponentIntegration:
     def test_component_survives_disconnect_reconnect(self):
         """Test that component reference persists through disconnect/reconnect."""
         oscillator = SineOscillator(440)
-        output_port = Port("output", "test", parent_module=MagicMock(), component=oscillator)
+        output_port = Port(
+            "output", "test", parent_module=MagicMock(), component=oscillator
+        )
         input_port = Port("input", "in", parent_module=MagicMock())
 
         # Connect
@@ -1471,7 +1490,9 @@ class TestPortComponentEdgeCases:
         mock_component = MagicMock()
         mock_component.test_attribute = "test_value"
 
-        port = Port("output", "test", parent_module=MagicMock(), component=mock_component)
+        port = Port(
+            "output", "test", parent_module=MagicMock(), component=mock_component
+        )
         assert port.component.test_attribute == "test_value"
 
     def test_multiple_ports_same_component(self):
@@ -1494,7 +1515,6 @@ class TestPortComponentEdgeCases:
         # Component on input port (unusual but allowed)
         input_port = Port("input", "in", parent_module=MagicMock(), component=osc)
         assert input_port.component is osc
-
 
 
 if __name__ == "__main__":

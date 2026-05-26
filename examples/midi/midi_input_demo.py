@@ -22,7 +22,6 @@ Press Ctrl+C to exit.
 import sys
 import time
 
-
 try:
     from engine.io.midi import MIDIInput, MIDO_AVAILABLE
     from engine.io.midi import (

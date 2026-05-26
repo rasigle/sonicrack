@@ -64,7 +64,7 @@ class LFOModule(ModuleWidget):
             gain_db=LFO_DEFAULT_GAIN_DB,
             wave_range=(-1, 1),
             sample_rate=sample_rate,
-            mode="analog"
+            mode="analog",
         )
         self._triangle_oscillator = TriangleOscillator(
             freq,
@@ -89,9 +89,15 @@ class LFOModule(ModuleWidget):
         # Add four output ports - one for each waveform
         # Pass component references so ports know their associated engine components
         self.sine_port: Port = self.add_output("Sine", component=self._sine_oscillator)
-        self.triangle_port: Port = self.add_output("Triangle", component=self._triangle_oscillator)
-        self.sawtooth_port: Port = self.add_output("Sawtooth", component=self._sawtooth_oscillator)
-        self.square_port: Port = self.add_output("Square", component=self._square_oscillator)
+        self.triangle_port: Port = self.add_output(
+            "Triangle", component=self._triangle_oscillator
+        )
+        self.sawtooth_port: Port = self.add_output(
+            "Sawtooth", component=self._sawtooth_oscillator
+        )
+        self.square_port: Port = self.add_output(
+            "Square", component=self._square_oscillator
+        )
 
         # Store ports for easy iteration
         self.ports = [
@@ -144,7 +150,6 @@ class LFOModule(ModuleWidget):
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
-
         # Register with audio_config to receive sample rate change notifications
         audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
 
@@ -180,7 +185,6 @@ class LFOModule(ModuleWidget):
     def _on_pulsewidth_changed(self):
         """Handle pulse width changes - only update square oscillator."""
         self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
-
 
     @staticmethod
     def get_cv_output_range() -> tuple[float, float]:

@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Create a compatible metaclass that combines QGraphicsWidget's metaclass with ABCMeta
 class ModuleWidgetMeta(type(QGraphicsWidget), ABCMeta):
     """Combined metaclass for QGraphicsWidget and ABC."""
+
     pass
 
 
@@ -430,7 +431,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 # Clear all port data to prevent stale audio
                 for port in self.input_ports + self.output_ports:
                     try:
-                        if hasattr(port, 'port') and port.port:
+                        if hasattr(port, "port") and port.port:
                             port.port.clear()
                     except (RuntimeError, AttributeError):
                         pass  # Port might already be cleared or deleted
@@ -449,10 +450,13 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                     try:
                         # Disconnect the underlying Port data models
                         if cable.start_port and cable.end_port:
-                            if (hasattr(cable.start_port, 'port') and
-                                hasattr(cable.end_port, 'port')):
+                            if hasattr(cable.start_port, "port") and hasattr(
+                                cable.end_port, "port"
+                            ):
                                 if cable.start_port.port and cable.end_port.port:
-                                    cable.start_port.port.disconnect(cable.end_port.port)
+                                    cable.start_port.port.disconnect(
+                                        cable.end_port.port
+                                    )
 
                         # Remove cable from UI
                         if cable.start_port:

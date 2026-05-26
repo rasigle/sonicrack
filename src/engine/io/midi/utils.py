@@ -27,7 +27,6 @@ Example:
 
 import re
 
-
 # Note name to semitone mapping (C = 0)
 NOTE_NAMES = {
     "C": 0,

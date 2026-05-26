@@ -12,7 +12,10 @@ from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.modules.visualization.visualizer_utils import get_samples_hybrid, validate_samples
+from src.gui.modules.visualization.visualizer_utils import (
+    get_samples_hybrid,
+    validate_samples,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +99,7 @@ class SpectrumModule(ModuleWidget):
         # Visualization timer (20 Hz = 50ms, on UI thread)
         # Using QTimer is simpler and works correctly with Qt event loop
         from PyQt6.QtCore import QTimer
+
         self._viz_timer = QTimer()
         self._viz_timer.setInterval(50)  # 50ms = 20 Hz
         self._viz_timer.timeout.connect(self._update_display)
@@ -109,7 +113,6 @@ class SpectrumModule(ModuleWidget):
             new_sample_rate: New sample rate in Hz
         """
         self._sample_rate = new_sample_rate
-
 
     def _update_samples(self, samples: np.ndarray):
         """Update the display with new audio samples.
@@ -145,7 +148,9 @@ class SpectrumModule(ModuleWidget):
         try:
             # Calculate level in dB from time-domain peak amplitude (to match waveform)
             peak_amplitude = np.max(np.abs(samples))
-            peak_level = 20 * np.log10(peak_amplitude + 1e-10) if peak_amplitude > 0 else -100.0
+            peak_level = (
+                20 * np.log10(peak_amplitude + 1e-10) if peak_amplitude > 0 else -100.0
+            )
 
             # Compute FFT
             n = min(len(samples), 4096)
@@ -167,7 +172,6 @@ class SpectrumModule(ModuleWidget):
             # Convert to frequency
             freq_resolution = self._sample_rate / (2 * len(magnitude))
             peak_freq = peak_idx * freq_resolution
-
 
             # Update labels
             if peak_freq < 1000:
@@ -193,8 +197,10 @@ class SpectrumModule(ModuleWidget):
         """Update the spectrum display at 30 FPS (independent of audio rate).
 
         HYBRID MODE:
-        - PASSIVE when output module is playing: reads buffered samples (no interference)
-        - ACTIVE when standalone: actively pulls samples (enables visualization without output)
+        - PASSIVE when output module is playing: reads buffered samples
+            (no interference)
+        - ACTIVE when standalone: actively pulls samples (enables visualization without
+            output)
         """
         # Check if input is connected
         if not self.in_port.is_connected:
@@ -221,10 +227,12 @@ class SpectrumModule(ModuleWidget):
     def process(self, num_samples: int | None = None):
         """Process method for audio path.
 
-        For visualizers: This is a NO-OP. Visualizers observe samples via observe_samples()
-        which is called explicitly by modules that want to share their output.
+        For visualizers: This is a NO-OP. Visualizers observe samples via
+        observe_samples() which is called explicitly by modules that want to share
+        their output.
 
-        Visualizers are NOT part of the audio processing chain to avoid any interference.
+        Visualizers are NOT part of the audio processing chain to avoid any
+        interference.
 
         Args:
             num_samples: Number of samples (ignored)

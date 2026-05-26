@@ -71,7 +71,6 @@ class SimpleVolumeModule(ModuleWidget):
 
         logger.debug(f"🎚️ Volume: gain set to {new_gain:.3f}")
 
-
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
         """Volume requires the In port to be connected."""

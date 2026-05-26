@@ -397,8 +397,7 @@ class TestLoadPlugin:
     def test_load_plugin_success(self):
         """Test loading a valid plugin file."""
         plugin_file = Path(self.temp_dir) / "test_plugin.py"
-        plugin_file.write_text(
-            """
+        plugin_file.write_text("""
 from src.gui.core.module_registry import register_module
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -410,8 +409,7 @@ class PluginModule(ModuleWidget):
         description = "Test plugin"
         version = "1.0.0"
         author = "Test"
-"""
-        )
+""")
 
         registry = get_registry()
         initial_count = registry.count()

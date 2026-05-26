@@ -27,7 +27,7 @@ def check_output_module_exists(visualizer_module) -> bool:
     Returns:
         True if output module exists, False otherwise
     """
-    if not hasattr(visualizer_module, 'scene'):
+    if not hasattr(visualizer_module, "scene"):
         return False
 
     scene = visualizer_module.scene()
@@ -36,7 +36,7 @@ def check_output_module_exists(visualizer_module) -> bool:
 
     # Check all items in scene for output module
     for item in scene.items():
-        if isinstance(item, ModuleWidget) and hasattr(item, 'audio_output'):
+        if isinstance(item, ModuleWidget) and hasattr(item, "audio_output"):
             return True
 
     return False
@@ -60,15 +60,25 @@ def get_samples_passive_mode(input_port) -> Optional[np.ndarray]:
     try:
         for connected_port in input_port.connected_to:
             if connected_port.value is not None:
-                if isinstance(connected_port.value, np.ndarray) and connected_port.value.size > 0:
+                if (
+                    isinstance(connected_port.value, np.ndarray)
+                    and connected_port.value.size > 0
+                ):
                     # Make a copy to avoid any threading issues
                     samples = connected_port.value.copy()
-                    logger.debug(f"PASSIVE: Got {len(samples)} samples from port {connected_port.port_name}, value_id={id(connected_port.value)}")
+                    logger.debug(
+                        f"PASSIVE: Got {len(samples)} samples from port "
+                        f"{connected_port.port_name}, "
+                        f"value_id={id(connected_port.value)}"
+                    )
                     return samples
                 elif isinstance(connected_port.value, (int, float)):
                     # Scalar value - convert to small array for visualization
                     samples = np.array([connected_port.value], dtype=np.float32)
-                    logger.debug(f"PASSIVE: Got scalar {connected_port.value} from port {connected_port.port_name}")
+                    logger.debug(
+                        f"PASSIVE: Got scalar {connected_port.value} "
+                        f"from port {connected_port.port_name}"
+                    )
                     return samples
         logger.debug("PASSIVE: No valid samples found in connected ports")
     except Exception as e:
@@ -77,7 +87,9 @@ def get_samples_passive_mode(input_port) -> Optional[np.ndarray]:
     return None
 
 
-def get_samples_active_mode(input_port, num_samples: int = 1024) -> Optional[np.ndarray]:
+def get_samples_active_mode(
+    input_port, num_samples: int = 1024
+) -> Optional[np.ndarray]:
     """Get samples in ACTIVE mode - actively generate samples.
 
     In active mode (no output module exists), we directly call process() on
@@ -98,16 +110,25 @@ def get_samples_active_mode(input_port, num_samples: int = 1024) -> Optional[np.
         # (can't use port.read() because visualizers are marked non-processing)
         for connected_port in input_port.connected_to:
             if connected_port.parent_module:
-                logger.debug(f"ACTIVE: Triggering process({num_samples}) on {connected_port.parent_module.__class__.__name__}")
+                logger.debug(
+                    f"ACTIVE: Triggering process({num_samples}) on "
+                    f"{connected_port.parent_module.__class__.__name__}"
+                )
                 # Call process() directly on upstream module
-                if hasattr(connected_port.parent_module, 'process'):
+                if hasattr(connected_port.parent_module, "process"):
                     connected_port.parent_module.process(num_samples)
 
                 # Now read the generated value from the port
                 if connected_port.value is not None:
-                    if isinstance(connected_port.value, np.ndarray) and connected_port.value.size > 0:
+                    if (
+                        isinstance(connected_port.value, np.ndarray)
+                        and connected_port.value.size > 0
+                    ):
                         samples = connected_port.value
-                        logger.debug(f"ACTIVE: Got {len(samples)} samples from {connected_port.port_name}")
+                        logger.debug(
+                            f"ACTIVE: Got {len(samples)} samples from "
+                            f"{connected_port.port_name}"
+                        )
                         break
 
         # Fallback: try port.read() if direct call didn't work
@@ -117,7 +138,10 @@ def get_samples_active_mode(input_port, num_samples: int = 1024) -> Optional[np.
             if not isinstance(samples, np.ndarray) or samples.size == 0:
                 samples = None
             else:
-                logger.debug(f"ACTIVE: Fallback got {len(samples) if samples is not None else 0} samples")
+                logger.debug(
+                    f"ACTIVE: Fallback got "
+                    f"{len(samples) if samples is not None else 0} samples"
+                )
 
         return samples
 
@@ -126,7 +150,9 @@ def get_samples_active_mode(input_port, num_samples: int = 1024) -> Optional[np.
         return None
 
 
-def get_samples_hybrid(visualizer_module, input_port, num_samples: int = 1024) -> Optional[np.ndarray]:
+def get_samples_hybrid(
+    visualizer_module, input_port, num_samples: int = 1024
+) -> Optional[np.ndarray]:
     """Get samples using hybrid active/passive mode.
 
     This is the main entry point for visualizers. It automatically detects
@@ -152,13 +178,15 @@ def get_samples_hybrid(visualizer_module, input_port, num_samples: int = 1024) -
         Audio samples as numpy array, or None if unavailable
     """
     # Check if input is connected
-    if not hasattr(input_port, 'is_connected') or not input_port.is_connected:
+    if not hasattr(input_port, "is_connected") or not input_port.is_connected:
         return None
 
     # Determine mode based on output module presence
     output_exists = check_output_module_exists(visualizer_module)
 
-    logger.debug(f"get_samples_hybrid: output_exists={output_exists}, num_samples={num_samples}")
+    logger.debug(
+        f"get_samples_hybrid: output_exists={output_exists}, num_samples={num_samples}"
+    )
 
     if output_exists:
         # PASSIVE MODE: Read cached value (no generation)
@@ -189,4 +217,3 @@ def validate_samples(samples) -> bool:
         return samples.size > 0
 
     return False
-

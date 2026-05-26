@@ -91,7 +91,8 @@ class ClipperModule(ModuleWidget):
             num_samples: Number of samples to process
 
         Note:
-            This method is called in the pull-based architecture to generate output samples.
+            This method is called in the pull-based architecture to generate output
+            samples.
         """
         if not self.in_port.is_connected:
             self.out_port.write(np.zeros(num_samples, dtype=np.float32))

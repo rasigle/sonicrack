@@ -151,7 +151,7 @@ class OutputModule(ModuleWidget):
         """Handle module close/deletion - ensure audio stops first."""
         logger.debug("OutputModule closing - stopping audio")
         # Stop audio output before Qt deletes the module
-        if hasattr(self, 'audio_output') and self.audio_output:
+        if hasattr(self, "audio_output") and self.audio_output:
             try:
                 self.audio_output.stop_playback()
             except Exception as e:
@@ -178,7 +178,7 @@ class OutputModule(ModuleWidget):
         """
         # Invalidate all module caches at the start of each audio cycle
         # This ensures all modules regenerate their samples for this cycle
-        if hasattr(self, 'audio_engine') and self.audio_engine:
+        if hasattr(self, "audio_engine") and self.audio_engine:
             self.audio_engine.invalidate_all_caches()
 
         # Check which ports are connected

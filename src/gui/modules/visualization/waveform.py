@@ -6,8 +6,15 @@ import threading
 import numpy as np
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath, QLinearGradient, QBrush, \
-    QFont
+from PyQt6.QtGui import (
+    QPainter,
+    QPen,
+    QColor,
+    QPainterPath,
+    QLinearGradient,
+    QBrush,
+    QFont,
+)
 from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout
 
 from src.gui.core.module import ModuleCategory, ModuleMetadata
@@ -90,7 +97,7 @@ class WaveformModule(ModuleWidget):
             max_value=8192,
             default_value=2048,
             logarithmic=False,
-            callback=self._on_timerange_changed
+            callback=self._on_timerange_changed,
         )
         self.timerange_knob.setFixedSize(60, 80)
         controls_row.addWidget(self.timerange_knob)
@@ -136,11 +143,15 @@ class WaveformModule(ModuleWidget):
         stats_layout = QHBoxLayout()
 
         self.min_label = QLabel("Min: 0.000")
-        self.min_label.setStyleSheet("color: #ff6b6b; font-weight: bold; font-size: 11px;")
+        self.min_label.setStyleSheet(
+            "color: #ff6b6b; font-weight: bold; font-size: 11px;"
+        )
         stats_layout.addWidget(self.min_label)
 
         self.peak_label = QLabel("Peak: 0.0 dB")
-        self.peak_label.setStyleSheet("color: #ffd93d; font-weight: bold; font-size: 11px;")
+        self.peak_label.setStyleSheet(
+            "color: #ffd93d; font-weight: bold; font-size: 11px;"
+        )
         stats_layout.addWidget(self.peak_label)
 
         stats_layout.addStretch()
@@ -152,7 +163,9 @@ class WaveformModule(ModuleWidget):
         stats_layout.addStretch()
 
         self.max_label = QLabel("Max: 0.000")
-        self.max_label.setStyleSheet("color: #4ecdc4; font-weight: bold; font-size: 11px;")
+        self.max_label.setStyleSheet(
+            "color: #4ecdc4; font-weight: bold; font-size: 11px;"
+        )
         stats_layout.addWidget(self.max_label)
 
         layout.addLayout(stats_layout)
@@ -185,7 +198,9 @@ class WaveformModule(ModuleWidget):
             self.freeze_button.setText("Freeze")
             self._frozen_samples = None
 
-    def _update_samples(self, samples_l: np.ndarray | None, samples_r: np.ndarray | None):
+    def _update_samples(
+        self, samples_l: np.ndarray | None, samples_r: np.ndarray | None
+    ):
         """Update the display with new audio samples.
 
         Args:
@@ -253,7 +268,9 @@ class WaveformModule(ModuleWidget):
         min_val = float(np.min(samples))
         max_val = float(np.max(samples))
         peak_amplitude = np.max(np.abs(samples))
-        peak_db = 20 * np.log10(peak_amplitude + 1e-10) if peak_amplitude > 0 else -100.0
+        peak_db = (
+            20 * np.log10(peak_amplitude + 1e-10) if peak_amplitude > 0 else -100.0
+        )
 
         # Update labels
         self.min_label.setText(f"Min: {min_val:.3f}")
@@ -264,7 +281,9 @@ class WaveformModule(ModuleWidget):
         if samples.ndim == 1:
             self.samples_label.setText(f"Samples: {len(samples)}")
         else:
-            self.samples_label.setText(f"Samples: {samples.shape[0]} × {samples.shape[1]}")
+            self.samples_label.setText(
+                f"Samples: {samples.shape[0]} × {samples.shape[1]}"
+            )
 
     def get_required_inputs(self) -> list[str]:
         """Waveform requires at least one input to visualize.
@@ -278,8 +297,10 @@ class WaveformModule(ModuleWidget):
         """Update the waveform display at 20 Hz (independent of audio rate).
 
         HYBRID MODE:
-        - PASSIVE when output module is playing: reads buffered samples (no interference)
-        - ACTIVE when standalone: actively pulls samples (enables visualization without output)
+        - PASSIVE when output module is playing: reads buffered samples (no
+            interference)
+        - ACTIVE when standalone: actively pulls samples (enables visualization
+            without output)
         """
         try:
             # If frozen, keep showing frozen samples but still update display
@@ -302,7 +323,8 @@ class WaveformModule(ModuleWidget):
             # Get current timerange
             num_samples = int(self.timerange_knob.get_value())
 
-            # ALWAYS use active mode - directly generate samples for real-time visualization
+            # ALWAYS use active mode - directly generate samples for real-time
+            # visualization
             # This ensures we get fresh samples on each timer tick
             samples_l = None
             samples_r = None
@@ -310,14 +332,22 @@ class WaveformModule(ModuleWidget):
             if l_connected:
                 # Directly trigger sample generation from connected module
                 for connected_port in self.in_port_l.connected_to:
-                    if connected_port.parent_module and hasattr(connected_port.parent_module, 'process'):
+                    if connected_port.parent_module and hasattr(
+                        connected_port.parent_module, "process"
+                    ):
                         try:
                             # Generate fresh samples
                             connected_port.parent_module.process(num_samples)
                             if connected_port.value is not None:
-                                if isinstance(connected_port.value, np.ndarray) and connected_port.value.size > 0:
+                                if (
+                                    isinstance(connected_port.value, np.ndarray)
+                                    and connected_port.value.size > 0
+                                ):
                                     samples_l = connected_port.value.copy()
-                                    logger.debug(f"Waveform: Got L samples, shape={samples_l.shape}")
+                                    logger.debug(
+                                        f"Waveform: Got L samples, "
+                                        f"shape={samples_l.shape}"
+                                    )
                                     break
                         except Exception as e:
                             logger.debug(f"Error generating L samples: {e}")
@@ -325,14 +355,22 @@ class WaveformModule(ModuleWidget):
             if r_connected:
                 # Directly trigger sample generation from connected module
                 for connected_port in self.in_port_r.connected_to:
-                    if connected_port.parent_module and hasattr(connected_port.parent_module, 'process'):
+                    if connected_port.parent_module and hasattr(
+                        connected_port.parent_module, "process"
+                    ):
                         try:
                             # Generate fresh samples
                             connected_port.parent_module.process(num_samples)
                             if connected_port.value is not None:
-                                if isinstance(connected_port.value, np.ndarray) and connected_port.value.size > 0:
+                                if (
+                                    isinstance(connected_port.value, np.ndarray)
+                                    and connected_port.value.size > 0
+                                ):
                                     samples_r = connected_port.value.copy()
-                                    logger.debug(f"Waveform: Got R samples, shape={samples_r.shape}")
+                                    logger.debug(
+                                        f"Waveform: Got R samples, "
+                                        f"shape={samples_r.shape}"
+                                    )
                                     break
                         except Exception as e:
                             logger.debug(f"Error generating R samples: {e}")
@@ -351,10 +389,12 @@ class WaveformModule(ModuleWidget):
     def process(self, num_samples: int = 1):
         """Process method for audio path.
 
-        For visualizers: This is a NO-OP. Visualizers observe samples via observe_samples()
-        which is called explicitly by modules that want to share their output.
+        For visualizers: This is a NO-OP. Visualizers observe samples via
+        observe_samples() which is called explicitly by modules that want to share
+        their output.
 
-        Visualizers are NOT part of the audio processing chain to avoid any interference.
+        Visualizers are NOT part of the audio processing chain to avoid any
+        interference.
 
         Args:
             num_samples: Number of samples (ignored)
@@ -511,9 +551,16 @@ class WaveformDisplay(QWidget):
             center_y = height / 2
             painter.drawLine(0, int(center_y), width, int(center_y))
 
-    def _draw_waveform_with_fill(self, painter: QPainter, samples: np.ndarray,
-                                   center_y: float, y_scale: float,
-                                   width: int, wave_color: QColor, fill_color: QColor):
+    def _draw_waveform_with_fill(
+        self,
+        painter: QPainter,
+        samples: np.ndarray,
+        center_y: float,
+        y_scale: float,
+        width: int,
+        wave_color: QColor,
+        fill_color: QColor,
+    ):
         """Draw waveform with gradient fill effect.
 
         Args:
@@ -550,8 +597,15 @@ class WaveformDisplay(QWidget):
         painter.fillPath(fill_path, QBrush(fill_color))
 
         # Draw waveform line with glow effect
-        painter.setPen(QPen(wave_color, 2.5, Qt.PenStyle.SolidLine,
-                           Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        painter.setPen(
+            QPen(
+                wave_color,
+                2.5,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+                Qt.PenJoinStyle.RoundJoin,
+            )
+        )
         painter.drawPath(path)
 
     def paintEvent(self, event):
@@ -582,14 +636,24 @@ class WaveformDisplay(QWidget):
 
                 # Left channel
                 self._draw_waveform_with_fill(
-                    painter, self.samples[:, 0], left_center, y_scale,
-                    width, self.wave_color_left, self.wave_fill_left
+                    painter,
+                    self.samples[:, 0],
+                    left_center,
+                    y_scale,
+                    width,
+                    self.wave_color_left,
+                    self.wave_fill_left,
                 )
 
                 # Right channel
                 self._draw_waveform_with_fill(
-                    painter, self.samples[:, 1], right_center, y_scale,
-                    width, self.wave_color_right, self.wave_fill_right
+                    painter,
+                    self.samples[:, 1],
+                    right_center,
+                    y_scale,
+                    width,
+                    self.wave_color_right,
+                    self.wave_fill_right,
                 )
 
                 # Draw channel labels with better styling
@@ -610,8 +674,13 @@ class WaveformDisplay(QWidget):
                 y_scale = (height / 2) * 0.85
 
                 self._draw_waveform_with_fill(
-                    painter, self.samples, center_y, y_scale,
-                    width, self.wave_color_mono, self.wave_fill_mono
+                    painter,
+                    self.samples,
+                    center_y,
+                    y_scale,
+                    width,
+                    self.wave_color_mono,
+                    self.wave_fill_mono,
                 )
 
                 # Draw scale markers
@@ -625,5 +694,3 @@ class WaveformDisplay(QWidget):
             painter.setPen(self.text_color)
             painter.setFont(QFont("Arial", 12))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No Signal")
-
-

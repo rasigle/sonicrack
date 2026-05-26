@@ -349,7 +349,9 @@ class ModulatedOscillator(Generator):
         result_array = np.asarray(result, dtype=np.float64)
         if result_array.shape == ():
             return np.full(n, float(result_array), dtype=np.float64)
-        return np.array(np.broadcast_to(result_array, (n,)), dtype=np.float64, copy=False)
+        return np.array(
+            np.broadcast_to(result_array, (n,)), dtype=np.float64, copy=False
+        )
 
     def _evaluate_modulation_array(
         self,
@@ -387,11 +389,17 @@ class ModulatedOscillator(Generator):
         if isinstance(osc, SineOscillator):
             return self._generate_sine_waveform(freqs, phase_offsets_deg, sample_rate)
         if isinstance(osc, TriangleOscillator):
-            return self._generate_triangle_waveform(freqs, phase_offsets_deg, sample_rate)
+            return self._generate_triangle_waveform(
+                freqs, phase_offsets_deg, sample_rate
+            )
         if isinstance(osc, SawtoothOscillator):
-            return self._generate_sawtooth_waveform(freqs, phase_offsets_deg, sample_rate)
+            return self._generate_sawtooth_waveform(
+                freqs, phase_offsets_deg, sample_rate
+            )
 
-        raise TypeError(f"Unsupported oscillator type for vectorized generation: {type(osc)!r}")
+        raise TypeError(
+            f"Unsupported oscillator type for vectorized generation: {type(osc)!r}"
+        )
 
     def _generate_sine_waveform(
         self,
@@ -528,7 +536,9 @@ class ModulatedOscillator(Generator):
             return 0.0
         return oscillator._p / oscillator._period
 
-    def _update_phase_state_from_vectorized(self, phase_state: dict[str, float | str]) -> None:
+    def _update_phase_state_from_vectorized(
+        self, phase_state: dict[str, float | str]
+    ) -> None:
         """Commit the carrier phase accumulated during vectorized generation."""
         kind = phase_state.get("kind")
         if kind == "angular":

@@ -95,8 +95,7 @@ class ADSRModule(ModuleWidget):
         self.trigger_button = QPushButton("Trigger")
         self.trigger_button.setCheckable(False)  # Not a toggle, just a momentary push
         self.trigger_button.setMinimumHeight(35)
-        self.trigger_button.setStyleSheet(
-            """
+        self.trigger_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
@@ -112,8 +111,7 @@ class ADSRModule(ModuleWidget):
             QPushButton:hover {
                 background-color: #5cbf60;
             }
-        """
-        )
+        """)
         self.trigger_button.setToolTip(
             "Manual Trigger\n"
             "Press: Start attack phase\n"
@@ -206,16 +204,18 @@ class ADSRModule(ModuleWidget):
     def process(self, num_samples: int = 1):
         """Generate ADSR envelope output.
 
-        Generates envelope values based on current ADSR state and writes to the output port.
+        Generates envelope values based on current ADSR state and writes to the output
+        port.
         Can be triggered by gate input or manual trigger button.
 
         Args:
-            num_samples: Number of samples to generate (default: 1 for per-sample processing)
+            num_samples: Number of samples to generate (default: 1 for per-sample
+                processing)
 
         Note:
-            In the current architecture, this method is not actively called during playback.
-            The audio engine directly calls get_samples() on the compiled AudioComponents.
-            This method exists to satisfy the AudioModule interface.
+            In the current architecture, this method is not actively called during
+            playback. The audio engine directly calls get_samples() on the compiled
+            AudioComponents. This method exists to satisfy the AudioModule interface.
         """
         if self.out_port.is_connected and hasattr(self, "_adsr_component"):
             # Generate envelope samples

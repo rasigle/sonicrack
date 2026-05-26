@@ -80,7 +80,6 @@ class Port:
         # Data state - can be scalar or numpy array
         self.value: float | np.ndarray = 0.0
 
-
     def connect(self, other: Port) -> None:
         """Connect this port to another port (bidirectional).
 
@@ -136,9 +135,7 @@ class Port:
             # Also remove from other side (bidirectional)
             if self in other.connected_to:
                 other.connected_to.remove(self)
-            logger.debug(
-                f"Port disconnected: {self.port_name} <-/-> {other.port_name}"
-            )
+            logger.debug(f"Port disconnected: {self.port_name} <-/-> {other.port_name}")
             # Clear port data to prevent stale audio
             self.clear()
         except ValueError:
@@ -185,8 +182,10 @@ class Port:
                         continue
 
                     # Skip non-processing modules (like visualizers)
-                    if hasattr(connected_port.parent_module, 'is_processing_module') and \
-                       not connected_port.parent_module.is_processing_module:
+                    if (
+                        hasattr(connected_port.parent_module, "is_processing_module")
+                        and not connected_port.parent_module.is_processing_module
+                    ):
                         continue
 
                     if hasattr(connected_port.parent_module, "ensure_samples_ready"):
@@ -221,7 +220,7 @@ class Port:
                         if len(value) < num_samples:
                             # Pad with zeros
                             padded = np.zeros(num_samples, dtype=value.dtype)
-                            padded[:len(value)] = value
+                            padded[: len(value)] = value
                             result = padded
                         else:
                             # Truncate to requested size
@@ -238,11 +237,11 @@ class Port:
                         if len(value) < len(result):
                             # Pad with zeros
                             padded = np.zeros(len(result), dtype=value.dtype)
-                            padded[:len(value)] = value
+                            padded[: len(value)] = value
                             result = result + padded
                         else:
                             # Truncate to match result size
-                            result = result + value[:len(result)]
+                            result = result + value[: len(result)]
                     else:
                         result = result + value
                 else:
@@ -274,7 +273,6 @@ class Port:
             )
         # Note: Visualizers poll port.value directly - no notifications needed!
         # This ensures ZERO interference with audio thread
-
 
     def peek_recent(self, num_samples: int | None = None) -> float | np.ndarray:
         """Peek at recent samples without triggering upstream generation.

@@ -202,13 +202,14 @@ class VCAModule(ModuleWidget):
         the CV port or the amplitude knob), and writes the result to the output port.
 
         Args:
-            num_samples: Number of samples to process (default: 1 for per-sample processing)
+            num_samples: Number of samples to process (default: 1 for per-sample
+                processing)
 
         Note:
-            In the current architecture, this method is not actively called during playback.
-            The audio engine directly calls get_samples() on the compiled AudioComponents.
-            This method exists to satisfy the AudioModule interface and for potential
-            future use in a more modular processing pipeline.
+            In the current architecture, this method is not actively called during
+            playback. The audio engine directly calls get_samples() on the compiled
+            AudioComponents. This method exists to satisfy the AudioModule interface
+            and for potential future use in a more modular processing pipeline.
         """
         # Read input signal
         if not self.in_port.is_connected:

@@ -56,16 +56,22 @@ class OscillatorModule(ModuleWidget):
         pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
 
         self._sine_oscillator = SineOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate,
-            mode="analog"
+            freq,
+            gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
+            sample_rate=sample_rate,
+            mode="analog",
         )
         self._triangle_oscillator = TriangleOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate,
-            mode="analog"
+            freq,
+            gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
+            sample_rate=sample_rate,
+            mode="analog",
         )
         self._sawtooth_oscillator = SawtoothOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate,
-            mode="analog"
+            freq,
+            gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
+            sample_rate=sample_rate,
+            mode="analog",
         )
         self._square_oscillator = SquareOscillator(
             freq,
@@ -77,9 +83,15 @@ class OscillatorModule(ModuleWidget):
         # Add four output ports - one for each waveform
         # Pass component references so ports know their associated engine components
         self.sine_port: Port = self.add_output("Sine", component=self._sine_oscillator)
-        self.triangle_port: Port = self.add_output("Triangle", component=self._triangle_oscillator)
-        self.sawtooth_port: Port = self.add_output("Sawtooth", component=self._sawtooth_oscillator)
-        self.square_port: Port = self.add_output("Square", component=self._square_oscillator)
+        self.triangle_port: Port = self.add_output(
+            "Triangle", component=self._triangle_oscillator
+        )
+        self.sawtooth_port: Port = self.add_output(
+            "Sawtooth", component=self._sawtooth_oscillator
+        )
+        self.square_port: Port = self.add_output(
+            "Square", component=self._square_oscillator
+        )
 
         self.ports = [
             self.sine_port,
@@ -93,7 +105,6 @@ class OscillatorModule(ModuleWidget):
             self._sawtooth_oscillator,
             self._square_oscillator,
         ]
-
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -128,7 +139,6 @@ class OscillatorModule(ModuleWidget):
 
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
-
 
         # Register with audio_config to receive sample rate change notifications
         audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
@@ -178,4 +188,3 @@ class OscillatorModule(ModuleWidget):
         """Handle pulse width changes - only update square oscillator if connected."""
         if self.square_port.is_connected:
             self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
-

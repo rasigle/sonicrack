@@ -6,4 +6,4 @@ cd "%~dp0..\environment"
 call .\uv_sync_all.bat
 
 echo Running black code checking
-uv run black .
+uv run black --target-version py311 .

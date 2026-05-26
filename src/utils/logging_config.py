@@ -24,6 +24,7 @@ DETAILED_FORMAT = (
     "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
 )
 
+
 def setup_logging(
     level: int = DEFAULT_LOG_LEVEL,
     log_file: str | None = None,

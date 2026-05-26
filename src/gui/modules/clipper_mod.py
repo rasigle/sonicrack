@@ -84,7 +84,7 @@ class ClipperModulatedModule(ModulatedModuleBase):
         if samples is None:
             self.out_port.write(np.zeros(num_samples, dtype=np.float32))
             return
-            
+
         # Apply clipping (simplified version for process-based flow)
         threshold = self.threshold_knob.get_value()
         clipped = samples.clip(-threshold, threshold)

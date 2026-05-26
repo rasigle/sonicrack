@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 @register_module()
 class SimplePannerModule(ModuleWidget):
     """Simple panner module without modulation input."""
@@ -57,7 +58,6 @@ class SimplePannerModule(ModuleWidget):
 
         # Register parameters for automatic get/set
         self.register_parameter("position", self.pan_knob)
-
 
     def _on_pan_changed(self):
         """Handle pan knob changes by updating pan component.

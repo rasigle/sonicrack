@@ -117,9 +117,7 @@ class MixerModule(ModuleWidget):
         # Update the Volume component amplitude (click-free)
         self._volume_components[channel_index].amplitude = new_gain
 
-        logger.debug(
-            f"🎚️ Mixer: Ch {channel_index + 1} gain set to {new_gain:.3f}"
-        )
+        logger.debug(f"🎚️ Mixer: Ch {channel_index + 1} gain set to {new_gain:.3f}")
 
     def process(self, num_samples: int = 1):
         """Mix input signals and write to output port.

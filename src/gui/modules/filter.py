@@ -252,15 +252,17 @@ class FilterModule(ModuleWidget):
     def process(self, num_samples: int = 1):
         """Apply filter to input signal.
 
-        Reads from the input port, applies the configured filter, and writes to the output port.
+        Reads from the input port, applies the configured filter, and writes to the
+        output port.
 
         Args:
-            num_samples: Number of samples to process (default: 1 for per-sample processing)
+            num_samples: Number of samples to process (default: 1 for per-sample
+                processing)
 
         Note:
-            In the current architecture, this method is not actively called during playback.
-            The audio engine directly calls get_samples() on the compiled AudioComponents.
-            This method exists to satisfy the AudioModule interface.
+            In the current architecture, this method is not actively called during
+            playback. The audio engine directly calls get_samples() on the compiled
+            AudioComponents. This method exists to satisfy the AudioModule interface.
         """
         if not self.in_port.is_connected:
             return

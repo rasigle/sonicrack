@@ -56,13 +56,16 @@ class OscillatorModule(ModuleWidget):
         pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
 
         self._sine_oscillator = SineOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
+            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate,
+            mode="analog"
         )
         self._triangle_oscillator = TriangleOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
+            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate,
+            mode="analog"
         )
         self._sawtooth_oscillator = SawtoothOscillator(
-            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate
+            freq, gain_db=OSCILLATOR_DEFAULT_GAIN_DB, sample_rate=sample_rate,
+            mode="analog"
         )
         self._square_oscillator = SquareOscillator(
             freq,

@@ -6,7 +6,7 @@ import numpy as np
 
 from src.engine.oscillator_modulated import ModulatedOscillator
 from src.engine.modulator import ADSREnvelope
-from src.engine.oscillator import SineOscillator
+from src.engine.oscillator import SineOscillator, SquareOscillator, SawtoothOscillator
 
 
 class TestModulatedOscillatorInitialization(unittest.TestCase):
@@ -218,6 +218,155 @@ class TestSampleGeneration(unittest.TestCase):
         # Large buffer should use vectorized
         large = mod_osc.get_samples(1000, mode="auto", reset=True)
         self.assertIsInstance(large, np.ndarray)
+
+    def test_vectorized_matches_iterator_for_bright_sine_mode(self) -> None:
+        """Vectorized modulation should preserve sine harmonic modes."""
+        sample_rate = 2000
+        iterator_osc = SineOscillator(
+            frequency=55,
+            amplitude=0.7,
+            gain_db=None,
+            sample_rate=sample_rate,
+            mode="bright",
+        )
+        vectorized_osc = SineOscillator(
+            frequency=55,
+            amplitude=0.7,
+            gain_db=None,
+            sample_rate=sample_rate,
+            mode="bright",
+        )
+        iterator_mod = SineOscillator(
+            frequency=2,
+            amplitude=1.0,
+            gain_db=None,
+            sample_rate=sample_rate,
+            wave_range=(0, 1),
+        )
+        vectorized_mod = SineOscillator(
+            frequency=2,
+            amplitude=1.0,
+            gain_db=None,
+            sample_rate=sample_rate,
+            wave_range=(0, 1),
+        )
+
+        mod_iter = ModulatedOscillator(
+            iterator_osc,
+            iterator_mod,
+            amp_mod=lambda base_amp, env_val: base_amp * env_val,
+        )
+        mod_vec = ModulatedOscillator(
+            vectorized_osc,
+            vectorized_mod,
+            amp_mod=lambda base_amp, env_val: base_amp * env_val,
+        )
+
+        samples_iter = mod_iter.get_samples_iterator(512, reset=True)
+        samples_vec = mod_vec.get_samples_vectorized(512)
+
+        np.testing.assert_allclose(samples_iter, samples_vec, rtol=1e-5, atol=1e-5)
+
+    def test_vectorized_matches_iterator_for_square_oscillator(self) -> None:
+        """Vectorized modulation should keep square waves as square waves."""
+        sample_rate = 4000
+        iterator_osc = SquareOscillator(
+            frequency=35,
+            amplitude=0.8,
+            gain_db=None,
+            sample_rate=sample_rate,
+            pulsewidth=0.3,
+            mode="soft",
+            smoothness=18.0,
+        )
+        vectorized_osc = SquareOscillator(
+            frequency=35,
+            amplitude=0.8,
+            gain_db=None,
+            sample_rate=sample_rate,
+            pulsewidth=0.3,
+            mode="soft",
+            smoothness=18.0,
+        )
+        iterator_mod = SineOscillator(
+            frequency=1.5,
+            amplitude=0.1,
+            gain_db=None,
+            sample_rate=sample_rate,
+            phase=90,
+        )
+        vectorized_mod = SineOscillator(
+            frequency=1.5,
+            amplitude=0.1,
+            gain_db=None,
+            sample_rate=sample_rate,
+            phase=90,
+        )
+
+        mod_iter = ModulatedOscillator(
+            iterator_osc,
+            iterator_mod,
+            freq_mod=lambda base_freq, mod_val: base_freq * (1.0 + mod_val),
+        )
+        mod_vec = ModulatedOscillator(
+            vectorized_osc,
+            vectorized_mod,
+            freq_mod=lambda base_freq, mod_val: base_freq * (1.0 + mod_val),
+        )
+
+        samples_iter = mod_iter.get_samples_iterator(512, reset=True)
+        samples_vec = mod_vec.get_samples_vectorized(512)
+
+        np.testing.assert_allclose(samples_iter, samples_vec, rtol=1e-5, atol=1e-5)
+
+    def test_vectorized_preserves_analog_sawtooth_mode(self) -> None:
+        """Vectorized modulation should keep analog sawtooth distinct from pure."""
+        sample_rate = 3000
+        analog_osc = SawtoothOscillator(
+            frequency=40,
+            amplitude=0.6,
+            gain_db=None,
+            sample_rate=sample_rate,
+            mode="analog",
+        )
+        pure_osc = SawtoothOscillator(
+            frequency=40,
+            amplitude=0.6,
+            gain_db=None,
+            sample_rate=sample_rate,
+            mode="pure",
+        )
+        analog_mod = SineOscillator(
+            frequency=1,
+            amplitude=1.0,
+            gain_db=None,
+            sample_rate=sample_rate,
+            wave_range=(0, 1),
+        )
+        pure_mod = SineOscillator(
+            frequency=1,
+            amplitude=1.0,
+            gain_db=None,
+            sample_rate=sample_rate,
+            wave_range=(0, 1),
+        )
+
+        mod_analog = ModulatedOscillator(
+            analog_osc,
+            analog_mod,
+            amp_mod=lambda base_amp, env_val: base_amp * env_val,
+        )
+        mod_pure = ModulatedOscillator(
+            pure_osc,
+            pure_mod,
+            amp_mod=lambda base_amp, env_val: base_amp * env_val,
+        )
+
+        analog_samples = mod_analog.get_samples_vectorized(512)
+        pure_samples = mod_pure.get_samples_vectorized(512)
+
+        self.assertFalse(np.allclose(analog_samples, pure_samples))
+        self.assertGreater(np.max(np.abs(analog_samples - pure_samples)), 0.01)
 
 
 class TestMultipleModulators(unittest.TestCase):

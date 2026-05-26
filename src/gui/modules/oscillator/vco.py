@@ -50,12 +50,13 @@ class ModulatedOscillatorModule(ModuleWidget):
         """Initialize modulated oscillator module."""
         super().__init__(
             width=220,
-            height=200,
+            height=240,
             color=QColor(100, 140, 220),
         )
 
         # Initialize default parameters FIRST (before creating component)
         self._waveform = "Sine"
+        self._mode = self._get_default_mode_for_waveform(self._waveform)
         self._base_frequency = 440.0
         self._gain_db = DEFAULT_GAIN_DB
         self._phase = 0.0
@@ -83,6 +84,15 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.wave_combo.currentTextChanged.connect(self._on_wave_changed)
         wave_layout.addWidget(self.wave_combo)
         layout.addLayout(wave_layout)
+
+        # Mode selector
+        mode_layout = QHBoxLayout()
+        mode_layout.addWidget(QLabel("Mode:"))
+        self.mode_combo = QtWidgets.QComboBox()
+        self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
+        self._refresh_mode_options(self._waveform, preserve_current=False)
+        mode_layout.addWidget(self.mode_combo)
+        layout.addLayout(mode_layout)
 
         # Frequency control (base frequency when no modulation)
         knobs_layout = QHBoxLayout()
@@ -118,11 +128,56 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.register_parameter(
             "waveform", self.wave_combo, getter="currentText", setter="setCurrentText"
         )
+        self.register_parameter(
+            "mode", self.mode_combo, getter="currentText", setter="setCurrentText"
+        )
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("gain_db", self.gain_knob)
         self.register_parameter("phase", self.phase_slider)
 
         self.component = self.create_engine_component()
+
+    @staticmethod
+    def _get_available_modes_for_waveform(waveform: str) -> list[str]:
+        """Return supported engine modes for the selected waveform."""
+        if waveform == "Sine":
+            return SineOscillator.get_available_modes()
+        if waveform == "Square":
+            return SquareOscillator.get_available_modes()
+        if waveform == "Sawtooth":
+            return SawtoothOscillator.get_available_modes()
+        if waveform == "Triangle":
+            return TriangleOscillator.get_available_modes()
+        raise ValueError(f"Unknown waveform type: {waveform}")
+
+    @classmethod
+    def _get_default_mode_for_waveform(cls, waveform: str) -> str:
+        """Return a sensible default mode for each waveform."""
+        preferred_defaults = {
+            "Sine": "analog",
+            "Square": "ideal",
+            "Sawtooth": "analog",
+            "Triangle": "analog",
+        }
+        available_modes = cls._get_available_modes_for_waveform(waveform)
+        preferred = preferred_defaults.get(waveform, available_modes[0])
+        return preferred if preferred in available_modes else available_modes[0]
+
+    def _refresh_mode_options(self, waveform: str, preserve_current: bool = True):
+        """Refresh mode choices when the selected waveform changes."""
+        available_modes = self._get_available_modes_for_waveform(waveform)
+        selected_mode = self._mode if preserve_current else None
+
+        if selected_mode not in available_modes:
+            selected_mode = self._get_default_mode_for_waveform(waveform)
+
+        self.mode_combo.blockSignals(True)
+        self.mode_combo.clear()
+        self.mode_combo.addItems(available_modes)
+        self.mode_combo.setCurrentText(selected_mode)
+        self.mode_combo.blockSignals(False)
+
+        self._mode = selected_mode
 
     def _create_base_oscillator(self):
         """Create the base oscillator component based on current waveform."""
@@ -130,32 +185,37 @@ class ModulatedOscillatorModule(ModuleWidget):
             return SineOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase
+                phase=self._phase,
+                mode=self._mode,
             )
         elif self._waveform == "Square":
             return SquareOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase
+                phase=self._phase,
+                mode=self._mode,
             )
         elif self._waveform == "Sawtooth":
             return SawtoothOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase
+                phase=self._phase,
+                mode=self._mode,
             )
         elif self._waveform == "Triangle":
             return TriangleOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase
+                phase=self._phase,
+                mode=self._mode,
             )
         else:
             # Default to sine
             return SineOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase
+                phase=self._phase,
+                mode=self._mode,
             )
 
     def _on_wave_changed(self, wave_type: str):
@@ -164,6 +224,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         logger = logging.getLogger(__name__)
 
         self._waveform = wave_type
+        self._refresh_mode_options(wave_type)
         logger.debug(f"VCO: Waveform changed to {wave_type}")
 
         # Recreate the base oscillator with new waveform
@@ -172,6 +233,23 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.out_port.component = self.component
 
         self.parameter_changed.emit("waveform", wave_type)
+
+    def _on_mode_changed(self, mode: str):
+        """Handle oscillator mode changes by recreating the component."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        if not mode:
+            return
+
+        self._mode = mode
+        logger.debug(f"VCO: Mode changed to {mode}")
+
+        self.component = self._create_base_oscillator()
+        self.out_port.component = self.component
+
+        self.parameter_changed.emit("mode", mode)
 
     def _on_frequency_changed(self):
         """Handle frequency knob change by updating the component."""
@@ -365,6 +443,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         logger = logging.getLogger(__name__)
 
         wave_type = self.wave_combo.currentText()
+        mode = self.mode_combo.currentText()
         base_freq = self.freq_knob.get_value()
         gain_db = self.gain_knob.get_value()
         phase = self.phase_slider.get_value()
@@ -386,13 +465,13 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         # Create the base oscillator
         if wave_type == "Sine":
-            osc = SineOscillator(base_freq, gain_db=gain_db, phase=phase)
+            osc = SineOscillator(base_freq, gain_db=gain_db, phase=phase, mode=mode)
         elif wave_type == "Square":
-            osc = SquareOscillator(base_freq, gain_db=gain_db, phase=phase)
+            osc = SquareOscillator(base_freq, gain_db=gain_db, phase=phase, mode=mode)
         elif wave_type == "Sawtooth":
-            osc = SawtoothOscillator(base_freq, gain_db=gain_db, phase=phase)
+            osc = SawtoothOscillator(base_freq, gain_db=gain_db, phase=phase, mode=mode)
         elif wave_type == "Triangle":
-            osc = TriangleOscillator(base_freq, gain_db=gain_db, phase=phase)
+            osc = TriangleOscillator(base_freq, gain_db=gain_db, phase=phase, mode=mode)
         else:
             raise ValueError(f"Unknown waveform type: {wave_type}")
 

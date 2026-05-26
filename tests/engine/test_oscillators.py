@@ -111,7 +111,7 @@ class TestSineOscillator(TestOscillatorBase):
         samples_iter = osc1.get_samples_iterator(100, reset=True)
         samples_vec = osc2.get_samples_vectorized(100)
 
-        self.assert_arrays_close(np.array(samples_iter), samples_vec, rtol=1e-10)
+        self.assert_arrays_close(np.array(samples_iter), samples_vec, rtol=1e-6)
 
     def test_parameter_changes(self) -> None:
         """Test frequency and amplitude can be changed mid-stream."""
@@ -131,6 +131,24 @@ class TestSineOscillator(TestOscillatorBase):
         # Max amplitude should be around 0.5
         self.assertLess(np.max(np.abs(samples)), 0.51)
         self.assertGreater(np.max(np.abs(samples)), 0.45)
+
+    def test_amplitude_smoothing_continues_across_buffers(self) -> None:
+        """Vectorized amplitude smoothing should not restart on each buffer."""
+        osc = SineOscillator(
+            frequency=0,
+            amplitude=1.0,
+            gain_db=None,
+            phase=90,
+            sample_rate=1000,
+        )
+
+        osc.amplitude = 0.0
+        first_buffer = np.abs(osc.get_samples_vectorized(5))
+        second_buffer = np.abs(osc.get_samples_vectorized(5))
+
+        self.assertGreater(first_buffer[-1], 0.0)
+        self.assertLess(second_buffer[0], first_buffer[-1])
+        self.assertAlmostEqual(second_buffer[-1], 0.0, delta=1e-6)
 
     def test_auto_mode_selection(self) -> None:
         """Test auto mode selects correct method based on buffer size."""

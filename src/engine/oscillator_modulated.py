@@ -65,7 +65,13 @@ import numpy as np
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor, Generator
 from src.engine.audio_component_registry import register_component, ComponentCategory
-from src.engine.oscillator import Oscillator
+from src.engine.oscillator import (
+    Oscillator,
+    SineOscillator,
+    SquareOscillator,
+    TriangleOscillator,
+    SawtoothOscillator,
+)
 
 
 @register_component()
@@ -264,13 +270,8 @@ class ModulatedOscillator(Generator):
             - Iterator approach: ~258K samples/sec
             - Vectorized approach: ~5-10M samples/sec (20-40x faster)
         """
-        # Import oscillator types for type checking
-        from src.engine.oscillator import (
-            SineOscillator,
-            TriangleOscillator,
-            SawtoothOscillator,
-            SquareOscillator,
-        )
+        if n <= 0:
+            return np.empty(0, dtype=np.float32)
 
         # Step 1: Generate all modulator values in bulk (vectorized)
         mod_arrays = []
@@ -285,86 +286,259 @@ class ModulatedOscillator(Generator):
             mod_arrays.append(mod_vals)
 
         # Step 2: Compute modulated parameters for ALL samples at once
-
-        # Get base values
         base_freq = self.oscillator.init_freq
         base_amp = self.oscillator.init_amp
+        base_phase = self.oscillator.init_phase
         sample_rate = self.oscillator.sample_rate
 
-        # Compute frequencies for all samples (vectorized)
-        if self.freq_mod is not None:
-            mod_idx = 1 if self._modulators_count == 2 else 0
-            mod_vals = mod_arrays[mod_idx]
+        freqs = self._evaluate_modulation_array(
+            n=n,
+            base_value=base_freq,
+            mod_arrays=mod_arrays,
+            mod_func=self.freq_mod,
+            mod_index=(1 if self._modulators_count == 2 else 0),
+        )
+        if freqs is None:
+            freqs = np.full(n, base_freq, dtype=np.float64)
 
-            # Check if freq_mod can be vectorized
-            try:
-                # Try vectorized call
-                freqs = self.freq_mod(np.full(n, base_freq, dtype=np.float32), mod_vals)
-            except (TypeError, ValueError):
-                # Fallback to element-wise if function doesn't support arrays
-                freqs = np.array(
-                    [self.freq_mod(base_freq, mod_vals[i]) for i in range(n)],
-                    dtype=np.float32,
-                )
-        else:
-            # Constant frequency
-            freqs = np.full(n, base_freq, dtype=np.float32)
+        amps = self._evaluate_modulation_array(
+            n=n,
+            base_value=base_amp,
+            mod_arrays=mod_arrays,
+            mod_func=self.amp_mod,
+            mod_index=0,
+        )
+        if amps is None:
+            amps = np.full(n, base_amp, dtype=np.float64)
 
-        # Compute amplitudes for all samples (vectorized)
-        if self.amp_mod is not None:
-            mod_vals = mod_arrays[0]
+        phase_offsets_deg = self._evaluate_modulation_array(
+            n=n,
+            base_value=base_phase,
+            mod_arrays=mod_arrays,
+            mod_func=self.phase_mod,
+            mod_index=(2 if self._modulators_count == 3 else -1),
+        )
 
-            # Check if amp_mod can be vectorized
-            try:
-                # Try vectorized call
-                amps = self.amp_mod(np.full(n, base_amp, dtype=np.float32), mod_vals)
-            except (TypeError, ValueError):
-                # Fallback to element-wise if function doesn't support arrays
-                amps = np.array(
-                    [self.amp_mod(base_amp, mod_vals[i]) for i in range(n)],
-                    dtype=np.float32,
-                )
-        else:
-            # Constant amplitude
-            amps = np.full(n, base_amp, dtype=np.float32)
-
-        # Step 3: Phase accumulation with time-varying frequency
-        # This is the KEY optimization - accumulate phase changes
-        phase_increments = 2.0 * np.pi * freqs / sample_rate
-        phases = np.cumsum(phase_increments) + self.oscillator._p
-
-        # Step 4: Generate waveform based on oscillator type
-        # Use optimized NumPy operations for each waveform
-
-        if isinstance(self.oscillator, SineOscillator):
-            # Sine wave: simple sin function
-            waveform = np.sin(phases)
-
-        elif isinstance(self.oscillator, SquareOscillator):
-            # Square wave: sign of sin
-            waveform = np.sign(np.sin(phases))
-
-        elif isinstance(self.oscillator, TriangleOscillator):
-            # Triangle wave: 2*arcsin(sin(x))/π
-            waveform = (2.0 / np.pi) * np.arcsin(np.sin(phases))
-
-        elif isinstance(self.oscillator, SawtoothOscillator):
-            # Sawtooth wave: phase modulo 2π, normalized to [-1, 1]
-            waveform = 2.0 * ((phases / (2.0 * np.pi)) % 1.0) - 1.0
-
-        else:
-            # Unknown oscillator type - fall back to sample-by-sample
-            # This maintains compatibility with custom oscillators
+        if not isinstance(
+            self.oscillator,
+            (SineOscillator, SquareOscillator, TriangleOscillator, SawtoothOscillator),
+        ):
             return self._get_samples_fallback(n, mod_arrays)
 
-        # Step 5: Apply amplitude modulation
-        samples = waveform * amps
+        # Step 3: Generate waveform while preserving oscillator-specific behavior.
+        waveform, phase_state = self._generate_vectorized_waveform(
+            freqs=freqs,
+            phase_offsets_deg=phase_offsets_deg,
+            sample_rate=sample_rate,
+        )
 
-        # Step 6: Update oscillator state for continuous phase
-        # This ensures phase continuity between calls
-        self.oscillator._p = phases[-1] % (2.0 * np.pi)
+        # Step 4: Apply amplitude modulation.
+        samples = np.asarray(waveform * amps, dtype=np.float32)
 
-        return samples.astype(np.float32)
+        # Step 5: Update oscillator parameter state to match the final modulated sample.
+        if mod_arrays:
+            self._modulate([mod_arr[-1] for mod_arr in mod_arrays])
+
+        self._update_phase_state_from_vectorized(phase_state)
+
+        return samples
+
+    @staticmethod
+    def _coerce_modulation_result(result, n: int) -> np.ndarray:
+        """Normalize a scalar or array-like modulation result to a 1-D float array."""
+        result_array = np.asarray(result, dtype=np.float64)
+        if result_array.shape == ():
+            return np.full(n, float(result_array), dtype=np.float64)
+        return np.array(np.broadcast_to(result_array, (n,)), dtype=np.float64, copy=False)
+
+    def _evaluate_modulation_array(
+        self,
+        n: int,
+        base_value: float,
+        mod_arrays: list[np.ndarray],
+        mod_func,
+        mod_index: int,
+    ) -> np.ndarray | None:
+        """Evaluate a modulation function for an entire vectorized buffer."""
+        if mod_func is None:
+            return None
+
+        mod_vals = mod_arrays[mod_index]
+        base_array = np.full(n, base_value, dtype=np.float64)
+
+        try:
+            result = mod_func(base_array, mod_vals)
+        except (TypeError, ValueError):
+            result = [mod_func(base_value, mod_vals[i]) for i in range(n)]
+
+        return self._coerce_modulation_result(result, n)
+
+    def _generate_vectorized_waveform(
+        self,
+        freqs: np.ndarray | None,
+        phase_offsets_deg: np.ndarray | None,
+        sample_rate: float,
+    ) -> tuple[np.ndarray, dict[str, float | str]]:
+        """Generate a waveform buffer that respects the underlying oscillator type."""
+        osc = self.oscillator
+
+        if isinstance(osc, SquareOscillator):
+            return self._generate_square_waveform(freqs, phase_offsets_deg, sample_rate)
+        if isinstance(osc, SineOscillator):
+            return self._generate_sine_waveform(freqs, phase_offsets_deg, sample_rate)
+        if isinstance(osc, TriangleOscillator):
+            return self._generate_triangle_waveform(freqs, phase_offsets_deg, sample_rate)
+        if isinstance(osc, SawtoothOscillator):
+            return self._generate_sawtooth_waveform(freqs, phase_offsets_deg, sample_rate)
+
+        raise TypeError(f"Unsupported oscillator type for vectorized generation: {type(osc)!r}")
+
+    def _generate_sine_waveform(
+        self,
+        freqs: np.ndarray | None,
+        phase_offsets_deg: np.ndarray | None,
+        sample_rate: float,
+    ) -> tuple[np.ndarray, dict[str, float | str]]:
+        osc = self.oscillator
+        increments = (2.0 * np.pi * freqs) / sample_rate
+        carrier_phases, end_phase = self._build_carrier_phase_buffer(osc._i, increments)
+
+        if phase_offsets_deg is None:
+            phase_offsets = np.full(len(freqs), osc._p, dtype=np.float64)
+        else:
+            phase_offsets = np.deg2rad(phase_offsets_deg)
+
+        total_phases = carrier_phases + phase_offsets
+        waveform = np.asarray(osc._generate_waveform(total_phases), dtype=np.float64)
+        waveform = np.asarray(osc._apply_wave_range_values(waveform), dtype=np.float64)
+        return waveform, {"kind": "angular", "carrier_end": end_phase}
+
+    def _generate_square_waveform(
+        self,
+        freqs: np.ndarray | None,
+        phase_offsets_deg: np.ndarray | None,
+        sample_rate: float,
+    ) -> tuple[np.ndarray, dict[str, float | str]]:
+        osc = self.oscillator
+        increments = (2.0 * np.pi * freqs) / sample_rate
+        carrier_phases, end_phase = self._build_carrier_phase_buffer(osc._i, increments)
+
+        if phase_offsets_deg is None:
+            phase_offsets = np.full(len(freqs), osc._p, dtype=np.float64)
+        else:
+            phase_offsets = np.deg2rad(phase_offsets_deg)
+
+        wrapped_phases = (carrier_phases + phase_offsets) % (2.0 * np.pi)
+        waveform = osc._strategy.generate_samples(
+            phases=wrapped_phases,
+            pulsewidth_threshold=osc._pulsewidth_threshold,
+            low_value=osc._wave_range[0],
+            high_value=osc._wave_range[1],
+        )
+        return np.asarray(waveform, dtype=np.float64), {
+            "kind": "angular",
+            "carrier_end": end_phase,
+        }
+
+    def _generate_sawtooth_waveform(
+        self,
+        freqs: np.ndarray | None,
+        phase_offsets_deg: np.ndarray | None,
+        sample_rate: float,
+    ) -> tuple[np.ndarray, dict[str, float | str]]:
+        osc = self.oscillator
+        increments = freqs / sample_rate
+        carrier_cycles, end_cycle = self._build_carrier_phase_buffer(
+            self._get_saw_like_carrier_cycle(osc),
+            increments,
+        )
+
+        if phase_offsets_deg is None:
+            phase_offsets = np.full(
+                len(freqs),
+                self._get_saw_like_phase_offset_cycle(osc),
+                dtype=np.float64,
+            )
+        else:
+            phase_offsets = phase_offsets_deg / 360.0
+
+        cycles = carrier_cycles + phase_offsets
+        waveform = 2 * (cycles - np.floor(0.5 + cycles))
+        if osc.mode == "analog":
+            waveform = osc._apply_analog_character(waveform)
+        waveform = np.asarray(osc._apply_wave_range_values(waveform), dtype=np.float64)
+        return waveform, {"kind": "cycle", "carrier_end": end_cycle}
+
+    def _generate_triangle_waveform(
+        self,
+        freqs: np.ndarray | None,
+        phase_offsets_deg: np.ndarray | None,
+        sample_rate: float,
+    ) -> tuple[np.ndarray, dict[str, float | str]]:
+        osc = self.oscillator
+        increments = freqs / sample_rate
+        carrier_cycles, end_cycle = self._build_carrier_phase_buffer(
+            self._get_saw_like_carrier_cycle(osc),
+            increments,
+        )
+
+        if phase_offsets_deg is None:
+            phase_offsets = np.full(
+                len(freqs),
+                self._get_saw_like_phase_offset_cycle(osc),
+                dtype=np.float64,
+            )
+        else:
+            phase_offsets = phase_offsets_deg / 360.0
+
+        cycles = carrier_cycles + phase_offsets
+        waveform = 2 * (cycles - np.floor(0.5 + cycles))
+        waveform = (np.abs(waveform) - 0.5) * 2
+        if osc.mode == "analog":
+            waveform = osc._apply_analog_character_triangle(waveform)
+        waveform = np.asarray(osc._apply_wave_range_values(waveform), dtype=np.float64)
+        return waveform, {"kind": "cycle", "carrier_end": end_cycle}
+
+    @staticmethod
+    def _build_carrier_phase_buffer(
+        start_phase: float, increments: np.ndarray
+    ) -> tuple[np.ndarray, float]:
+        """Build a phase buffer where sample k uses the phase before increment k."""
+        if len(increments) == 0:
+            return np.empty(0, dtype=np.float64), float(start_phase)
+
+        phase_offsets = np.concatenate(
+            ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
+        )
+        phases = start_phase + phase_offsets
+        end_phase = float(start_phase + np.sum(increments, dtype=np.float64))
+        return phases, end_phase
+
+    @staticmethod
+    def _get_saw_like_carrier_cycle(oscillator: SawtoothOscillator) -> float:
+        """Get the continuous carrier phase cycle for saw/triangle oscillators."""
+        if getattr(oscillator, "_period", 0) == 0:
+            return 0.0
+        return oscillator._i / oscillator._period
+
+    @staticmethod
+    def _get_saw_like_phase_offset_cycle(oscillator: SawtoothOscillator) -> float:
+        """Get the current phase-offset cycle for saw/triangle oscillators."""
+        if getattr(oscillator, "_period", 0) == 0:
+            return 0.0
+        return oscillator._p / oscillator._period
+
+    def _update_phase_state_from_vectorized(self, phase_state: dict[str, float | str]) -> None:
+        """Commit the carrier phase accumulated during vectorized generation."""
+        kind = phase_state.get("kind")
+        if kind == "angular":
+            self.oscillator._i = float(phase_state["carrier_end"]) % (2.0 * np.pi)
+        elif kind == "cycle":
+            carrier_cycle = float(phase_state["carrier_end"]) % 1.0
+            if getattr(self.oscillator, "_period", 0) != 0:
+                self.oscillator._i = carrier_cycle * self.oscillator._period
+            else:
+                self.oscillator._i = 0
 
     def _get_samples_fallback(self, n: int, mod_arrays: list) -> np.ndarray:
         """Fallback to sample-by-sample generation for unknown oscillator types.

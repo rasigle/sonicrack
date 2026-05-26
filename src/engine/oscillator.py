@@ -55,7 +55,7 @@ import numpy as np
 from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_GAIN_DB
 from src.engine.audio_component import Generator, ComponentDescriptor
 from src.engine.audio_component_registry import register_component, ComponentCategory
-from src.utils.math import db_to_linear, linear_to_db, squish_val
+from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args, filter_provided_args
 
 DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS = 10  # 10 milliseconds
@@ -358,6 +358,64 @@ class Oscillator(Generator):
         """
         pass
 
+    def _apply_wave_range_value(self, value: float) -> float:
+        """Apply wave-range conversion to a single normalized sample."""
+        if self._needs_range_conversion:
+            return value * self._range_scale + self._range_offset
+        return value
+
+    def _apply_wave_range_values(self, values: np.ndarray) -> np.ndarray:
+        """Apply wave-range conversion to normalized vectorized samples."""
+        if self._needs_range_conversion:
+            return values * self._range_scale + self._range_offset
+        return values
+
+    def _apply_amplitude_to_buffer(self, values: np.ndarray) -> np.ndarray:
+        """Apply current amplitude or smoothing envelope to a sample buffer.
+
+        This helper keeps `_current_amplitude` in sync across successive vectorized
+        calls, which preserves smooth transitions even when the smoothing ramp spans
+        multiple audio buffers.
+        """
+        values = np.asarray(values)
+        n = len(values)
+
+        if n == 0:
+            return np.empty(0, dtype=np.float32)
+
+        if self._smoothing_samples_remaining > 0:
+            smooth_count = min(n, self._smoothing_samples_remaining)
+            smoothing_progress = (
+                np.arange(1, smooth_count + 1, dtype=np.float64)
+                / self._smoothing_samples_remaining
+            )
+            amp_envelope = np.asarray(
+                self._current_amplitude
+                + (
+                    self._target_amplitude - self._current_amplitude
+                ) * smoothing_progress,
+                dtype=np.float32,
+            )
+
+            samples = np.empty(n, dtype=np.float32)
+            samples[:smooth_count] = values[:smooth_count] * amp_envelope
+
+            if smooth_count < n:
+                samples[smooth_count:] = (
+                    values[smooth_count:] * self._target_amplitude
+                )
+
+            self._smoothing_samples_remaining -= smooth_count
+            self._current_amplitude = float(amp_envelope[-1])
+
+            if self._smoothing_samples_remaining <= 0:
+                self._current_amplitude = self._target_amplitude
+
+            return samples.astype(np.float32)
+
+        self._current_amplitude = self._a
+        return np.asarray(values * self._a, dtype=np.float32)
+
     def __next__(self):
         """Return the next sample from the oscillator.
 
@@ -476,11 +534,15 @@ class Oscillator(Generator):
 
 @register_component()
 class SawtoothOscillator(Oscillator):
-    """Sawtooth wave generator.
+    """Sawtooth wave generator with analog mode for vintage character.
 
     The sawtooth oscillates in the range specified by `wave_range` and is scaled by
     `amp`. Phase is interpreted in degrees and converted to an offset within the
     oscillator period.
+
+    Supports two modes:
+    - **pure**: Clean digital sawtooth
+    - **analog**: Vintage character with subtle harmonics and soft clipping
 
     The implementation uses an internal period (`_period`) computed from
     `sample_rate / freq`.
@@ -489,7 +551,7 @@ class SawtoothOscillator(Oscillator):
     descriptor = ComponentDescriptor(
         name="Sawtooth",
         category=ComponentCategory.OSCILLATOR,
-        description="Sawtooth wave oscillator",
+        description="Sawtooth wave oscillator with analog mode",
         fluent_api_name="sawtooth",
         config_params=[
             "frequency",
@@ -498,13 +560,48 @@ class SawtoothOscillator(Oscillator):
             "phase",
             "sample_rate",
             "wave_range",
+            "mode",
         ],
-        tags=["basic", "oscillator", "sawtooth"],
+        tags=["basic", "oscillator", "sawtooth", "analog"],
     )
 
-    def __init__(self, *args, **kwargs):
-        """Initialize sawtooth oscillator."""
-        super().__init__(*args, **kwargs)
+    @track_provided_args
+    def __init__(
+        self,
+        frequency: float = 440,
+        amplitude: float = 1.0,
+        gain_db: float | None = DEFAULT_GAIN_DB,
+        phase: float = 0.0,
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
+        wave_range: tuple[float, float] = (-1, 1),
+        mode: Literal["pure", "analog"] = "pure",
+    ):
+        """Initialize sawtooth oscillator with mode selection.
+
+        Args:
+            frequency: Initial frequency in Hz.
+            amplitude: Linear amplitude (0.0 to 1.0+). Default: 1.0
+            gain_db: Gain in decibels. Default: -20.0 (safe for mixing)
+            phase: Initial phase offset in degrees (0-360).
+            sample_rate: Sample rate in Hz. Default: 44100
+            wave_range: Output range tuple (min, max). Default: (-1, 1)
+            mode: Generation mode:
+                - "pure": Clean digital sawtooth
+                - "analog": Vintage character with harmonics
+        """
+        self._mode = mode
+        kwargs = filter_provided_args(
+            self._provided_args,  # noqa
+            frequency=frequency,
+            amplitude=amplitude,
+            gain_db=gain_db,
+            phase=phase,
+            sample_rate=sample_rate,
+            wave_range=wave_range,
+        )
+        super().__init__(
+            **kwargs
+        )
         # Store original phase in degrees for recalculation when frequency changes
         self._phase_degrees = self._p
 
@@ -538,6 +635,62 @@ class SawtoothOscillator(Oscillator):
         """Reset internal sample index."""
         self._i = 0
 
+    @property
+    def mode(self) -> Literal["pure", "analog"]:
+        """str: Current sawtooth generation mode.
+
+        Returns:
+            Current mode ("pure" or "analog")
+        """
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: Literal["pure", "analog"]):
+        """Set sawtooth generation mode.
+
+        Args:
+            value: Mode to use ("pure" or "analog")
+
+        Raises:
+            ValueError: If mode is not recognized
+        """
+        if value not in ["pure", "analog"]:
+            raise ValueError(f"Invalid mode '{value}'. Must be 'pure' or 'analog'")
+        self._mode = value
+
+    @classmethod
+    def get_available_modes(cls) -> list[str]:
+        """Get the supported sawtooth waveform modes."""
+        return ["pure", "analog"]
+
+    def _apply_analog_character(self, val: float | np.ndarray) -> float | np.ndarray:
+        """Apply analog-style character to sawtooth waveform.
+
+        Adds subtle harmonics and soft clipping to create vintage analog
+        oscillator character.
+
+        Args:
+            val: Pure sawtooth waveform value(s)
+
+        Returns:
+            Analog-characterized sawtooth value(s)
+        """
+        # Apply gentle soft clipping for analog saturation
+        # This adds even-order harmonics
+        analog = np.tanh(val * 1.15)
+
+        # Add subtle high-frequency component for "edge" definition
+        # This mimics analog oscillator edge characteristics
+        if isinstance(val, np.ndarray):
+            # For vectorized: add slight phase-based modulation
+            phase_mod = np.sin(np.arange(len(val)) * 0.1) * 0.03
+            analog = analog * (1.0 + phase_mod)
+        else:
+            # For iterator: simpler approach
+            analog = analog * 1.02
+
+        return analog * 0.92
+
     def __next__(self):
         """Compute next sawtooth sample and advance index.
 
@@ -546,9 +699,13 @@ class SawtoothOscillator(Oscillator):
         """
         div = (self._i + self._p) / self._period if self._period != 0 else 0
         val = 2 * (div - np.floor(0.5 + div))
+
+        # Apply analog character if mode is set
+        if self._mode == "analog":
+            val = self._apply_analog_character(val)
+
         self._i = self._i + 1
-        if self._wave_range != (-1, 1):
-            val = squish_val(val, *self._wave_range)
+        val = self._apply_wave_range_value(val)
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
@@ -567,35 +724,12 @@ class SawtoothOscillator(Oscillator):
         else:
             val = np.zeros(n, dtype=np.float32)
 
-        # Apply wave range if needed (optimized with pre-computed constants)
-        if self._needs_range_conversion:
-            val = val * self._range_scale + self._range_offset
+        # Apply analog character if mode is set
+        if self._mode == "analog":
+            val = self._apply_analog_character(val)
 
-        # Apply amplitude with smoothing if transitioning (prevents clicks!)
-        if self._smoothing_samples_remaining > 0:
-            # Calculate how many samples to smooth in this buffer
-            smooth_count = min(n, self._smoothing_samples_remaining)
-
-            # Create smooth amplitude envelope (linear ramp)
-            amp_envelope = np.linspace(
-                self._current_amplitude, self._target_amplitude, smooth_count
-            )
-
-            # Apply smoothed amplitude to first part
-            samples = np.zeros(n, dtype=np.float32)
-            samples[:smooth_count] = val[:smooth_count] * amp_envelope
-
-            # Apply target amplitude to rest (if any)
-            if smooth_count < n:
-                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
-
-            # Update state
-            self._smoothing_samples_remaining -= smooth_count
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
-        else:
-            # No smoothing needed - direct multiplication
-            samples = val * self._a
+        val = self._apply_wave_range_values(val)
+        samples = self._apply_amplitude_to_buffer(val)
 
         # Update internal state
         self._i += n
@@ -605,17 +739,21 @@ class SawtoothOscillator(Oscillator):
 
 @register_component()
 class TriangleOscillator(SawtoothOscillator):
-    """Triangle wave generator derived from sawtooth logic.
+    """Triangle wave generator with analog mode for vintage character.
 
     The triangle waveform is computed by taking the absolute of a centered
     sawtooth and scaling it to [-1, 1] before amplitude scaling.
+
+    Supports two modes:
+    - **pure**: Clean digital triangle
+    - **analog**: Vintage character with subtle harmonics and soft clipping
     """
 
     descriptor = ComponentDescriptor(
         name="Triangle",
         category=ComponentCategory.OSCILLATOR,
-        description="Triangle wave oscillator",
-        tags=["basic", "oscillator", "triangle"],
+        description="Triangle wave oscillator with analog mode",
+        tags=["basic", "oscillator", "triangle", "analog"],
         fluent_api_name="triangle",
         config_params=[
             "frequency",
@@ -624,8 +762,36 @@ class TriangleOscillator(SawtoothOscillator):
             "phase",
             "sample_rate",
             "wave_range",
+            "mode",
         ],
     )
+
+    def _apply_analog_character_triangle(self, val: float | np.ndarray) -> float | np.ndarray:
+        """Apply analog-style character to triangle waveform.
+
+        Adds subtle harmonics and soft clipping to create vintage analog
+        oscillator character, optimized for triangle waves.
+
+        Args:
+            val: Pure triangle waveform value(s)
+
+        Returns:
+            Analog-characterized triangle value(s)
+        """
+        # Apply very gentle soft clipping for analog warmth
+        # Triangle waves naturally have odd harmonics, so we use gentler clipping
+        analog = np.tanh(val * 1.08)
+
+        # Add subtle modulation for analog "drift"
+        if isinstance(val, np.ndarray):
+            # For vectorized: add slight amplitude modulation
+            phase_mod = np.sin(np.arange(len(val)) * 0.08) * 0.02
+            analog = analog * (1.0 + phase_mod)
+        else:
+            # For iterator: simpler approach
+            analog = analog * 1.01
+
+        return analog * 0.95
 
     def __next__(self):
         """Compute next triangle sample and advance index.
@@ -636,9 +802,13 @@ class TriangleOscillator(SawtoothOscillator):
         div = (self._i + self._p) / self._period if self._period != 0 else 0
         val = 2 * (div - np.floor(0.5 + div))
         val = (abs(val) - 0.5) * 2
+
+        # Apply analog character if mode is set
+        if self._mode == "analog":
+            val = self._apply_analog_character_triangle(val)
+
         self._i = self._i + 1
-        if self._wave_range != (-1, 1):
-            val = squish_val(val, *self._wave_range)
+        val = self._apply_wave_range_value(val)
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
@@ -658,35 +828,12 @@ class TriangleOscillator(SawtoothOscillator):
         else:
             val = np.zeros(n, dtype=np.float32)
 
-        # Apply wave range if needed (optimized with pre-computed constants)
-        if self._needs_range_conversion:
-            val = val * self._range_scale + self._range_offset
+        # Apply analog character if mode is set
+        if self._mode == "analog":
+            val = self._apply_analog_character_triangle(val)
 
-        # Apply amplitude with smoothing if transitioning (prevents clicks!)
-        if self._smoothing_samples_remaining > 0:
-            # Calculate how many samples to smooth in this buffer
-            smooth_count = min(n, self._smoothing_samples_remaining)
-
-            # Create smooth amplitude envelope (linear ramp)
-            amp_envelope = np.linspace(
-                self._current_amplitude, self._target_amplitude, smooth_count
-            )
-
-            # Apply smoothed amplitude to first part
-            samples = np.zeros(n, dtype=np.float32)
-            samples[:smooth_count] = val[:smooth_count] * amp_envelope
-
-            # Apply target amplitude to rest (if any)
-            if smooth_count < n:
-                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
-
-            # Update state
-            self._smoothing_samples_remaining -= smooth_count
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
-        else:
-            # No smoothing needed - direct multiplication
-            samples = val * self._a
+        val = self._apply_wave_range_values(val)
+        samples = self._apply_amplitude_to_buffer(val)
 
         # Update internal state
         self._i += n
@@ -696,7 +843,21 @@ class TriangleOscillator(SawtoothOscillator):
 
 @register_component()
 class SineOscillator(Oscillator):
-    """Sine wave generator.
+    """Sine wave generator with multiple harmonic modes for richer sound.
+
+    The sine oscillator supports four modes:
+
+    - **pure**: Classic pure sine wave (single frequency, clean but flat)
+    - **warm**: Softened triangle wave with even harmonics (analog warmth)
+    - **bright**: Rich harmonic spectrum with visible modulation (supersaw-like presence)
+    - **analog**: Vintage character with subtle imperfections (VCV Rack inspired)
+
+    The 'warm' mode adds even harmonics for analog character, while 'bright' mode
+    adds harmonics with visible waveform modulation, creating a complex, modern sound
+    that's distinctly different from square waves and perfect for cutting leads and pads.
+
+    The 'analog' mode implements vintage oscillator characteristics with subtle
+    analog-style imperfections and harmonics for a classic hardware sound.
 
     The sine oscillator uses `_step` to advance the internal phase per sample.
     Phase is converted from degrees to radians in `_post_phase_set`.
@@ -705,8 +866,8 @@ class SineOscillator(Oscillator):
     descriptor = ComponentDescriptor(
         name="Sine",
         category=ComponentCategory.OSCILLATOR,
-        description="Pure sine wave oscillator",
-        tags=["basic", "oscillator", "sine"],
+        description="Pure sine wave oscillator with harmonic modes",
+        tags=["basic", "oscillator", "sine", "harmonics", "analog"],
         fluent_api_name="sine",
         config_params=[
             "frequency",
@@ -715,8 +876,52 @@ class SineOscillator(Oscillator):
             "phase",
             "sample_rate",
             "wave_range",
+            "mode",
         ],
     )
+
+    @track_provided_args
+    def __init__(
+        self,
+        frequency: float = 440,
+        amplitude: float = 1.0,
+        gain_db: float | None = DEFAULT_GAIN_DB,
+        phase: float = 0.0,
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
+        wave_range: tuple[float, float] = (-1, 1),
+        mode: Literal["pure", "warm", "bright", "analog"] = "pure",
+    ):
+        """Construct a sine oscillator with selectable harmonic mode.
+
+        Args:
+            frequency: Initial frequency in Hz.
+            amplitude: Linear amplitude (0.0 to 1.0+). Default: 1.0
+                Note: Ignored if gain_db is specified.
+            gain_db: Gain in decibels. Default: -20.0 (safe for mixing)
+                Overrides amplitude if provided.
+            phase: Initial phase offset in degrees (0-360).
+            sample_rate: Sample rate in Hz. Default: 44100
+            wave_range: Output range tuple (min, max). Default: (-1, 1)
+                Use default for audio. Only change for special cases.
+            mode: Sine wave generation mode:
+                - "pure": Classic pure sine wave (single frequency)
+                - "warm": Softened triangle with even harmonics (analog warmth)
+                - "bright": Rich harmonic spectrum with visible modulation
+                - "analog": Vintage oscillator with subtle imperfections
+        """
+        self._mode = mode
+        kwargs = filter_provided_args(
+            self._provided_args,  # noqa
+            frequency=frequency,
+            amplitude=amplitude,
+            gain_db=gain_db,
+            phase=phase,
+            sample_rate=sample_rate,
+            wave_range=wave_range,
+        )
+        super().__init__(
+            **kwargs
+        )
 
     def _post_freq_set(self):
         """Recompute the angular step per sample when frequency changes."""
@@ -730,21 +935,216 @@ class SineOscillator(Oscillator):
         """Reset internal accumulator used for phase progression."""
         self._i = 0
 
+    @property
+    def mode(self) -> Literal["pure", "warm", "bright", "analog"]:
+        """str: Current sine wave generation mode.
+
+        Returns:
+            Current mode ("pure", "warm", "bright", or "analog")
+        """
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: Literal["pure", "warm", "bright", "analog"]):
+        """Set sine wave generation mode.
+
+        Args:
+            value: Mode to use ("pure", "warm", "bright", or "analog")
+
+        Raises:
+            ValueError: If mode is not recognized
+        """
+        if value not in ["pure", "warm", "bright", "analog"]:
+            raise ValueError(
+                f"Invalid mode '{value}'. Must be 'pure', 'warm', 'bright', or 'analog'"
+            )
+        self._mode = value
+
+    @classmethod
+    def get_available_modes(cls) -> list[str]:
+        """Get the supported sine waveform modes."""
+        return ["pure", "warm", "bright", "analog"]
+
+    def _generate_waveform(self, phase: float | np.ndarray) -> float | np.ndarray:
+        """Generate the active sine waveform variant for the provided phase."""
+        if self._mode == "pure":
+            return self._generate_pure_sine(phase)
+        if self._mode == "warm":
+            return self._generate_warm_sine(phase)
+        if self._mode == "bright":
+            return self._generate_bright_sine(phase)
+        return self._generate_analog_sine(phase)
+
+    def _generate_pure_sine(
+            self, phase: float | np.ndarray
+    ) -> float | np.ndarray:
+        """Generate pure sine wave (classic single frequency).
+
+        Args:
+            phase: Phase value(s) in radians
+
+        Returns:
+            Pure sine wave value(s)
+        """
+        return np.sin(phase)
+
+    def _generate_warm_sine(
+            self, phase: float | np.ndarray
+    ) -> float | np.ndarray:
+        """Generate warm sine with even harmonics (softened triangle).
+
+        This mode creates a warmer, more analog sound by combining a sine wave
+        with even harmonics. This adds fullness and richness similar to vintage
+        analog synthesizers, while maintaining a smooth, sine-like character.
+
+        Implementation: Uses Fourier series with even harmonics for smooth,
+        rounded warm sine character without sharp discontinuities.
+
+        Args:
+            phase: Phase value(s) in radians
+
+        Returns:
+            Warm sine wave value(s) with even harmonics
+        """
+        # Start with fundamental sine
+        fundamental = np.sin(phase)
+
+        # Add even harmonics with decreasing amplitude (Fourier series style)
+        # This creates warmth without sharp edges
+        harmonic_2 = np.sin(2 * phase) * 0.30  # 2nd harmonic - warmth
+        harmonic_4 = np.sin(4 * phase) * 0.15  # 4th harmonic - fullness
+        harmonic_6 = np.sin(6 * phase) * 0.08  # 6th harmonic - richness
+
+        # Combine all harmonics
+        warm = fundamental + harmonic_2 + harmonic_4 + harmonic_6
+
+        # Apply very gentle soft clipping to add subtle analog character
+        # Much gentler than before to keep sine-like smoothness
+        warm = np.tanh(warm * 0.95)
+
+        # Normalize to maintain similar amplitude to pure sine
+        return warm * 0.90
+
+    def _generate_bright_sine(
+            self, phase: float | np.ndarray
+    ) -> float | np.ndarray:
+        """Generate bright sine with rich harmonic content (enhanced presence).
+
+        This mode creates a bright, rich sound with visible harmonic modulation
+        while maintaining a recognizable sine-like shape. The waveform shows
+        clear ripples and modulation from the harmonics, making it distinctly
+        different from pure sine while still being sine-based.
+
+        Perfect for leads, pads, and sounds that need presence and complexity
+        while remaining musical and clean.
+
+        Implementation: Sine fundamental with carefully balanced harmonics
+        to create visible modulation without destroying the sine character.
+
+        Args:
+            phase: Phase value(s) in radians
+
+        Returns:
+            Bright sine wave value(s) with visible harmonic modulation
+        """
+        # Fundamental sine (dominant component)
+        fundamental = np.sin(phase)
+
+        # Add harmonics with carefully tuned amplitudes
+        # Strong enough to create visible ripples, but not so strong
+        # that they dominate and destroy the sine shape
+
+        # Use odd harmonics primarily (3rd, 5th, 7th) for brightness
+        # Plus some even harmonics for fullness
+        harmonic_2 = np.sin(2 * phase) * 0.18  # 2nd - slight warmth
+        harmonic_3 = np.sin(3 * phase) * 0.25  # 3rd - brightness (dominant harmonic)
+        harmonic_5 = np.sin(5 * phase) * 0.15  # 5th - presence
+        harmonic_7 = np.sin(7 * phase) * 0.10  # 7th - shimmer
+        harmonic_9 = np.sin(9 * phase) * 0.06  # 9th - subtle air
+
+        # Combine all harmonics
+        bright = fundamental + harmonic_2 + harmonic_3 + harmonic_5 + harmonic_7 + harmonic_9
+
+        # Apply subtle waveshaping to add more harmonic complexity
+        # Very gentle - just enough to create visible ripples
+        bright = bright + (bright ** 3) * 0.08
+
+        # Normalize to keep peaks around ±1
+        return bright * 0.75
+
+    def _generate_analog_sine(
+            self, phase: float | np.ndarray
+    ) -> float | np.ndarray:
+        """Generate analog-style sine with vintage imperfections.
+
+        This mode implements vintage analog oscillator characteristics with subtle
+        imperfections to create a more "vintage hardware" sound. It includes:
+
+        - Subtle harmonic distortion (2nd and 3rd harmonics)
+        - Gentle waveform shaping for analog character
+        - Slight asymmetry mimicking analog circuits
+        - Very musical, slightly imperfect character
+
+        Unlike pure digital sine (perfectly clean) or bright mode (very rich),
+        this mode sits in between - cleaner than warm but with more character
+        than pure. Perfect for emulating vintage synthesizers and adding
+        subtle analog flavor.
+
+        Implementation: Inspired by VCV Rack's oscillator design philosophy of
+        subtle non-linearities that make the sound more "alive" and less
+        clinical than pure mathematical sine.
+
+        Args:
+            phase: Phase value(s) in radians
+
+        Returns:
+            Analog-style sine wave value(s) with vintage imperfections
+        """
+        # Generate fundamental sine
+        fundamental = np.sin(phase)
+
+        # Add subtle 2nd harmonic for analog warmth (vintage character)
+        # VCV Rack's oscillators have slight even-order distortion
+        second_harmonic = np.sin(2 * phase) * 0.08
+
+        # Add very subtle 3rd harmonic for presence
+        # This adds slight "air" without being harsh
+        third_harmonic = np.sin(3 * phase) * 0.04
+
+        # Combine harmonics
+        vcv = fundamental + second_harmonic + third_harmonic
+
+        # Apply gentle soft clipping to add subtle asymmetry
+        # This mimics analog circuit non-linearities
+        # tanh with gentle drive adds character without harshness
+        vcv = np.tanh(vcv * 1.1)
+
+        # Add very subtle phase modulation for "analog drift"
+        # This creates a slightly "alive" character
+        phase_mod = np.sin(phase * 0.5) * 0.02
+        vcv = vcv * (1.0 + phase_mod)
+
+        # Normalize to maintain consistent output level
+        # Accounting for harmonic additions and soft clipping
+        return vcv * 0.88
+
     def __next__(self):
         """Return next sine sample and advance internal phase accumulator.
 
         Returns:
             float: Next sine sample scaled by amplitude.
         """
-        val = np.sin(self._i + self._p)
+        # Calculate current phase
+        current_phase = self._i + self._p
+
+        val = self._generate_waveform(current_phase)
 
         # Optimized phase wrapping: only wrap when needed (10-15% faster)
         self._i += self._step
         if self._i >= 2 * np.pi:
             self._i -= 2 * np.pi
 
-        if self._wave_range != (-1, 1):
-            val = squish_val(val, *self._wave_range)
+        val = self._apply_wave_range_value(val)
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
@@ -756,38 +1156,9 @@ class SineOscillator(Oscillator):
         # Generate phase values for all samples (optimized: pre-add phase offset)
         phases = (self._i + self._p) + self._step * np.arange(n)
 
-        # Compute sine values
-        val = np.sin(phases)
-
-        # Apply wave range if needed (optimized with pre-computed constants)
-        if self._needs_range_conversion:
-            val = val * self._range_scale + self._range_offset
-
-        # Apply amplitude with smoothing if transitioning (prevents clicks!)
-        if self._smoothing_samples_remaining > 0:
-            # Calculate how many samples to smooth in this buffer
-            smooth_count = min(n, self._smoothing_samples_remaining)
-
-            # Create smooth amplitude envelope (linear ramp)
-            amp_envelope = np.linspace(
-                self._current_amplitude, self._target_amplitude, smooth_count
-            )
-
-            # Apply smoothed amplitude to first part
-            samples = np.zeros(n, dtype=np.float32)
-            samples[:smooth_count] = val[:smooth_count] * amp_envelope
-
-            # Apply target amplitude to rest (if any)
-            if smooth_count < n:
-                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
-
-            # Update state
-            self._smoothing_samples_remaining -= smooth_count
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
-        else:
-            # No smoothing needed - direct multiplication
-            samples = val * self._a
+        val = self._generate_waveform(phases)
+        val = self._apply_wave_range_values(val)
+        samples = self._apply_amplitude_to_buffer(val)
 
         # Update internal state with phase wrapping
         self._i = (self._i + self._step * n) % (2 * np.pi)
@@ -1026,31 +1397,7 @@ class SquareOscillator(SineOscillator):
             high_value=self._wave_range[1],
         )
 
-        # Apply amplitude with smoothing if transitioning (prevents clicks!)
-        if self._smoothing_samples_remaining > 0:
-            # Calculate how many samples to smooth in this buffer
-            smooth_count = min(n, self._smoothing_samples_remaining)
-
-            # Create smooth amplitude envelope (linear ramp)
-            amp_envelope = np.linspace(
-                self._current_amplitude, self._target_amplitude, smooth_count
-            )
-
-            # Apply smoothed amplitude to first part
-            samples = np.zeros(n, dtype=np.float32)
-            samples[:smooth_count] = val[:smooth_count] * amp_envelope
-
-            # Apply target amplitude to rest (if any)
-            if smooth_count < n:
-                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
-
-            # Update state
-            self._smoothing_samples_remaining -= smooth_count
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
-        else:
-            # No smoothing needed - direct multiplication
-            samples = val * self._a
+        samples = self._apply_amplitude_to_buffer(val)
 
         # Update internal state with phase wrapping
         self._i = (self._i + self._step * n) % (2 * np.pi)

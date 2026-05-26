@@ -64,6 +64,7 @@ class LFOModule(ModuleWidget):
             gain_db=LFO_DEFAULT_GAIN_DB,
             wave_range=(-1, 1),
             sample_rate=sample_rate,
+            mode="analog"
         )
         self._triangle_oscillator = TriangleOscillator(
             freq,

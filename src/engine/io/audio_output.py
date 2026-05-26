@@ -294,6 +294,8 @@ class AudioOutput:
 
         try:
             # Enable fade-in to prevent startup click
+            self.is_fading_out = False
+            self.fade_out_samples_remaining = 0
             self.is_fading_in = True
             self.fade_in_samples_remaining = self.fade_in_total_samples
             self.post_fade_silence = False
@@ -303,7 +305,7 @@ class AudioOutput:
                 samplerate=self.sample_rate,
                 channels=2,
                 blocksize=self.buffer_size,
-                callback=self._sounddevice_callback if self.audio_callback else None,
+                callback=self._sounddevice_callback,
                 dtype=np.float32,
             )
 
@@ -315,6 +317,10 @@ class AudioOutput:
             )
 
         except Exception as e:
+            self.stream = None
+            self.is_playing = False
+            self.is_fading_in = False
+            self.fade_in_samples_remaining = 0
             logger.error(f"Failed to start playback: {e}", exc_info=True)
             raise
 

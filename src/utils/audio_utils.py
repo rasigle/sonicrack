@@ -10,12 +10,37 @@ These utilities are designed to work seamlessly with the audio engine
 components and provide a consistent interface for audio operations.
 """
 
-import librosa
+import re
+
 import numpy as np
 from scipy.io import wavfile
-import soundfile as sf
 
 from src.constants import DEFAULT_SAMPLE_RATE
+
+
+_NOTE_OFFSETS = {
+    "C": 0,
+    "B#": 0,
+    "C#": 1,
+    "DB": 1,
+    "D": 2,
+    "D#": 3,
+    "EB": 3,
+    "E": 4,
+    "FB": 4,
+    "E#": 5,
+    "F": 5,
+    "F#": 6,
+    "GB": 6,
+    "G": 7,
+    "G#": 8,
+    "AB": 8,
+    "A": 9,
+    "A#": 10,
+    "BB": 10,
+    "B": 11,
+    "CB": 11,
+}
 
 
 def to_int16(audio: np.ndarray | list, amplitude: float = 1.0) -> np.ndarray:
@@ -152,15 +177,29 @@ def load_wave(filename: str, mono: bool = True) -> tuple[int, np.ndarray]:
             - audio (np.ndarray): Audio samples as float32 in range [-1.0, 1.0].
 
     Example:
-        >>> sr, audio = load_wave("recording.wav")
-        >>> print(f"Loaded {len(audio)} samples at {sr} Hz")
-        >>> print(f"Duration: {len(audio) / sr:.2f} seconds")
+        >>> sr, audio_data = load_wave("recording.wav")
+        >>> print(f"Loaded {len(audio_data)} samples at {sr} Hz")
+        >>> print(f"Duration: {len(audio_data) / sr:.2f} seconds")
 
     Note:
         The returned audio is always normalized to [-1.0, 1.0] range
         regardless of the original bit depth.
     """
-    audio, sample_rate = sf.read(filename)
+    sample_rate, audio = wavfile.read(filename)
+
+    audio = np.asarray(audio)
+
+    if np.issubdtype(audio.dtype, np.integer):
+        if audio.dtype == np.uint8:
+            audio = (audio.astype(np.float32) - 128.0) / 128.0
+        else:
+            info = np.iinfo(audio.dtype)
+            scale = float(max(abs(info.min), info.max))
+            audio = audio.astype(np.float32) / scale
+    elif np.issubdtype(audio.dtype, np.floating):
+        audio = audio.astype(np.float32)
+    else:
+        raise TypeError(f"Unsupported WAV data type: {audio.dtype}")
 
     # Convert stereo to mono if requested
     if mono and audio.ndim > 1:
@@ -191,10 +230,23 @@ def note_to_frequency(note: str) -> float:
         659.25 Hz
 
     Note:
-        This function uses librosa's note_to_hz conversion which follows
-        standard Western music notation with equal temperament tuning.
+        Uses equal temperament with A4 = 440 Hz.
     """
-    return float(librosa.note_to_hz(note))
+    if not isinstance(note, str):
+        raise TypeError(f"Note name must be a string, got {type(note).__name__}")
+
+    match = re.fullmatch(r"\s*([A-Ga-g])([#bB]?)(-?\d+)\s*", note)
+    if match is None:
+        raise ValueError(f"Invalid note name: {note!r}")
+
+    note_name = f"{match.group(1).upper()}{match.group(2).upper()}"
+    octave = int(match.group(3))
+
+    if note_name not in _NOTE_OFFSETS:
+        raise ValueError(f"Invalid note name: {note!r}")
+
+    midi_note = (octave + 1) * 12 + _NOTE_OFFSETS[note_name]
+    return float(440.0 * (2.0 ** ((midi_note - 69) / 12.0)))
 
 
 def mono_to_stereo(samples: np.ndarray) -> np.ndarray:

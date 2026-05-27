@@ -8,7 +8,7 @@ dynamic = ["version"]
 authors = [
     {name = "Rainer Sigle", email = "rainer.sigle@live.de"}
 ]
-description = "Professional modular audio synthesis framework with visual patching interface and high-performance engine"
+description = "Modular audio synthesis framework with visual patching interface and high-performance audio engine"
 readme = "README.md"
 license = {text = "MIT"}
 keywords = ["audio", "synthesis", "modular", "synthesizer", "music", "sound-design", "dsp"]
@@ -30,18 +30,31 @@ dependencies = [
     "numpy>=2.2.6",
     "scipy",
     "sounddevice>=0.5.2", # Audio I/O
-    "mido", # Midi-support
-    "python-rtmidi>=1.5.8", # Midi I/O
-    "librosa>=0.11.0", # Audio analysis
     "pyqt6", # GUI library
-    # used in examples
+    "scipy-stubs>=1.17.1.5",
+]
+
+[project.optional-dependencies]
+# install with e.g.: uv sync --extra examples
+midi = [
+    "mido", # MIDI support is optional in code and only required for MIDI features
+    "python-rtmidi>=1.5.8", # Common real-time MIDI backend for mido
+]
+examples = [
+    "librosa>=0.11.0", # Example audio-analysis scripts/notebooks
+    "matplotlib>=3.10.7", # Plotting in examples
+    "pyaudio", # Live input in signal-analysis examples
+    "pyqtgraph>=0.13.7", # Example visual analyzers
+    "notebook>=7.4.7", # Jupyter notebooks in examples/
+]
+full = [
+    "mido",
+    "python-rtmidi>=1.5.8",
+    "librosa>=0.11.0",
+    "matplotlib>=3.10.7",
+    "pyaudio",
     "pyqtgraph>=0.13.7",
     "notebook>=7.4.7",
-    "pynput>=1.8.1",
-    "matplotlib>=3.10.7",
-    "pandas>=2.3.3",
-    "pyaudio",
-    "scipy-stubs~=1.16.3",
 ]
 
 [dependency-groups]
@@ -50,15 +63,14 @@ dependencies = [
     # Linter
     "black[jupyter]",
     "flake8>=7.0.1",
-    "pytest>=7.4.2",
-    "pytest-cov>=4.1.0",
+    "scipy-stubs~=1.17.1.5",
 
     # Testing
-    "pytest",
+    "pytest>=7.4.2",
+    "pytest-cov>=4.1.0",
     "pytest-html",
     "pytest-mock",
     "coverage",
-    "pytest-cov",
 ]
 
 
@@ -67,7 +79,7 @@ dependencies = [
 line-length = 88
 indent-width = 4
 
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
@@ -84,4 +96,3 @@ version = {attr = "_version.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-

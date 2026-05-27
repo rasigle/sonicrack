@@ -5,6 +5,6 @@
 call uv_check_activate_venv.bat
 
 echo Synchronizing mandatory dependencies
-uv sync --native-tls --no-default-groups --no-group "dev"
+uv sync --no-default-groups --no-group "dev"
 echo - done
 echo.

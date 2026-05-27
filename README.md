@@ -88,9 +88,19 @@ Alternative editable install:
 python -m pip install -e .
 ```
 
+Optional extras:
+
+```powershell
+python -m pip install -e ".[midi]"
+python -m pip install -e ".[examples]"
+python -m pip install -e ".[full]"
+```
+
 Notes:
 
-- The project depends on GUI/audio packages such as `PyQt6`, `sounddevice`, `python-rtmidi`, and `pyaudio`.
+- The base install covers the core engine and PyQt6 GUI application.
+- MIDI support now lives behind the `midi` extra.
+- Notebook and visualization-heavy example dependencies live behind `examples` extras.
 - Depending on your machine, real audio or MIDI features may also require working local system drivers.
 
 ### 2. Launch the GUI

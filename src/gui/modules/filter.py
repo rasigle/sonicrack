@@ -1,5 +1,11 @@
 """Filter module for the modular synthesizer GUI."""
 
+from __future__ import annotations
+
+from typing import Any, cast
+
+import numpy as np
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
@@ -10,10 +16,11 @@ from PyQt6.QtWidgets import (
 )
 
 from src.engine.filter import ButterworthFilter
+from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.widgets import Knob, HSlider
-from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.core.module_registry import register_module
+from src.gui.widgets import HSlider, Knob
+from src.gui.widgets.module_widget import ModuleWidget
 
 
 @register_module()
@@ -130,6 +137,9 @@ class FilterModule(ModuleWidget):
         )
 
         self.component = self.create_engine_component()
+        self._sample_rate_listener = self._on_global_sample_rate_changed
+        audio_config.add_sample_rate_listener(self._sample_rate_listener)
+        self.destroyed.connect(self._cleanup_audio_config_listeners)
 
     def _set_high_cutoff_visible(self, visible: bool):
         """Show or hide the high cutoff controls."""
@@ -161,21 +171,21 @@ class FilterModule(ModuleWidget):
         self._set_high_cutoff_visible(is_bandpass)
 
         # Update component and emit signal
-        self.create_engine_component()
+        self.component = self.create_engine_component()
         self.parameter_changed.emit("filter_type", filter_type)
 
     def _on_cutoff_changed(self):
         """Handle cutoff frequency change."""
         value = self.cutoff_knob.get_value()
         self.cutoff_value_label.setText(f"{int(value)} Hz")
-        self.create_engine_component()
+        self.component = self.create_engine_component()
         self.parameter_changed.emit("cutoff", value)
 
     def _on_high_cutoff_changed(self):
         """Handle high cutoff frequency change (band-pass only)."""
         value = self.high_cutoff_knob.get_value()
         self.high_cutoff_value_label.setText(f"{int(value)} Hz")
-        self.create_engine_component()
+        self.component = self.create_engine_component()
         self.parameter_changed.emit("high_cutoff", value)
 
     def _on_order_changed(self, value: float):
@@ -183,8 +193,45 @@ class FilterModule(ModuleWidget):
         # Convert to int since filter order must be an integer
         order_int = int(value)
         self.order_value_label.setText(str(order_int))
-        self.create_engine_component()
+        self.component = self.create_engine_component()
         self.parameter_changed.emit("order", order_int)
+
+    def _on_global_sample_rate_changed(self, new_sample_rate: int):
+        """Redesign filter coefficients when the global sample rate changes."""
+        self.component = self.create_engine_component()
+
+    def _cleanup_audio_config_listeners(self, *_args):
+        """Remove registered global listeners during Qt object teardown."""
+        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
+
+    def _get_filter_type(self) -> str:
+        """Map UI filter type text to engine filter type."""
+        type_map = {
+            "Low-pass": "low",
+            "High-pass": "high",
+            "Band-pass": "band",
+        }
+        return type_map.get(self.type_combo.currentText(), "low")
+
+    def _get_cutoff_param(self) -> float | tuple[float, float]:
+        """Get the current cutoff parameter in engine format."""
+        cutoff = self.cutoff_knob.get_value()
+        high_cutoff = self.high_cutoff_knob.get_value()
+        filter_type = self._get_filter_type()
+
+        if filter_type == "band":
+            low = min(cutoff, high_cutoff)
+            high = max(cutoff, high_cutoff)
+
+            if low == high:
+                if high < self.high_cutoff_knob.max_value:
+                    high += 1.0
+                else:
+                    low = max(self.cutoff_knob.min_value, low - 1.0)
+
+            return low, high
+
+        return cutoff
 
     def get_required_inputs(self) -> list[str]:
         """Return list of required input port names.
@@ -198,56 +245,22 @@ class FilterModule(ModuleWidget):
 
     def create_engine_component(
         self,
-        input_components=None,
-        modulation_components=None,
-    ):
-        """Create the filter audio component.
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
+    ) -> ButterworthFilter:
+        """Create the filter modifier component.
 
-        Args:
-            input_components: List of input audio components (should have 1)
-            modulation_components: Not used for this module
-
-        Returns:
-            ButterworthFilter component or Chain if there are inputs
+        The patch compiler wraps modifier components in a ``Chain`` itself, so this
+        method must only return the modifier and not a composed signal path.
         """
-        from src.engine.composer import Chain
+        del input_components, modulation_components
 
-        # Get parameters from widgets
-        cutoff = self.cutoff_knob.get_value()
-        high_cutoff = self.high_cutoff_knob.get_value()
-        order = int(self.order_slider.get_value())  # Ensure integer
-
-        # Map display name to internal name
-        type_map = {
-            "Low-pass": "low",
-            "High-pass": "high",
-            "Band-pass": "band",
-        }
-        filter_type = type_map.get(self.type_combo.currentText(), "low")
-
-        # Determine cutoff based on filter type
-        if filter_type == "band":
-            # Ensure low < high
-            low = min(cutoff, high_cutoff)
-            high = max(cutoff, high_cutoff)
-            cutoff_param = (low, high)
-        else:
-            cutoff_param = cutoff
-
-        # Create filter
-        filter_component = ButterworthFilter(
-            cutoff=cutoff_param,
-            order=order,
-            filter_type=filter_type,
+        return ButterworthFilter(
+            cutoff=self._get_cutoff_param(),
+            order=int(self.order_slider.get_value()),
+            filter_type=self._get_filter_type(),
+            sample_rate=audio_config.sample_rate,
         )
-
-        # If there are input components, create a chain
-        if input_components and len(input_components) > 0:
-            input_component = input_components[0]
-            return Chain(input_component, filter_component)
-
-        # Otherwise return just the filter (shouldn't happen in normal use)
-        return filter_component
 
     def process(self, num_samples: int = 1):
         """Apply filter to input signal.
@@ -265,40 +278,24 @@ class FilterModule(ModuleWidget):
             AudioComponents. This method exists to satisfy the AudioModule interface.
         """
         if not self.in_port.is_connected:
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
             return
 
         # Read input signal
-        input_signal = self.in_port.read()
+        input_signal = self.in_port.read(num_samples)
+        if input_signal is None:
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+            return
 
-        # Create filter component if not already created
-        if not hasattr(self, "_filter_component") or self._filter_component is None:
-            cutoff = self.cutoff_knob.get_value()
-            high_cutoff = self.high_cutoff_knob.get_value()
-            order = int(self.order_slider.get_value())
+        # Recreate lazily if needed, otherwise use the live modifier component.
+        if self.component is None:
+            self.component = self.create_engine_component()
 
-            type_map = {
-                "Low-pass": "low",
-                "High-pass": "high",
-                "Band-pass": "band",
-            }
-            filter_type = type_map.get(self.type_combo.currentText(), "low")
-
-            if filter_type == "band":
-                low = min(cutoff, high_cutoff)
-                high = max(cutoff, high_cutoff)
-                cutoff_param = (low, high)
-            else:
-                cutoff_param = cutoff
-
-            self._filter_component = ButterworthFilter(
-                cutoff=cutoff_param,
-                order=order,
-                filter_type=filter_type,
-            )
-
-        # Apply filter (note: filter needs proper vectorized processing)
-        # For now, this is a placeholder
-        output_signal = input_signal  # TODO: Implement proper filtering
+        output_signal = self.component(input_signal)
+        if isinstance(output_signal, tuple):
+            tuple_signal = cast(tuple[float, ...], output_signal)
+            self.out_port.write(np.asarray(tuple_signal, dtype=np.float32))
+            return
 
         # Write to output port
         self.out_port.write(output_signal)

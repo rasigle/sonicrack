@@ -4,7 +4,7 @@ import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
-from src.engine import Volume
+from src.engine import Chain, Volume, WaveAdder
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
@@ -119,6 +119,35 @@ class MixerModule(ModuleWidget):
 
         logger.debug(f"🎚️ Mixer: Ch {channel_index + 1} gain set to {new_gain:.3f}")
 
+    def create_engine_component(
+        self,
+        input_components=None,
+        modulation_components=None,
+    ):
+        """Create a mixer component for the patch compiler.
+
+        Each input is wrapped with its corresponding channel gain, then all active
+        channels are summed together.
+        """
+        if not input_components:
+            return None
+
+        processed_inputs = []
+        for channel_idx, input_component in enumerate(input_components):
+            if input_component is None:
+                continue
+
+            gain = DEFAULT_CHANNEL_VOLUME
+            if channel_idx < len(self.gain_knobs):
+                gain = self.gain_knobs[channel_idx].get_value()
+
+            processed_inputs.append(Chain(input_component, Volume(amplitude=gain)))
+
+        if not processed_inputs:
+            return None
+
+        return WaveAdder(*processed_inputs, mix_mode="sum")
+
     def process(self, num_samples: int = 1):
         """Mix input signals and write to output port.
 
@@ -153,6 +182,8 @@ class MixerModule(ModuleWidget):
 
         # Write mixed signal to output
         if mixed_signal is not None:
+            if isinstance(mixed_signal, tuple):
+                mixed_signal = np.asarray(mixed_signal, dtype=np.float32)
             self.out_port.write(mixed_signal)
         else:
             # No inputs connected, write silence

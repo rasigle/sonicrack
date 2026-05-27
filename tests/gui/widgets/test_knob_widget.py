@@ -5,15 +5,9 @@ from unittest.mock import Mock
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication
 
 from src.gui.widgets.knob_widget import Knob
 
-
-@pytest.fixture
-def app():
-    """Create QApplication instance for testing."""
-    return QApplication([])
 
 
 def test_knob_callback_on_set_value(app):

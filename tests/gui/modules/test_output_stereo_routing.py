@@ -2,16 +2,10 @@
 
 import pytest
 import numpy as np
-from PyQt6.QtWidgets import QApplication
 
 from src.gui.modules.output.output import OutputModule
 from src.utils.audio_utils import mono_to_stereo, combine_lr_to_stereo
 
-
-@pytest.fixture
-def app():
-    """Create QApplication instance for testing."""
-    return QApplication([])
 
 
 @pytest.fixture

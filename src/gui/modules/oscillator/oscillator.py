@@ -173,6 +173,29 @@ class OscillatorModule(ModuleWidget):
         if self._square_oscillator:
             self._square_oscillator.sample_rate = new_sample_rate
 
+    def create_engine_component(self, input_components=None, modulation_components=None):
+        """Return no shared engine component for this module.
+
+        The oscillator exposes independent components per output port via
+        ``get_output_component()`` rather than a single component shared by all
+        outputs.
+        """
+        return None
+
+    def get_output_component(self, port_name: str):
+        """Return the engine component backing a specific waveform output."""
+        port = self.outputs.get(port_name)
+        if port is None or not port.is_connected:
+            return None
+
+        components = {
+            "Sine": self._sine_oscillator,
+            "Triangle": self._triangle_oscillator,
+            "Sawtooth": self._sawtooth_oscillator,
+            "Square": self._square_oscillator,
+        }
+        return components.get(port_name)
+
     # AudioModuleInterface implementation
     def _on_frequency_changed(self):
         """Handle frequency changes - update all connected oscillators."""

@@ -209,6 +209,13 @@ class Port:
             return sum(values)
 
         # Mixed or all arrays - need to handle carefully
+        # Legacy behavior: when no sample count is requested, mismatched array shapes
+        # are considered an error instead of being silently padded or truncated.
+        if num_samples is None:
+            array_shapes = {v.shape for v in values if isinstance(v, np.ndarray)}
+            if len(array_shapes) > 1:
+                raise ValueError("Cannot mix arrays with different shapes")
+
         # If num_samples was requested, ensure all arrays match that size
         result = None
         for value in values:
@@ -232,18 +239,22 @@ class Port:
             else:
                 # Add subsequent values
                 if isinstance(value, np.ndarray):
+                    assert result is not None
+                    result_array = np.asarray(result)
+
                     # Adjust array size to match result if needed
-                    if result.shape != value.shape:
-                        if len(value) < len(result):
+                    if result_array.shape != value.shape:
+                        result_length = len(result_array)
+                        if len(value) < result_length:
                             # Pad with zeros
-                            padded = np.zeros(len(result), dtype=value.dtype)
+                            padded = np.zeros(result_length, dtype=value.dtype)
                             padded[: len(value)] = value
-                            result = result + padded
+                            result = result_array + padded
                         else:
                             # Truncate to match result size
-                            result = result + value[: len(result)]
+                            result = result_array + value[:result_length]
                     else:
-                        result = result + value
+                        result = result_array + value
                 else:
                     # Scalar - broadcast across array
                     result = result + value

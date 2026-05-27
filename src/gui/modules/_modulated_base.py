@@ -99,6 +99,19 @@ class ModulatedModuleBase(ModuleWidget):
         """
         return 0.0, 1.0  # Default: unipolar [0, 1]
 
+    @staticmethod
+    def _describe_component(component: Any) -> str:
+        """Return a stable component description for logging."""
+        if component is None:
+            return "None"
+
+        descriptor = getattr(type(component), "descriptor", None)
+        descriptor_name = getattr(descriptor, "name", None)
+        if isinstance(descriptor_name, str) and descriptor_name:
+            return f"{type(component).__name__}({descriptor_name})"
+
+        return type(component).__name__
+
     def create_engine_component(
         self,
         input_components: list[Any] | None = None,
@@ -117,7 +130,11 @@ class ModulatedModuleBase(ModuleWidget):
         elif self.modulator_component:
             mod_comp = self.modulator_component
 
-        logger.debug(f"{self.__class__.__name__} modulator: {mod_comp}")
+        logger.debug(
+            "%s modulator: %s",
+            self.__class__.__name__,
+            self._describe_component(mod_comp),
+        )
 
         if mod_comp:
             # Modulation connected - update UI and create modulated component

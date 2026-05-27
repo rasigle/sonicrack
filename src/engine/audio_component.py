@@ -132,8 +132,21 @@ class AudioComponent(ABC):
         kwargs = {param: config[param] for param in config if param in config_params}
         return cls(**kwargs)
 
+    def get_component_name(self) -> str:
+        """Resolve a human-readable component name for logs and diagnostics."""
+        instance_name = getattr(self, "component_name", None)
+        if isinstance(instance_name, str) and instance_name:
+            return instance_name
+
+        descriptor = getattr(type(self), "descriptor", None)
+        descriptor_name = getattr(descriptor, "name", None)
+        if isinstance(descriptor_name, str) and descriptor_name:
+            return descriptor_name
+
+        return self.__class__.__name__
+
     def __str__(self) -> str:
-        return f"AudioComponent {self.component_name}"
+        return f"AudioComponent {self.get_component_name()}"
 
 
 class Generator(AudioComponent):

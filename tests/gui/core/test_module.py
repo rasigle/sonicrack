@@ -1,5 +1,7 @@
 """Test the generic audio module interface."""
 
+import logging
+
 import pytest
 from PyQt6.QtWidgets import QApplication
 
@@ -72,18 +74,22 @@ def test_volume_interface(qapp):
     assert component is not None
 
 
-def test_volume_with_modulation(qapp):
+def test_volume_with_modulation(qapp, caplog):
     """Test volume with modulation input."""
     module = VolumeModule()
 
     # Create modulation source
     lfo = SineOscillator(1.0, wave_range=(-1, 1))
+    assert str(lfo) == "AudioComponent Sine"
 
     # Create component with modulation
-    component = module.create_engine_component(
-        input_components=None, modulation_components={"Mod": lfo}
-    )
+    with caplog.at_level(logging.DEBUG, logger="src.gui.modules._modulated_base"):
+        component = module.create_engine_component(
+            input_components=None, modulation_components={"Mod": lfo}
+        )
+
     assert component is not None
+    assert "VolumeModule modulator: SineOscillator(Sine)" in caplog.text
 
 
 def test_mixer_interface(qapp):

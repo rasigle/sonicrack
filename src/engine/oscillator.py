@@ -55,8 +55,6 @@ Note:
     during audio generation.
 """
 
-import numpy as np
-from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.oscillator_base import (
     DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS,
     Oscillator,
@@ -87,40 +85,6 @@ __all__ = [
     "IdealSquareStrategySmoothing",
     "SoftSquareStrategy",
     "SquareWaveFactory",
-    "synth",
     "_derive_amplitude_from_init",
 ]
 
-
-def synth(
-    frequency: float = 440,
-    dur: float = 1.0,
-    amplitude: float = 1.0,
-    sr: float | int = DEFAULT_SAMPLE_RATE,
-    stype: str = "sine",
-    mode: str = "auto",
-) -> np.ndarray:
-    """Synthesize a waveform of the requested type."""
-    if dur <= 0:
-        raise ValueError("Duration must be positive.")
-    if frequency < 0:
-        raise ValueError("Frequency must be non-negative.")
-    n_samples = int(dur * sr)
-    stype = stype.lower()
-    if stype == "sin":
-        stype = "sine"
-    if stype == "sawtooth":
-        stype = "saw"
-    if stype == "triangle":
-        stype = "tri"
-    synth_map = {
-        "sine": SineOscillator,
-        "square": SquareOscillator,
-        "saw": SawtoothOscillator,
-        "tri": TriangleOscillator,
-    }
-    try:
-        osc = synth_map[stype](frequency=frequency, amplitude=amplitude, sample_rate=sr)
-    except KeyError as exc:
-        raise ValueError(f"Unsupported waveform type: {stype}") from exc
-    return osc.get_samples(n_samples, mode=mode)

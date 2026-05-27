@@ -77,7 +77,7 @@ def white_noise(
     dur: float,
     amplitude: float = 1.0,
     sr: float = DEFAULT_SAMPLE_RATE,
-    seed: int = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """Generate white noise with flat frequency spectrum.
 
@@ -132,7 +132,7 @@ def pink_noise(
     dur: float,
     amplitude: float = 1.0,
     sr: float = DEFAULT_SAMPLE_RATE,
-    seed: int = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """Generate pink noise with 1/f frequency spectrum.
 
@@ -220,7 +220,7 @@ def brownian_noise(
     dur: float,
     amplitude: float = 1.0,
     sr: float = DEFAULT_SAMPLE_RATE,
-    seed: int = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """Generate Brownian noise (red noise) with 1/f² frequency spectrum.
 
@@ -290,7 +290,7 @@ def blue_noise(
     dur: float,
     amplitude: float = 1.0,
     sr: float = DEFAULT_SAMPLE_RATE,
-    seed: int = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """Generate blue noise with increasing frequency spectrum.
 
@@ -463,7 +463,7 @@ def velvet_noise(
     density: float = 0.01,
     amplitude: float = 1.0,
     sr: float = DEFAULT_SAMPLE_RATE,
-    seed: int = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """Generate velvet noise - sparse impulse train with flat spectrum.
 
@@ -536,7 +536,7 @@ def grey_noise(
     dur: float,
     amplitude: float = 1.0,
     sr: float = DEFAULT_SAMPLE_RATE,
-    seed: int = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """Generate grey noise with psychoacoustically flat spectrum.
 
@@ -644,7 +644,7 @@ def sample_hold_noise(
     rate: float = 10.0,
     amplitude: float = 1.0,
     sr: float = DEFAULT_SAMPLE_RATE,
-    seed: int = None,
+    seed: int | None = None,
 ) -> np.ndarray:
     """Generate sample & hold noise - stepped random values.
 

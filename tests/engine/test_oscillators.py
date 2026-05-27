@@ -17,8 +17,8 @@ from src.engine.oscillator import (
     SawtoothOscillator,
     TriangleOscillator,
     SquareOscillator,
-    synth,
 )
+from src.engine.synthesis import synth
 
 
 class TestOscillatorBase(unittest.TestCase):

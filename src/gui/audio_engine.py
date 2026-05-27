@@ -7,7 +7,7 @@ NOTE: This engine now uses a pull-based architecture where the audio callback
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from PyQt6 import QtCore
 
@@ -36,8 +36,8 @@ class AudioEngine(QtCore.QObject):
         self.sample_rate: float = sample_rate
         self.buffer_size: float = buffer_size
 
-        self.modules = []
-        self.connections = []
+        self.modules: list[Any] = []
+        self.connections: list[Any] = []
 
         # No QTimer needed - audio callback drives processing now!
         audio_config.add_sample_rate_listener(self._on_config_changed)

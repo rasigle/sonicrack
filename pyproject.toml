@@ -32,6 +32,7 @@ dependencies = [
     "sounddevice>=0.5.2", # Audio I/O
     "pyqt6", # GUI library
     "scipy-stubs>=1.17.1.5",
+    "ipykernel>=7.2.0",
 ]
 
 [project.optional-dependencies]
@@ -64,6 +65,8 @@ full = [
     "black[jupyter]",
     "flake8>=7.0.1",
     "scipy-stubs~=1.17.1.5",
+    "mypy>=1.3.0",
+    "ruff>=0.0.241",
 
     # Testing
     "pytest>=7.4.2",
@@ -96,3 +99,13 @@ version = {attr = "_version.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+
+[tool.mypy]
+check_untyped_defs = false
+disable_error_code = "annotation-unchecked"
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["mido", "mido.*", "sounddevice", "sounddevice.*"]
+ignore_missing_imports = true

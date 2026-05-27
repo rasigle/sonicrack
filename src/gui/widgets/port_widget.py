@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import QPainter, QPen, QColor
 from PyQt6.QtWidgets import QGraphicsItem
@@ -76,12 +78,12 @@ class PortWidget(QGraphicsItem):
         return self.port.index
 
     @property
-    def value(self) -> float:
+    def value(self) -> float | np.ndarray:
         """Get port value from model."""
         return self.port.value
 
     @value.setter
-    def value(self, val: float):
+    def value(self, val: float | np.ndarray):
         """Set port value in model."""
         self.port.value = val
 
@@ -130,7 +132,7 @@ class PortWidget(QGraphicsItem):
         """Disconnect from any connected port."""
         self.port.disconnect()
 
-    def read(self) -> float:
+    def read(self) -> float | np.ndarray:
         """Read value from connected port.
 
         Returns:
@@ -138,7 +140,7 @@ class PortWidget(QGraphicsItem):
         """
         return self.port.read()
 
-    def write(self, value: float) -> None:
+    def write(self, value: float | np.ndarray) -> None:
         """Write a value to this port.
 
         Args:
@@ -159,7 +161,7 @@ class PortWidget(QGraphicsItem):
         r = self.radius + 2
         return QRectF(-r, -r, r * 2, r * 2)
 
-    def paint(self, painter: QPainter, option, widget=None):
+    def paint(self, painter: QPainter | None, option, widget=None):
         """Paint the port.
 
         Args:
@@ -167,6 +169,9 @@ class PortWidget(QGraphicsItem):
             option: Style options
             widget: Optional widget
         """
+        if painter is None:
+            return
+
         # Port color based on type
         if self.port_type == "input":
             color = QColor(100, 200, 100) if self.hovered else QColor(80, 180, 80)

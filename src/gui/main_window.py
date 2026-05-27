@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from PyQt6 import QtGui, QtWidgets
 from PyQt6.QtCore import Qt
@@ -38,6 +38,7 @@ from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH
 
 if TYPE_CHECKING:
     from src.gui.core.module_registry import ModuleRegistry
+    from src.gui.modules.output.output import OutputModule
     from src.gui.widgets.port_widget import PortWidget
 
 logger = logging.getLogger(__name__)
@@ -247,9 +248,22 @@ class ModularSynthWindow(QMainWindow):
         """Connect signals."""
 
         # Patch canvas signals
-        self.patch_canvas.cable_connected.connect(self._on_cable_connected)
-        self.patch_canvas.cable_disconnected.connect(self._on_cable_disconnected)
-        self.patch_canvas.module_deleted.connect(self._on_module_deleted)
+        patch_canvas = self._require_patch_canvas()
+        patch_canvas.cable_connected.connect(self._on_cable_connected)
+        patch_canvas.cable_disconnected.connect(self._on_cable_disconnected)
+        patch_canvas.module_deleted.connect(self._on_module_deleted)
+
+    def _require_patch_canvas(self) -> PatchCanvas:
+        """Return the initialized patch canvas."""
+        if self.patch_canvas is None:
+            raise RuntimeError("Patch canvas has not been initialized")
+        return self.patch_canvas
+
+    def _require_statusbar(self) -> QStatusBar:
+        """Return the initialized status bar."""
+        if self.statusbar is None:
+            raise RuntimeError("Status bar has not been initialized")
+        return self.statusbar
 
     def _add_module(self, module_name: str):
         """Add a module to the canvas.
@@ -258,12 +272,15 @@ class ModularSynthWindow(QMainWindow):
             module_name: Name of the module type to add
         """
         module_class = self.registry.get(module_name, strict=True)
+        assert module_class is not None
+        patch_canvas = self._require_patch_canvas()
+        statusbar = self._require_statusbar()
 
         # Check if trying to add an Output module when one already exists
         if module_class.metadata.category == ModuleCategory.OUTPUT:
 
             # Check if an Output module already exists
-            for module in self.patch_canvas.get_modules():
+            for module in patch_canvas.get_modules():
                 if module.metadata.category == ModuleCategory.OUTPUT:
                     QMessageBox.warning(
                         self,
@@ -274,15 +291,15 @@ class ModularSynthWindow(QMainWindow):
                         "Connect multiple audio sources to the existing Output module "
                         "instead.",
                     )
-                    self.statusbar.showMessage("Cannot add multiple Output modules")
+                    statusbar.showMessage("Cannot add multiple Output modules")
                     logger.warning("Attempted to add multiple Output modules")
                     return
 
         # Initialize the module to add with default parameters
         module_instance = module_class()
 
-        self.patch_canvas.add_module(module_instance)
-        self.statusbar.showMessage(f"Added {module_name}")
+        patch_canvas.add_module(module_instance)
+        statusbar.showMessage(f"Added {module_name}")
         logger.info(f"Added module: {module_name}")
 
         # Mark patch as modified
@@ -292,13 +309,16 @@ class ModularSynthWindow(QMainWindow):
 
         # If this is an Output module, give it a reference to the audio engine
         if module_class.metadata.category == ModuleCategory.OUTPUT:
-            module_instance.audio_engine = self.audio_engine
+            from src.gui.modules.output.output import OutputModule
+
+            output_module = cast(OutputModule, module_instance)
+            setattr(output_module, "audio_engine", self.audio_engine)
             logger.debug("Set audio_engine reference on Output module")
 
     def _on_audio_error(self, error: str):
         """Handle audio error."""
         QMessageBox.critical(self, "Audio Error", f"Audio error occurred:\n{error}")
-        self.statusbar.showMessage(f"Error: {error}")
+        self._require_statusbar().showMessage(f"Error: {error}")
 
     def _on_cable_connected(self, start_port: PortWidget, target_port: PortWidget):
         """Handle cable connection."""
@@ -354,10 +374,12 @@ class ModularSynthWindow(QMainWindow):
         from src.gui.modules.output.output import OutputModule
 
         logger.info("=== Starting process-based playback ===")
+        patch_canvas = self._require_patch_canvas()
+        statusbar = self._require_statusbar()
 
         # Find the Output module
         output_module = None
-        for module in self.patch_canvas.get_modules():
+        for module in patch_canvas.get_modules():
             if isinstance(module, OutputModule):
                 output_module = module
                 break
@@ -372,12 +394,12 @@ class ModularSynthWindow(QMainWindow):
         # everything
         try:
             output_module.start_playback()
-            self.statusbar.showMessage("Playback started (process-based)")
+            statusbar.showMessage("Playback started (process-based)")
             logger.info("✓ Process-based playback started")
 
         except Exception as e:
             logger.error(f"Failed to start playback: {e}", exc_info=True)
-            self.statusbar.showMessage(f"Playback error: {e}")
+            statusbar.showMessage(f"Playback error: {e}")
 
     def _restart_output_playback(self):
         """Restart playback to refresh audio callback with current connections.
@@ -388,10 +410,11 @@ class ModularSynthWindow(QMainWindow):
         from src.gui.modules.output.output import OutputModule
 
         logger.info("=== Restarting playback (refreshing audio callback) ===")
+        patch_canvas = self._require_patch_canvas()
 
         # Find the Output module
         output_module = None
-        for module in self.patch_canvas.get_modules():
+        for module in patch_canvas.get_modules():
             if isinstance(module, OutputModule):
                 output_module = module
                 break
@@ -399,6 +422,8 @@ class ModularSynthWindow(QMainWindow):
         if not output_module:
             logger.debug("No Output module found")
             return
+
+        output_module = cast(OutputModule, output_module)
 
         # Stop playback first (if running)
         if output_module.audio_output.is_playing:
@@ -410,7 +435,7 @@ class ModularSynthWindow(QMainWindow):
 
         QTimer.singleShot(100, lambda: self._delayed_start_playback(output_module))
 
-    def _delayed_start_playback(self, output_module):
+    def _delayed_start_playback(self, output_module: OutputModule):
         """Start playback after a short delay.
 
         Args:
@@ -419,10 +444,10 @@ class ModularSynthWindow(QMainWindow):
         try:
             logger.info("Restarting playback with refreshed connections")
             output_module.start_playback()
-            self.statusbar.showMessage("Playback restarted (refreshed)")
+            self._require_statusbar().showMessage("Playback restarted (refreshed)")
         except Exception as e:
             logger.error(f"Failed to restart playback: {e}", exc_info=True)
-            self.statusbar.showMessage(f"Playback error: {e}")
+            self._require_statusbar().showMessage(f"Playback error: {e}")
 
     def _on_module_deleted(self, module):
         """Handle module deletion.
@@ -533,14 +558,16 @@ class ModularSynthWindow(QMainWindow):
         Args:
             file_path: Path to save the patch to
         """
+        patch_canvas = self._require_patch_canvas()
+
         # Validate file path
         if not file_path:
             logger.warning("Save cancelled - no file path provided")
             return
 
-        modules = self.patch_canvas.get_modules()
-        connections = self.patch_canvas.get_connections()
-        metadata = {}
+        modules = patch_canvas.get_modules()
+        connections = patch_canvas.get_connections()
+        metadata: dict[str, Any] = {}
 
         success = self.preset_manager.save_preset(
             modules, connections, metadata, file_path
@@ -558,7 +585,7 @@ class ModularSynthWindow(QMainWindow):
         self.patch_modified = False
         self._update_window_title()
 
-        self.statusbar.showMessage(f"Patch saved: {Path(file_path).name}")
+        self._require_statusbar().showMessage(f"Patch saved: {Path(file_path).name}")
         logger.info(f"Patch saved to {file_path}")
 
     def _open_patch(self):
@@ -619,7 +646,9 @@ class ModularSynthWindow(QMainWindow):
             self.patch_modified = False
             self._update_window_title()
 
-            self.statusbar.showMessage(f"Patch loaded: {Path(file_path).name}")
+            self._require_statusbar().showMessage(
+                f"Patch loaded: {Path(file_path).name}"
+            )
             logger.info(f"Patch loaded from {file_path}")
 
         except Exception as e:
@@ -661,8 +690,9 @@ class ModularSynthWindow(QMainWindow):
         self._stop_all_output_modules()
 
         # Clear the canvas
-        self.patch_canvas.clear_all()
-        self.statusbar.showMessage("Canvas cleared")
+        patch_canvas = self._require_patch_canvas()
+        patch_canvas.clear_all()
+        self._require_statusbar().showMessage("Canvas cleared")
 
     def _stop_all_output_modules(self):
         """Stop playback on all Output modules in the current patch.
@@ -683,8 +713,9 @@ class ModularSynthWindow(QMainWindow):
 
     def _save_as_library_preset(self):
         """Save the current patch as a preset."""
-        modules = self.patch_canvas.get_modules()
-        connections = self.patch_canvas.get_connections()
+        patch_canvas = self._require_patch_canvas()
+        modules = patch_canvas.get_modules()
+        connections = patch_canvas.get_connections()
 
         if not modules:
             QMessageBox.warning(
@@ -731,9 +762,10 @@ class ModularSynthWindow(QMainWindow):
         """
         # Stop all Output modules (process-based architecture)
         self._stop_all_output_modules()
+        patch_canvas = self._require_patch_canvas()
 
         # Clear current patch
-        self.patch_canvas.clear_all()
+        patch_canvas.clear_all()
 
         # Rebuild modules
         module_map = {}  # Maps old module IDs to new module instances
@@ -762,7 +794,7 @@ class ModularSynthWindow(QMainWindow):
                         logger.warning(f"Failed to set parameter {param_name}: {e}")
 
             # Add to canvas
-            self.patch_canvas.add_module(module_instance)
+            patch_canvas.add_module(module_instance)
 
             # Set position
             module_instance.setPos(position["x"], position["y"])
@@ -796,9 +828,11 @@ class ModularSynthWindow(QMainWindow):
                         break
 
                 if source_port_obj and target_port_obj:
+                    source_port_widget = cast(PortWidget, source_port_obj)
+                    target_port_widget = cast(PortWidget, target_port_obj)
                     # Create cable connection
-                    self.patch_canvas.create_connection(
-                        source_port_obj, target_port_obj
+                    patch_canvas.create_connection(
+                        source_port_widget, target_port_widget
                     )
                 else:
                     logger.warning(
@@ -806,7 +840,7 @@ class ModularSynthWindow(QMainWindow):
                     )
 
         # Compile the loaded patch
-        self.statusbar.showMessage("Preset loaded successfully")
+        self._require_statusbar().showMessage("Preset loaded successfully")
 
     def closeEvent(self, event):
         """Handle window close event."""

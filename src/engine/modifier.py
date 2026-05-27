@@ -122,7 +122,7 @@ class Modifier(AudioComponent):
     """Base for components that modify signals (effects, filters)."""
 
     @abstractmethod
-    def __call__(self, val: float | tuple[float, ...]) -> float | tuple[float, ...]:
+    def __call__(self, val: Any) -> Any:
         """Apply modification to a value or a bunch of values.
 
         Args:
@@ -168,6 +168,8 @@ class Panner(Modifier):
         Raises:
             TypeError: If position is not a number.
         """
+        super().__init__()
+
         # Input validation
         if not isinstance(position, (int, float, np.number)):
             raise TypeError(f"position must be a number, got {type(position).__name__}")
@@ -483,6 +485,16 @@ class Volume(Modifier):
             TypeError: If amplitude is not a number.
             ValueError: If amplitude is negative.
         """
+        super().__init__()
+
+        # Input validation
+        if not isinstance(amplitude, (int, float, np.number)):
+            raise TypeError(
+                f"amplitude must be a number, got {type(amplitude).__name__}"
+            )
+        if amplitude < 0:
+            raise ValueError(f"amplitude must be non-negative, got {amplitude}")
+
         self._amplitude = _derive_amplitude_from_init(
             self._provided_args, amplitude, gain_db  # noqa
         )
@@ -531,7 +543,7 @@ class Volume(Modifier):
 
     @gain_db.setter
     def gain_db(self, value: float):
-        new_amplitude = db_to_linear(value)
+        new_amplitude = float(db_to_linear(value))
         # Initiate smooth transition (prevents clicks)
         self._target_amplitude = new_amplitude
         self._smoothing_samples_remaining = self._smoothing_duration_samples
@@ -553,7 +565,7 @@ class Volume(Modifier):
             TypeError: If input is not int, float, numpy array, or Iterable.
         """
         # Scalar input
-        if isinstance(val, float | int | np.number):
+        if isinstance(val, (float, int, np.number)):
             # Apply amplitude with smoothing if transitioning (prevents clicks!)
             if self._smoothing_samples_remaining > 0:
                 # Create smooth amplitude envelope (linear ramp)
@@ -578,7 +590,7 @@ class Volume(Modifier):
                 return float(val * self._amplitude)
 
         # Vectorized input
-        if isinstance(val, tuple | np.ndarray | Iterable):
+        if isinstance(val, (tuple, np.ndarray, Iterable)):
             return self._scale_vectorized(np.asarray(val))
 
         logger.error(f"Invalid input type for Volume: {type(val)}")
@@ -799,7 +811,7 @@ class ModulatedVolume(Volume):
         """
         if self._modulation_target == "gain_db":
             # Convert dB values to linear amplitude
-            amplitude_values = db_to_linear(mod_values)
+            amplitude_values = np.asarray(db_to_linear(mod_values), dtype=np.float32)
             return (samples * amplitude_values).astype(np.float32)
         else:
             # Direct amplitude modulation
@@ -849,6 +861,8 @@ class Frequency(Modifier):
             TypeError: If frequency is not a number.
             ValueError: If frequency is negative.
         """
+        super().__init__()
+
         # Input validation
         if not isinstance(frequency, (int, float, np.number)):
             raise TypeError(
@@ -1113,7 +1127,7 @@ class ModulatedClipper(Modifier):
 
         if isinstance(val, Iterable):
             # Stereo tuple
-            return tuple(np.clip(v, -threshold, threshold) for v in val)
+            return tuple(float(np.clip(v, -threshold, threshold)) for v in val)
 
         # Mono scalar
         return float(np.clip(val, -threshold, threshold))

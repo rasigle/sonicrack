@@ -129,7 +129,7 @@ class PresetManager:
         Returns:
             List of preset metadata dictionaries
         """
-        presets = []
+        presets: list[dict[str, Any]] = []
 
         try:
             for filepath in self.preset_directory.glob("*.json"):
@@ -176,7 +176,7 @@ class PresetManager:
         Returns:
             List of unique category names
         """
-        categories = set()
+        categories: set[str] = set()
 
         for preset in self.list_presets():
             category = preset.get("category", "User")
@@ -201,7 +201,7 @@ class PresetManager:
             Dictionary containing serialized patch data
         """
         # Build preset data structure
-        preset_data = {
+        preset_data: dict[str, Any] = {
             "metadata": {
                 "name": metadata.get("name", "Untitled Preset"),
                 "author": metadata.get("author", ""),
@@ -220,12 +220,12 @@ class PresetManager:
 
         # Serialize modules
         for module_id, module in zip(module_ids.values(), modules):
-            metadata = module.metadata
+            module_metadata = module.metadata
             module_data = {
                 "id": module_id,
-                "type": metadata.title,
+                "type": module_metadata.title,
                 "custom_name": module.custom_name,
-                "module_category": metadata.category.value,  # Convert enum to string
+                "module_category": module_metadata.category.value,
                 "position": {"x": module.pos().x(), "y": module.pos().y()},
                 "parameters": module.get_parameters(),
             }

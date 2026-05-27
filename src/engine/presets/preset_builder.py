@@ -169,7 +169,7 @@ class PresetBuilder:
 
         logger.debug(f"Pre-generated {len(self._component_methods)} component methods")
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> Callable[..., PresetBuilder]:
         """Get pre-cached component method.
 
         Args:
@@ -205,6 +205,7 @@ class PresetBuilder:
             Self for method chaining
         """
         component_class = audio_registry.get(comp_name, strict=True)
+        assert component_class is not None
 
         # Inject sample_rate if not provided
         if "sample_rate" not in kwargs:
@@ -242,9 +243,8 @@ class PresetBuilder:
         Returns:
             Self for method chaining
         """
-        component = audio_registry.get(comp_name)
-        if not component:
-            raise ValueError(f"Unknown component: {comp_name}")
+        component = audio_registry.get(comp_name, strict=True)
+        assert component is not None
 
         # Create instance
         instance = component(*args, **kwargs)
@@ -274,9 +274,8 @@ class PresetBuilder:
         Returns:
             Self for method chaining
         """
-        component_class = audio_registry.get(comp_name)
-        if not component_class:
-            raise ValueError(f"Unknown component: {comp_name}")
+        component_class = audio_registry.get(comp_name, strict=True)
+        assert component_class is not None
 
         # Inject sample_rate if not provided
         if "sample_rate" not in kwargs:
@@ -287,20 +286,20 @@ class PresetBuilder:
 
         # Wrap source with ModulatedOscillator if we have an oscillator
         if self._source and hasattr(self._source, "frequency"):
-            mod_osc_class = audio_registry.get("ModulatedOscillator")
-            if mod_osc_class:
-                if target == "amplitude":
-                    self._source = mod_osc_class(
-                        self._source, modulator, amp_mod=lambda base, mod: base * mod
-                    )
-                elif target == "frequency":
-                    self._source = mod_osc_class(
-                        self._source, modulator, freq_mod=lambda base, mod: base * mod
-                    )
-                elif target == "phase":
-                    self._source = mod_osc_class(
-                        self._source, modulator, phase_mod=lambda base, mod: base + mod
-                    )
+            mod_osc_class = audio_registry.get("ModulatedOscillator", strict=True)
+            assert mod_osc_class is not None
+            if target == "amplitude":
+                self._source = mod_osc_class(
+                    self._source, modulator, amp_mod=lambda base, mod: base * mod
+                )
+            elif target == "frequency":
+                self._source = mod_osc_class(
+                    self._source, modulator, freq_mod=lambda base, mod: base * mod
+                )
+            elif target == "phase":
+                self._source = mod_osc_class(
+                    self._source, modulator, phase_mod=lambda base, mod: base + mod
+                )
 
         # Build params dict for tree
         params = component_class.descriptor.to_config(*args, **kwargs)
@@ -446,23 +445,27 @@ class PresetBuilder:
                 if isinstance(self._source, list):
                     # Apply modulation to first oscillator only (backward compatibility)
                     if hasattr(self._source[0], "frequency"):
-                        mod_osc_desc = audio_registry.get("ModulatedOscillator")
-                        if mod_osc_desc:
-                            self._source[0] = mod_osc_desc.create_instance(
-                                self._source[0],
-                                modulator,
-                                amp_mod=lambda base, mod: base * mod,
-                            )
+                        mod_osc_desc = audio_registry.get(
+                            "ModulatedOscillator", strict=True
+                        )
+                        assert mod_osc_desc is not None
+                        self._source[0] = mod_osc_desc.create_instance(
+                            self._source[0],
+                            modulator,
+                            amp_mod=lambda base, mod: base * mod,
+                        )
                 else:
                     # Single oscillator
                     if hasattr(self._source, "frequency"):
-                        mod_osc_desc = audio_registry.get("ModulatedOscillator")
-                        if mod_osc_desc:
-                            self._source = mod_osc_desc.create_instance(
-                                self._source,
-                                modulator,
-                                amp_mod=lambda base, mod: base * mod,
-                            )
+                        mod_osc_desc = audio_registry.get(
+                            "ModulatedOscillator", strict=True
+                        )
+                        assert mod_osc_desc is not None
+                        self._source = mod_osc_desc.create_instance(
+                            self._source,
+                            modulator,
+                            amp_mod=lambda base, mod: base * mod,
+                        )
         return self
 
     def modify_frequency(self, value_or_modulator) -> PresetBuilder:
@@ -502,23 +505,27 @@ class PresetBuilder:
                 if isinstance(self._source, list):
                     # Apply modulation to first oscillator only (backward compatibility)
                     if hasattr(self._source[0], "frequency"):
-                        mod_osc_desc = audio_registry.get("ModulatedOscillator")
-                        if mod_osc_desc:
-                            self._source[0] = mod_osc_desc.create_instance(
-                                self._source[0],
-                                modulator,
-                                freq_mod=lambda base, mod: base * mod,
-                            )
+                        mod_osc_desc = audio_registry.get(
+                            "ModulatedOscillator", strict=True
+                        )
+                        assert mod_osc_desc is not None
+                        self._source[0] = mod_osc_desc.create_instance(
+                            self._source[0],
+                            modulator,
+                            freq_mod=lambda base, mod: base * mod,
+                        )
                 else:
                     # Single oscillator
                     if hasattr(self._source, "frequency"):
-                        mod_osc_desc = audio_registry.get("ModulatedOscillator")
-                        if mod_osc_desc:
-                            self._source = mod_osc_desc.create_instance(
-                                self._source,
-                                modulator,
-                                freq_mod=lambda base, mod: base * mod,
-                            )
+                        mod_osc_desc = audio_registry.get(
+                            "ModulatedOscillator", strict=True
+                        )
+                        assert mod_osc_desc is not None
+                        self._source = mod_osc_desc.create_instance(
+                            self._source,
+                            modulator,
+                            freq_mod=lambda base, mod: base * mod,
+                        )
         return self
 
     def modify_oscillator_at(
@@ -568,8 +575,7 @@ class PresetBuilder:
         osc_nodes = [
             node
             for node in self._component_tree.children
-            if audio_registry.get(node.component_type).descriptor.category
-            == ComponentCategory.OSCILLATOR
+            if self._get_node_category(node.component_type) == ComponentCategory.OSCILLATOR
         ]
         if index < len(osc_nodes):
             node = osc_nodes[index]
@@ -630,7 +636,7 @@ class PresetBuilder:
                     osc_nodes = [
                         node
                         for node in self._component_tree.children
-                        if audio_registry.get(node.component_type).descriptor.category
+                        if self._get_node_category(node.component_type)
                         == ComponentCategory.OSCILLATOR
                     ]
                     if i < len(osc_nodes):
@@ -651,7 +657,7 @@ class PresetBuilder:
                     osc_nodes = [
                         node
                         for node in self._component_tree.children
-                        if audio_registry.get(node.component_type).descriptor.category
+                        if self._get_node_category(node.component_type)
                         == ComponentCategory.OSCILLATOR
                     ]
                     if i < len(osc_nodes):
@@ -691,6 +697,12 @@ class PresetBuilder:
     def print_tree(self) -> None:
         """Print the preset tree to console."""
         print(self.to_tree())
+
+    def _get_node_category(self, component_type: str) -> ComponentCategory:
+        """Resolve a component category for a tree node via the registry."""
+        component_class = audio_registry.get(component_type, strict=True)
+        assert component_class is not None
+        return component_class.descriptor.category
 
     # ========================================================================
     # Config Generation (On-Demand)
@@ -782,7 +794,8 @@ class PresetBuilder:
         lines.append("")
 
         for node in self._component_tree.children:
-            component = audio_registry.get(node.component_type)
+            component = audio_registry.get(node.component_type, strict=True)
+            assert component is not None
 
             # Build parameter string
             params = []
@@ -810,6 +823,7 @@ class PresetBuilder:
 
         for node in self._component_tree.children:
             component_class = audio_registry.get(node.component_type, strict=True)
+            assert component_class is not None
             category = component_class.descriptor.category
             if category == ComponentCategory.OSCILLATOR:
                 oscillators += 1
@@ -844,8 +858,7 @@ class PresetBuilder:
         self._component_tree.children = [
             node
             for node in self._component_tree.children
-            if audio_registry.get(node.component_type).descriptor.category
-            != ComponentCategory.MODIFIER
+            if self._get_node_category(node.component_type) != ComponentCategory.MODIFIER
         ]
 
         logger.debug("Cleared all effects")
@@ -865,6 +878,7 @@ class PresetBuilder:
         for component in config.get("components", []):
             comp_name = component["name"]
             component_class = audio_registry.get(comp_name, strict=True)
+            assert component_class is not None
             descriptor = component_class.descriptor
             method_name = (
                 descriptor.fluent_api_name if descriptor.fluent_api_name else comp_name
@@ -937,6 +951,7 @@ class PresetBuilder:
         for component in config.get("components", []):
             comp_type = component["name"]
             component_class = audio_registry.get(comp_type, strict=True)
+            assert component_class is not None
             descriptor = component_class.descriptor
             method_name = (
                 descriptor.fluent_api_name if descriptor.fluent_api_name else comp_type

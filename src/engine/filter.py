@@ -36,6 +36,8 @@ Note:
     scipy.signal.butter.
 """
 
+from typing import Literal, cast
+
 import numpy as np
 from scipy.signal import filtfilt, butter as scipy_butter, lfilter, lfilter_zi
 
@@ -62,7 +64,8 @@ class ButterworthFilter(Modifier):
     Example:
         >>> # Low-pass filter at 1kHz
         >>> lpf = ButterworthFilter(cutoff=1000, filter_type="low")
-        >>> filtered = lpf(audio_samples)
+        >>> samples = np.random.randn(1000)
+        >>> filtered = lpf(samples)
         >>>
         >>> # Band-pass filter 200-2000 Hz
         >>> bpf = ButterworthFilter(cutoff=(200, 2000), filter_type="band")
@@ -76,11 +79,13 @@ class ButterworthFilter(Modifier):
         tags=["filter", "frequency", "butterworth", "iir"],
     )
 
+    FilterType = Literal["low", "high", "band"]
+
     def __init__(
         self,
         cutoff: float | tuple[float, float] = 1000.0,
         order: int = 4,
-        filter_type: str = "low",
+        filter_type: Literal["low", "high", "band"] = "low",
         sample_rate: int = DEFAULT_SAMPLE_RATE,
     ):
         """Initialize Butterworth filter.
@@ -96,7 +101,7 @@ class ButterworthFilter(Modifier):
         self.sample_rate = sample_rate
         self._cutoff = cutoff
         self._order = order
-        self._filter_type = filter_type
+        self._filter_type: ButterworthFilter.FilterType = filter_type
 
         # Validate filter type
         if filter_type not in ("low", "high", "band"):
@@ -131,6 +136,7 @@ class ButterworthFilter(Modifier):
         """
         nyq = 0.5 * self.sample_rate
 
+        wn: float | list[float]
         if isinstance(self._cutoff, (list, tuple)):
             # Band-pass filter
             wn = [c / nyq for c in self._cutoff]
@@ -138,7 +144,12 @@ class ButterworthFilter(Modifier):
             # Low-pass or high-pass
             wn = self._cutoff / nyq
 
-        b, a = scipy_butter(self._order, wn, btype=self._filter_type, analog=False)
+        b, a = scipy_butter(
+            self._order,
+            wn,
+            btype=cast(ButterworthFilter.FilterType, self._filter_type),
+            analog=False,
+        )
         return b, a
 
     def __iter__(self):
@@ -152,6 +163,13 @@ class ButterworthFilter(Modifier):
             "ButterworthFilter requires vectorized processing. "
             "Use scale_vectorized() instead of iterator mode."
         )
+
+    def _filter_scalar(self, val: float) -> float:
+        """Apply the filter to a single scalar sample using the current state."""
+        filtered, self._filter_state = lfilter(
+            self._b, self._a, [val], zi=self._filter_state
+        )
+        return float(filtered[0])
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray
@@ -173,13 +191,10 @@ class ButterworthFilter(Modifier):
 
         # Handle stereo tuples
         if isinstance(val, tuple):
-            return tuple(self(v) for v in val)
+            return tuple(self._filter_scalar(v) for v in val)
 
         # Apply filter with state for single samples
-        filtered, self._filter_state = lfilter(
-            self._b, self._a, [val], zi=self._filter_state
-        )
-        return float(filtered[0])
+        return self._filter_scalar(val)
 
     def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
         """Apply filter to array of samples (optimized vectorized version).
@@ -237,7 +252,12 @@ class ButterworthFilter(Modifier):
 # Utility functions for standalone use
 
 
-def butter(order, cutoff, fs, btype="low"):
+def butter(
+    order: int,
+    cutoff: float | tuple[float, float] | list[float] | np.ndarray,
+    fs: float,
+    btype: Literal["low", "high", "band"] = "low",
+):
     """
     Design Butterworth IIR filter coefficients.
 
@@ -252,6 +272,7 @@ def butter(order, cutoff, fs, btype="low"):
             Numerator (b) and denominator (a) polynomials of the IIR filter.
     """
     nyq = 0.5 * fs
+    wn: float | list[float]
     if isinstance(cutoff, (list, tuple, np.ndarray)):
         wn = [c / nyq for c in cutoff]
     else:
@@ -259,7 +280,9 @@ def butter(order, cutoff, fs, btype="low"):
 
     from scipy.signal import butter
 
-    b, a = butter(order, wn, btype=btype, analog=False)
+    b, a = butter(
+        order, wn, btype=cast(Literal["low", "high", "band"], btype), analog=False
+    )
     return b, a
 
 

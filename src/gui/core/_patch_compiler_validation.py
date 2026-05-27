@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from src.gui.core.module import AudioModule
 from src.gui.core.module import ModuleCategory
+from src.gui.widgets.port_widget import PortWidget
 
 
 class PatchCompilerValidationMixin:
     """Cycle detection and patch prevalidation."""
 
+    modules: list[AudioModule]
+    connections: list[tuple[PortWidget, PortWidget]]
+
     def _detect_cycles(self) -> list[str]:
         """Detect cycles in the patch graph."""
         errors: list[str] = []
-        graph = {}
+        graph: dict[Any, list[Any]] = {}
         connections = self.connections
 
         for start_port, end_port in connections:

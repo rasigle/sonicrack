@@ -1,6 +1,7 @@
 """Unit tests for modifiers (Panner, Volume, Clipper, etc.)."""
 
 import unittest
+from typing import cast
 
 import numpy as np
 
@@ -134,7 +135,7 @@ class TestPanner(unittest.TestCase):
         panner = Panner(0.0)
         samples = np.array([0.5, -0.5, 1.0, -1.0, 0.0])
 
-        left, right = panner(samples)
+        left, right = cast(tuple[np.ndarray, np.ndarray], panner(samples))
 
         # Should return numpy arrays
         self.assertIsInstance(left, np.ndarray)
@@ -218,7 +219,7 @@ class TestPanner(unittest.TestCase):
         """Test panner with array input."""
         panner = Panner(0.5)
         samples = np.array([1.0, 0.5, -0.5, -1.0], dtype=np.float32)
-        left, right = panner(samples)
+        left, right = cast(tuple[np.ndarray, np.ndarray], panner(samples))
 
         self.assertIsInstance(left, np.ndarray)
         self.assertIsInstance(right, np.ndarray)
@@ -257,10 +258,10 @@ class TestPanner(unittest.TestCase):
     def test_input_validation_invalid_type(self):
         """Test Panner rejects invalid position type."""
         with self.assertRaises(TypeError):
-            Panner("invalid")
+            Panner(cast(float, "invalid"))
 
         with self.assertRaises(TypeError):
-            Panner([0.5])
+            Panner(cast(float, [0.5]))
 
 
 class TestModulatedPanner(unittest.TestCase):
@@ -362,7 +363,9 @@ class TestModulatedPanner(unittest.TestCase):
         num_samples = 20
         samples = np.ones(num_samples)
 
-        left, right = panner(samples)  # Use __call__ which handles vectorization
+        left, right = cast(
+            tuple[np.ndarray, np.ndarray], panner(samples)
+        )  # Use __call__ which handles vectorization
 
         # Should return numpy arrays
         self.assertIsInstance(left, np.ndarray)
@@ -383,7 +386,9 @@ class TestModulatedPanner(unittest.TestCase):
         num_samples = 50
         samples = np.ones(num_samples)
 
-        left, right = panner(samples)  # Use __call__ which handles vectorization
+        left, right = cast(
+            tuple[np.ndarray, np.ndarray], panner(samples)
+        )  # Use __call__ which handles vectorization
 
         # Check power preservation for each sample
         for i in range(num_samples):
@@ -613,7 +618,7 @@ class TestVolume(unittest.TestCase):
     def test_input_validation_invalid_type(self):
         """Test Volume rejects invalid amplitude type."""
         with self.assertRaises(TypeError):
-            Volume("invalid")
+            Volume(cast(float, "invalid"))
 
     def test_input_validation_negative(self):
         """Test Volume rejects negative amplitude."""
@@ -628,7 +633,7 @@ class TestVolume(unittest.TestCase):
         """Test Volume rejects invalid input types in call."""
         volume = Volume(0.5)
         with self.assertRaises(TypeError):
-            volume({"invalid": "dict"})
+            volume(cast(float | tuple[float, ...] | np.ndarray, {"invalid": "dict"}))
 
 
 class TestModulatedVolume(unittest.TestCase):
@@ -712,7 +717,7 @@ class TestFrequency(unittest.TestCase):
     def test_frequency_scaling(self) -> None:
         """Test frequency modifier scales value."""
         freq_mod = Frequency(2.0)
-        result = freq_mod(440.0)
+        result = cast(float, freq_mod(440.0))
         self.assertAlmostEqual(result, 880.0, places=5)
 
     def test_initialization_default(self):
@@ -760,7 +765,7 @@ class TestFrequency(unittest.TestCase):
     def test_input_validation_invalid_type(self):
         """Test Frequency rejects invalid type."""
         with self.assertRaises(TypeError):
-            Frequency("invalid")
+            Frequency(cast(float, "invalid"))
 
     def test_input_validation_negative(self):
         """Test Frequency rejects negative value."""
@@ -805,12 +810,12 @@ class TestClipper(unittest.TestCase):
         """Test clipper works with stereo input."""
         clipper = Clipper((-0.4, 0.6))
 
-        result = clipper((1.0, -1.0))
+        result = cast(tuple[float, ...], clipper((1.0, -1.0)))
         self.assertIsInstance(result, tuple)
         self.assertEqual(result[0], 0.6)
         self.assertEqual(result[1], -0.4)
 
-        result = clipper((-1.0, 1.0))
+        result = cast(tuple[float, ...], clipper((-1.0, 1.0)))
         self.assertIsInstance(result, tuple)
         self.assertEqual(result[0], -0.4)
         self.assertEqual(result[1], 0.6)
@@ -885,15 +890,15 @@ class TestClipper(unittest.TestCase):
     def test_input_validation_invalid_type(self):
         """Test Clipper rejects invalid wave_range type."""
         with self.assertRaises(TypeError):
-            Clipper("invalid")
+            Clipper(cast(tuple[float, float], "invalid"))
 
     def test_input_validation_wrong_length(self):
         """Test Clipper rejects wrong length tuple."""
         with self.assertRaises(ValueError):
-            Clipper((-1.0,))
+            Clipper(cast(tuple[float, float], (-1.0,)))
 
         with self.assertRaises(ValueError):
-            Clipper((-1.0, 0.0, 1.0))
+            Clipper(cast(tuple[float, float], (-1.0, 0.0, 1.0)))
 
     def test_input_validation_invalid_range(self):
         """Test Clipper rejects invalid range (min >= max)."""
@@ -906,7 +911,7 @@ class TestClipper(unittest.TestCase):
     def test_input_validation_non_numeric_values(self):
         """Test Clipper rejects non-numeric range values."""
         with self.assertRaises(TypeError):
-            Clipper(("a", "b"))
+            Clipper(cast(tuple[float, float], ("a", "b")))
 
 
 class TestModifierIntegration(unittest.TestCase):
@@ -918,8 +923,8 @@ class TestModifierIntegration(unittest.TestCase):
         panner = Panner(0.5)  # Right-biased pan
 
         # Apply volume, then pan
-        after_volume = volume(1.0)
-        after_pan = panner(after_volume)
+        after_volume = cast(float, volume(1.0))
+        after_pan = cast(tuple[float, float], panner(after_volume))
 
         self.assertIsInstance(after_pan, tuple)
         left, right = after_pan
@@ -1010,7 +1015,7 @@ class TestModulatedFrequency(unittest.TestCase):
     def test_input_validation_none_modulator(self):
         """Test ModulatedFrequency rejects None modulator."""
         with self.assertRaises(TypeError):
-            ModulatedFrequency(None)
+            ModulatedFrequency(cast(object, None))
 
 
 """Test cases for ModulatedVolume and ModulatedFrequency vectorization."""
@@ -1026,7 +1031,7 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
         for ModulatedVolume has been fixed.
         """
         from src.engine.composer import Chain
-        from engine import SquareOscillator
+        from src.engine import SquareOscillator
 
         # Create chain with ModulatedVolume (the problematic case)
         osc = SquareOscillator(440, amplitude=0.5, gain_db=None, sample_rate=1000)
@@ -1081,7 +1086,7 @@ class TestChainVectorizationPerformance(unittest.TestCase):
         """Test Chain with multiple modulated modifiers (complex case)."""
         from src.engine.composer import Chain
         from src.engine.oscillator import TriangleOscillator
-        from engine import SquareOscillator
+        from src.engine import SquareOscillator
         from src.engine.modifier import ModulatedPanner
 
         # This is similar to the user's original code

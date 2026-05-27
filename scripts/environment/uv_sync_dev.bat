@@ -5,6 +5,6 @@
 call .\uv_check_activate_venv.bat
 
 echo uv Synchronize Development Environment
-uv sync --group dev
+uv sync --group dev --extra examples
 echo - done
 echo.

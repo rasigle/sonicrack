@@ -61,6 +61,7 @@ Note:
 """
 
 import numpy as np
+from typing import cast
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor, Generator
@@ -135,8 +136,7 @@ class ModulatedOscillator(Generator):
         super().__init__()
         if not isinstance(oscillator, Oscillator):
             raise TypeError(
-                f"Oscillator should be an instance of Oscillator. "
-                f"Given: {type(oscillator)}"
+                f"Oscillator should be an instance of Oscillator. Given: {oscillator}"
             )
 
         self.oscillator: Oscillator = oscillator
@@ -407,7 +407,8 @@ class ModulatedOscillator(Generator):
         phase_offsets_deg: np.ndarray | None,
         sample_rate: float,
     ) -> tuple[np.ndarray, dict[str, float | str]]:
-        osc = self.oscillator
+        assert freqs is not None
+        osc = cast(SineOscillator, self.oscillator)
         increments = (2.0 * np.pi * freqs) / sample_rate
         carrier_phases, end_phase = self._build_carrier_phase_buffer(osc._i, increments)
 
@@ -418,7 +419,9 @@ class ModulatedOscillator(Generator):
 
         total_phases = carrier_phases + phase_offsets
         waveform = np.asarray(osc._generate_waveform(total_phases), dtype=np.float64)
-        waveform = np.asarray(osc._apply_wave_range_values(waveform), dtype=np.float64)
+        waveform = np.asarray(
+            cast(np.ndarray, osc._apply_wave_range_values(waveform)), dtype=np.float64
+        )
         return waveform, {"kind": "angular", "carrier_end": end_phase}
 
     def _generate_square_waveform(
@@ -427,7 +430,8 @@ class ModulatedOscillator(Generator):
         phase_offsets_deg: np.ndarray | None,
         sample_rate: float,
     ) -> tuple[np.ndarray, dict[str, float | str]]:
-        osc = self.oscillator
+        assert freqs is not None
+        osc = cast(SquareOscillator, self.oscillator)
         increments = (2.0 * np.pi * freqs) / sample_rate
         carrier_phases, end_phase = self._build_carrier_phase_buffer(osc._i, increments)
 
@@ -454,7 +458,8 @@ class ModulatedOscillator(Generator):
         phase_offsets_deg: np.ndarray | None,
         sample_rate: float,
     ) -> tuple[np.ndarray, dict[str, float | str]]:
-        osc = self.oscillator
+        assert freqs is not None
+        osc = cast(SawtoothOscillator, self.oscillator)
         increments = freqs / sample_rate
         carrier_cycles, end_cycle = self._build_carrier_phase_buffer(
             self._get_saw_like_carrier_cycle(osc),
@@ -473,8 +478,10 @@ class ModulatedOscillator(Generator):
         cycles = carrier_cycles + phase_offsets
         waveform = 2 * (cycles - np.floor(0.5 + cycles))
         if osc.mode == "analog":
-            waveform = osc._apply_analog_character(waveform)
-        waveform = np.asarray(osc._apply_wave_range_values(waveform), dtype=np.float64)
+            waveform = cast(np.ndarray, osc._apply_analog_character(waveform))
+        waveform = np.asarray(
+            cast(np.ndarray, osc._apply_wave_range_values(waveform)), dtype=np.float64
+        )
         return waveform, {"kind": "cycle", "carrier_end": end_cycle}
 
     def _generate_triangle_waveform(
@@ -483,7 +490,8 @@ class ModulatedOscillator(Generator):
         phase_offsets_deg: np.ndarray | None,
         sample_rate: float,
     ) -> tuple[np.ndarray, dict[str, float | str]]:
-        osc = self.oscillator
+        assert freqs is not None
+        osc = cast(TriangleOscillator, self.oscillator)
         increments = freqs / sample_rate
         carrier_cycles, end_cycle = self._build_carrier_phase_buffer(
             self._get_saw_like_carrier_cycle(osc),
@@ -503,8 +511,10 @@ class ModulatedOscillator(Generator):
         waveform = 2 * (cycles - np.floor(0.5 + cycles))
         waveform = (np.abs(waveform) - 0.5) * 2
         if osc.mode == "analog":
-            waveform = osc._apply_analog_character_triangle(waveform)
-        waveform = np.asarray(osc._apply_wave_range_values(waveform), dtype=np.float64)
+            waveform = cast(np.ndarray, osc._apply_analog_character_triangle(waveform))
+        waveform = np.asarray(
+            cast(np.ndarray, osc._apply_wave_range_values(waveform)), dtype=np.float64
+        )
         return waveform, {"kind": "cycle", "carrier_end": end_cycle}
 
     @staticmethod
@@ -519,7 +529,7 @@ class ModulatedOscillator(Generator):
             ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
         )
         phases = start_phase + phase_offsets
-        end_phase = float(start_phase + np.sum(increments, dtype=np.float64))
+        end_phase = float(start_phase + float(np.sum(increments, dtype=np.float64)))
         return phases, end_phase
 
     @staticmethod
@@ -545,10 +555,11 @@ class ModulatedOscillator(Generator):
             self.oscillator._i = float(phase_state["carrier_end"]) % (2.0 * np.pi)
         elif kind == "cycle":
             carrier_cycle = float(phase_state["carrier_end"]) % 1.0
-            if getattr(self.oscillator, "_period", 0) != 0:
-                self.oscillator._i = carrier_cycle * self.oscillator._period
+            period = float(getattr(self.oscillator, "_period", 0.0))
+            if period != 0.0:
+                self.oscillator._i = carrier_cycle * period
             else:
-                self.oscillator._i = 0
+                self.oscillator._i = 0.0
 
     def _get_samples_fallback(self, n: int, mod_arrays: list) -> np.ndarray:
         """Fallback to sample-by-sample generation for unknown oscillator types.

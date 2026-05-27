@@ -50,7 +50,7 @@ class LibraryPresetBrowserDialog(QDialog):
         super().__init__(parent)
 
         self.preset_manager = preset_manager
-        self.current_presets = []
+        self.current_presets: list[dict[str, Any]] = []
 
         self.setWindowTitle("Preset Browser")
         self.setMinimumSize(700, 500)

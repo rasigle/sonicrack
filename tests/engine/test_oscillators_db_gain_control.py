@@ -19,7 +19,7 @@ from src.engine.oscillator import (
     TriangleOscillator,
     SawtoothOscillator,
 )
-from engine import SquareOscillator
+from src.engine import SquareOscillator
 
 
 class TestOscillatorDBControl:

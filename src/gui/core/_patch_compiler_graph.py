@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from src.engine import CVScaler
 from src.gui.core.module import AudioModule
@@ -14,6 +14,14 @@ logger = logging.getLogger(__name__)
 
 class PatchCompilerGraphMixin:
     """Helpers for traversing module connections and collecting components."""
+
+    connections: list[tuple[PortWidget, PortWidget]]
+    _build_cache: dict[AudioModule, Any]
+    _module_to_component: dict[AudioModule, Any]
+
+    if TYPE_CHECKING:
+
+        def _build_chain_from_module(self, module: AudioModule) -> Any | None: ...
 
     def _cache_component(self, module: AudioModule, component: Any) -> None:
         """Cache a compiled component and track it for hot-swapping."""

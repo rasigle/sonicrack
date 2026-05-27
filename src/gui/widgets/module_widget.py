@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 # Create a compatible metaclass that combines QGraphicsWidget's metaclass with ABCMeta
-class ModuleWidgetMeta(type(QGraphicsWidget), ABCMeta):
+class ModuleWidgetMeta(type(QGraphicsWidget), ABCMeta):  # type: ignore[misc]
     """Combined metaclass for QGraphicsWidget and ABC."""
 
     pass
@@ -326,8 +326,11 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         path.addRect(self.boundingRect())
         return path
 
-    def paint(self, painter: QPainter, option, widget=None):
+    def paint(self, painter: QPainter | None, option, widget=None):
         """Paint the module."""
+        if painter is None:
+            return
+
         rect = self.boundingRect()
 
         # Module background with gradient

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from src.engine.audio_component import AudioComponent
 from src.engine.composer import Chain, WaveAdder
@@ -14,6 +14,29 @@ logger = logging.getLogger(__name__)
 
 class PatchCompilerBuilderMixin:
     """Build compiled components for modules by category."""
+
+    _build_cache: dict[AudioModule, Any]
+    _module_to_component: dict[AudioModule, Any]
+
+    if TYPE_CHECKING:
+
+        def _cache_component(self, module: AudioModule, component: Any) -> None: ...
+
+        def _find_port_by_name(
+            self, module: AudioModule, port_name: str
+        ) -> Any | None: ...
+
+        def _find_connection_to_port(self, port: Any) -> Any | None: ...
+
+        def _build_component_from_port(self, connection: Any) -> Any | None: ...
+
+        def _collect_input_components_from_port(
+            self, port: Any, track_skipped: bool = False
+        ) -> tuple[list[Any], list[str]]: ...
+
+        def _collect_modulation_components(
+            self, module: AudioModule
+        ) -> dict[str, Any]: ...
 
     def _build_chain_from_module(self, module: AudioModule) -> AudioComponent | None:
         """Build an audio chain by dispatching to a category-specific builder."""

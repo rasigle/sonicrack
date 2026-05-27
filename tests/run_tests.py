@@ -31,7 +31,7 @@ def run_all_tests(
     # Discover tests
     loader = unittest.TestLoader()
     start_dir = Path(__file__).parent
-    suite = loader.discover(start_dir, pattern=pattern)
+    suite = loader.discover(str(start_dir), pattern=pattern)
 
     # Run tests
     runner = unittest.TextTestRunner(verbosity=verbosity)

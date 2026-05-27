@@ -17,6 +17,9 @@ DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS = 10
 class Oscillator(Generator):
     """Base class for all signal generators with gain and sample generation helpers."""
 
+    _provided_args: set[str]
+    ended: bool = False
+
     @track_provided_args
     def __init__(
         self,
@@ -37,8 +40,8 @@ class Oscillator(Generator):
             self._provided_args, amplitude, gain_db  # noqa
         )
 
-        self._i = 0
-        self._step = 0
+        self._i: float = 0.0
+        self._step: float = 0.0
 
         self._f = frequency
         self._a = self._initial_amp
@@ -114,7 +117,7 @@ class Oscillator(Generator):
 
     @gain_db.setter
     def gain_db(self, value: float):
-        new_amplitude = db_to_linear(value)
+        new_amplitude = float(db_to_linear(value))
         self._target_amplitude = new_amplitude
         self._smoothing_samples_remaining = self._smoothing_samples_duration_total
         self._a = new_amplitude
@@ -245,20 +248,22 @@ class Oscillator(Generator):
         return self.get_samples_vectorized(n)
 
 
-def _derive_amplitude_from_init(given_args, amplitude: float, gain_db: float) -> float:
+def _derive_amplitude_from_init(
+    given_args: set[str], amplitude: float | None, gain_db: float | None
+) -> float:
     """Determine the initial linear amplitude from constructor arguments."""
-    if amplitude and not isinstance(amplitude, (int, float, np.number)):
+    if amplitude is not None and not isinstance(amplitude, (int, float, np.number)):
         raise TypeError(f"Amplitude must be number, got {type(amplitude).__name__}")
-    if amplitude and amplitude < 0.0:
+    if amplitude is not None and amplitude < 0.0:
         raise ValueError(f"Amplitude must be non-negative, got {amplitude}")
-    if gain_db and not isinstance(gain_db, (int, float, np.number)):
+    if gain_db is not None and not isinstance(gain_db, (int, float, np.number)):
         raise TypeError(f"Gain_db must be a number, got {type(gain_db).__name__}")
 
     gain_db_set = "gain_db" in given_args
     amplitude_set = "amplitude" in given_args
 
     if gain_db_set and gain_db is not None:
-        expected_amp = db_to_linear(gain_db)
+        expected_amp = float(db_to_linear(gain_db))
         if (
             amplitude_set
             and amplitude is not None
@@ -274,6 +279,6 @@ def _derive_amplitude_from_init(given_args, amplitude: float, gain_db: float) ->
         return amplitude
 
     if gain_db is not None:
-        return db_to_linear(gain_db)
+        return float(db_to_linear(gain_db))
 
     return 1.0

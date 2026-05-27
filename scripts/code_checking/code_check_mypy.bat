@@ -6,4 +6,4 @@ cd "%~dp0..\environment"
 call .\uv_sync_dev.bat
 
 echo Running mypy
-uv run mypy .\fatlife .\tests
+uv run mypy .\src .\tests

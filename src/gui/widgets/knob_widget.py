@@ -95,7 +95,7 @@ class Knob(QWidget):
             # Ensure we don't take log of zero or negative numbers
             if self.min_value <= 0:
                 # Shift values to be positive for log calculation
-                min_log = 0
+                min_log = 0.0
                 max_log = math.log10(self.max_value - self.min_value + 1)
                 val_log = math.log10(value - self.min_value + 1)
             else:
@@ -121,7 +121,7 @@ class Knob(QWidget):
             # Ensure we don't take log of zero or negative numbers
             if self.min_value <= 0:
                 # Shift values to be positive for log calculation
-                min_log = 0
+                min_log = 0.0
                 max_log = math.log10(self.max_value - self.min_value + 1)
                 val_log = min_log + norm_value * (max_log - min_log)
                 return (10**val_log) - 1 + self.min_value

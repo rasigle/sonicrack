@@ -1,9 +1,11 @@
 """Unit tests for ModulatedOscillator."""
 
 import unittest
+from typing import cast
 
 import numpy as np
 
+from src.engine.oscillator_base import Oscillator
 from src.engine.oscillator_modulated import ModulatedOscillator
 from src.engine.modulator import ADSREnvelope
 from src.engine.oscillator import SineOscillator, SquareOscillator, SawtoothOscillator
@@ -44,7 +46,11 @@ class TestModulatedOscillatorInitialization(unittest.TestCase):
 
         # Should raise TypeError with non-Oscillator
         with self.assertRaises(TypeError):
-            ModulatedOscillator("not an oscillator", env, amp_mod=lambda a, e: a * e)
+            ModulatedOscillator(
+                cast(Oscillator, cast(object, "not an oscillator")),
+                env,
+                amp_mod=lambda a, e: a * e,
+            )
 
 
 class TestAmplitudeModulation(unittest.TestCase):

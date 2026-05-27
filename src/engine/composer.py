@@ -218,12 +218,16 @@ class Chain(Composer):
 
     def __iter__(self):
         iter(self.oscillator)
-        [iter(mod) for mod in self.modifiers if hasattr(mod, "__iter__")]
+        for modifier in self.modifiers:
+            if type(modifier).__next__ is not AudioComponent.__next__:
+                iter(modifier)
         return self
 
     def __next__(self):
         val = next(self.oscillator)
-        [next(mod) for mod in self.modifiers if hasattr(mod, "__iter__")]
+        for modifier in self.modifiers:
+            if type(modifier).__next__ is not AudioComponent.__next__:
+                next(modifier)
         for modifier in self.modifiers:
             val = modifier(val)
         return val

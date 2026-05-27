@@ -42,6 +42,8 @@ Note:
 """
 
 import itertools
+from collections.abc import Iterator
+from typing import Any
 
 import numpy as np
 
@@ -128,7 +130,7 @@ class ADSREnvelope(Modulator):
         super().__init__()
 
         self.ended = True  # Start in ended state
-        self.val = 0  # Initialize current value
+        self.val: float = 0.0  # Initialize current value
 
         # Pre-compute phase durations in samples (performance optimization)
         # These will be set by _update_phase_samples()
@@ -143,7 +145,7 @@ class ADSREnvelope(Modulator):
             "idle"  # Current phase: 'idle', 'attack', 'decay', 'sustain', 'release'
         )
         self._phase_position = 0  # Position within current phase (in samples)
-        self._stepper = None
+        self._stepper: Iterator[float] | None = None
 
     @property
     def attack_duration(self) -> float:
@@ -243,7 +245,7 @@ class ADSREnvelope(Modulator):
         # Only initialize stepper if not in idle state
         # This prevents spurious triggers when creating iterator
         if self._phase != "idle":
-            self.val = 0
+            self.val = 0.0
             self.ended = False
             self._stepper = self._get_ads_stepper()
             self._phase = "attack"
@@ -259,6 +261,7 @@ class ADSREnvelope(Modulator):
         # Ensure stepper exists
         if self._stepper is None:
             self._stepper = self._get_ads_stepper()
+        assert self._stepper is not None
 
         self.val = next(self._stepper)
         self._phase_position += 1
@@ -596,7 +599,7 @@ def getadsr(
     adsr.trigger_note_on()  # Trigger envelope to start attack phase
     down_len = int(sum([a, d, sd]) * sample_rate)
     up_len = int(r * sample_rate)
-    adsr = iter(adsr)
+    iter(adsr)
     adsr_vals = adsr.get_samples(down_len)
     adsr.trigger_release()
     adsr_vals = np.concatenate([adsr_vals, adsr.get_samples(up_len)])
@@ -615,19 +618,11 @@ class GateTriggeredADSR(Modulator):
     MIDI Input [Gate] output.
 
     Example:
-        >>> from src.engine.midi import MIDIToCV, NoteOnMessage, NoteOffMessage
-        >>>
-        >>> # Create MIDI to CV and ADSR
-        >>> cv = MIDIToCV()
+        >>> # Example gate source object with a get_samples() method omitted for brevity
         >>> adsr = ADSREnvelope(attack_duration=0.1, release_duration=0.3)
-        >>> gate_adsr = GateTriggeredADSR(adsr, cv.get_gate_samples(100))
-        >>>
-        >>> # Trigger with MIDI
-        >>> cv.process_message(NoteOnMessage(0.0, 0, 60, 100))
-        >>> samples1 = gate_adsr.get_samples(1000)  # ADSR attacks
-        >>>
-        >>> cv.process_message(NoteOffMessage(0.1, 0, 60))
-        >>> samples2 = gate_adsr.get_samples(1000)  # ADSR releases
+        >>> gate_source = ...
+        >>> gate_adsr = GateTriggeredADSR(adsr, gate_source)
+        >>> samples = gate_adsr.get_samples(1000)
     """
 
     def __init__(self, adsr_envelope: ADSREnvelope, gate_source: AudioComponent):
@@ -652,17 +647,18 @@ class GateTriggeredADSR(Modulator):
             # For other gate sources with gate property
             initial_gate = gate_source.gate
 
-        self.previous_gate = initial_gate
+        self.previous_gate = float(initial_gate)
+        self.ended = self.adsr.ended
 
         logger.debug(
             f"GateTriggeredADSR initialized with initial gate={self.previous_gate}"
         )
 
-    def get_samples(self, num_samples: int, **kwargs) -> np.ndarray:
+    def get_samples(self, n: int, *args: Any, **kwargs: Any) -> np.ndarray:
         """Generate envelope samples, checking gate for triggers.
 
         Args:
-            num_samples: Number of samples to generate
+            n: Number of samples to generate
             **kwargs: Additional arguments (ignored, for compatibility with
                 ModulatedVolume)
 
@@ -672,13 +668,13 @@ class GateTriggeredADSR(Modulator):
         # Get gate signal
         if hasattr(self.gate_source, "get_gate_samples"):
             # For CV converters with specialized gate method
-            gate_samples = self.gate_source.get_gate_samples(num_samples)
+            gate_samples = self.gate_source.get_gate_samples(n)
         elif hasattr(self.gate_source, "get_samples"):
             # For generic audio components
-            gate_samples = self.gate_source.get_samples(num_samples)
+            gate_samples = self.gate_source.get_samples(n)
         else:
             logger.warning("Gate source has no get_samples method")
-            gate_samples = np.zeros(num_samples)
+            gate_samples = np.zeros(n)
 
         # Check for gate transitions (look at first sample for now)
         # In a more sophisticated implementation, we'd check each sample
@@ -699,7 +695,10 @@ class GateTriggeredADSR(Modulator):
         self.previous_gate = current_gate
 
         # Generate ADSR envelope samples
-        return self.adsr.get_samples(num_samples)
+        _ = args, kwargs
+        samples = self.adsr.get_samples(n)
+        self.ended = self.adsr.ended
+        return samples
 
     def __iter__(self):
         """Make GateTriggeredADSR iterable for use as modulator."""
@@ -713,6 +712,7 @@ class GateTriggeredADSR(Modulator):
         # Initialize ADSR iterator
         if hasattr(self.adsr, "__iter__"):
             iter(self.adsr)
+        self.ended = self.adsr.ended
         return self
 
     def __next__(self) -> float:
@@ -745,24 +745,24 @@ class GateTriggeredADSR(Modulator):
 
         # Get next ADSR value
         if hasattr(self.adsr, "__next__"):
-            return next(self.adsr)
-        else:
-            # Fallback to get_samples
-            samples = self.adsr.get_samples(1)
-            return samples[0] if len(samples) > 0 else 0.0
+            value = next(self.adsr)
+            self.ended = self.adsr.ended
+            return value
 
-    @property
-    def ended(self) -> bool:
-        """Check if envelope has ended."""
-        return self.adsr.ended
+        # Fallback to get_samples
+        samples = self.adsr.get_samples(1)
+        self.ended = self.adsr.ended
+        return samples[0] if len(samples) > 0 else 0.0
 
     def trigger_note_on(self):
         """Manually trigger note on."""
         self.adsr.trigger_note_on()
+        self.ended = self.adsr.ended
 
     def trigger_note_off(self):
         """Manually trigger note off."""
         self.adsr.trigger_note_off()
+        self.ended = self.adsr.ended
 
     # Parameter forwarding for hot-swap support
     @property

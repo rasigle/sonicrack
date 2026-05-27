@@ -2,12 +2,14 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import Callable, Literal, cast
+
 import numpy as np
+
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor
 from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.oscillator_sine import SineOscillator
+from src.engine.oscillator_base import Oscillator
 from src.utils.utils import filter_provided_args, track_provided_args
 
 SquareWaveMode = Literal["ideal", "ideal_smooth", "soft"]
@@ -161,7 +163,7 @@ class SoftSquareStrategy(SquareWaveStrategy):
 class SquareWaveFactory:
     """Factory for square wave strategy instances."""
 
-    _strategies = {
+    _strategies: dict[str, type[SquareWaveStrategy]] = {
         "ideal": IdealSquareStrategy,
         "ideal_smooth": IdealSquareStrategySmoothing,
         "soft": SoftSquareStrategy,
@@ -176,7 +178,8 @@ class SquareWaveFactory:
             )
         logging.debug(f"Creating square wave strategy with mode: {mode}")
         strategy_class = cls._strategies[mode]
-        return strategy_class(**kwargs)
+        strategy_factory = cast(Callable[..., SquareWaveStrategy], strategy_class)
+        return strategy_factory(**kwargs)
 
     @classmethod
     def get_available_modes(cls) -> list[str]:
@@ -190,7 +193,7 @@ class SquareWaveFactory:
 
 
 @register_component()
-class SquareOscillator(SineOscillator):
+class SquareOscillator(Oscillator):
     """Square or pulse wave oscillator with selectable generation strategy."""
 
     descriptor = ComponentDescriptor(
@@ -253,6 +256,15 @@ class SquareOscillator(SineOscillator):
             raise ValueError(f"pulsewidth must be between 0.0 and 1.0, got {value}")
         self._pulsewidth = value
         self._pulsewidth_threshold = value * 2 * np.pi
+
+    def _post_freq_set(self):
+        self._step = (2 * np.pi * self._f) / self._sample_rate
+
+    def _post_phase_set(self):
+        self._p = np.deg2rad(self._p)
+
+    def _initialize_osc(self):
+        self._i = 0.0
 
     @property
     def mode(self) -> SquareWaveMode:

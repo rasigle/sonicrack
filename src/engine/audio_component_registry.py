@@ -212,7 +212,7 @@ class AudioComponentRegistry:
         ]
 
         # Group by category
-        by_category = {}
+        by_category: dict[str, list[str]] = {}
         for name, component in self._components.items():
             category = component.descriptor.category.value
             if category not in by_category:
@@ -246,6 +246,7 @@ class AudioComponentRegistry:
         """
         self._ensure_initialized()
         component = self.get(name, strict=True)  # Will raise if not found
+        assert component is not None
         return component(*args, **kwargs)
 
 

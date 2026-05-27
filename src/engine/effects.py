@@ -8,7 +8,7 @@ effects.
 from __future__ import annotations
 
 import numpy as np
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import (
@@ -55,7 +55,7 @@ class Distortion(Modifier):
 
     def __init__(
         self,
-        source: AudioComponent = None,
+        source: AudioComponent | None = None,
         drive: float = 1.0,
         mix: float = 1.0,
         output_gain: float = 0.5,
@@ -175,7 +175,7 @@ class Distortion(Modifier):
             # Fallback to soft clipping if unknown type
             distorted = np.tanh(amplified)
 
-        return distorted
+        return np.asarray(distorted, dtype=np.float32)
 
     def __call__(self, val: float | np.ndarray) -> float | np.ndarray:
         """Apply distortion to value(s) - Modifier interface.
@@ -190,21 +190,24 @@ class Distortion(Modifier):
         """
         # Handle scalar
         if isinstance(val, (float, int, np.number)):
-            dry = float(val)
-            wet = self._apply_distortion(np.array([dry]))[0]
-            mixed = dry * (1.0 - self._mix) + wet * self._mix
+            dry_sample = float(val)
+            wet_sample = self._apply_distortion(
+                np.array([dry_sample], dtype=np.float32)
+            )[0]
+            mixed = dry_sample * (1.0 - self._mix) + wet_sample * self._mix
             return mixed * self._output_gain
 
         # Handle array
-        dry = np.asarray(val)
-        wet = self._apply_distortion(dry)
-        mixed = dry * (1.0 - self._mix) + wet * self._mix
+        dry_samples = np.asarray(val, dtype=np.float32)
+        wet_samples = self._apply_distortion(dry_samples)
+        mixed = dry_samples * (1.0 - self._mix) + wet_samples * self._mix
         return (mixed * self._output_gain).astype(np.float32)
 
     def __iter__(self):
         """Initialize iterator."""
         if self.source is not None:
-            iter(self.source)
+            source = cast(Any, self.source)
+            iter(source)
         return self
 
     def __next__(self) -> float:
@@ -212,7 +215,8 @@ class Distortion(Modifier):
         if self.source is None:
             raise ValueError("source is required for iterator usage")
 
-        dry = next(self.source)
+        source = cast(Any, self.source)
+        dry = next(source)
 
         # Apply distortion
         wet = self._apply_distortion(np.array([dry]))[0]
@@ -239,7 +243,8 @@ class Distortion(Modifier):
             raise ValueError("source is required for get_samples_vectorized()")
 
         # Get input samples
-        dry = self.source.get_samples_vectorized(n)
+        source = cast(Any, self.source)
+        dry = source.get_samples_vectorized(n)
 
         # Apply distortion
         wet = self._apply_distortion(dry)
@@ -286,9 +291,11 @@ class Delay(Modifier):
         fluent_api_name="delay",
     )
 
+    _prev_feedback: float
+
     def __init__(
         self,
-        source: AudioComponent = None,
+        source: AudioComponent | None = None,
         delay_time: float = 0.5,
         feedback: float = 0.3,
         mix: float = 0.5,
@@ -320,6 +327,7 @@ class Delay(Modifier):
 
         # Calculate delay in samples
         self._delay_samples = int(self._delay_time * self._sample_rate)
+        self._prev_feedback: float = self._feedback
 
     def reset_buffer(self):
         """Clear the delay buffer to prevent clicks when reusing the delay."""
@@ -353,14 +361,11 @@ class Delay(Modifier):
     def feedback(self, value: float):
         """Set feedback amount."""
         self._feedback = np.clip(value, 0.0, 0.95)
+        previous_feedback = getattr(self, "_prev_feedback", self._feedback)
 
         # If feedback is being reduced significantly, optionally reduce buffer content
         # to prevent lingering echoes that might sound like clicks
-        if (
-            hasattr(self, "_prev_feedback")
-            and self._prev_feedback > 0.7
-            and value < 0.3
-        ):
+        if previous_feedback > 0.7 and value < 0.3:
             # Fade out buffer content to prevent sudden silence
             self._buffer *= 0.5
 
@@ -415,7 +420,8 @@ class Delay(Modifier):
     def __iter__(self):
         """Initialize iterator."""
         if self.source is not None:
-            iter(self.source)
+            source = cast(Any, self.source)
+            iter(source)
         return self
 
     def __next__(self) -> float:
@@ -424,7 +430,8 @@ class Delay(Modifier):
             raise ValueError("source is required for iterator usage")
 
         # Get input sample
-        input_sample = next(self.source)
+        source = cast(Any, self.source)
+        input_sample = next(source)
 
         # Calculate read position (circular buffer)
         read_pos = (self._write_pos - self._delay_samples) % self._buffer_size
@@ -453,7 +460,8 @@ class Delay(Modifier):
             Array of delayed samples
         """
         # Get input samples
-        input_samples = self.source.get_samples_vectorized(n)
+        source = cast(Any, self.source)
+        input_samples = source.get_samples_vectorized(n)
         output_samples = np.zeros(n, dtype=np.float32)
 
         # Process each sample (delay requires sequential processing for feedback)
@@ -515,7 +523,7 @@ class Reverb(Modifier):
 
     def __init__(
         self,
-        source: AudioComponent = None,
+        source: AudioComponent | None = None,
         room_size: float = 0.5,
         damping: float = 0.5,
         mix: float = 0.3,
@@ -723,7 +731,8 @@ class Reverb(Modifier):
     def __iter__(self):
         """Initialize iterator."""
         if self.source is not None:
-            iter(self.source)
+            source = cast(Any, self.source)
+            iter(source)
         return self
 
     def __next__(self) -> float:
@@ -732,7 +741,8 @@ class Reverb(Modifier):
             raise ValueError("source is required for iterator usage")
 
         # Get input sample
-        input_sample = next(self.source)
+        source = cast(Any, self.source)
+        input_sample = next(source)
 
         # Process through parallel comb filters
         comb_sum = 0.0
@@ -762,7 +772,8 @@ class Reverb(Modifier):
             Array of reverb samples
         """
         # Get input samples
-        input_samples = self.source.get_samples_vectorized(n)
+        source = cast(Any, self.source)
+        input_samples = source.get_samples_vectorized(n)
         output_samples = np.zeros(n, dtype=np.float32)
 
         # Process each sample through the reverb

@@ -202,10 +202,13 @@ def pink_noise(
         step = 2**i
         # Vectorized random generation for this octave
         num_updates = (length + step - 1) // step
-        random_values = np.random.uniform(-1, 1, num_updates)
+        random_values: list[float] = (
+            (np.random.rand(num_updates).astype(np.float32) * 2.0) - 1.0
+        ).tolist()
 
         # Broadcast values across the step intervals
-        for j, val in enumerate(random_values):
+        for j in range(num_updates):
+            val = random_values[j]
             start = j * step
             end = min(start + step, length)
             array[i, start:end] = val
@@ -766,9 +769,9 @@ class NoiseGenerator(Generator):
         self._smoothing_samples_remaining = 0
         self._smoothing_duration_samples = 441  # 10ms at 44.1kHz
 
-        self._buffer = None
-        self._buffer_index = 0
-        self._buffer_size = 1024  # Generate in chunks for efficiency
+        self._buffer: np.ndarray | None = None
+        self._buffer_index: int = 0
+        self._buffer_size: int = 1024  # Generate in chunks for efficiency
 
     @property
     def amplitude(self) -> float:
@@ -801,7 +804,7 @@ class NoiseGenerator(Generator):
 
     @gain_db.setter
     def gain_db(self, value: float):
-        new_amplitude = db_to_linear(value)
+        new_amplitude = float(db_to_linear(value))
         # Initiate smooth transition (prevents clicks)
         self._target_amplitude = new_amplitude
         self._smoothing_samples_remaining = self._smoothing_duration_samples

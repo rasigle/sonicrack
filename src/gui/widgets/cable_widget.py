@@ -37,7 +37,7 @@ class Cable(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setAcceptHoverEvents(True)
         self.setAcceptedMouseButtons(
-            Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
+            Qt.MouseButtons(Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton)
         )
         self.setZValue(-1)  # Draw cables behind modules
 
@@ -79,9 +79,9 @@ class Cable(QGraphicsItem):
 
         return QRectF(start, end).normalized().adjusted(-10, -10, 10, 10)
 
-    def paint(self, painter: QPainter, option, widget=None):
+    def paint(self, painter: QPainter | None, option, widget=None):
         """Paint the cable as a curved line."""
-        if not self.start_port:
+        if painter is None or not self.start_port:
             return
 
         start = self.mapFromScene(self.start_port.get_scene_pos())
@@ -241,6 +241,8 @@ class Cable(QGraphicsItem):
         # Use centralized delete method
         from src.gui.patch_canvas import PatchCanvas
 
-        if self.scene() and isinstance(self.scene().parent(), PatchCanvas):
-            canvas: PatchCanvas = self.scene().parent()
+        scene = self.scene()
+        parent = scene.parent() if scene is not None else None
+        if isinstance(parent, PatchCanvas):
+            canvas = parent
             canvas.delete_cable(self, emit_signal=True)

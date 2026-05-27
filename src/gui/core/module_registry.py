@@ -285,7 +285,10 @@ def discover_modules(
     try:
         # Import the package
         package = importlib.import_module(package_path)
-        package_dir = Path(package.__file__).parent
+        package_file = package.__file__
+        if package_file is None:
+            raise ValueError(f"Package '{package_path}' has no filesystem path")
+        package_dir = Path(package_file).parent
 
         # Find all Python files
         module_files = (

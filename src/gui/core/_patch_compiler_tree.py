@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.gui.core.module import AudioModule, ModuleCategory
+from src.gui.widgets.port_widget import PortWidget
 
 
 class PatchCompilerTreeMixin:
     """Build hierarchical tree representations of patches."""
+
+    modules: list[AudioModule]
+    connections: list[tuple[PortWidget, PortWidget]]
+
+    if TYPE_CHECKING:
+
+        def _find_connection_to_port(self, port: PortWidget) -> PortWidget | None: ...
 
     def _get_signal_path_modules(self, output_module: AudioModule) -> set[AudioModule]:
         """Collect all modules that contribute to the output signal path."""
@@ -43,8 +51,8 @@ class PatchCompilerTreeMixin:
                 break
 
         if output_module is not None:
-            visited = set()
-            return self._build_tree_node(output_module, visited)
+            output_visited: set[int] = set()
+            return self._build_tree_node(output_module, output_visited)
 
         connected_as_input = set()
         for _start_port, end_port in connections:
@@ -56,7 +64,7 @@ class PatchCompilerTreeMixin:
         if not root_modules:
             root_modules = modules
 
-        visited = set()
+        visited: set[int] = set()
         return {
             "name": "Patch (no output)",
             "type": "ROOT",
@@ -73,7 +81,7 @@ class PatchCompilerTreeMixin:
     ) -> dict[str, Any]:
         """Build a recursive tree node for a module."""
         module_id = id(module)
-        node = {
+        node: dict[str, Any] = {
             "name": module.metadata.title,
             "type": module.metadata.category.value,
             "id": module_id,

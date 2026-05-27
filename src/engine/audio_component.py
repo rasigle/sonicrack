@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Any, TypeVar, Type
 
+import numpy as np
+
 from src.constants import DEFAULT_SAMPLE_RATE
 
 T = TypeVar("T", bound="AudioComponent")
@@ -29,7 +31,7 @@ class ComponentDescriptor:
         name: Unique identifier for the component (e.g., "sine_oscillator")
         category: Component category (oscillator, modulator, modifier, composer)
         config_params: List of parameter names to store in preset configs
-        description: Human-readable description
+        description: More detailed and human-readable description of the component.
         fluent_api_name: Optional name of the component for the fluent API
         serializer: Optional custom serializer function
         deserializer: Optional custom deserializer function
@@ -89,6 +91,27 @@ class AudioComponent(ABC):
     # Common metadata
     component_name: str
     descriptor: ComponentDescriptor
+    _provided_args: set[str]
+    ended: bool = False
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Permit dynamic construction through registry-returned base types."""
+
+    def __iter__(self) -> AudioComponent:
+        return self
+
+    def __next__(self) -> float:
+        raise StopIteration
+
+    def get_samples_vectorized(self, n: int) -> np.ndarray:
+        raise NotImplementedError
+
+    def get_samples(self, n: int, *args: Any, **kwargs: Any) -> np.ndarray:
+        return self.get_samples_vectorized(n)
+
+    @classmethod
+    def create_instance(cls: Type[T], *args: Any, **kwargs: Any) -> T:
+        return cls(*args, **kwargs)
 
     @classmethod
     def from_config(cls: Type[T], config: dict[str, Any]) -> T:
@@ -103,16 +126,19 @@ class AudioComponent(ABC):
             Component instance
         """
         descr = cls.descriptor
+        config_params = descr.config_params or []
 
         # Extract parameters from config
-        kwargs = {
-            param: config[param] for param in config if param in descr.config_params
-        }
+        kwargs = {param: config[param] for param in config if param in config_params}
         return cls(**kwargs)
+
+    def __str__(self) -> str:
+        return f"AudioComponent {self.component_name}"
 
 
 class Generator(AudioComponent):
     """Base for components that generate signals (oscillators, modulators, noise)."""
 
     def __init__(self, sample_rate: float = DEFAULT_SAMPLE_RATE):
+        super().__init__()
         self.sample_rate = sample_rate

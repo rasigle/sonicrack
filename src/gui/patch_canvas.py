@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, QPointF
@@ -41,8 +41,8 @@ class PatchCanvas(QGraphicsView):
         """Initialize the patch canvas."""
         super().__init__(parent)
 
-        self.scene = QGraphicsScene(self)
-        self.setScene(self.scene)
+        self._scene = QGraphicsScene(self)
+        self.setScene(self._scene)
 
         # Canvas properties
         self.setSceneRect(-2000, -2000, 4000, 4000)
@@ -66,7 +66,7 @@ class PatchCanvas(QGraphicsView):
             if item.port_type == "output":
                 self.drag_start_port = item
                 self.dragging_cable = Cable(item)
-                self.scene.addItem(self.dragging_cable)
+                self._scene.addItem(self.dragging_cable)
                 event.accept()
                 return
 
@@ -92,10 +92,17 @@ class PatchCanvas(QGraphicsView):
 
         if self.dragging_cable:
             item = self.itemAt(event.pos())
+            start_port = self.drag_start_port
+
+            if start_port is None:
+                self.dragging_cable.remove()
+                self.dragging_cable = None
+                event.accept()
+                return
 
             if isinstance(item, PortWidget) and item.port_type == "input":
                 # Check if trying to connect to the same module
-                if item.parent_module == self.drag_start_port.parent_module:
+                if item.parent_module == start_port.parent_module:
                     # Self-connection not allowed - show error
                     QMessageBox.warning(
                         self,
@@ -107,7 +114,7 @@ class PatchCanvas(QGraphicsView):
                     self.dragging_cable.remove()
                 else:
                     # Check if this connection would create a cycle
-                    cycle_info = self._would_create_cycle(self.drag_start_port, item)
+                    cycle_info = self._would_create_cycle(start_port, item)
                     if cycle_info:
                         # Connection would create a cycle - show error
                         QMessageBox.warning(
@@ -122,7 +129,7 @@ class PatchCanvas(QGraphicsView):
                     else:
                         # Valid connection
                         self.dragging_cable.set_end_port(item)
-                        self.cable_connected.emit(self.drag_start_port, item)
+                        self.cable_connected.emit(start_port, item)
             else:
                 # Invalid connection, remove cable
                 self.dragging_cable.remove()
@@ -150,10 +157,10 @@ class PatchCanvas(QGraphicsView):
         dest_module = end_port.parent_module
 
         # Build graph of existing connections
-        graph = {}  # module -> list of modules it connects to
+        graph: dict[ModuleWidget, list[ModuleWidget]] = {}
 
         # Get all existing cables from the scene
-        for item in self.scene.items():
+        for item in self._scene.items():
             if isinstance(item, Cable) and item.start_port and item.end_port:
                 src = item.start_port.parent_module
                 dst = item.end_port.parent_module
@@ -167,10 +174,10 @@ class PatchCanvas(QGraphicsView):
         graph[source_module].append(dest_module)
 
         # Check if this creates a cycle using DFS
-        visited = set()
-        rec_stack = set()
+        visited: set[ModuleWidget] = set()
+        rec_stack: set[ModuleWidget] = set()
 
-        def dfs(module, current_path):
+        def dfs(module: ModuleWidget, current_path: list[ModuleWidget]) -> str | None:
             """Depth-first search to detect cycles."""
             visited.add(module)
             rec_stack.add(module)
@@ -200,7 +207,7 @@ class PatchCanvas(QGraphicsView):
         """Handle key press for deleting cables and modules."""
         if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
             # Get selected items
-            selected_items = self.scene.selectedItems()
+            selected_items = self._scene.selectedItems()
 
             # Collect all cables and modules to delete
             cables_to_delete = []
@@ -243,7 +250,7 @@ class PatchCanvas(QGraphicsView):
 
                 # Remove the module itself
                 try:
-                    self.scene.removeItem(module)
+                    self._scene.removeItem(module)
                 except RuntimeError:
                     pass  # Already removed
 
@@ -271,12 +278,15 @@ class PatchCanvas(QGraphicsView):
             module: The module widget to add
             pos: Optional position to place the module
         """
-        self.scene.addItem(module)
+        self._scene.addItem(module)
         if pos:
             module.setPos(pos)
         else:
             # Place at center of view
-            center = self.mapToScene(self.viewport().rect().center())
+            viewport = self.viewport()
+            if viewport is None:
+                raise RuntimeError("Patch canvas viewport is not available")
+            center = self.mapToScene(viewport.rect().center())
             module.setPos(center)
 
     def delete_cable(self, cable: Cable, emit_signal: bool = True):
@@ -334,7 +344,7 @@ class PatchCanvas(QGraphicsView):
 
         # Create and add cable
         cable = Cable(start_port, end_port)
-        self.scene.addItem(cable)
+        self._scene.addItem(cable)
 
         # Emit signal
         self.cable_connected.emit(start_port, end_port)
@@ -347,8 +357,8 @@ class PatchCanvas(QGraphicsView):
         Returns:
             List of (output_port, input_port) tuples
         """
-        connections = []
-        for item in self.scene.items():
+        connections: list[tuple[PortWidget, PortWidget]] = []
+        for item in self._scene.items():
             if isinstance(item, Cable) and item.start_port and item.end_port:
                 connections.append((item.start_port, item.end_port))
         return connections
@@ -361,7 +371,7 @@ class PatchCanvas(QGraphicsView):
         """
         from src.gui.widgets.module_widget import ModuleWidget
 
-        return [item for item in self.scene.items() if isinstance(item, ModuleWidget)]
+        return [item for item in self._scene.items() if isinstance(item, ModuleWidget)]
 
     def get_modules_by_category(self, category: ModuleCategory) -> list[ModuleWidget]:
         """Get all modules of a specific category currently on the canvas.
@@ -382,9 +392,11 @@ class PatchCanvas(QGraphicsView):
         Returns:
             The OutputModule instance, or None if not found
         """
+        from src.gui.modules.output.output import OutputModule
+
         for module in self.get_modules():
             if module.metadata.category == ModuleCategory.OUTPUT:
-                return module  # noqa
+                return cast(OutputModule, module)
         return None
 
     def clear_all(self):
@@ -395,6 +407,6 @@ class PatchCanvas(QGraphicsView):
                 port.port.clear()
 
         # Then clear the scene
-        self.scene.clear()
+        self._scene.clear()
         self.dragging_cable = None
         self.drag_start_port = None

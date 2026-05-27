@@ -3,14 +3,14 @@
 import pytest
 import numpy as np
 
-from engine.io.midi import (
+from src.engine.io.midi import (
     MIDIToCV,
     NoteOnMessage,
     NoteOffMessage,
     ControlChangeMessage,
     PitchBendMessage,
 )
-from engine.io.midi import midi_to_frequency
+from src.engine.io.midi import midi_to_frequency
 
 
 class TestMIDIToCV:

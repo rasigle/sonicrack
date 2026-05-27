@@ -1,9 +1,13 @@
 """Tests for PatchCompiler validation and tree behavior."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
-from src.gui.core.module import ModuleCategory
+from typing import cast
+
+from src.gui.core.module import AudioModule, ModuleCategory
 from src.gui.core.patch_compiler import PatchCompiler
+from src.gui.widgets.port_widget import PortWidget
 
 
 @dataclass
@@ -22,31 +26,41 @@ class _Port:
 class _Module:
     def __init__(self, title: str, category: ModuleCategory):
         self.metadata = _Metadata(title=title, category=category)
-        self.input_ports = []
-        self.output_ports = []
+        self.input_ports: list[_Port] = []
+        self.output_ports: list[_Port] = []
 
-    def add_input(self, name: str):
+    def add_input(self, name: str) -> _Port:
         port = _Port(self, name, "input")
         self.input_ports.append(port)
         return port
 
-    def add_output(self, name: str):
+    def add_output(self, name: str) -> _Port:
         port = _Port(self, name, "output")
         self.output_ports.append(port)
         return port
 
-    def get_required_inputs(self):
+    def get_required_inputs(self) -> list[str]:
         return []
 
-    def get_modulation_inputs(self):
+    def get_modulation_inputs(self) -> list[str]:
         return []
+
+
+def _as_modules(*modules: _Module) -> list[AudioModule]:
+    return cast(list[AudioModule], list(modules))
+
+
+def _as_connections(
+    *connections: tuple[_Port, _Port]
+) -> list[tuple[PortWidget, PortWidget]]:
+    return cast(list[tuple[PortWidget, PortWidget]], list(connections))
 
 
 def test_patch_compiler_prevalidation_requires_output():
     source = _Module("Osc", ModuleCategory.SOURCE)
     source.add_output("Out")
     compiler = PatchCompiler()
-    compiler.set_patch([source], [])
+    compiler.set_patch(_as_modules(source), _as_connections())
     errors = compiler.get_prevalidation_errors()
     assert "No output module in patch." in errors
 
@@ -62,8 +76,10 @@ def test_patch_compiler_prevalidation_detects_cycles():
     output_in = output.add_input("In")
     compiler = PatchCompiler()
     compiler.set_patch(
-        [mod_a, mod_b, output],
-        [(mod_a_out, mod_b_in), (mod_b_out, mod_a_in), (mod_a_out, output_in)],
+        _as_modules(mod_a, mod_b, output),
+        _as_connections(
+            (mod_a_out, mod_b_in), (mod_b_out, mod_a_in), (mod_a_out, output_in)
+        ),
     )
     errors = compiler.get_prevalidation_errors()
     assert any("Infinite loop detected" in error for error in errors)
@@ -75,7 +91,9 @@ def test_patch_compiler_build_patch_tree_from_output():
     output = _Module("Output", ModuleCategory.OUTPUT)
     output_in = output.add_input("In")
     compiler = PatchCompiler()
-    compiler.set_patch([source, output], [(source_out, output_in)])
+    compiler.set_patch(
+        _as_modules(source, output), _as_connections((source_out, output_in))
+    )
     tree = compiler.build_patch_tree()
     assert tree["name"] == "Output"
     assert tree["type"] == ModuleCategory.OUTPUT.value
@@ -88,7 +106,7 @@ def test_patch_compiler_build_patch_tree_without_output_creates_root():
     source = _Module("Osc", ModuleCategory.SOURCE)
     source.add_output("Out")
     compiler = PatchCompiler()
-    compiler.set_patch([source], [])
+    compiler.set_patch(_as_modules(source), _as_connections())
     tree = compiler.build_patch_tree()
     assert tree["name"] == "Patch (no output)"
     assert tree["type"] == "ROOT"

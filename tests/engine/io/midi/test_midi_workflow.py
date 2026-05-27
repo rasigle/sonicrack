@@ -6,15 +6,15 @@ works correctly.
 
 import numpy as np
 
-from engine.io.midi import (
+from src.engine.io.midi import (
     MIDIToCV,
     NoteOnMessage,
     NoteOffMessage,
     CVFrequencyOutput,
     CVGateOutput,
 )
-from engine import SineOscillator, ADSREnvelope, ModulatedOscillator
-from engine.modulator import GateTriggeredADSR
+from src.engine import SineOscillator, ADSREnvelope, ModulatedOscillator
+from src.engine.modulator import GateTriggeredADSR
 
 
 class TestMIDIWorkflow:

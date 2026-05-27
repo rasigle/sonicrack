@@ -87,4 +87,3 @@ __all__ = [
     "SquareWaveFactory",
     "_derive_amplitude_from_init",
 ]
-

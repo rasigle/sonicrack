@@ -351,14 +351,20 @@ class ModulatedOscillatorModule(ModuleWidget):
             if has_gain_mod and gain_signal is not None:
                 gain_gen = SignalGenerator(gain_signal)
                 modulators.append(gain_gen)
-                amp_mod = lambda base_amp, cv_amp: base_amp * cv_amp
+
+                def amplitude_modulator(base_amp, cv_amp):
+                    return base_amp * cv_amp
+
+                amp_mod = amplitude_modulator
 
             if has_freq_mod and freq_signal is not None:
                 freq_gen = SignalGenerator(freq_signal)
                 modulators.append(freq_gen)
-                freq_mod = (
-                    lambda base_freq, cv_freq: cv_freq
-                )  # Use CV frequency directly
+
+                def frequency_modulator(base_freq, cv_freq):
+                    return cv_freq
+
+                freq_mod = frequency_modulator  # Use CV frequency directly
 
             # Create modulated oscillator
             modulated_osc = ModulatedOscillator(

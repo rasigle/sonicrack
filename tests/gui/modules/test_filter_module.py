@@ -72,4 +72,3 @@ def test_filter_module_bandpass_reorders_cutoffs(app):
 
     assert component.filter_type == "band"
     assert component.cutoff == (200.0, 2000.0)
-

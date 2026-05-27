@@ -9,7 +9,6 @@ from PyQt6.QtTest import QTest
 from src.gui.widgets.knob_widget import Knob
 
 
-
 def test_knob_callback_on_set_value(app):
     """Test that callback is called when set_value is used."""
     callback = Mock()

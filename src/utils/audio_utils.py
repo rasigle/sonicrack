@@ -17,7 +17,6 @@ from scipy.io import wavfile
 
 from src.constants import DEFAULT_SAMPLE_RATE
 
-
 _NOTE_OFFSETS = {
     "C": 0,
     "B#": 0,

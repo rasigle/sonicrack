@@ -74,6 +74,9 @@ class PatchCanvas(QGraphicsView):
 
     def mouseMoveEvent(self, event):
         """Handle mouse move for cable dragging."""
+        if event is None:
+            return
+
         if self.dragging_cable:
             pos = self.mapToScene(event.pos())
             self.dragging_cable.set_temp_end_pos(pos)
@@ -84,6 +87,9 @@ class PatchCanvas(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
         """Handle mouse release for cable connection."""
+        if event is None:
+            return
+
         if self.dragging_cable:
             item = self.itemAt(event.pos())
 

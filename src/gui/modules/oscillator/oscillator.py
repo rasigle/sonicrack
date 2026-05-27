@@ -173,7 +173,9 @@ class OscillatorModule(ModuleWidget):
         if self._square_oscillator:
             self._square_oscillator.sample_rate = new_sample_rate
 
-    def create_engine_component(self, input_components=None, modulation_components=None):
+    def create_engine_component(
+        self, input_components=None, modulation_components=None
+    ):
         """Return no shared engine component for this module.
 
         The oscillator exposes independent components per output port via

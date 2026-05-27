@@ -7,7 +7,6 @@ from src.gui.modules.output.output import OutputModule
 from src.utils.audio_utils import mono_to_stereo, combine_lr_to_stereo
 
 
-
 @pytest.fixture
 def output_module(app):
     """Create an OutputModule instance for testing."""

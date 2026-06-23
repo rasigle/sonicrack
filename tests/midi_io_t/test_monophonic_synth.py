@@ -1,6 +1,7 @@
 """Tests for monophonic MIDI synthesizer."""
 
 import numpy as np
+import pytest
 
 from src.engine import SineOscillator
 from src.midi_io import MonophonicSynth, NoteOffMessage, NoteOnMessage
@@ -23,6 +24,13 @@ class DummyVoice:
 
     def trigger_note_off(self):
         self.note_off_triggered = True
+
+
+class BrokenVoice(DummyVoice):
+    """Voice that fails during rendering."""
+
+    def get_samples(self, num_samples):
+        raise RuntimeError("voice render failed")
 
 
 class TestMonophonicSynth:
@@ -246,3 +254,15 @@ class TestMonophonicSynth:
         assert not np.allclose(samples, 0.0)
         # Should be roughly between -1 and 1 (with some headroom)
         assert np.abs(samples).max() < 2.0
+
+    def test_get_samples_propagates_voice_render_errors(self):
+        """Voice render errors are not hidden behind silence."""
+
+        def voice_factory():
+            return BrokenVoice()
+
+        synth = MonophonicSynth(voice_factory)
+        synth.note_on(60, 100)
+
+        with pytest.raises(RuntimeError, match="voice render failed"):
+            synth.get_samples(128)

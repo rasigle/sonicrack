@@ -1,6 +1,7 @@
 """Tests for polyphonic MIDI synthesizer."""
 
 import numpy as np
+import pytest
 
 from src.engine import SineOscillator
 from src.midi_io import NoteOffMessage, NoteOnMessage, PolyphonicSynth, Voice
@@ -27,6 +28,13 @@ class DummyVoice:
 
     def trigger_note_off(self):
         self.note_off_triggered = True
+
+
+class BrokenVoice(DummyVoice):
+    """Voice that fails during rendering."""
+
+    def get_samples(self, num_samples):
+        raise RuntimeError("voice render failed")
 
 
 class TestVoice:
@@ -270,3 +278,15 @@ class TestPolyphonicSynth:
         assert not np.allclose(samples, 0.0)
         # Should be roughly between -1 and 1 (with normalization)
         assert np.abs(samples).max() < 3.0
+
+    def test_get_samples_propagates_voice_render_errors(self):
+        """Voice render errors are not hidden by clearing the failed voice."""
+
+        def voice_factory():
+            return BrokenVoice()
+
+        synth = PolyphonicSynth(voice_factory, max_voices=4)
+        synth.note_on(60, 100)
+
+        with pytest.raises(RuntimeError, match="voice render failed"):
+            synth.get_samples(128)

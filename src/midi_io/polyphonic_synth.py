@@ -340,7 +340,7 @@ class PolyphonicSynth:
 
         Notes:
             - Automatically cleans up voices when envelopes end
-            - Handles exceptions in voice generation gracefully
+            - Propagates voice generation errors so render bugs are visible
             - Returns silence if no voices are active
             - RMS normalization prevents clipping with multiple voices
 
@@ -361,17 +361,13 @@ class PolyphonicSynth:
             voice.age += num_samples
 
             if voice.component is not None:
-                try:
-                    samples = voice.component.get_samples(num_samples)
-                    if output is None:
-                        output = np.zeros_like(samples, dtype=np.float32)
-                    output += samples
-                    active_voices += 1
+                samples = voice.component.get_samples(num_samples)
+                if output is None:
+                    output = np.zeros_like(samples, dtype=np.float32)
+                output += samples
+                active_voices += 1
 
-                    if voice.has_ended():
-                        voice.clear()
-                except Exception as e:
-                    logger.error(f"Error generating samples: {e}")
+                if voice.has_ended():
                     voice.clear()
 
         if output is None:

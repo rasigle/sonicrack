@@ -141,7 +141,7 @@ class MIDIInput:
                 self._port = mido.open_input(device)
                 self.device_name = device
                 logger.info(f"Opened MIDI device: {device}")
-            except Exception as e:
+            except (OSError, RuntimeError) as e:
                 raise OSError(f"Failed to open MIDI device '{device}': {e}") from e
 
     def close(self) -> None:
@@ -274,7 +274,7 @@ class MIDIInput:
                 # Small sleep to avoid busy-waiting
                 time.sleep(0.001)  # 1ms
 
-            except Exception as e:
+            except (OSError, RuntimeError) as e:
                 if self._running:
                     logger.error(f"Error receiving MIDI message: {e}")
                 time.sleep(0.01)  # Back off on error
@@ -297,6 +297,7 @@ class MIDIInput:
         try:
             callback(msg)
         except Exception:
+            # User callbacks are an isolation boundary for the MIDI input thread.
             logger.exception("MIDI input callback failed")
 
     def _convert_message(self, raw_msg) -> MIDIMessage | None:

@@ -298,42 +298,38 @@ class MonophonicSynth:
             return np.zeros(num_samples, dtype=np.float32)
 
         # Generate samples from voice
-        try:
-            samples = self.voice.get_samples(num_samples)
+        samples = self.voice.get_samples(num_samples)
 
-            # Check if envelope has ended (release complete) and note is not playing
-            if not self.is_playing:
-                # Check if the voice/envelope has ended
-                ended = False
+        # Check if envelope has ended (release complete) and note is not playing
+        if not self.is_playing:
+            # Check if the voice/envelope has ended
+            ended = False
 
-                # Check voice.ended
-                if hasattr(self.voice, "ended") and self.voice.ended:
-                    ended = True
-                # Check modifiers for ended state (ModulatedVolume)
-                elif hasattr(self.voice, "modifiers"):
-                    for modifier in self.voice.modifiers:
-                        if hasattr(modifier, "modulator"):
-                            if (
-                                hasattr(modifier.modulator, "ended")
-                                and modifier.modulator.ended
-                            ):
-                                ended = True
-                                break
-                        elif hasattr(modifier, "ended") and modifier.ended:
+            # Check voice.ended
+            if hasattr(self.voice, "ended") and self.voice.ended:
+                ended = True
+            # Check modifiers for ended state (ModulatedVolume)
+            elif hasattr(self.voice, "modifiers"):
+                for modifier in self.voice.modifiers:
+                    if hasattr(modifier, "modulator"):
+                        if (
+                            hasattr(modifier.modulator, "ended")
+                            and modifier.modulator.ended
+                        ):
                             ended = True
                             break
+                    elif hasattr(modifier, "ended") and modifier.ended:
+                        ended = True
+                        break
 
-                # If ended, clear voice and return silence
-                if ended:
-                    self.voice = None
-                    self.current_note = None
-                    logger.debug("Voice ended, clearing")
-                    return np.zeros(num_samples, dtype=np.float32)
+            # If ended, clear voice and return silence
+            if ended:
+                self.voice = None
+                self.current_note = None
+                logger.debug("Voice ended, clearing")
+                return np.zeros(num_samples, dtype=np.float32)
 
-            return samples
-        except Exception as e:
-            logger.error(f"Error generating samples: {e}")
-            return np.zeros(num_samples, dtype=np.float32)
+        return samples
 
     def reset(self):
         """Reset the synthesizer state.

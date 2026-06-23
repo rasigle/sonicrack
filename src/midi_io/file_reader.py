@@ -92,7 +92,7 @@ class MIDIFile:
         # Parse the MIDI file
         try:
             self._midi = mido.MidiFile(str(self.filepath))
-        except Exception as e:
+        except (OSError, EOFError, ValueError) as e:
             raise OSError(f"Failed to read MIDI file '{filepath}': {e}") from e
 
         # Extract properties

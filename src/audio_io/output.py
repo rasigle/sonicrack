@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_FADEOUT_DURATION_MS = 50
 DEFAULT_FADEIN_DURATION_MS = 10
+STREAM_ERROR_TYPES = (sd.PortAudioError, OSError, RuntimeError)
 
 
 class AudioOutput:
@@ -94,7 +95,7 @@ class AudioOutput:
 
         try:
             self.stream.write(samples.astype(np.float32))
-        except Exception as e:
+        except STREAM_ERROR_TYPES as e:
             logger.error(f"Error writing audio samples: {e}", exc_info=True)
 
     def set_audio_callback(self, callback: RealtimeAudioCallback):
@@ -348,7 +349,7 @@ class AudioOutput:
                 f"Buffer: {self.buffer_size})"
             )
 
-        except Exception as e:
+        except STREAM_ERROR_TYPES as e:
             self.stream = None
             self.is_playing = False
             self.is_fading_in = False
@@ -390,7 +391,7 @@ class AudioOutput:
             # Now stop the stream
             self._finalize_stop()
 
-        except Exception as e:
+        except STREAM_ERROR_TYPES as e:
             logger.error(f"Failed to stop playback: {e}", exc_info=True)
             self._finalize_stop()
 
@@ -407,7 +408,7 @@ class AudioOutput:
             self.post_fade_silence = False
             logger.info("Playback stopped")
 
-        except Exception as e:
+        except STREAM_ERROR_TYPES as e:
             logger.error(f"Failed to finalize stop: {e}", exc_info=True)
 
     def cleanup(self, graceful: bool = True):

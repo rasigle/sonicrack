@@ -47,12 +47,8 @@ class AudioComponentRegistry:
 
         self._initialized = True
 
-        # Import all engine modules to trigger decorator registration
-        try:
-
-            logger.debug("Auto-loaded engine components into registry")
-        except Exception as e:
-            logger.error(f"Failed to auto-load engine components: {e}")
+        # Engine modules register components during normal package import.
+        logger.debug("Audio component registry initialized")
 
     def register(
         self, component_class: type[AudioComponent], override: bool = False
@@ -282,7 +278,7 @@ def _extract_parameter_names(cls: type) -> list[str]:
             for param_name in sig.parameters
             if param_name not in ("self", "args", "kwargs")
         ]
-    except Exception as e:
+    except (TypeError, ValueError) as e:
         logger.warning(f"Could not extract parameters from {cls.__name__}: {e}")
         return []
 

@@ -282,6 +282,12 @@ class Chain(Composer):
             else:
                 # Stereo input - apply modifier to left channel
                 # (Panners shouldn't receive stereo input, but handle gracefully)
+                if modifier.__class__.__name__ == "ButterworthFilter":
+                    result = modifier(samples)
+                    if isinstance(result, np.ndarray) and result.shape == samples.shape:
+                        samples = result
+                        continue
+
                 result = modifier(samples[:, 0])
                 if isinstance(result, tuple) and len(result) == 2:
                     left, right = result

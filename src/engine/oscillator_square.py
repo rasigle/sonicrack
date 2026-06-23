@@ -1,6 +1,7 @@
 """Square-wave strategies and oscillator implementation."""
 
 import logging
+import math
 from abc import ABC, abstractmethod
 from typing import Literal, Protocol, runtime_checkable
 
@@ -406,9 +407,9 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
             return None
         diff = threshold - start_phase
         if delta >= 0.0:
-            threshold -= np.floor(diff)
+            threshold -= math.floor(diff)
         else:
-            threshold -= np.ceil(diff)
+            threshold -= math.ceil(diff)
         subsample = (threshold - start_phase) / delta
         if 0.0 < subsample <= 1.0:
             return float(subsample)
@@ -444,7 +445,11 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
     def _process_normalized_sample(
         self, phase: float, pulsewidth_threshold: float
     ) -> float:
-        pulsewidth = float(np.clip(pulsewidth_threshold / TWO_PI, 0.01, 0.99))
+        pulsewidth = pulsewidth_threshold / TWO_PI
+        if pulsewidth < 0.01:
+            pulsewidth = 0.01
+        elif pulsewidth > 0.99:
+            pulsewidth = 0.99
         current_phase = (phase % TWO_PI) / TWO_PI
         if self._prev_phase is None:
             self._prev_phase = (current_phase - self.frequency / self.sample_rate) % 1.0

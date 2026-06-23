@@ -304,9 +304,7 @@ def butter(
     else:
         wn = cutoff / nyq
 
-    from scipy.signal import butter
-
-    b, a = butter(
+    b, a = scipy_butter(
         order, wn, btype=cast(Literal["low", "high", "band"], btype), analog=False
     )
     return b, a

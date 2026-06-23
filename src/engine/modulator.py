@@ -50,6 +50,7 @@ import numpy as np
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import AudioComponent, ComponentDescriptor, Generator
 from src.engine.audio_component_registry import ComponentCategory, register_component
+from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.logging_config import get_engine_logger
 
 logger = get_engine_logger("modulator")
@@ -126,8 +127,8 @@ class ADSREnvelope(Modulator):
         self._decay_duration = decay_duration
         self.sustain_level = sustain_level
         self._release_duration = release_duration
-        self._sample_rate = sample_rate
-        super().__init__()
+        self._sample_rate = validate_sample_rate(sample_rate)
+        super().__init__(sample_rate=sample_rate)
 
         self.ended = True  # Start in ended state
         self.val: float = 0.0  # Initialize current value
@@ -188,7 +189,7 @@ class ADSREnvelope(Modulator):
     @sample_rate.setter
     def sample_rate(self, value: float):
         """Set sample rate and update all pre-computed samples."""
-        self._sample_rate = value
+        self._sample_rate = validate_sample_rate(value)
         self._update_phase_samples()
 
     def _get_ads_stepper(self):
@@ -378,6 +379,7 @@ class ADSREnvelope(Modulator):
             This method is ~75x slower than get_samples_vectorized().
             Use only for testing, debugging, or educational purposes.
         """
+        n = validate_sample_count(n)
         if reset:
             iter(self)
         return np.array([next(self) for _ in range(n)], np.float32)
@@ -400,6 +402,7 @@ class ADSREnvelope(Modulator):
             Supports mid-envelope calls, release phase, and phase transitions.
         """
 
+        n = validate_sample_count(n)
         # Initialize stepper if needed
         if self._stepper is None:
             iter(self)
@@ -665,6 +668,7 @@ class GateTriggeredADSR(Modulator):
         Returns:
             Envelope output (0.0 to 1.0)
         """
+        n = validate_sample_count(n)
         # Get gate signal
         if hasattr(self.gate_source, "get_gate_samples"):
             # For CV converters with specialized gate method

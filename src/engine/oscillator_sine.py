@@ -8,6 +8,7 @@ from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator_base import Oscillator
+from src.engine.validation import validate_sample_count
 from src.utils.utils import filter_provided_args, track_provided_args
 
 
@@ -147,6 +148,7 @@ class SineOscillator(Oscillator):
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
+        n = validate_sample_count(n)
         sample_indices = np.arange(n, dtype=np.float64)
         phases = (self._i + self._p) + self._step * sample_indices
         absolute_indices = self._sample_index + sample_indices

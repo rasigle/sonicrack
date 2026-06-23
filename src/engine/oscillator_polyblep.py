@@ -28,6 +28,7 @@ from src.engine.audio_component_registry import (
     register_component,
 )
 from src.engine.oscillator import _derive_amplitude_from_init
+from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.utils import track_provided_args
 
 
@@ -177,6 +178,7 @@ class PolyBLEPOscillator(Generator):
                 0.1 = 10% duty cycle (narrow pulse)
                 0.9 = 90% duty cycle (wide pulse)
         """
+        sample_rate = validate_sample_rate(sample_rate)
         super().__init__(sample_rate)
         self.wave_shape = wave_shape
 
@@ -415,6 +417,7 @@ class PolyBLEPOscillator(Generator):
         Returns:
             Array of n samples
         """
+        n = validate_sample_count(n)
         # Generate phase array
         phases: np.ndarray | None = (
             self._phase_normalized + self._increment * np.arange(n)
@@ -546,6 +549,7 @@ class PolyBLEPOscillator(Generator):
         Returns:
             Array of samples
         """
+        n = validate_sample_count(n)
         if reset:
             iter(self)
         return np.array([next(self) for _ in range(n)], dtype=np.float32)
@@ -567,6 +571,7 @@ class PolyBLEPOscillator(Generator):
         Raises:
             ValueError: If mode is invalid
         """
+        n = validate_sample_count(n)
         if mode not in ("auto", "iterator", "vectorized"):
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."

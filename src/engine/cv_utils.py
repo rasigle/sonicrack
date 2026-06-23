@@ -9,6 +9,9 @@ from typing import Any
 
 import numpy as np
 
+from src.engine.audio_component import AudioComponent
+from src.engine.validation import validate_sample_count
+
 logger = logging.getLogger(__name__)
 
 
@@ -109,8 +112,16 @@ class CVScaler:
         Returns:
             Array of scaled samples
         """
+        n = validate_sample_count(n)
         # Try to get samples from source efficiently
-        if hasattr(self._source, "get_samples"):
+        vectorized_method = getattr(type(self._source), "get_samples_vectorized", None)
+        has_vectorized_override = (
+            vectorized_method is not None
+            and vectorized_method is not AudioComponent.get_samples_vectorized
+        )
+        if not kwargs and has_vectorized_override:
+            samples = self._source.get_samples_vectorized(n)
+        elif hasattr(self._source, "get_samples"):
             samples = self._source.get_samples(n, **kwargs)
         else:
             # Fallback to iterator

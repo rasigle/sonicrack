@@ -44,9 +44,21 @@ from src.engine.audio_component import AudioComponent, ComponentDescriptor
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import Oscillator
 from src.engine.oscillator_modulated import ModulatedOscillator
+from src.engine.validation import validate_sample_count
 from src.utils.logging_config import get_engine_logger
 
 logger = get_engine_logger("composer")
+
+
+def _get_vectorized_samples(component: Any, n: int) -> np.ndarray:
+    """Render a child component through its most direct vectorized entry point."""
+    if hasattr(component, "get_samples_vectorized"):
+        return component.get_samples_vectorized(n)
+
+    if hasattr(component, "get_samples"):
+        return component.get_samples(n, reset=False, mode="vectorized")
+
+    return np.array([next(component) for _ in range(n)], dtype=np.float32)
 
 
 class Composer(AudioComponent, ABC):
@@ -76,6 +88,7 @@ class Composer(AudioComponent, ABC):
         Returns:
             list: List of `n` consecutive samples produced by calling `next(self)`.
         """
+        n = validate_sample_count(n)
         osc = iter(self) if reset else self
         return np.array([next(osc) for _ in range(n)], np.float32)
 
@@ -118,6 +131,7 @@ class Composer(AudioComponent, ABC):
             >>> samples1 = chain.get_samples(1000)  # Auto mode
             >>> samples2 = chain.get_samples(100,mode="iterator")
         """
+        n = validate_sample_count(n)
         if mode not in ("auto", "iterator", "vectorized"):
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
@@ -253,14 +267,9 @@ class Chain(Composer):
                 - Mono: shape (n, )
                 - Stereo: shape (n, 2)
         """
+        n = validate_sample_count(n)
         # Generate samples from oscillator (vectorized)
-        if hasattr(self.oscillator, "get_samples"):
-            samples = self.oscillator.get_samples(n, reset=False, mode="vectorized")
-        else:
-            # Fallback to iterator
-            samples = np.array(
-                [next(self.oscillator) for _ in range(n)], dtype=np.float32
-            )
+        samples = _get_vectorized_samples(self.oscillator, n)
 
         # Apply each modifier in sequence using vectorized methods
         for modifier in self.modifiers:
@@ -421,6 +430,7 @@ class WaveAdder(Composer):
             Achieves ~50-100x speedup over iterator approach through
             vectorized generation and combination.
         """
+        n = validate_sample_count(n)
         # Fast path for single generator (no mixing needed)
         if len(self.generators) == 1:
             samples = self.generators[0].get_samples(n, mode="vectorized")
@@ -439,7 +449,7 @@ class WaveAdder(Composer):
         # Generate samples from all generators (vectorized)
         all_samples = []
         for gen in self.generators:
-            samples = gen.get_samples(n, mode="vectorized")
+            samples = _get_vectorized_samples(gen, n)
             all_samples.append(samples)
 
         # Optimize for mono mode (most common case)

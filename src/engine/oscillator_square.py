@@ -11,6 +11,7 @@ from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator_base import Oscillator
+from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.utils import filter_provided_args, track_provided_args
 
 SquareWaveMode = Literal[
@@ -98,10 +99,8 @@ class IdealSquareStrategySmoothing(SquareWaveStrategy):
             raise ValueError(
                 f"smoothing_time_ms must be non-negative, got {smoothing_time_ms}"
             )
-        if sample_rate <= 0:
-            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
         self.smoothing_time_ms = smoothing_time_ms
-        self.sample_rate = sample_rate
+        self.sample_rate = validate_sample_rate(sample_rate)
         self._current_amplitude = 1.0
         self._target_amplitude = 1.0
         self._start_amplitude = 1.0
@@ -112,9 +111,7 @@ class IdealSquareStrategySmoothing(SquareWaveStrategy):
         return int(self.smoothing_time_ms * self.sample_rate / 1000)
 
     def set_sample_rate(self, sample_rate: float) -> None:
-        if sample_rate <= 0:
-            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
-        self.sample_rate = sample_rate
+        self.sample_rate = validate_sample_rate(sample_rate)
 
     def reset_amplitude(self, amplitude: float) -> None:
         self._current_amplitude = amplitude
@@ -236,15 +233,11 @@ class BandlimitedSquareStrategy(SquareWaveStrategy):
     """PolyBLEP antialiased square wave with reduced edge aliasing."""
 
     def __init__(self, sample_rate: float = 44100, frequency: float = 440) -> None:
-        if sample_rate <= 0:
-            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
-        self.sample_rate = sample_rate
+        self.sample_rate = validate_sample_rate(sample_rate)
         self.frequency = frequency
 
     def set_sample_rate(self, sample_rate: float) -> None:
-        if sample_rate <= 0:
-            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
-        self.sample_rate = sample_rate
+        self.sample_rate = validate_sample_rate(sample_rate)
 
     def set_frequency(self, frequency: float) -> None:
         self.frequency = frequency
@@ -361,9 +354,7 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
         frequency: float = 440,
         dc_block: bool = True,
     ) -> None:
-        if sample_rate <= 0:
-            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
-        self.sample_rate = sample_rate
+        self.sample_rate = validate_sample_rate(sample_rate)
         self.frequency = frequency
         self.dc_block = dc_block
         self._buffer = np.zeros(2 * VCV_MINBLEP_ZERO_CROSSINGS, dtype=np.float32)
@@ -374,9 +365,7 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
         self._update_dc_alpha()
 
     def set_sample_rate(self, sample_rate: float) -> None:
-        if sample_rate <= 0:
-            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
-        self.sample_rate = sample_rate
+        self.sample_rate = validate_sample_rate(sample_rate)
         self._update_dc_alpha()
 
     def set_frequency(self, frequency: float) -> None:
@@ -777,6 +766,7 @@ class SquareOscillator(Oscillator):
         return float(self._apply_amplitude_to_buffer(np.asarray([val]))[0])
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
+        n = validate_sample_count(n)
         phases = (self._i + self._p) + self._step * np.arange(n)
         wrapped_phases = phases % TWO_PI
         val = self._strategy.generate_samples(

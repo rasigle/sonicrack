@@ -7,6 +7,7 @@ import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import Generator
+from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
 
@@ -30,6 +31,7 @@ class Oscillator(Generator):
         sample_rate: int | float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
     ):
+        sample_rate = validate_sample_rate(sample_rate)
         self._sample_rate = sample_rate
         super().__init__(sample_rate=sample_rate)
 
@@ -138,6 +140,7 @@ class Oscillator(Generator):
 
     @sample_rate.setter
     def sample_rate(self, value):
+        value = validate_sample_rate(value)
         if value != self._sample_rate:
             self._sample_rate = value
             self._smoothing_samples_duration_total = int(
@@ -220,6 +223,7 @@ class Oscillator(Generator):
     def get_samples_iterator(
         self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False
     ) -> np.ndarray:
+        n = validate_sample_count(n)
         if reset:
             iter(self)
         return np.array([next(self) for _ in range(n)], dtype=np.float32)
@@ -231,6 +235,7 @@ class Oscillator(Generator):
     def get_samples(
         self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
     ) -> np.ndarray:
+        n = validate_sample_count(n)
         if mode not in ("auto", "iterator", "vectorized"):
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."

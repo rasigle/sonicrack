@@ -46,6 +46,7 @@ from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentCategory, ComponentDescriptor
 from src.engine.audio_component_registry import register_component
 from src.engine.modifier import Modifier
+from src.engine.validation import validate_sample_rate
 
 
 @register_component()
@@ -99,7 +100,7 @@ class ButterworthFilter(Modifier):
         """
         super().__init__()
 
-        self.sample_rate = sample_rate
+        self.sample_rate = validate_sample_rate(sample_rate)
         self._cutoff = cutoff
         self._order = order
         self._filter_type: ButterworthFilter.FilterType = filter_type

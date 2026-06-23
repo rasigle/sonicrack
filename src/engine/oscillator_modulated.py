@@ -74,6 +74,7 @@ from src.engine.oscillator import (
     SquareOscillator,
     TriangleOscillator,
 )
+from src.engine.validation import validate_sample_count
 
 
 @register_component()
@@ -246,6 +247,7 @@ class ModulatedOscillator(Generator):
             list[float]: List of `n` consecutive samples produced by calling
             `next(self)` repeatedly.
         """
+        n = validate_sample_count(n)
         if reset:
             iter(self)
         return np.array([next(self) for _ in range(n)], dtype=np.float32)
@@ -271,7 +273,8 @@ class ModulatedOscillator(Generator):
             - Iterator approach: ~258K samples/sec
             - Vectorized approach: ~5-10M samples/sec (20-40x faster)
         """
-        if n <= 0:
+        n = validate_sample_count(n)
+        if n == 0:
             return np.empty(0, dtype=np.float32)
 
         # Step 1: Generate all modulator values in bulk (vectorized)
@@ -617,6 +620,7 @@ class ModulatedOscillator(Generator):
             >>> samples1 = mod_osc.get_samples(1000)  # Auto mode
             >>> samples2 = mod_osc.get_samples(100,mode="iterator")
         """
+        n = validate_sample_count(n)
         if mode not in ("auto", "iterator", "vectorized"):
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."

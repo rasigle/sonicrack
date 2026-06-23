@@ -19,6 +19,7 @@ from src.engine.audio_component import (
 )
 from src.engine.audio_component_registry import register_component
 from src.engine.modifier import Modifier
+from src.engine.validation import validate_sample_count, validate_sample_rate
 
 if TYPE_CHECKING:
     pass
@@ -243,6 +244,7 @@ class Distortion(Modifier):
         Raises:
             ValueError: If source is None (required for this method)
         """
+        n = validate_sample_count(n)
         if self.source is None:
             raise ValueError("source is required for get_samples_vectorized()")
 
@@ -264,6 +266,7 @@ class Distortion(Modifier):
         if mode == "vectorized":
             return self.get_samples_vectorized(n)
 
+        n = validate_sample_count(n)
         return np.array([next(self) for _ in range(n)], dtype=np.float32)
 
 
@@ -321,13 +324,13 @@ class Delay(Modifier):
         """
         super().__init__(*args, **kwargs)
         self.source = source  # Optional!
-        self._sample_rate = sample_rate
+        self._sample_rate = validate_sample_rate(sample_rate)
         self._delay_time = np.clip(delay_time, 0.001, 2.0)
         self._feedback = np.clip(feedback, 0.0, 0.95)
         self._mix = np.clip(mix, 0.0, 1.0)
 
         # Create delay buffer (circular buffer)
-        max_delay_samples = int(2.0 * sample_rate)  # Max 2 seconds
+        max_delay_samples = int(2.0 * self._sample_rate)  # Max 2 seconds
         self._buffer = np.zeros(max_delay_samples, dtype=np.float32)
         self._buffer_size = max_delay_samples
         self._write_pos = 0
@@ -466,6 +469,10 @@ class Delay(Modifier):
         Returns:
             Array of delayed samples
         """
+        n = validate_sample_count(n)
+        if self.source is None:
+            raise ValueError("source is required for get_samples_vectorized()")
+
         # Get input samples
         source = cast(Any, self.source)
         input_samples = source.get_samples_vectorized(n)
@@ -492,12 +499,13 @@ class Delay(Modifier):
             np.float32
         )
 
-    def get_samples(self, n: int, mode: str = "vectorized") -> np.ndarray:
+    def get_samples(self, n: int, mode: str = "vectorized", **kwargs) -> np.ndarray:
         """Get n samples using specified mode."""
         if mode == "vectorized":
             return self.get_samples_vectorized(n)
-        else:
-            return np.array([next(self) for _ in range(n)], dtype=np.float32)
+
+        n = validate_sample_count(n)
+        return np.array([next(self) for _ in range(n)], dtype=np.float32)
 
 
 @register_component()
@@ -549,14 +557,14 @@ class Reverb(Modifier):
         """
         super().__init__(*args, **kwargs)
         self.source = source  # Optional!
-        self._sample_rate = sample_rate
+        self._sample_rate = validate_sample_rate(sample_rate)
         self._room_size = np.clip(room_size, 0.0, 1.0)
         self._damping = np.clip(damping, 0.0, 1.0)
         self._mix = np.clip(mix, 0.0, 1.0)
 
         # Freeverb-inspired delay line lengths (in samples at 44.1kHz)
         # Scaled to current sample rate
-        scale = sample_rate / 44100.0
+        scale = self._sample_rate / 44100.0
 
         # Comb filter delay lengths (prime numbers for density)
         self._comb_delays = [
@@ -584,12 +592,18 @@ class Reverb(Modifier):
         ]
         self._comb_positions = [0] * len(self._comb_delays)
         self._comb_filter_states = [0.0] * len(self._comb_delays)
+        self._comb_count = len(self._comb_buffers)
+        self._comb_buffer_lengths = [len(buffer) for buffer in self._comb_buffers]
 
         # Create buffers for allpass filters
         self._allpass_buffers = [
             np.zeros(delay, dtype=np.float32) for delay in self._allpass_delays
         ]
         self._allpass_positions = [0] * len(self._allpass_delays)
+        self._allpass_count = len(self._allpass_buffers)
+        self._allpass_buffer_lengths = [
+            len(buffer) for buffer in self._allpass_buffers
+        ]
 
         # Update feedback coefficients
         self._update_coefficients()
@@ -659,7 +673,7 @@ class Reverb(Modifier):
         buffer[pos] = input_val + filtered * self._feedback
 
         # Update position
-        self._comb_positions[index] = (pos + 1) % len(buffer)
+        self._comb_positions[index] = (pos + 1) % self._comb_buffer_lengths[index]
 
         return output
 
@@ -684,9 +698,47 @@ class Reverb(Modifier):
         buffer[pos] = input_val + delayed * 0.5
 
         # Update position
-        self._allpass_positions[index] = (pos + 1) % len(buffer)
+        self._allpass_positions[index] = (
+            pos + 1
+        ) % self._allpass_buffer_lengths[index]
 
         return output
+
+    def _process_sample(self, input_sample: float) -> float:
+        """Process one mono sample through all reverb delay lines."""
+        comb_sum = 0.0
+        for index in range(self._comb_count):
+            buffer = self._comb_buffers[index]
+            pos = self._comb_positions[index]
+
+            output = float(buffer[pos])
+            filtered = (
+                output * self._damp2
+                + self._comb_filter_states[index] * self._damp1
+            )
+            self._comb_filter_states[index] = filtered
+            buffer[pos] = input_sample + filtered * self._feedback
+            self._comb_positions[index] = (
+                pos + 1
+            ) % self._comb_buffer_lengths[index]
+
+            comb_sum += output
+
+        wet = comb_sum / self._comb_count
+
+        for index in range(self._allpass_count):
+            buffer = self._allpass_buffers[index]
+            pos = self._allpass_positions[index]
+
+            delayed = float(buffer[pos])
+            output = -wet + delayed
+            buffer[pos] = wet + delayed * 0.5
+            self._allpass_positions[index] = (
+                pos + 1
+            ) % self._allpass_buffer_lengths[index]
+            wet = output
+
+        return input_sample * (1.0 - self._mix) + wet * self._mix
 
     def __call__(self, val: float | np.ndarray) -> float | np.ndarray:
         """Apply reverb to value(s) - Modifier interface.
@@ -699,44 +751,16 @@ class Reverb(Modifier):
         """
         # Handle scalar
         if isinstance(val, (float, int, np.number)):
-            input_sample = float(val)
-
-            # Process through parallel comb filters
-            comb_sum = 0.0
-            for i in range(len(self._comb_delays)):
-                comb_sum += self._process_comb(input_sample, i)
-
-            # Average comb outputs
-            wet = comb_sum / len(self._comb_delays)
-
-            # Process through series allpass filters
-            for i in range(len(self._allpass_delays)):
-                wet = self._process_allpass(wet, i)
-
-            # Mix dry and wet
-            return input_sample * (1.0 - self._mix) + wet * self._mix
+            return self._process_sample(float(val))
 
         # Handle array
         input_samples = np.asarray(val)
         output_samples = np.zeros(len(input_samples), dtype=np.float32)
 
         for i in range(len(input_samples)):
-            # Process through parallel comb filters
-            comb_sum = 0.0
-            for j in range(len(self._comb_delays)):
-                comb_sum += self._process_comb(input_samples[i], j)
+            output_samples[i] = self._process_sample(float(input_samples[i]))
 
-            # Average comb outputs
-            wet = comb_sum / len(self._comb_delays)
-
-            # Process through series allpass filters
-            for j in range(len(self._allpass_delays)):
-                wet = self._process_allpass(wet, j)
-
-            # Mix dry and wet
-            output_samples[i] = input_samples[i] * (1.0 - self._mix) + wet * self._mix
-
-        return output_samples.astype(np.float32)
+        return output_samples
 
     def __iter__(self):
         """Initialize iterator."""
@@ -754,20 +778,7 @@ class Reverb(Modifier):
         source = cast(Any, self.source)
         input_sample = next(source)
 
-        # Process through parallel comb filters
-        comb_sum = 0.0
-        for i in range(len(self._comb_delays)):
-            comb_sum += self._process_comb(input_sample, i)
-
-        # Average comb outputs
-        wet = comb_sum / len(self._comb_delays)
-
-        # Process through series allpass filters
-        for i in range(len(self._allpass_delays)):
-            wet = self._process_allpass(wet, i)
-
-        # Mix dry and wet
-        return input_sample * (1.0 - self._mix) + wet * self._mix
+        return self._process_sample(float(input_sample))
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         """Generate n reverb samples.
@@ -781,6 +792,10 @@ class Reverb(Modifier):
         Returns:
             Array of reverb samples
         """
+        n = validate_sample_count(n)
+        if self.source is None:
+            raise ValueError("source is required for get_samples_vectorized()")
+
         # Get input samples
         source = cast(Any, self.source)
         input_samples = source.get_samples_vectorized(n)
@@ -788,26 +803,14 @@ class Reverb(Modifier):
 
         # Process each sample through the reverb
         for i in range(n):
-            # Process through parallel comb filters
-            comb_sum = 0.0
-            for j in range(len(self._comb_delays)):
-                comb_sum += self._process_comb(input_samples[i], j)
+            output_samples[i] = self._process_sample(float(input_samples[i]))
 
-            # Average comb outputs
-            wet = comb_sum / len(self._comb_delays)
+        return output_samples
 
-            # Process through series allpass filters
-            for j in range(len(self._allpass_delays)):
-                wet = self._process_allpass(wet, j)
-
-            # Mix dry and wet
-            output_samples[i] = input_samples[i] * (1.0 - self._mix) + wet * self._mix
-
-        return output_samples.astype(np.float32)
-
-    def get_samples(self, n: int, mode: str = "vectorized") -> np.ndarray:
+    def get_samples(self, n: int, mode: str = "vectorized", **kwargs) -> np.ndarray:
         """Get n samples using specified mode."""
         if mode == "vectorized":
             return self.get_samples_vectorized(n)
-        else:
-            return np.array([next(self) for _ in range(n)], dtype=np.float32)
+
+        n = validate_sample_count(n)
+        return np.array([next(self) for _ in range(n)], dtype=np.float32)

@@ -8,6 +8,7 @@ from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator_base import Oscillator
+from src.engine.validation import validate_sample_count
 from src.utils.utils import filter_provided_args, track_provided_args
 
 
@@ -112,6 +113,7 @@ class SawtoothOscillator(Oscillator):
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
+        n = validate_sample_count(n)
         indices = np.arange(n, dtype=np.float32) + self._i
         if self._period != 0:
             div = (indices + self._p) / self._period
@@ -171,6 +173,7 @@ class TriangleOscillator(SawtoothOscillator):
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
+        n = validate_sample_count(n)
         indices = np.arange(n, dtype=np.float32) + self._i
         if self._period != 0:
             div = (indices + self._p) / self._period

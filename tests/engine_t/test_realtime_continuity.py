@@ -19,6 +19,7 @@ from src.engine import (
     SquareOscillator,
     TriangleOscillator,
     Volume,
+    WaveAdder,
 )
 from src.engine.filter import ButterworthFilter
 
@@ -70,6 +71,26 @@ def test_butterworth_filter_preserves_stereo_state_across_buffers():
     np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
 
 
+def test_butterworth_filter_preserves_multichannel_state_across_buffers():
+    rng = np.random.default_rng(9012)
+    signal = rng.normal(0.0, 0.25, (TOTAL_SAMPLES, 4)).astype(np.float32)
+
+    continuous_filter = ButterworthFilter(cutoff=1800, order=4, sample_rate=48000)
+    chunked_filter = ButterworthFilter(cutoff=1800, order=4, sample_rate=48000)
+
+    continuous = continuous_filter.scale_vectorized(signal)
+
+    offset = 0
+    chunks = []
+    for chunk_size in CHUNKS:
+        chunk = signal[offset : offset + chunk_size]
+        chunks.append(chunked_filter.scale_vectorized(chunk))
+        offset += chunk_size
+    chunked = np.concatenate(chunks)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
 def test_stereo_chain_with_filter_preserves_state_across_buffers():
     def make_chain() -> Chain:
         return Chain(
@@ -81,6 +102,63 @@ def test_stereo_chain_with_filter_preserves_state_across_buffers():
     continuous = make_chain().get_samples_vectorized(TOTAL_SAMPLES)
     chunked_chain = make_chain()
     chunked = _render_chunked(chunked_chain.get_samples_vectorized)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+def test_nested_composer_graph_preserves_state_across_buffers():
+    def make_graph() -> Chain:
+        bass = Chain(
+            SawtoothOscillator(frequency=110, gain_db=-15, sample_rate=44100),
+            ButterworthFilter(cutoff=900, order=3, sample_rate=44100),
+            Volume(gain_db=-3),
+        )
+        shimmer_lfo = SineOscillator(
+            frequency=0.75,
+            amplitude=0.25,
+            gain_db=None,
+            sample_rate=44100,
+        )
+        shimmer = Chain(
+            TriangleOscillator(frequency=330, gain_db=-18, sample_rate=44100),
+            ModulatedVolume(shimmer_lfo),
+        )
+        echo = Delay(
+            SquareOscillator(
+                frequency=220,
+                gain_db=-20,
+                pulsewidth=0.42,
+                mode="bandlimited",
+                sample_rate=44100,
+            ),
+            delay_time=0.006,
+            feedback=0.22,
+            mix=0.35,
+            sample_rate=44100,
+        )
+        pan_lfo = SineOscillator(
+            frequency=1.25,
+            amplitude=0.8,
+            gain_db=None,
+            sample_rate=44100,
+        )
+        room = Reverb(
+            WaveAdder(bass, shimmer, echo, mix_mode="average"),
+            room_size=0.45,
+            damping=0.35,
+            mix=0.25,
+            sample_rate=44100,
+        )
+        return Chain(
+            room,
+            ButterworthFilter(cutoff=2400, order=4, sample_rate=44100),
+            ModulatedPanner(pan_lfo),
+            ButterworthFilter(cutoff=3200, order=2, sample_rate=44100),
+        )
+
+    continuous = make_graph().get_samples_vectorized(TOTAL_SAMPLES)
+    chunked_graph = make_graph()
+    chunked = _render_chunked(chunked_graph.get_samples_vectorized)
 
     np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
 
@@ -157,6 +235,42 @@ def test_reverb_preserves_state_across_buffers():
     continuous = make_reverb().get_samples_vectorized(TOTAL_SAMPLES)
     chunked_reverb = make_reverb()
     chunked = _render_chunked(chunked_reverb.get_samples_vectorized)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("sample_rate", [44100, 48000, 96000])
+def test_stateful_chain_preserves_state_across_sample_rates(sample_rate: int):
+    def make_chain() -> Chain:
+        return Chain(
+            SawtoothOscillator(
+                frequency=sample_rate / 320,
+                gain_db=-16,
+                mode="analog",
+                sample_rate=sample_rate,
+            ),
+            Delay(
+                delay_time=0.0025,
+                feedback=0.25,
+                mix=0.35,
+                sample_rate=sample_rate,
+            ),
+            Reverb(
+                room_size=0.35,
+                damping=0.45,
+                mix=0.2,
+                sample_rate=sample_rate,
+            ),
+            ButterworthFilter(
+                cutoff=min(3200, sample_rate * 0.2),
+                order=3,
+                sample_rate=sample_rate,
+            ),
+        )
+
+    continuous = make_chain().get_samples_vectorized(TOTAL_SAMPLES)
+    chunked_chain = make_chain()
+    chunked = _render_chunked(chunked_chain.get_samples_vectorized)
 
     np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
 

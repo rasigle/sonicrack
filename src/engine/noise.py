@@ -69,6 +69,7 @@ from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor, Generator
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import _derive_amplitude_from_init
+from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
 
@@ -755,6 +756,7 @@ class NoiseGenerator(Generator):
                 provided.
             sample_rate: Sample rate in Hz
         """
+        sample_rate = validate_sample_rate(sample_rate)
         super().__init__(sample_rate)
         self.noise_type: str = noise_type
 
@@ -767,7 +769,7 @@ class NoiseGenerator(Generator):
         self._target_amplitude = self._amplitude
         self._current_amplitude = self._amplitude
         self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = 441  # 10ms at 44.1kHz
+        self._smoothing_duration_samples = max(1, int(0.01 * self.sample_rate))
 
         self._buffer: np.ndarray | None = None
         self._buffer_index: int = 0
@@ -898,5 +900,6 @@ class NoiseGenerator(Generator):
         Returns:
             Array of noise samples
         """
+        num_samples = validate_sample_count(num_samples, name="num_samples")
         duration = num_samples / self.sample_rate
         return self._generate_noise(duration, num_samples)

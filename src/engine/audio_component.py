@@ -9,6 +9,7 @@ from typing import Any, TypeVar
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.validation import validate_sample_count, validate_sample_rate
 
 T = TypeVar("T", bound="AudioComponent")
 
@@ -108,9 +109,11 @@ class AudioComponent(ABC):
         raise StopIteration
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
+        validate_sample_count(n)
         raise NotImplementedError
 
     def get_samples(self, n: int, *args: Any, **kwargs: Any) -> np.ndarray:
+        n = validate_sample_count(n)
         return self.get_samples_vectorized(n)
 
     @classmethod
@@ -158,4 +161,4 @@ class Generator(AudioComponent):
 
     def __init__(self, sample_rate: float = DEFAULT_SAMPLE_RATE):
         super().__init__()
-        self.sample_rate = sample_rate
+        self.sample_rate = validate_sample_rate(sample_rate)

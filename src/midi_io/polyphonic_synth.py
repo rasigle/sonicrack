@@ -21,7 +21,7 @@ Audio Mixing:
     - Prevents clipping with multiple voices
 
 Example:
-    >>> from engine.io.midi import PolyphonicSynth
+    >>> from src.midi_io import PolyphonicSynth
     >>> from engine import SineOscillator, ADSREnvelope, Chain, ModulatedVolume
     >>>
     >>> def voice_factory():
@@ -63,8 +63,8 @@ from typing import Any
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.io.midi.messages import NoteOffMessage, NoteOnMessage
-from src.engine.io.midi.utils import midi_to_frequency
+from src.midi_io.messages import NoteOffMessage, NoteOnMessage
+from src.midi_io.utils import midi_to_frequency
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ class PolyphonicSynth:
         voices: List of pre-allocated Voice objects
 
     Example:
-        >>> from engine.io.midi import PolyphonicSynth
+        >>> from src.midi_io import PolyphonicSynth
         >>> from engine import SineOscillator, ADSREnvelope, Chain, ModulatedVolume
         >>>
         >>> def voice_factory():
@@ -234,7 +234,7 @@ class PolyphonicSynth:
             sample_rate: Audio sample rate in Hz (default: 44100)
 
         Example:
-            >>> from engine.io.midi import PolyphonicSynth
+            >>> from src.midi_io import PolyphonicSynth
             >>> from engine import SineOscillator, ADSREnvelope, Chain, ModulatedVolume
             >>>
             >>> def make_piano_voice():

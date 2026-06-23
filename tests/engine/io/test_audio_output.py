@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from src.engine.io.audio_output import (
+from src.audio_io import (
     DEFAULT_FADEIN_DURATION_MS,
     DEFAULT_FADEOUT_DURATION_MS,
     AudioOutput,
@@ -111,7 +111,7 @@ class TestSampleRateAndBufferSize(unittest.TestCase):
         self.assertEqual(audio.buffer_size, 1024)
         self.assertFalse(audio.is_playing)
 
-    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("src.audio_io.output.sd.OutputStream")
     def test_set_sample_rate_while_playing(self, mock_stream_class):
         """Test changing sample rate restarts stream if playing."""
         audio = AudioOutput(sample_rate=44100)
@@ -129,7 +129,7 @@ class TestSampleRateAndBufferSize(unittest.TestCase):
         self.assertTrue(mock_stream.close.called)
         self.assertEqual(audio.sample_rate, 48000)
 
-    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("src.audio_io.output.sd.OutputStream")
     def test_set_buffer_size_while_playing(self, mock_stream_class):
         """Test changing buffer size restarts stream if playing."""
         audio = AudioOutput(buffer_size=2048)
@@ -212,7 +212,7 @@ class TestVolumeControl(unittest.TestCase):
 class TestPlaybackControl(unittest.TestCase):
     """Test playback start/stop functionality."""
 
-    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("src.audio_io.output.sd.OutputStream")
     def test_start_playback(self, mock_stream_class):
         """Test starting playback."""
         mock_stream = Mock()
@@ -236,7 +236,7 @@ class TestPlaybackControl(unittest.TestCase):
         )
         mock_stream.start.assert_called_once()
 
-    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("src.audio_io.output.sd.OutputStream")
     def test_start_playback_already_playing(self, mock_stream_class):
         """Test starting playback when already playing."""
         mock_stream = Mock()
@@ -254,7 +254,7 @@ class TestPlaybackControl(unittest.TestCase):
         # Should not create new stream
         mock_stream_class.assert_not_called()
 
-    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("src.audio_io.output.sd.OutputStream")
     @patch("time.sleep")
     def test_stop_playback(self, mock_sleep, mock_stream_class):
         """Test stopping playback."""
@@ -282,7 +282,7 @@ class TestPlaybackControl(unittest.TestCase):
 
         self.assertFalse(audio.is_playing)
 
-    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("src.audio_io.output.sd.OutputStream")
     @patch("time.sleep")
     def test_cleanup(self, mock_sleep, mock_stream_class):
         """Test cleanup method."""
@@ -459,7 +459,7 @@ class TestSoundDeviceCallback(unittest.TestCase):
 class TestIntegrationScenarios(unittest.TestCase):
     """Integration tests for common usage scenarios."""
 
-    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("src.audio_io.output.sd.OutputStream")
     @patch("time.sleep")
     def test_full_playback_cycle(self, mock_sleep, mock_stream_class):
         """Test complete playback start -> change settings -> stop cycle."""
@@ -485,7 +485,7 @@ class TestIntegrationScenarios(unittest.TestCase):
         audio.stop_playback()
         self.assertFalse(audio.is_playing)
 
-    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("src.audio_io.output.sd.OutputStream")
     def test_multiple_sample_rate_changes(self, mock_stream_class):
         """Test multiple sample rate changes."""
         mock_stream = Mock()
@@ -548,7 +548,7 @@ class TestEdgeCases(unittest.TestCase):
         # Fade samples should scale appropriately
         self.assertGreater(audio.fade_out_total_samples, 0)
 
-    @patch("src.engine.io.audio_output.sd.OutputStream")
+    @patch("src.audio_io.output.sd.OutputStream")
     def test_stream_creation_failure(self, mock_stream_class):
         """Test handling of stream creation failure."""
         mock_stream_class.side_effect = RuntimeError("Failed to create stream")

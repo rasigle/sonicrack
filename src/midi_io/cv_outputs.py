@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 
 from src.engine.audio_component import AudioComponent
-from src.engine.io.midi.midi_to_cv import MIDIToCV
+from src.midi_io.midi_to_cv import MIDIToCV
 
 
 class CVFrequencyOutput(AudioComponent):

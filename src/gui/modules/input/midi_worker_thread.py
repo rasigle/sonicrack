@@ -8,7 +8,7 @@ import logging
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from src.engine.io.midi import MIDIInput
+from src.midi_io import MIDIInput
 
 logger = logging.getLogger(__name__)
 

@@ -32,7 +32,8 @@ The engine exposes a fairly broad synthesis surface:
 - **Noise:** white, pink, brownian, blue, grey, velvet, sample-and-hold, Perlin
 - **Filters:** Butterworth filter utilities and filter component support
 - **Effects:** distortion, delay, reverb
-- **I/O:** optional `AudioOutput` via `src.engine.io.audio_output` using the `audio-io` extra
+- **I/O:** optional `AudioOutput` via `src.audio_io` using the `audio-io` extra
+- **MIDI:** optional MIDI adapters via `src.midi_io` using the `midi` extra
 - **Preset/build helpers:** preset builder and preset library modules
 
 Example:
@@ -91,15 +92,19 @@ python -m pip install -e .
 Optional extras:
 
 ```powershell
+python -m pip install -e ".[audio-io]"
 python -m pip install -e ".[midi]"
+python -m pip install -e ".[gui]"
 python -m pip install -e ".[examples]"
 python -m pip install -e ".[full]"
 ```
 
 Notes:
 
-- The base install covers the core engine and PyQt6 GUI application.
-- MIDI support now lives behind the `midi` extra.
+- The base install covers the core DSP engine only.
+- Audio-device output lives behind the `audio-io` extra.
+- GUI support lives behind the `gui` extra.
+- MIDI support lives behind the `midi` extra and is exposed from `src.midi_io`.
 - Notebook and visualization-heavy example dependencies live behind `examples` extras.
 - Depending on your machine, real audio or MIDI features may also require working local system drivers.
 
@@ -222,7 +227,7 @@ from src.engine import (
 Audio-device output is optional and intentionally kept out of the core engine import:
 
 ```python
-from src.engine.io.audio_output import AudioOutput
+from src.audio_io import AudioOutput
 ```
 
 ## What this README intentionally does not claim

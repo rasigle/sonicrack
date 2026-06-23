@@ -772,7 +772,7 @@ def test_no_qt_dependencies():
     port.write(5.0)
 
     # PortModel module should not import PyQt6
-    import gui.core.port as port_module
+    import src.gui.core.port as port_module
 
     assert "PyQt6" not in sys.modules or "PyQt6" not in str(port_module.__file__)
 

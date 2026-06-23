@@ -4,7 +4,7 @@ This module provides real-time MIDI input functionality using the mido library.
 It handles device enumeration, message reception, and callback-based processing.
 
 Example:
-    >>> from engine.io.midi import MIDIInput
+    >>> from src.midi_io import MIDIInput
     >>>
     >>> def on_message(msg):
     ...     print(f"Received: {msg}")
@@ -36,7 +36,7 @@ except ImportError:
     MIDO_AVAILABLE = False
     logging.warning("mido not installed. Install with: pip install mido python-rtmidi")
 
-from src.engine.io.midi.messages import (
+from src.midi_io.messages import (
     AftertouchMessage,
     ControlChangeMessage,
     MIDIMessage,

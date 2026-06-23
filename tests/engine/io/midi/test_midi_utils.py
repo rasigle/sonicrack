@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.engine.io.midi import (
+from src.midi_io import (
     frequency_to_midi,
     get_note_range,
     midi_to_frequency,

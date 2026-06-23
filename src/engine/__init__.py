@@ -1,4 +1,4 @@
-"""High-performance audio synthesis engine.
+"""High-performance, GUI-independent audio DSP engine.
 
 AudioPlayground Engine is a modular audio synthesis framework designed for real-time
 synthesis, sound design, and music production. The engine provides vectorized
@@ -80,8 +80,6 @@ Note:
     For production use, prefer get_samples_vectorized() or auto mode.
     The iterator mode is provided for prototyping and fine-grained control.
 
-Version: 0.1.0
-License: See LICENSE file
 """
 
 from src.engine.audio_component import (
@@ -94,33 +92,23 @@ from src.engine.audio_component_registry import (
     audio_registry,
     register_component,
 )
-
-# Composers
 from src.engine.composer import (
     Chain,
     Composer,
     WaveAdder,
 )
-
-# CV Utilities
 from src.engine.cv_utils import (
     CVScaler,
     bipolar_to_unipolar,
     scale_cv,
     unipolar_to_bipolar,
 )
-
-# Effects
 from src.engine.effects import (
     Delay,
     Distortion,
     Reverb,
 )
-
-# Filters
 from src.engine.filter import ButterworthFilter, apply_filter, butter
-
-# Modifiers
 from src.engine.modifier import (
     Clipper,
     Frequency,
@@ -131,15 +119,11 @@ from src.engine.modifier import (
     Panner,
     Volume,
 )
-
-# Modulators
 from src.engine.modulator import (
     ADSREnvelope,
     Modulator,
     getadsr,
 )
-
-# Noise generators
 from src.engine.noise import (
     NoiseGenerator,
     blue_noise,
@@ -151,8 +135,6 @@ from src.engine.noise import (
     velvet_noise,
     white_noise,
 )
-
-# Oscillators
 from src.engine.oscillator import (
     Oscillator,
     SawtoothOscillator,
@@ -160,42 +142,31 @@ from src.engine.oscillator import (
     SquareOscillator,
     TriangleOscillator,
 )
-
-# Modulated Oscillator
 from src.engine.oscillator_modulated import ModulatedFrequency, ModulatedOscillator
-
-# Presets
 from src.engine.presets.preset_builder import PresetBuilder
 from src.engine.presets.preset_library import PresetLibrary
 from src.engine.synthesis import synth
 
 __all__ = [
-    # Audio Component Base
     "AudioComponent",
     "ComponentCategory",
     "ComponentDescriptor",
     "AudioComponentRegistry",
-    # Registry
     "register_component",
     "audio_registry",
-    # Oscillators
     "Oscillator",
     "SineOscillator",
     "SquareOscillator",
     "SawtoothOscillator",
     "TriangleOscillator",
     "synth",
-    # Modulators
     "Modulator",
     "ADSREnvelope",
     "getadsr",
-    # Modulated Oscillator
     "ModulatedOscillator",
-    # Composers
     "Composer",
     "Chain",
     "WaveAdder",
-    # Modifiers
     "Modifier",
     "Panner",
     "ModulatedPanner",
@@ -205,16 +176,13 @@ __all__ = [
     "ModulatedFrequency",
     "Clipper",
     "ModulatedClipper",
-    # CV Utilities
     "CVScaler",
     "bipolar_to_unipolar",
     "unipolar_to_bipolar",
     "scale_cv",
-    # Filters
     "butter",
     "apply_filter",
     "ButterworthFilter",
-    # Noise
     "white_noise",
     "pink_noise",
     "brownian_noise",
@@ -224,11 +192,9 @@ __all__ = [
     "grey_noise",
     "sample_hold_noise",
     "NoiseGenerator",
-    # Effects
     "Distortion",
     "Delay",
     "Reverb",
-    # Presets
     "PresetBuilder",
     "PresetLibrary",
 ]

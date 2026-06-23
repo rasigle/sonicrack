@@ -7,14 +7,14 @@ works correctly.
 import numpy as np
 
 from src.engine import ADSREnvelope, ModulatedOscillator, SineOscillator
-from src.engine.io.midi import (
+from src.engine.modulator import GateTriggeredADSR
+from src.midi_io import (
     CVFrequencyOutput,
     CVGateOutput,
     MIDIToCV,
     NoteOffMessage,
     NoteOnMessage,
 )
-from src.engine.modulator import GateTriggeredADSR
 
 
 class TestMIDIWorkflow:

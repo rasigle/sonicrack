@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.engine.io.midi import (
+from src.midi_io import (
     ControlChangeMessage,
     MIDIToCV,
     NoteOffMessage,

@@ -41,7 +41,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
 )
 
-from src.engine.io.midi import (
+from src.midi_io import (
     CVFrequencyOutput,
     CVGateOutput,
     CVVelocityOutput,
@@ -160,8 +160,8 @@ class MIDIInputModule(ModuleWidget):
         """Refresh the list of available MIDI devices."""
         try:
             # Import MIDIInput only for device listing
-            from src.engine.io.midi import MIDIInput
-            from src.engine.io.midi.input import MIDO_AVAILABLE
+            from src.midi_io import MIDIInput
+            from src.midi_io.input import MIDO_AVAILABLE
 
             if not MIDO_AVAILABLE:
                 self.device_status_changed.emit("MIDI library not installed")
@@ -292,7 +292,7 @@ class MIDIInputModule(ModuleWidget):
         # Update UI
         if isinstance(msg, NoteOnMessage):
             if msg.velocity > 0:
-                from src.engine.io.midi import midi_to_note_name
+                from src.midi_io import midi_to_note_name
 
                 note_name = midi_to_note_name(msg.note)
                 self.note_label.setText(f"{note_name} ({msg.note})")

@@ -5,9 +5,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-import src.engine.io.midi.input as midi_input_module
-from src.engine.io.midi import MIDIInput, NoteOffMessage, NoteOnMessage
-from src.engine.io.midi.input import MIDO_AVAILABLE
+import src.midi_io.input as midi_input_module
+from src.midi_io import MIDIInput, NoteOffMessage, NoteOnMessage
+from src.midi_io.input import MIDO_AVAILABLE
 
 # Skip all tests if mido not available
 pytestmark = pytest.mark.skipif(not MIDO_AVAILABLE, reason="mido not installed")

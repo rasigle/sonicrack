@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.engine.io.midi import (
+from src.midi_io import (
     AftertouchMessage,
     ControlChangeMessage,
     MIDIMessage,

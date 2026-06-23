@@ -8,7 +8,7 @@ This package provides MIDI functionality including:
 - Note-to-frequency conversion utilities
 
 Example - Basic MIDI Input:
-    >>> from engine.io.midi import MIDIInput
+    >>> from src.midi_io import MIDIInput
     >>>
     >>> def on_message(msg):
     ...     print(f"Received: {msg}")
@@ -17,26 +17,26 @@ Example - Basic MIDI Input:
     >>> midi.start(on_message)
 
 Example - MIDI File Playback:
-    >>> from engine.io.midi import MIDIFile
+    >>> from src.midi_io import MIDIFile
     >>>
     >>> midi_file = MIDIFile("song.mid")
     >>> notes = midi_file.get_notes_in_range(0, 1.0)  # First second
 
 Example - Note Conversion:
-    >>> from engine.io.midi import midi_to_frequency, note_name_to_midi
+    >>> from src.midi_io import midi_to_frequency, note_name_to_midi
     >>>
     >>> freq = midi_to_frequency(69)  # A4 = 440 Hz
     >>> note = note_name_to_midi("C4")  # Middle C = 60
 """
 
-from src.engine.io.midi.cv_outputs import (
+from src.midi_io.cv_outputs import (
     CVFrequencyOutput,
     CVGateOutput,
     CVVelocityOutput,
 )
-from src.engine.io.midi.file_reader import MIDIFile
-from src.engine.io.midi.input import MIDIInput
-from src.engine.io.midi.messages import (
+from src.midi_io.file_reader import MIDIFile
+from src.midi_io.input import MIDIInput
+from src.midi_io.messages import (
     AftertouchMessage,
     ControlChangeMessage,
     MIDIMessage,
@@ -45,10 +45,10 @@ from src.engine.io.midi.messages import (
     PitchBendMessage,
     ProgramChangeMessage,
 )
-from src.engine.io.midi.midi_to_cv import MIDIToCV
-from src.engine.io.midi.monophonic_synth import MonophonicSynth
-from src.engine.io.midi.polyphonic_synth import PolyphonicSynth, Voice
-from src.engine.io.midi.utils import (
+from src.midi_io.midi_to_cv import MIDIToCV
+from src.midi_io.monophonic_synth import MonophonicSynth
+from src.midi_io.polyphonic_synth import PolyphonicSynth, Voice
+from src.midi_io.utils import (
     frequency_to_midi,
     get_note_range,
     midi_to_frequency,

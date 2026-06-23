@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.engine.io.midi import ControlChangeMessage, MIDIFile
-from src.engine.io.midi.input import MIDO_AVAILABLE
+from src.midi_io import ControlChangeMessage, MIDIFile
+from src.midi_io.input import MIDO_AVAILABLE
 
 # Skip all tests if mido not available
 pytestmark = pytest.mark.skipif(not MIDO_AVAILABLE, reason="mido not installed")
@@ -269,10 +269,10 @@ class TestMIDIFileErrors:
         dummy_file.write_bytes(b"MThd" + b"\x00" * 20)  # Fake MIDI header
 
         # Patch MIDO_AVAILABLE before importing
-        import src.engine.io.midi.file_reader
+        import src.midi_io.file_reader
 
         # Need to patch at the module level where it's checked
-        monkeypatch.setattr(src.engine.io.midi.file_reader, "MIDO_AVAILABLE", False)
+        monkeypatch.setattr(src.midi_io.file_reader, "MIDO_AVAILABLE", False)
 
         with pytest.raises(RuntimeError, match="mido.*not installed"):
             MIDIFile(str(dummy_file))

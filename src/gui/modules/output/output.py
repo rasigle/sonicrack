@@ -9,7 +9,7 @@ import numpy as np
 from PyQt6 import QtWidgets
 from PyQt6.QtGui import QColor
 
-from src.engine.io.audio_output import AudioOutput
+from src.audio_io import AudioOutput
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module

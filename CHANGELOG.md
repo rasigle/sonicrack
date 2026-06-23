@@ -122,6 +122,52 @@ First release of AudioPlayground!
 
 ## [Unreleased]
 
+### Added
+- Split core DSP from IO concerns with standalone `src.engine`, `src.audio_io`, and
+  `src.midi_io` package boundaries.
+- Added realtime audio callback contracts and callback diagnostics for status/error
+  tracking without logging from the sounddevice callback.
+- Added DSP and audio callback benchmark scripts, including allocation tracking and
+  hot-path profiling helpers.
+- Added realtime continuity coverage for filters, effects, oscillators, modulated
+  chains, nested composer graphs, and stateful chains at `44100`, `48000`, and
+  `96000` Hz.
+- Added shared engine validation helpers for sample-rate and render-length
+  contracts.
+
+### Changed
+- Moved audio-device playback and MIDI functionality out of the engine package so
+  the base wheel remains GUI- and device-backend independent.
+- Reworked audio output callbacks to reuse buffers, fill `outdata` directly, and
+  avoid steady-state callback allocations.
+- Optimized VCV-style square generation and the `Reverb` hot path based on local
+  benchmark/profile results.
+- Standardized finite positive sample-rate validation and non-negative integer
+  render-length validation across core engine entry points.
+- Changed `NoiseGenerator` smoothing to derive its 10 ms window from the configured
+  sample rate.
+- Narrowed non-callback exception handling in scoped engine/audio_io/midi_io code
+  to explicit IO/runtime/parse exception types.
+
+### Fixed
+- Fixed state carry across buffer boundaries for `ButterworthFilter`.
+- Fixed stereo `Chain` plus `ButterworthFilter` rendering so channel state is
+  preserved independently.
+- Fixed analog sine/sawtooth/triangle vectorized coloration so continuous sample
+  index state is preserved across buffers.
+- Fixed `ADSREnvelope(sample_rate=...)` so explicit sample rates survive base
+  initialization and drive phase sample counts correctly.
+- Fixed MIDI synth render paths to propagate voice-generation errors instead of
+  silently returning or mixing silence.
+- Kept broad exception handling only at explicit callback isolation boundaries:
+  sounddevice callback diagnostics and MIDI user callback dispatch.
+
+### Tests
+- Added regression tests for runtime contracts, cross-rate continuity, callback
+  buffer reuse/allocation behavior, and MIDI synth render-error propagation.
+- Current scoped verification: engine + audio IO + MIDI IO tests pass with
+  `782 passed, 2 skipped, 8 subtests passed`.
+
 ### Planned for v1.1
 - MIDI input support
 - Filter modules (low-pass, high-pass, band-pass)

@@ -18,7 +18,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@@v8.2.0
+        uses: astral-sh/setup-uv@v8.2.0
 
       - name: Run engine tests
         run: uv run --extra audio-io --extra midi pytest tests/engine_t -q

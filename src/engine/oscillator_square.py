@@ -12,8 +12,12 @@ from src.engine.audio_component_registry import ComponentCategory, register_comp
 from src.engine.oscillator_base import Oscillator
 from src.utils.utils import filter_provided_args, track_provided_args
 
-SquareWaveMode = Literal["ideal", "ideal_smooth", "soft", "bandlimited", "comparator"]
+SquareWaveMode = Literal[
+    "ideal", "ideal_smooth", "bandlimited", "vcv", "soft", "comparator"
+]
 TWO_PI = 2 * np.pi
+VCV_MINBLEP_ZERO_CROSSINGS = 16
+VCV_MINBLEP_OVERSAMPLE = 16
 logger = logging.getLogger(__name__)
 
 
@@ -276,9 +280,7 @@ class BandlimitedSquareStrategy(SquareWaveStrategy):
             return np.full(len(phases), 1.0, dtype=np.float32)
 
         normalized_phases = (phases % TWO_PI) / TWO_PI
-        output = np.where(normalized_phases < pulsewidth, 1.0, -1.0).astype(
-            np.float64
-        )
+        output = np.where(normalized_phases < pulsewidth, 1.0, -1.0).astype(np.float64)
         increment = self._increment
         output += self._polyblep(normalized_phases, increment)
         shifted_phases = (normalized_phases - pulsewidth + 1.0) % 1.0
@@ -314,6 +316,212 @@ class BandlimitedSquareStrategy(SquareWaveStrategy):
     ) -> np.ndarray:
         normalized = self._generate_normalized(phases, pulsewidth_threshold)
         return self._scale_from_normalized(normalized, low_value, high_value)
+
+
+def _blackman_harris(position: np.ndarray) -> np.ndarray:
+    return (
+        0.35875
+        - 0.48829 * np.cos(TWO_PI * position)
+        + 0.14128 * np.cos(2 * TWO_PI * position)
+        - 0.01168 * np.cos(3 * TWO_PI * position)
+    )
+
+
+def _minimum_phase_minblep_table(
+    zero_crossings: int = VCV_MINBLEP_ZERO_CROSSINGS,
+    oversample: int = VCV_MINBLEP_OVERSAMPLE,
+) -> np.ndarray:
+    n = 2 * zero_crossings * oversample
+    positions = np.arange(n, dtype=np.float64) / oversample - zero_crossings
+    impulse = np.sinc(positions)
+    impulse *= _blackman_harris(np.arange(n, dtype=np.float64) / (n - 1))
+
+    spectrum = np.fft.fft(impulse)
+    log_magnitude = np.log(np.maximum(np.abs(spectrum), np.exp(-10.0)))
+    cepstrum = np.fft.ifft(log_magnitude)
+    cepstrum[1 : n // 2] *= 2.0
+    cepstrum[n // 2 :] = 0.0
+    minimum_phase = np.fft.ifft(np.exp(np.fft.fft(cepstrum))).real
+
+    step = np.cumsum(minimum_phase) / oversample
+    step = np.concatenate(([0.0], step[:-1]))
+    step /= step[-1] + minimum_phase[-1] / oversample
+    return np.asarray(step - 1.0, dtype=np.float32)
+
+
+class VCVRackSquareStrategy(SquareWaveStrategy):
+    """VCV Rack Fundamental-style minBLEP square wave with DC blocking."""
+
+    _minblep_table = _minimum_phase_minblep_table()
+
+    def __init__(
+        self,
+        sample_rate: float = 44100,
+        frequency: float = 440,
+        dc_block: bool = True,
+    ) -> None:
+        if sample_rate <= 0:
+            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
+        self.sample_rate = sample_rate
+        self.frequency = frequency
+        self.dc_block = dc_block
+        self._buffer = np.zeros(2 * VCV_MINBLEP_ZERO_CROSSINGS, dtype=np.float32)
+        self._prev_phase: float | None = None
+        self._last_square_state = 1.0
+        self._last_pulsewidth = 0.5
+        self._dc_lowpass_state = 0.0
+        self._update_dc_alpha()
+
+    def set_sample_rate(self, sample_rate: float) -> None:
+        if sample_rate <= 0:
+            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
+        self.sample_rate = sample_rate
+        self._update_dc_alpha()
+
+    def set_frequency(self, frequency: float) -> None:
+        self.frequency = frequency
+
+    def reset_state(self) -> None:
+        self._buffer.fill(0.0)
+        self._prev_phase = None
+        self._last_square_state = 1.0
+        self._last_pulsewidth = 0.5
+        self._dc_lowpass_state = 0.0
+
+    def _update_dc_alpha(self) -> None:
+        cutoff = min(0.4, 20.0 / self.sample_rate)
+        w = TWO_PI * cutoff
+        self._dc_alpha = w / (1.0 + w)
+
+    @staticmethod
+    def _square_state(phase: float, pulsewidth: float) -> float:
+        return 1.0 if phase < pulsewidth else -1.0
+
+    @staticmethod
+    def _crossing_subsample(
+        threshold: float, start_phase: float, end_phase: float
+    ) -> float | None:
+        delta = end_phase - start_phase
+        if delta == 0.0:
+            return None
+        diff = threshold - start_phase
+        if delta >= 0.0:
+            threshold -= np.floor(diff)
+        else:
+            threshold -= np.ceil(diff)
+        subsample = (threshold - start_phase) / delta
+        if 0.0 < subsample <= 1.0:
+            return float(subsample)
+        return None
+
+    def _insert_discontinuity(self, subsample: float, magnitude: float) -> None:
+        if not 0.0 < subsample <= 1.0 or magnitude == 0.0:
+            return
+        table = self._minblep_table
+        extended_table = np.concatenate((table, np.zeros(1, dtype=np.float32)))
+        offset = (1.0 - subsample) * VCV_MINBLEP_OVERSAMPLE
+        for index in range(len(self._buffer)):
+            position = index * VCV_MINBLEP_OVERSAMPLE + offset
+            lower = int(position)
+            fraction = position - lower
+            value = extended_table[lower] + fraction * (
+                extended_table[lower + 1] - extended_table[lower]
+            )
+            self._buffer[index] += magnitude * value
+
+    def _shift_buffer(self) -> float:
+        value = float(self._buffer[0])
+        self._buffer[:-1] = self._buffer[1:]
+        self._buffer[-1] = 0.0
+        return value
+
+    def _process_dc_filter(self, value: float) -> float:
+        if not self.dc_block:
+            return value
+        self._dc_lowpass_state += self._dc_alpha * (value - self._dc_lowpass_state)
+        return value - self._dc_lowpass_state
+
+    def _process_normalized_sample(
+        self, phase: float, pulsewidth_threshold: float
+    ) -> float:
+        pulsewidth = float(np.clip(pulsewidth_threshold / TWO_PI, 0.01, 0.99))
+        current_phase = (phase % TWO_PI) / TWO_PI
+        if self._prev_phase is None:
+            self._prev_phase = (current_phase - self.frequency / self.sample_rate) % 1.0
+            self._last_square_state = self._square_state(self._prev_phase, pulsewidth)
+            self._last_pulsewidth = pulsewidth
+
+        if pulsewidth != self._last_pulsewidth:
+            changed_state = self._square_state(self._prev_phase, pulsewidth)
+            magnitude = changed_state - self._last_square_state
+            if magnitude != 0.0:
+                self._insert_discontinuity(1e-6, magnitude)
+                self._last_square_state = changed_state
+            self._last_pulsewidth = pulsewidth
+
+        start_phase = self._prev_phase
+        delta = current_phase - start_phase
+        if delta < -0.5:
+            current_phase_unwrapped = current_phase + 1.0
+        elif delta > 0.5:
+            current_phase_unwrapped = current_phase - 1.0
+        else:
+            current_phase_unwrapped = current_phase
+
+        wrap_subsample = self._crossing_subsample(
+            1.0, start_phase, current_phase_unwrapped
+        )
+        if wrap_subsample is not None:
+            self._insert_discontinuity(wrap_subsample, 2.0)
+
+        pulse_subsample = self._crossing_subsample(
+            pulsewidth, start_phase, current_phase_unwrapped
+        )
+        if pulse_subsample is not None:
+            self._insert_discontinuity(pulse_subsample, -2.0)
+
+        normalized = self._square_state(current_phase, pulsewidth)
+        self._last_square_state = normalized
+        self._prev_phase = current_phase
+        normalized += self._shift_buffer()
+        return self._process_dc_filter(normalized)
+
+    @staticmethod
+    def _scale_from_normalized(
+        value: float | np.ndarray, low_value: float, high_value: float
+    ) -> float | np.ndarray:
+        midpoint = (high_value + low_value) / 2.0
+        scale = (high_value - low_value) / 2.0
+        return midpoint + value * scale
+
+    def generate_sample(
+        self,
+        phase: float,
+        pulsewidth_threshold: float,
+        low_value: float,
+        high_value: float,
+    ) -> float:
+        normalized = self._process_normalized_sample(phase, pulsewidth_threshold)
+        return float(self._scale_from_normalized(normalized, low_value, high_value))
+
+    def generate_samples(
+        self,
+        phases: np.ndarray,
+        pulsewidth_threshold: float,
+        low_value: float,
+        high_value: float,
+    ) -> np.ndarray:
+        normalized = np.asarray(
+            [
+                self._process_normalized_sample(float(phase), pulsewidth_threshold)
+                for phase in phases
+            ],
+            dtype=np.float32,
+        )
+        return np.asarray(
+            self._scale_from_normalized(normalized, low_value, high_value),
+            dtype=np.float32,
+        )
 
 
 class ComparatorSquareStrategy(SquareWaveStrategy):
@@ -383,8 +591,9 @@ class SquareWaveFactory:
     _strategies: dict[str, type[SquareWaveStrategy]] = {
         "ideal": IdealSquareStrategy,
         "ideal_smooth": IdealSquareStrategySmoothing,
-        "soft": SoftSquareStrategy,
         "bandlimited": BandlimitedSquareStrategy,
+        "vcv": VCVRackSquareStrategy,
+        "soft": SoftSquareStrategy,
         "comparator": ComparatorSquareStrategy,
     }
 

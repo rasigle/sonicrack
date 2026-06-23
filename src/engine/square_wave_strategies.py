@@ -9,6 +9,7 @@ from src.engine.oscillator_square import (
     SquareWaveFactory,
     SquareWaveMode,
     SquareWaveStrategy,
+    VCVRackSquareStrategy,
 )
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "SquareWaveStrategy",
     "BandlimitedSquareStrategy",
     "ComparatorSquareStrategy",
+    "VCVRackSquareStrategy",
     "IdealSquareStrategy",
     "IdealSquareStrategySmoothing",
     "SoftSquareStrategy",

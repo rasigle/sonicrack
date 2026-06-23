@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
-from gui.audio_config import audio_config
 from src.engine.oscillator import (
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
     TriangleOscillator,
 )
+from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.ui_constants import (

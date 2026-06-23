@@ -43,17 +43,15 @@ jobs:
           import importlib.util
 
           import src.engine as engine
-          import src.engine.core as core
 
           assert importlib.util.find_spec("sounddevice") is None
           assert importlib.util.find_spec("PyQt6") is None
           assert importlib.util.find_spec("src.audio_io") is not None
           assert importlib.util.find_spec("src.midi_io") is not None
-          assert hasattr(core, "SineOscillator")
           assert hasattr(engine, "SineOscillator")
           assert not hasattr(engine, "AudioOutput")
 
-          osc = core.SineOscillator(frequency=440)
+          osc = engine.SineOscillator(frequency=440)
           samples = osc.get_samples(16, mode="vectorized")
           assert samples.shape == (16,)
           PY

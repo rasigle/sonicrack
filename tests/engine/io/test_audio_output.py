@@ -454,6 +454,43 @@ class TestSoundDeviceCallback(unittest.TestCase):
         self.audio._sounddevice_callback(outdata, 1024, None, None)
 
         np.testing.assert_array_equal(outdata, 0)
+        self.assertEqual(self.audio.callback_error_count, 1)
+        self.assertIsInstance(self.audio.last_callback_error, RuntimeError)
+
+    def test_callback_status_is_recorded(self):
+        """Test that callback status diagnostics are recorded without raising."""
+        status = object()
+        self.audio.audio_callback = lambda n: np.zeros((n, 2), dtype=np.float32)
+        outdata = np.ones((1024, 2), dtype=np.float32)
+
+        self.audio._sounddevice_callback(outdata, 1024, None, status)
+
+        self.assertEqual(self.audio.callback_status_count, 1)
+        self.assertIs(self.audio.last_callback_status, status)
+
+    def test_callback_reuses_ramp_buffer_for_steady_state_fades(self):
+        """Test that fade/volume ramps reuse the preallocated ramp buffer."""
+        self.audio.audio_callback = lambda n: np.ones((n, 2), dtype=np.float32)
+        self.audio._current_master_volume = 0.0
+        self.audio._target_master_volume = 1.0
+        self.audio._master_volume_smoothing_samples = 64
+        ramp_id = id(self.audio._ramp_buffer)
+
+        outdata = np.zeros((1024, 2), dtype=np.float32)
+        self.audio._sounddevice_callback(outdata, 1024, None, None)
+
+        self.assertEqual(id(self.audio._ramp_buffer), ramp_id)
+
+    def test_callback_copies_short_signal_into_output_buffer(self):
+        """Test short callback output leaves the rest of the buffer silent."""
+        self.audio.audio_callback = lambda n: np.ones((10, 2), dtype=np.float32)
+        self.audio._master_volume_smoothing_samples = 0
+        outdata = np.full((1024, 2), 99.0, dtype=np.float32)
+
+        self.audio._sounddevice_callback(outdata, 1024, None, None)
+
+        np.testing.assert_array_almost_equal(outdata[:10], 0.7)
+        np.testing.assert_array_equal(outdata[10:], 0)
 
 
 class TestIntegrationScenarios(unittest.TestCase):

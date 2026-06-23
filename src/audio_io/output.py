@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 
 import numpy as np
 import sounddevice as sd
+
+from src.audio_io.realtime import RealtimeAudioCallback
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class AudioOutput:
         self,
         sample_rate: int = 44100,
         buffer_size: int = 2048,
-        audio_callback: Callable[[int], np.ndarray | None] | None = None,
+        audio_callback: RealtimeAudioCallback | None = None,
     ):
         """Initialize the audio output.
 
@@ -72,6 +73,14 @@ class AudioOutput:
 
         # Track if we're in post-fade silence mode
         self.post_fade_silence: bool = False
+        self.callback_error_count: int = 0
+        self.callback_status_count: int = 0
+        self.last_callback_error: Exception | None = None
+        self.last_callback_status = None
+
+        callback_buffer_size = max(self.buffer_size, 1)
+        self._ramp_buffer = np.empty(callback_buffer_size, dtype=np.float32)
+        self._ramp_index_buffer = np.arange(callback_buffer_size, dtype=np.float32)
 
     def write(self, samples: np.ndarray):
         """Write audio samples directly to the output stream.
@@ -88,7 +97,7 @@ class AudioOutput:
         except Exception as e:
             logger.error(f"Error writing audio samples: {e}", exc_info=True)
 
-    def set_audio_callback(self, callback: Callable[[int], np.ndarray | None]):
+    def set_audio_callback(self, callback: RealtimeAudioCallback):
         """Set the audio generation callback.
 
         Args:
@@ -125,6 +134,7 @@ class AudioOutput:
             self.stop_playback()
 
         self.buffer_size = buffer_size
+        self._ensure_callback_buffers(buffer_size)
 
         if was_playing:
             self.start_playback()
@@ -166,125 +176,147 @@ class AudioOutput:
             status: Stream status
         """
         if status:
-            logger.warning(f"Audio callback status: {status}")
+            self.callback_status_count += 1
+            self.last_callback_status = status
 
         try:
-            # Generate samples using the provided callback
+            outdata.fill(0)
+
             if self.audio_callback is None:
-                outdata.fill(0)
                 return
 
             samples = self.audio_callback(frames)
 
             if samples is None:
-                outdata.fill(0)
                 return
 
-            samples = np.asarray(samples)
-            if samples.ndim == 0:
-                samples = np.atleast_1d(samples)
-
-            # Ensure stereo format
-            if samples.ndim == 1:
-                samples = np.column_stack((samples, samples))
-            elif samples.ndim == 2 and samples.shape[1] == 1:
-                samples = np.repeat(samples, 2, axis=1)
-            else:
-                samples = samples.copy()
-
-            # Clip samples to expected frame length
-            if samples.shape[0] != frames:
-                resized = np.zeros((frames, 2), dtype=samples.dtype)
-                length = min(samples.shape[0], frames)
-                resized[:length] = samples[:length]
-                samples = resized
+            self._copy_callback_samples(outdata, samples, frames)
 
             # Apply master volume smoothing
             if self._master_volume_smoothing_samples > 0:
-                # Linear interpolation from current to target
                 num_smooth = min(self._master_volume_smoothing_samples, frames)
-                alpha = np.linspace(0, 1, num_smooth)
-                volume_ramp = (
-                    self._current_master_volume * (1 - alpha)
-                    + self._target_master_volume * alpha
+                volume_ramp = self._fill_ramp(
+                    self._current_master_volume,
+                    self._target_master_volume,
+                    num_smooth,
                 )
 
-                samples[:num_smooth] *= volume_ramp[:, np.newaxis]
+                outdata[:num_smooth] *= volume_ramp[:, np.newaxis]
                 if frames > num_smooth:
-                    samples[num_smooth:] *= self._target_master_volume
+                    outdata[num_smooth:] *= self._target_master_volume
 
                 self._current_master_volume = self._target_master_volume
                 self._master_volume_smoothing_samples -= num_smooth
             else:
-                samples *= self._target_master_volume
+                outdata *= self._target_master_volume
 
             # Apply fade-in
             if self.is_fading_in and self.fade_in_samples_remaining > 0:
                 num_fade = min(self.fade_in_samples_remaining, frames)
-                num_fade = min(num_fade, samples.shape[0])
                 if num_fade > 0:
-                    segment = samples[:num_fade]
-                    actual_len = segment.shape[0]
-                    if actual_len > 0:
-                        fade_curve = np.linspace(
-                            1.0
-                            - (
-                                self.fade_in_samples_remaining
-                                / self.fade_in_total_samples
-                            ),
-                            1.0
-                            - (
-                                (self.fade_in_samples_remaining - actual_len)
-                                / self.fade_in_total_samples
-                            ),
-                            actual_len,
-                        )
-                        fade_curve_stereo = fade_curve[:, np.newaxis]
-                        np.multiply(segment, fade_curve_stereo, out=segment)
-                        self.fade_in_samples_remaining -= actual_len
+                    segment = outdata[:num_fade]
+                    fade_start = 1.0 - (
+                        self.fade_in_samples_remaining / self.fade_in_total_samples
+                    )
+                    fade_stop = 1.0 - (
+                        (self.fade_in_samples_remaining - num_fade)
+                        / self.fade_in_total_samples
+                    )
+                    fade_curve = self._fill_ramp(
+                        fade_start,
+                        fade_stop,
+                        num_fade,
+                    )
+                    np.multiply(segment, fade_curve[:, np.newaxis], out=segment)
+                    self.fade_in_samples_remaining -= num_fade
 
-                        if self.fade_in_samples_remaining <= 0:
-                            self.is_fading_in = False
-                            logger.debug("Fade-in complete")
+                    if self.fade_in_samples_remaining <= 0:
+                        self.is_fading_in = False
 
             # Apply fade-out
             if self.is_fading_out and not self.post_fade_silence:
                 if self.fade_out_samples_remaining > 0:
                     num_fade = min(self.fade_out_samples_remaining, frames)
-                    num_fade = min(num_fade, samples.shape[0])
                     if num_fade > 0:
-                        segment = samples[:num_fade]
-                        actual_len = segment.shape[0]
-                        if actual_len > 0:
-                            fade_curve = np.linspace(
-                                self.fade_out_samples_remaining
-                                / self.fade_out_total_samples,
-                                (self.fade_out_samples_remaining - actual_len)
-                                / self.fade_out_total_samples,
-                                actual_len,
-                            )
-                            fade_curve_stereo = fade_curve[:, np.newaxis]
-                            np.multiply(segment, fade_curve_stereo, out=segment)
-                            self.fade_out_samples_remaining -= actual_len
+                        segment = outdata[:num_fade]
+                        fade_start = (
+                            self.fade_out_samples_remaining
+                            / self.fade_out_total_samples
+                        )
+                        fade_stop = (
+                            (self.fade_out_samples_remaining - num_fade)
+                            / self.fade_out_total_samples
+                        )
+                        fade_curve = self._fill_ramp(
+                            fade_start,
+                            fade_stop,
+                            num_fade,
+                        )
+                        np.multiply(segment, fade_curve[:, np.newaxis], out=segment)
+                        self.fade_out_samples_remaining -= num_fade
 
-                            if self.fade_out_samples_remaining <= 0:
-                                self.post_fade_silence = True
-                                logger.debug("Fade-out complete, entering silence mode")
+                        if self.fade_out_samples_remaining <= 0:
+                            self.post_fade_silence = True
 
                         if frames > num_fade:
-                            samples[num_fade:] = 0
+                            outdata[num_fade:] = 0
                 else:
-                    samples.fill(0)
+                    outdata.fill(0)
             elif self.post_fade_silence:
-                samples.fill(0)
+                outdata.fill(0)
 
             # Clip and copy to output
-            np.clip(samples, -1.0, 1.0, out=samples)
-            outdata[:] = samples.astype(np.float32)
+            np.clip(outdata, -1.0, 1.0, out=outdata)
 
         except Exception as e:
-            logger.error(f"Error in audio callback: {e}", exc_info=True)
+            self.callback_error_count += 1
+            self.last_callback_error = e
             outdata.fill(0)
+
+    def _copy_callback_samples(
+        self, outdata: np.ndarray, samples: np.ndarray, frames: int
+    ) -> None:
+        """Copy callback samples into the stereo output buffer."""
+        array = np.asarray(samples)
+        if array.ndim == 0:
+            outdata[:1, 0] = array
+            outdata[:1, 1] = array
+            return
+
+        if array.ndim == 1:
+            length = min(array.shape[0], frames)
+            np.copyto(outdata[:length, 0], array[:length], casting="unsafe")
+            np.copyto(outdata[:length, 1], array[:length], casting="unsafe")
+            return
+
+        length = min(array.shape[0], frames)
+        if array.shape[1] == 1:
+            mono = array[:length, 0]
+            np.copyto(outdata[:length, 0], mono, casting="unsafe")
+            np.copyto(outdata[:length, 1], mono, casting="unsafe")
+            return
+
+        np.copyto(outdata[:length, :2], array[:length, :2], casting="unsafe")
+
+    def _fill_ramp(self, start: float, stop: float, length: int) -> np.ndarray:
+        """Fill and return a reusable linear ramp buffer."""
+        self._ensure_callback_buffers(length)
+        ramp = self._ramp_buffer[:length]
+        if length == 1:
+            ramp[0] = stop
+            return ramp
+
+        indices = self._ramp_index_buffer[:length]
+        scale = (stop - start) / (length - 1)
+        np.multiply(indices, scale, out=ramp)
+        ramp += start
+        return ramp
+
+    def _ensure_callback_buffers(self, frames: int) -> None:
+        """Grow reusable callback buffers outside the steady-state hot path."""
+        if frames > self._ramp_buffer.shape[0]:
+            self._ramp_buffer = np.empty(frames, dtype=np.float32)
+            self._ramp_index_buffer = np.arange(frames, dtype=np.float32)
 
     def start_playback(self):
         """Start audio playback."""

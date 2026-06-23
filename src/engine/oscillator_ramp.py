@@ -1,7 +1,9 @@
 """Ramp-based oscillators such as sawtooth and triangle."""
 
 from typing import Literal
+
 import numpy as np
+
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor
 from src.engine.audio_component_registry import ComponentCategory, register_component

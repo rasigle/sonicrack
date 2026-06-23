@@ -15,7 +15,7 @@ from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
-from src.utils.audio_utils import mono_to_stereo, combine_lr_to_stereo
+from src.utils.audio_utils import combine_lr_to_stereo, mono_to_stereo
 
 if TYPE_CHECKING:
     from src.gui.core.port import Port
@@ -138,24 +138,37 @@ class OutputModule(ModuleWidget):
                 "color: #4f4; font-size: 10px; font-weight: bold;"
             )
 
-    def stop_playback(self):
-        """Stop audio playback."""
+    def stop_playback(self, graceful: bool = True):
+        """Stop audio playback.
+
+        Args:
+            graceful: If True, perform the audio output fade-out before stopping.
+        """
         if self.audio_output.is_playing:
-            self.audio_output.stop_playback()
+            self.audio_output.stop_playback(graceful=graceful)
             self.status_label.setText("Stopped")
             self.status_label.setStyleSheet(
                 "color: #888; font-size: 10px; font-style: italic;"
             )
 
+    def shutdown(self, graceful: bool = True):
+        """Release audio resources before application shutdown."""
+        logger.debug("OutputModule shutdown requested")
+        if hasattr(self, "audio_output") and self.audio_output:
+            self.audio_output.cleanup(graceful=graceful)
+        self.status_label.setText("Stopped")
+        self.status_label.setStyleSheet(
+            "color: #888; font-size: 10px; font-style: italic;"
+        )
+
     def closeEvent(self, event):
         """Handle module close/deletion - ensure audio stops first."""
         logger.debug("OutputModule closing - stopping audio")
         # Stop audio output before Qt deletes the module
-        if hasattr(self, "audio_output") and self.audio_output:
-            try:
-                self.audio_output.stop_playback()
-            except Exception as e:
-                logger.debug(f"Error stopping audio on close: {e}")
+        try:
+            self.shutdown(graceful=True)
+        except Exception as e:
+            logger.debug(f"Error stopping audio on close: {e}")
         super().closeEvent(event)
 
     def _generate_samples(self, num_samples: int) -> np.ndarray:

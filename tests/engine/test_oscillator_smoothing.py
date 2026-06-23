@@ -2,13 +2,14 @@
 Test that all oscillator types have amplitude smoothing.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from src.engine.oscillator import (
-    SineOscillator,
     SawtoothOscillator,
-    TriangleOscillator,
+    SineOscillator,
     SquareOscillator,
+    TriangleOscillator,
 )
 
 
@@ -85,9 +86,10 @@ def test_oscillator_smoothing_triggers_on_gain_change(osc_class, name):
 
     # Smoothing duration should be reasonable (default is 10ms at sample_rate)
     expected_duration = int(10 * osc.sample_rate / 1000)  # 10ms default
-    assert (
-        osc._smoothing_samples_remaining == expected_duration
-    ), f"{name} smoothing duration incorrect: {osc._smoothing_samples_remaining} vs {expected_duration}"
+    assert osc._smoothing_samples_remaining == expected_duration, (
+        f"{name} smoothing duration incorrect: {osc._smoothing_samples_remaining} vs "
+        f"{expected_duration}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -123,16 +125,19 @@ def test_oscillator_smoothing_prevents_instant_jump(osc_class, name):
         segment_rms = np.sqrt(np.mean(samples[start:end] ** 2))
         rms_values.append(segment_rms)
 
-    # Each segment should have equal or higher RMS than previous (monotonic increase or flat)
+    # Each segment should have equal or higher RMS than previous (monotonic increase
+    # or flat)
     for i in range(1, 5):
-        assert (
-            rms_values[i] >= rms_values[i - 1] * 0.95
-        ), f"{name} amplitude decreased during smoothing! Segment {i-1}: {rms_values[i-1]:.3f}, Segment {i}: {rms_values[i]:.3f}"
+        assert rms_values[i] >= rms_values[i - 1] * 0.95, (
+            f"{name} amplitude decreased during smoothing! Segment {i-1}: "
+            f"{rms_values[i-1]:.3f}, Segment {i}: {rms_values[i]:.3f}"
+        )
 
     # Last segment should be significantly higher than first segment
-    assert (
-        rms_values[-1] > rms_values[0] * 1.2
-    ), f"{name} didn't transition enough! First: {rms_values[0]:.3f}, Last: {rms_values[-1]:.3f}"
+    assert rms_values[-1] > rms_values[0] * 1.2, (
+        f"{name} didn't transition enough! First: {rms_values[0]:.3f}, "
+        f"Last: {rms_values[-1]:.3f}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -193,18 +198,20 @@ def test_oscillator_smoothing_completes(osc_class, name):
     osc.get_samples_vectorized(smoothing_duration)
 
     # Check smoothing completed (or nearly completed)
-    assert (
-        osc._smoothing_samples_remaining <= smoothing_duration
-    ), f"{name} smoothing didn't complete! Remaining: {osc._smoothing_samples_remaining}"
+    assert osc._smoothing_samples_remaining <= smoothing_duration, (
+        f"{name} smoothing didn't complete! Remaining: "
+        f"{osc._smoothing_samples_remaining}"
+    )
 
     # If there's still smoothing remaining (e.g., SquareOscillator), complete it
     if osc._smoothing_samples_remaining > 0:
         osc.get_samples_vectorized(osc._smoothing_samples_remaining)
 
     # Now it should definitely be complete
-    assert (
-        osc._smoothing_samples_remaining == 0
-    ), f"{name} smoothing didn't complete after second attempt! Remaining: {osc._smoothing_samples_remaining}"
+    assert osc._smoothing_samples_remaining == 0, (
+        f"{name} smoothing didn't complete after second attempt! Remaining: "
+        f"{osc._smoothing_samples_remaining}"
+    )
 
     # Current amplitude should now equal target
     assert (
@@ -267,14 +274,16 @@ def test_oscillator_smoothing_duration_consistent(osc_class, name):
     expected_duration = int(10 * 44100 / 1000)
 
     # Check initial smoothing duration
-    assert (
-        osc._smoothing_samples_duration_total == expected_duration
-    ), f"{name} incorrect smoothing duration: {osc._smoothing_samples_duration_total} vs {expected_duration}"
+    assert osc._smoothing_samples_duration_total == expected_duration, (
+        f"{name} incorrect smoothing duration: {osc._smoothing_samples_duration_total} "
+        f"vs {expected_duration}"
+    )
 
     # Change gain to trigger smoothing
     osc.gain_db = -6
 
     # Verify smoothing uses correct duration
-    assert (
-        osc._smoothing_samples_remaining == expected_duration
-    ), f"{name} smoothing not using correct duration: {osc._smoothing_samples_remaining} vs {expected_duration}"
+    assert osc._smoothing_samples_remaining == expected_duration, (
+        f"{name} smoothing not using correct duration: "
+        f"{osc._smoothing_samples_remaining} vs {expected_duration}"
+    )

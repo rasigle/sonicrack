@@ -11,15 +11,21 @@ Example:
     >>>
     >>> midi = MIDIInput()
     >>> print(midi.list_devices())
+    ['Steinberg UR22-1 0']
     >>> midi.start(on_message)
     >>> # ... receive messages ...
+    >>>
     >>> midi.stop()
 """
 
+from __future__ import annotations
+
 import logging
 import threading
-from queue import Queue, Empty
-from typing import Callable, Optional
+import time
+from collections.abc import Callable
+from contextlib import suppress
+from queue import Empty, Queue
 
 try:
     import mido
@@ -31,13 +37,13 @@ except ImportError:
     logging.warning("mido not installed. Install with: pip install mido python-rtmidi")
 
 from src.engine.io.midi.messages import (
-    MIDIMessage,
-    NoteOnMessage,
-    NoteOffMessage,
+    AftertouchMessage,
     ControlChangeMessage,
+    MIDIMessage,
+    NoteOffMessage,
+    NoteOnMessage,
     PitchBendMessage,
     ProgramChangeMessage,
-    AftertouchMessage,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,7 +62,7 @@ class MIDIInput:
         >>> # List available devices
         >>> devices = MIDIInput.list_devices()
         >>> print(devices)
-
+        ['Steinberg UR22-1 0']
         >>> # Open first device and print messages
         >>> midi = MIDIInput(devices[0])
         >>> midi.start(lambda msg: print(msg))
@@ -64,7 +70,7 @@ class MIDIInput:
         >>> midi.stop()
     """
 
-    def __init__(self, device_name: Optional[str] = None):
+    def __init__(self, device_name: str | None = None):
         """Initialize MIDI input.
 
         Args:
@@ -74,18 +80,15 @@ class MIDIInput:
             RuntimeError: If mido is not installed
             IOError: If device cannot be opened
         """
-        if not MIDO_AVAILABLE:
-            raise RuntimeError(
-                "mido library not installed. "
-                "Install with: pip install mido python-rtmidi"
-            )
 
         self.device_name = device_name
-        self._port: Optional[mido.ports.BaseInput] = None
-        self._thread: Optional[threading.Thread] = None
+        self._port: mido.ports.BaseInput | None = None
+        self._thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
+        self._state_lock = threading.RLock()
         self._running = False
-        self._callback: Optional[Callable[[MIDIMessage], None]] = None
-        self._message_queue: Queue = Queue()
+        self._callback: Callable[[MIDIMessage], None] | None = None
+        self._message_queue: Queue[MIDIMessage] = Queue()
         self._current_time = 0.0
 
         logger.info(f"MIDI Input initialized for device: {device_name or 'auto'}")
@@ -105,12 +108,9 @@ class MIDIInput:
             >>> for i, device in enumerate(devices):
             ...     print(f"{i}: {device}")
         """
-        if not MIDO_AVAILABLE or mido is None:
-            raise RuntimeError("mido library not installed")
-
         return mido.get_input_names()
 
-    def open(self, device_name: Optional[str] = None):
+    def open(self, device_name: str | None = None) -> None:
         """Open a MIDI input device.
 
         Args:
@@ -119,39 +119,46 @@ class MIDIInput:
 
         Raises:
             IOError: If device cannot be opened
+            RuntimeError: If called while MIDI input is running
         """
-        if self._port is not None:
-            self.close()
+        with self._state_lock:
+            if self._running:
+                raise RuntimeError("Cannot open MIDI device while input is running")
 
-        device = device_name or self.device_name
+            if self._port is not None:
+                self._close_port()
 
-        if device is None:
-            # Open first available device
-            devices = self.list_devices()
-            if not devices:
-                raise IOError("No MIDI input devices found")
-            device = devices[0]
+            device = device_name or self.device_name
 
-        try:
-            self._port = mido.open_input(device)
-            self.device_name = device
-            logger.info(f"Opened MIDI device: {device}")
-        except Exception as e:
-            raise IOError(f"Failed to open MIDI device '{device}': {e}")
+            if device is None:
+                # Open first available device
+                devices = self.list_devices()
+                if not devices:
+                    raise OSError("No MIDI input devices found")
+                device = devices[0]
 
-    def close(self):
+            try:
+                self._port = mido.open_input(device)
+                self.device_name = device
+                logger.info(f"Opened MIDI device: {device}")
+            except Exception as e:
+                raise OSError(f"Failed to open MIDI device '{device}': {e}") from e
+
+    def close(self) -> None:
         """Close the MIDI input device."""
-        if self._port is not None:
-            self._port.close()
-            self._port = None
-            logger.info("Closed MIDI device")
+        self.stop()
 
-    def start(self, callback: Optional[Callable[[MIDIMessage], None]] = None):
+        with self._state_lock:
+            self._close_port()
+
+    def start(self, callback: Callable[[MIDIMessage], None] | None = None) -> None:
         """Start receiving MIDI messages.
 
         Args:
             callback: Function to call for each received message.
-                     Signature: callback(msg: MIDIMessage) -> None
+                The callback runs on the MIDI input background thread, so GUI code
+                should use get_messages() or a UI thread-safe dispatcher instead.
+                Signature: callback(msg: MIDIMessage) -> None
 
         Example:
             >>> def print_notes(msg):
@@ -161,40 +168,59 @@ class MIDIInput:
             >>> midi = MIDIInput()
             >>> midi.start(print_notes)
         """
-        if self._running:
-            logger.warning("MIDI input already running")
-            return
+        with self._state_lock:
+            if self._running:
+                logger.warning("MIDI input already running")
+                return
 
-        if self._port is None:
-            self.open()
+            if self._port is None:
+                self.open()
 
-        self._callback = callback
-        self._running = True
-        self._current_time = 0.0
+            self._callback = callback
+            self._running = True
+            self._stop_event.clear()
+            self._current_time = 0.0
 
-        # Start receiving thread
-        self._thread = threading.Thread(target=self._receive_loop, daemon=True)
-        self._thread.start()
+            self._thread = threading.Thread(
+                target=self._receive_loop,
+                name=f"MIDIInput[{self.device_name or 'auto'}]",
+                daemon=True,
+            )
+            self._thread.start()
 
         logger.info("Started MIDI input")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop receiving MIDI messages."""
-        self._running = False
+        with self._state_lock:
+            thread = self._thread
+            was_running = self._running
+            if thread is None and not was_running:
+                return
 
-        if self._thread is not None:
-            self._thread.join(timeout=1.0)
-            self._thread = None
+            self._running = False
+            self._stop_event.set()
+
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=1.0)
+            if thread.is_alive():
+                logger.warning("MIDI input thread did not stop within 1 second")
+
+        with self._state_lock:
+            if self._thread is thread:
+                self._thread = None
 
         logger.info("Stopped MIDI input")
 
     def get_messages(self, timeout: float = 0.0) -> list[MIDIMessage]:
         """Get queued messages (polling interface).
 
-        Alternative to callback - retrieve messages that have been queued.
+        Alternative to callback - retrieve messages that have been queued. With
+        timeout=0, this drains currently queued messages without blocking.
 
         Args:
-            timeout: Maximum time to wait for messages (seconds)
+            timeout: Maximum time to wait for the first message, in seconds.
+                Negative values are treated as zero.
 
         Returns:
             List of received messages (may be empty)
@@ -204,28 +230,26 @@ class MIDIInput:
             >>> midi.start()  # No callback
             >>>
             >>> while True:
-            ...     messages = midi.get_messages(timeout=0.1)
-            ...     for msg in messages:
+            ...     msgs = midi.get_messages(timeout=0.1)
+            ...     for msg in msgs:
             ...         print(msg)
         """
-        messages = []
-        deadline = None
+        messages: list[MIDIMessage] = []
 
-        if timeout > 0:
-            import time
+        if timeout <= 0:
+            while True:
+                try:
+                    messages.append(self._message_queue.get_nowait())
+                except Empty:
+                    return messages
 
-            deadline = time.time() + timeout
+        deadline = time.monotonic() + timeout
 
         while True:
             try:
-                remaining = None
-                if deadline is not None:
-                    import time
-
-                    remaining = max(0, deadline - time.time())
-                    if remaining <= 0:
-                        break
-
+                remaining = max(0, deadline - time.monotonic())
+                if not messages and remaining <= 0:
+                    break
                 msg = self._message_queue.get(timeout=remaining)
                 messages.append(msg)
             except Empty:
@@ -235,23 +259,17 @@ class MIDIInput:
 
     def _receive_loop(self):
         """Internal thread loop for receiving MIDI messages."""
-        import time
-
-        while self._running:
+        while not self._stop_event.is_set():
             try:
                 # Use iter_pending() to get available messages without blocking
-                for raw_msg in self._port.iter_pending():
-                    # Convert to our message format
-                    msg = self._convert_message(raw_msg)
+                with self._state_lock:
+                    port = self._port
 
-                    if msg is not None:
-                        # Queue message for retrieval via get_messages()
-                        self._message_queue.put(msg)
+                if port is None:
+                    break
 
-                        # NOTE: Do NOT call callback directly from this thread!
-                        # Calling GUI code from a background thread causes freezing.
-                        # The callback should be called from the main thread via
-                        # polling.
+                for raw_msg in port.iter_pending():
+                    self._handle_raw_message(raw_msg)
 
                 # Small sleep to avoid busy-waiting
                 time.sleep(0.001)  # 1ms
@@ -261,7 +279,27 @@ class MIDIInput:
                     logger.error(f"Error receiving MIDI message: {e}")
                 time.sleep(0.01)  # Back off on error
 
-    def _convert_message(self, raw_msg) -> Optional[MIDIMessage]:
+        with self._state_lock:
+            self._running = False
+
+    def _handle_raw_message(self, raw_msg) -> None:
+        """Convert, queue, and optionally dispatch one raw MIDI message."""
+        msg = self._convert_message(raw_msg)
+        if msg is None:
+            return
+
+        self._message_queue.put(msg)
+
+        callback = self._callback
+        if callback is None:
+            return
+
+        try:
+            callback(msg)
+        except Exception:
+            logger.exception("MIDI input callback failed")
+
+    def _convert_message(self, raw_msg) -> MIDIMessage | None:
         """Convert mido message to our internal format.
 
         Args:
@@ -330,18 +368,28 @@ class MIDIInput:
     @property
     def is_running(self) -> bool:
         """Check if MIDI input is currently running."""
-        return self._running
+        with self._state_lock:
+            return self._running
 
-    def __enter__(self):
+    def __enter__(self) -> MIDIInput:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
-        self.stop()
         self.close()
 
     def __del__(self):
         """Cleanup on deletion."""
-        self.stop()
-        self.close()
+        with suppress(Exception):
+            self.close()
+
+    def _close_port(self) -> None:
+        """Close the current port. Caller must hold _state_lock."""
+        if self._port is None:
+            return
+
+        port = self._port
+        self._port = None
+        port.close()
+        logger.info("Closed MIDI device")

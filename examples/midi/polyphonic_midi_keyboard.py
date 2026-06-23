@@ -26,20 +26,20 @@ except ImportError:
     sys.exit(1)
 
 
-from engine.io.midi import (
-    PolyphonicSynth,
-    MIDIInput,
-    midi_to_note_name,
-)
-from engine.io.midi import MIDO_AVAILABLE
-from engine.io.midi import NoteOnMessage, NoteOffMessage
 from engine import (
-    SineOscillator,
-    SawtoothOscillator,
     ADSREnvelope,
     Chain,
-    SquareOscillator,
     ModulatedVolume,
+    SawtoothOscillator,
+    SineOscillator,
+    SquareOscillator,
+)
+from engine.io.midi import (
+    MIDIInput,
+    NoteOffMessage,
+    NoteOnMessage,
+    PolyphonicSynth,
+    midi_to_note_name,
 )
 from src.constants import DEFAULT_SAMPLE_RATE
 
@@ -121,15 +121,9 @@ def select_voice_factory():
 def main():
     """Main function."""
     print(
-        f"\n{Colors.BOLD}{Colors.CYAN}=== Polyphonic MIDI Keyboard Synthesizer ==={Colors.ENDC}\n"
+        f"\n{Colors.BOLD}{Colors.CYAN}=== Polyphonic MIDI Keyboard Synthesizer ==="
+        f"{Colors.ENDC}\n"
     )
-
-    # Check if mido is available
-    if not MIDO_AVAILABLE:
-        print(f"{Colors.RED}Error: mido library not installed{Colors.ENDC}")
-        print("\nInstall with:")
-        print("  pip install mido python-rtmidi")
-        sys.exit(1)
 
     # List MIDI devices
     try:
@@ -239,18 +233,20 @@ def main():
 
     # Start audio and MIDI
     try:
-        with sd.OutputStream(
-            channels=2,
-            samplerate=DEFAULT_SAMPLE_RATE,
-            blocksize=1024,
-            callback=audio_callback,
+        with (
+            sd.OutputStream(
+                channels=2,
+                samplerate=DEFAULT_SAMPLE_RATE,
+                blocksize=1024,
+                callback=audio_callback,
+            ),
+            MIDIInput(selected_device) as midi,
         ):
-            with MIDIInput(selected_device) as midi:
-                midi.start(on_midi_message)
+            midi.start(on_midi_message)
 
-                # Keep running
-                while True:
-                    time.sleep(0.1)
+            # Keep running
+            while True:
+                time.sleep(0.1)
 
     except KeyboardInterrupt:
         print(f"\n\n{Colors.BOLD}Stopped.{Colors.ENDC}")

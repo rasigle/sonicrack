@@ -5,15 +5,16 @@ implementation, verifying API compatibility, waveform generation, and
 antialiasing effectiveness.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from src.engine.oscillator_polyblep import (
     PolyBLEPOscillator,
     PolyBLEPWaveforms,
     WaveShape,
+    generate_sawtooth,
     generate_sine,
     generate_square,
-    generate_sawtooth,
     generate_triangle,
 )
 

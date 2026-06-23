@@ -29,7 +29,7 @@ CC Numbers:
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class MIDIMessage:
     """Base class for all MIDI messages.
 
@@ -47,7 +47,7 @@ class MIDIMessage:
             raise ValueError(f"MIDI channel must be 0-15, got {self.channel}")
 
 
-@dataclass
+@dataclass(frozen=True)
 class NoteOnMessage(MIDIMessage):
     """MIDI Note On message.
 
@@ -98,7 +98,7 @@ class NoteOnMessage(MIDIMessage):
         return self.velocity / 127.0
 
 
-@dataclass
+@dataclass(frozen=True)
 class NoteOffMessage(MIDIMessage):
     """MIDI Note Off message.
 
@@ -130,7 +130,7 @@ class NoteOffMessage(MIDIMessage):
             raise ValueError(f"MIDI velocity must be 0-127, got {self.velocity}")
 
 
-@dataclass
+@dataclass(frozen=True)
 class ControlChangeMessage(MIDIMessage):
     """MIDI Control Change (CC) message.
 
@@ -192,7 +192,7 @@ class ControlChangeMessage(MIDIMessage):
         return self.value >= threshold
 
 
-@dataclass
+@dataclass(frozen=True)
 class PitchBendMessage(MIDIMessage):
     """MIDI Pitch Bend message.
 
@@ -239,7 +239,7 @@ class PitchBendMessage(MIDIMessage):
         return self.normalize_value() * bend_range
 
 
-@dataclass
+@dataclass(frozen=True)
 class ProgramChangeMessage(MIDIMessage):
     """MIDI Program Change message.
 
@@ -261,7 +261,7 @@ class ProgramChangeMessage(MIDIMessage):
             raise ValueError(f"Program must be 0-127, got {self.program}")
 
 
-@dataclass
+@dataclass(frozen=True)
 class AftertouchMessage(MIDIMessage):
     """MIDI Channel Aftertouch message.
 

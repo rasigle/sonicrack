@@ -14,19 +14,14 @@ If no file is provided, shows instructions on finding MIDI files.
 import sys
 from pathlib import Path
 
-try:
-    from engine.io.midi import MIDIFile, midi_to_note_name
-    from engine.io.midi import (
-        NoteOnMessage,
-        NoteOffMessage,
-        ControlChangeMessage,
-        PitchBendMessage,
-    )
-    from engine.io.midi import MIDO_AVAILABLE
-except ImportError:
-    print("Error: Could not import MIDI modules")
-    print("Make sure you're running from the project root directory")
-    sys.exit(1)
+from engine.io.midi import (
+    ControlChangeMessage,
+    MIDIFile,
+    NoteOffMessage,
+    NoteOnMessage,
+    PitchBendMessage,
+    midi_to_note_name,
+)
 
 
 # ANSI color codes
@@ -87,7 +82,7 @@ def analyze_midi_file(filepath: str):
 
     # Message types
     print(f"\n{Colors.BOLD}Message Types:{Colors.ENDC}")
-    message_types = midi.get_message_types()
+    message_types = midi.count_per_message_type()
     for msg_type, count in sorted(message_types.items()):
         print(f"  {msg_type:25s}: {count:5d}")
 
@@ -118,12 +113,13 @@ def analyze_midi_file(filepath: str):
             1 for msg in ch_messages if isinstance(msg, (NoteOnMessage, NoteOffMessage))
         )
         print(
-            f"    Channel {channel + 1:2d}:    {len(ch_messages):5d} messages ({ch_notes} notes)"
+            f"    Channel {channel + 1:2d}:    {len(ch_messages):5d} messages "
+            f"({ch_notes} notes)"
         )
 
     # First 10 messages preview
     print(f"\n{Colors.BOLD}First 10 Messages:{Colors.ENDC}")
-    for i, msg in enumerate(midi.messages[:10]):
+    for _i, msg in enumerate(midi.messages[:10]):
         timestamp_str = f"[{msg.timestamp:6.2f}s]"
         channel_str = f"Ch{msg.channel + 1:2d}"
 
@@ -150,7 +146,8 @@ def analyze_midi_file(filepath: str):
 
     if len(midi.messages) > 10:
         print(
-            f"  {Colors.CYAN}... and {len(midi.messages) - 10} more messages{Colors.ENDC}"
+            f"  {Colors.CYAN}... and {len(midi.messages) - 10} more "
+            f"messages{Colors.ENDC}"
         )
 
     # Timeline analysis (every 10 seconds)
@@ -176,13 +173,6 @@ def analyze_midi_file(filepath: str):
 
 
 def main():
-    """Main function."""
-    # Check if mido is available
-    if not MIDO_AVAILABLE:
-        print(f"{Colors.RED}Error: mido library not installed{Colors.ENDC}")
-        print("\nOr with uv:")
-        print("  uv pip install mido")
-        sys.exit(1)
 
     # Get file path from command line or prompt
     if len(sys.argv) > 1:

@@ -7,17 +7,17 @@ from PyQt6.QtWidgets import QHBoxLayout
 
 from gui.audio_config import audio_config
 from src.engine.oscillator import (
-    SineOscillator,
     SawtoothOscillator,
-    TriangleOscillator,
+    SineOscillator,
     SquareOscillator,
+    TriangleOscillator,
 )
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.ui_constants import (
-    MIN_PW_PERCENTAGE_VALUE,
-    MAX_PW_PERCENTAGE_VALUE,
     DEFAULT_PW_PERCENTAGE_VALUE,
+    MAX_PW_PERCENTAGE_VALUE,
+    MIN_PW_PERCENTAGE_VALUE,
 )
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
@@ -206,7 +206,7 @@ class LFOModule(ModuleWidget):
                 processing)
         """
         # Generate samples for each connected output
-        for port, osc in zip(self.ports, self.oscs):
+        for port, osc in zip(self.ports, self.oscs, strict=False):
             if port.is_connected and osc is not None:
                 # Generate samples from oscillator
                 samples = osc.get_samples(num_samples)

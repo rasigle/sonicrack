@@ -1,8 +1,10 @@
-import numpy as np
-import sounddevice as sd
+import contextlib
 import threading
 import tkinter as tk
 from tkinter import ttk
+
+import numpy as np
+import sounddevice as sd
 
 
 class SmoothSequencer:
@@ -70,10 +72,8 @@ class SmoothSequencer:
                 self.f_next = self.freqs[self.current_step]
                 # notify GUI of new step
                 if self.step_callback:
-                    try:
+                    with contextlib.suppress(Exception):
                         self.step_callback(self.current_step)
-                    except Exception:
-                        pass
 
             remain = self.samples_in_step - self.samples_generated
             n = min(frames - idx, remain)

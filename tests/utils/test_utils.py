@@ -1,6 +1,7 @@
 """Tests for utility functions in src.utils.utils."""
 
 import pytest
+
 from src.utils.utils import track_provided_args
 
 
@@ -87,7 +88,8 @@ class TestTrackProvidedArgs:
         assert instance._provided_args == {"a"}
 
     def test_handles_self_passed_as_keyword_correctly(self):
-        """Correctly tracks 'self' even if passed as a keyword (unusual but possible)."""
+        """Correctly tracks 'self' even if passed as a keyword (unusual but
+        possible)."""
 
         # Arrange
         class MyClass:
@@ -104,7 +106,8 @@ class TestTrackProvidedArgs:
         assert instance._provided_args == {"b"}
 
     def test_does_not_fail_on_standalone_function_without_self(self):
-        """Ensures the decorator does not raise an error on a function with no 'self'."""
+        """Ensures the decorator does not raise an error on a function with no
+        'self'."""
 
         # Arrange
         @track_provided_args
@@ -121,7 +124,8 @@ class TestTrackProvidedArgs:
             pytest.fail(f"Decorator failed on a standalone function: {e}")
 
     def test_overwriting_default_with_same_value_is_tracked(self):
-        """Ensures an argument is tracked if explicitly passed, even if it's the default value."""
+        """Ensures an argument is tracked if explicitly passed, even if it's the
+        default value."""
 
         # Arrange
         class MyClass:
@@ -153,7 +157,8 @@ class TestTrackProvidedArgs:
         # Assert
         # The decorator correctly identifies 'a' and 'b' as provided.
         # It also tracks 'c' and 'd' from **kwargs.
-        # The positional arguments that fall into *args are not named, so they are not tracked.
+        # The positional arguments that fall into *args are not named, so they are not
+        # tracked.
         assert instance._provided_args == {"a", "b", "c", "d"}
         assert instance.a == 1
         assert instance.args == (100, 200)

@@ -1,6 +1,6 @@
 """Visualization modules for audio signal monitoring."""
 
-from .waveform import WaveformModule
 from .spectrum import SpectrumModule
+from .waveform import WaveformModule
 
 __all__ = ["WaveformModule", "SpectrumModule"]

@@ -6,4 +6,4 @@ cd "%~dp0..\environment"
 call .\uv_sync_all.bat
 
 echo Running flake8 code checking
-uv run flake8 .\src .\scripts
+uv run flake8 .\src .\scripts .\examples .\tests

@@ -7,7 +7,7 @@ NOTE: This engine now uses a pull-based architecture where the audio callback
 from __future__ import annotations
 
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PyQt6 import QtCore
 

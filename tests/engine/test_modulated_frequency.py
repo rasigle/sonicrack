@@ -10,12 +10,13 @@ Tests cover:
 - Edge cases
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from src.engine.oscillator import (
+    SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
-    SawtoothOscillator,
     TriangleOscillator,
 )
 from src.engine.oscillator_modulated import ModulatedFrequency, ModulatedOscillator

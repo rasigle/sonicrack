@@ -7,12 +7,12 @@ import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB
 from src.engine.modifier import (
-    Panner,
-    ModulatedPanner,
-    Volume,
-    ModulatedVolume,
-    Frequency,
     Clipper,
+    Frequency,
+    ModulatedPanner,
+    ModulatedVolume,
+    Panner,
+    Volume,
 )
 from src.engine.modulator import ADSREnvelope
 from src.engine.oscillator import SineOscillator
@@ -350,7 +350,8 @@ class TestModulatedPanner(unittest.TestCase):
                 power,
                 1.0,
                 places=5,
-                msg=f"Power not preserved during modulation at position {panner.position}",
+                msg=f"Power not preserved during modulation at position "
+                f"{panner.position}",
             )
             next(panner)
 
@@ -1025,13 +1026,14 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
     """Test ModulatedVolume vectorized methods."""
 
     def test_regression_chain_with_modulated_volume(self):
-        """Regression test: Chain should use vectorized ModulatedVolume, not iterator fallback.
+        """Regression test: Chain should use vectorized ModulatedVolume, not iterator
+        fallback.
 
         This test ensures that the bug where Chain fell back to Python loops
         for ModulatedVolume has been fixed.
         """
-        from src.engine.composer import Chain
         from src.engine import SquareOscillator
+        from src.engine.composer import Chain
 
         # Create chain with ModulatedVolume (the problematic case)
         osc = SquareOscillator(440, amplitude=0.5, gain_db=None, sample_rate=1000)
@@ -1084,10 +1086,10 @@ class TestChainVectorizationPerformance(unittest.TestCase):
 
     def test_chain_with_multiple_modulated_modifiers(self):
         """Test Chain with multiple modulated modifiers (complex case)."""
-        from src.engine.composer import Chain
-        from src.engine.oscillator import TriangleOscillator
         from src.engine import SquareOscillator
+        from src.engine.composer import Chain
         from src.engine.modifier import ModulatedPanner
+        from src.engine.oscillator import TriangleOscillator
 
         # This is similar to the user's original code
         osc = SquareOscillator(440, amplitude=0.3, sample_rate=1000)

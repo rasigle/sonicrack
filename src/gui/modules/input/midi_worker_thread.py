@@ -5,7 +5,6 @@ the UI thread via Qt signals (thread-safe).
 """
 
 import logging
-from typing import Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -39,7 +38,7 @@ class MIDIWorkerThread(QThread):
         """
         super().__init__()
         self.device_name = device_name
-        self.midi_input: Optional[MIDIInput] = None
+        self.midi_input: MIDIInput | None = None
         self._running = False
 
     def run(self):

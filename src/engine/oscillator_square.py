@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Callable, Literal, cast
+from typing import Literal, Protocol, runtime_checkable
 
 import numpy as np
 
@@ -12,7 +12,27 @@ from src.engine.audio_component_registry import ComponentCategory, register_comp
 from src.engine.oscillator_base import Oscillator
 from src.utils.utils import filter_provided_args, track_provided_args
 
-SquareWaveMode = Literal["ideal", "ideal_smooth", "soft"]
+SquareWaveMode = Literal["ideal", "ideal_smooth", "soft", "bandlimited", "comparator"]
+TWO_PI = 2 * np.pi
+logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class _FrequencyAwareStrategy(Protocol):
+    def set_frequency(self, frequency: float) -> None:
+        pass
+
+
+@runtime_checkable
+class _SampleRateAwareStrategy(Protocol):
+    def set_sample_rate(self, sample_rate: float) -> None:
+        pass
+
+
+@runtime_checkable
+class _ResettableStrategy(Protocol):
+    def reset_state(self) -> None:
+        pass
 
 
 class SquareWaveStrategy(ABC):
@@ -42,9 +62,6 @@ class SquareWaveStrategy(ABC):
 class IdealSquareStrategy(SquareWaveStrategy):
     """Ideal aliased square wave with instant transitions."""
 
-    def __init__(self, **kwargs):
-        pass
-
     def generate_sample(
         self,
         phase: float,
@@ -69,19 +86,73 @@ class IdealSquareStrategy(SquareWaveStrategy):
 class IdealSquareStrategySmoothing(SquareWaveStrategy):
     """Ideal square wave with internal amplitude smoothing."""
 
-    def __init__(self, smoothing_time_ms: float = 5.0, sample_rate: float = 44100):
+    def __init__(
+        self, smoothing_time_ms: float = 5.0, sample_rate: float = 44100
+    ) -> None:
+        if smoothing_time_ms < 0:
+            raise ValueError(
+                f"smoothing_time_ms must be non-negative, got {smoothing_time_ms}"
+            )
+        if sample_rate <= 0:
+            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
         self.smoothing_time_ms = smoothing_time_ms
         self.sample_rate = sample_rate
         self._current_amplitude = 1.0
         self._target_amplitude = 1.0
+        self._start_amplitude = 1.0
+        self._smoothing_samples_total = 0
         self._smoothing_samples_remaining = 0
 
-    def set_amplitude(self, amplitude: float):
+    def _smoothing_sample_count(self) -> int:
+        return int(self.smoothing_time_ms * self.sample_rate / 1000)
+
+    def set_sample_rate(self, sample_rate: float) -> None:
+        if sample_rate <= 0:
+            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
+        self.sample_rate = sample_rate
+
+    def reset_amplitude(self, amplitude: float) -> None:
+        self._current_amplitude = amplitude
+        self._target_amplitude = amplitude
+        self._start_amplitude = amplitude
+        self._smoothing_samples_total = 0
+        self._smoothing_samples_remaining = 0
+
+    def set_amplitude(self, amplitude: float) -> None:
         if abs(amplitude - self._current_amplitude) > 0.001:
+            smoothing_samples = self._smoothing_sample_count()
+            self._start_amplitude = self._current_amplitude
             self._target_amplitude = amplitude
-            self._smoothing_samples_remaining = int(
-                self.smoothing_time_ms * self.sample_rate / 1000
-            )
+            self._smoothing_samples_total = smoothing_samples
+            self._smoothing_samples_remaining = smoothing_samples
+            if smoothing_samples == 0:
+                self.reset_amplitude(amplitude)
+
+    def _consume_amplitude_envelope(self, n: int) -> np.ndarray:
+        if n <= 0:
+            return np.empty(0, dtype=np.float32)
+        if self._smoothing_samples_remaining <= 0:
+            return np.full(n, self._current_amplitude, dtype=np.float32)
+
+        smooth_count = min(n, self._smoothing_samples_remaining)
+        completed = self._smoothing_samples_total - self._smoothing_samples_remaining
+        positions = completed + np.arange(1, smooth_count + 1, dtype=np.float64)
+        progress = positions / self._smoothing_samples_total
+        envelope = (
+            self._start_amplitude
+            + (self._target_amplitude - self._start_amplitude) * progress
+        ).astype(np.float32)
+
+        self._smoothing_samples_remaining -= smooth_count
+        self._current_amplitude = float(envelope[-1])
+        if self._smoothing_samples_remaining <= 0:
+            self.reset_amplitude(self._target_amplitude)
+
+        if smooth_count == n:
+            return envelope
+
+        tail = np.full(n - smooth_count, self._target_amplitude, dtype=np.float32)
+        return np.concatenate((envelope, tail))
 
     def generate_sample(
         self,
@@ -91,20 +162,7 @@ class IdealSquareStrategySmoothing(SquareWaveStrategy):
         high_value: float,
     ) -> float:
         val = high_value if phase < pulsewidth_threshold else low_value
-        if self._smoothing_samples_remaining > 0:
-            progress = 1.0 - (
-                self._smoothing_samples_remaining
-                / (self.smoothing_time_ms * self.sample_rate / 1000)
-            )
-            current_amp = (
-                self._current_amplitude
-                + (self._target_amplitude - self._current_amplitude) * progress
-            )
-            self._smoothing_samples_remaining -= 1
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
-            return val * current_amp
-        return val * self._current_amplitude
+        return float(val * self._consume_amplitude_envelope(1)[0])
 
     def generate_samples(
         self,
@@ -115,27 +173,36 @@ class IdealSquareStrategySmoothing(SquareWaveStrategy):
     ) -> np.ndarray:
         n = len(phases)
         val = np.where(phases < pulsewidth_threshold, high_value, low_value)
-        if self._smoothing_samples_remaining > 0:
-            smooth_count = min(n, self._smoothing_samples_remaining)
-            amp_envelope = np.linspace(
-                self._current_amplitude, self._target_amplitude, smooth_count
-            )
-            samples = np.zeros(n, dtype=np.float32)
-            samples[:smooth_count] = val[:smooth_count] * amp_envelope
-            if smooth_count < n:
-                samples[smooth_count:] = val[smooth_count:] * self._target_amplitude
-            self._smoothing_samples_remaining -= smooth_count
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
-            return samples
-        return (val * self._current_amplitude).astype(np.float32)
+        return (val * self._consume_amplitude_envelope(n)).astype(np.float32)
 
 
 class SoftSquareStrategy(SquareWaveStrategy):
     """Square wave with tanh-smoothed transitions."""
 
-    def __init__(self, smoothness: float = 10.0):
+    def __init__(self, smoothness: float = 10.0) -> None:
+        if smoothness <= 0:
+            raise ValueError(f"smoothness must be positive, got {smoothness}")
         self.smoothness = smoothness
+
+    def _smooth_level(
+        self, phases: float | np.ndarray, pulsewidth_threshold: float
+    ) -> float | np.ndarray:
+        if pulsewidth_threshold <= 0.0:
+            return np.zeros_like(phases, dtype=np.float32)
+        if pulsewidth_threshold >= TWO_PI:
+            return np.ones_like(phases, dtype=np.float32)
+
+        phases_wrapped = np.asarray(phases) % TWO_PI
+        inside_high = phases_wrapped < pulsewidth_threshold
+        distance_inside = np.minimum(
+            phases_wrapped, pulsewidth_threshold - phases_wrapped
+        )
+        distance_outside = np.minimum(
+            phases_wrapped - pulsewidth_threshold,
+            TWO_PI - phases_wrapped,
+        )
+        signed_distance = np.where(inside_high, distance_inside, -distance_outside)
+        return (np.tanh(signed_distance * self.smoothness) + 1.0) / 2.0
 
     def generate_sample(
         self,
@@ -144,9 +211,8 @@ class SoftSquareStrategy(SquareWaveStrategy):
         low_value: float,
         high_value: float,
     ) -> float:
-        dist_from_threshold = phase - pulsewidth_threshold
-        smooth_step = np.tanh(-dist_from_threshold * self.smoothness)
-        return low_value + (high_value - low_value) * (smooth_step + 1) / 2
+        level = self._smooth_level(phase, pulsewidth_threshold)
+        return float(low_value + (high_value - low_value) * level)
 
     def generate_samples(
         self,
@@ -155,9 +221,160 @@ class SoftSquareStrategy(SquareWaveStrategy):
         low_value: float,
         high_value: float,
     ) -> np.ndarray:
-        dist_from_threshold = phases - pulsewidth_threshold
-        smooth_step = np.tanh(-dist_from_threshold * self.smoothness)
-        return low_value + (high_value - low_value) * (smooth_step + 1) / 2
+        level = self._smooth_level(phases, pulsewidth_threshold)
+        return np.asarray(
+            low_value + (high_value - low_value) * level, dtype=np.float32
+        )
+
+
+class BandlimitedSquareStrategy(SquareWaveStrategy):
+    """PolyBLEP antialiased square wave with reduced edge aliasing."""
+
+    def __init__(self, sample_rate: float = 44100, frequency: float = 440) -> None:
+        if sample_rate <= 0:
+            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
+        self.sample_rate = sample_rate
+        self.frequency = frequency
+
+    def set_sample_rate(self, sample_rate: float) -> None:
+        if sample_rate <= 0:
+            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
+        self.sample_rate = sample_rate
+
+    def set_frequency(self, frequency: float) -> None:
+        self.frequency = frequency
+
+    @property
+    def _increment(self) -> float:
+        return min(abs(self.frequency / self.sample_rate), 0.5)
+
+    @staticmethod
+    def _polyblep(phases: np.ndarray, increment: float) -> np.ndarray:
+        correction = np.zeros_like(phases, dtype=np.float64)
+        if increment <= 0.0:
+            return correction
+
+        start_mask = phases < increment
+        if np.any(start_mask):
+            p = phases[start_mask] / increment
+            correction[start_mask] = (p + p) - (p * p) - 1.0
+
+        end_mask = phases > 1.0 - increment
+        if np.any(end_mask):
+            p = (phases[end_mask] - 1.0) / increment
+            correction[end_mask] = (p + p) + (p * p) + 1.0
+
+        return correction
+
+    def _generate_normalized(
+        self, phases: np.ndarray, pulsewidth_threshold: float
+    ) -> np.ndarray:
+        pulsewidth = pulsewidth_threshold / TWO_PI
+        if pulsewidth <= 0.0:
+            return np.full(len(phases), -1.0, dtype=np.float32)
+        if pulsewidth >= 1.0:
+            return np.full(len(phases), 1.0, dtype=np.float32)
+
+        normalized_phases = (phases % TWO_PI) / TWO_PI
+        output = np.where(normalized_phases < pulsewidth, 1.0, -1.0).astype(
+            np.float64
+        )
+        increment = self._increment
+        output += self._polyblep(normalized_phases, increment)
+        shifted_phases = (normalized_phases - pulsewidth + 1.0) % 1.0
+        output -= self._polyblep(shifted_phases, increment)
+        return output.astype(np.float32)
+
+    @staticmethod
+    def _scale_from_normalized(
+        values: np.ndarray, low_value: float, high_value: float
+    ) -> np.ndarray:
+        midpoint = (high_value + low_value) / 2.0
+        scale = (high_value - low_value) / 2.0
+        return np.asarray(midpoint + values * scale, dtype=np.float32)
+
+    def generate_sample(
+        self,
+        phase: float,
+        pulsewidth_threshold: float,
+        low_value: float,
+        high_value: float,
+    ) -> float:
+        normalized = self._generate_normalized(
+            np.asarray([phase], dtype=np.float64), pulsewidth_threshold
+        )
+        return float(self._scale_from_normalized(normalized, low_value, high_value)[0])
+
+    def generate_samples(
+        self,
+        phases: np.ndarray,
+        pulsewidth_threshold: float,
+        low_value: float,
+        high_value: float,
+    ) -> np.ndarray:
+        normalized = self._generate_normalized(phases, pulsewidth_threshold)
+        return self._scale_from_normalized(normalized, low_value, high_value)
+
+
+class ComparatorSquareStrategy(SquareWaveStrategy):
+    """Sine-comparator square wave with optional hysteresis."""
+
+    def __init__(self, hysteresis: float = 0.0) -> None:
+        if not 0.0 <= hysteresis <= 1.0:
+            raise ValueError(
+                f"hysteresis must be between 0.0 and 1.0, got {hysteresis}"
+            )
+        self.hysteresis = hysteresis
+        self._state_high = False
+        self._state_initialized = False
+
+    def reset_state(self) -> None:
+        self._state_high = False
+        self._state_initialized = False
+
+    @staticmethod
+    def _comparator_level(phase: float, pulsewidth_threshold: float) -> float:
+        pulsewidth = pulsewidth_threshold / TWO_PI
+        if pulsewidth <= 0.0:
+            return -1.0
+        if pulsewidth >= 1.0:
+            return 1.0
+
+        center = pulsewidth * np.pi
+        threshold = np.cos(center)
+        return float(np.cos((phase % TWO_PI) - center) - threshold)
+
+    def generate_sample(
+        self,
+        phase: float,
+        pulsewidth_threshold: float,
+        low_value: float,
+        high_value: float,
+    ) -> float:
+        level = self._comparator_level(phase, pulsewidth_threshold)
+        if not self._state_initialized:
+            self._state_high = level >= 0.0
+            self._state_initialized = True
+        elif self._state_high and level < -self.hysteresis:
+            self._state_high = False
+        elif not self._state_high and level > self.hysteresis:
+            self._state_high = True
+
+        return high_value if self._state_high else low_value
+
+    def generate_samples(
+        self,
+        phases: np.ndarray,
+        pulsewidth_threshold: float,
+        low_value: float,
+        high_value: float,
+    ) -> np.ndarray:
+        samples = np.empty(len(phases), dtype=np.float32)
+        for index, phase in enumerate(phases):
+            samples[index] = self.generate_sample(
+                float(phase), pulsewidth_threshold, low_value, high_value
+            )
+        return samples
 
 
 class SquareWaveFactory:
@@ -167,26 +384,29 @@ class SquareWaveFactory:
         "ideal": IdealSquareStrategy,
         "ideal_smooth": IdealSquareStrategySmoothing,
         "soft": SoftSquareStrategy,
+        "bandlimited": BandlimitedSquareStrategy,
+        "comparator": ComparatorSquareStrategy,
     }
 
     @classmethod
-    def create(cls, mode: SquareWaveMode = "ideal", **kwargs) -> SquareWaveStrategy:
+    def create(cls, mode: str = "ideal", **kwargs) -> SquareWaveStrategy:
         if mode not in cls._strategies:
             raise ValueError(
                 f"Unknown square wave mode: {mode}. "
                 f"Available modes: {list(cls._strategies.keys())}"
             )
-        logging.debug(f"Creating square wave strategy with mode: {mode}")
+        logger.debug("Creating square wave strategy with mode: %s", mode)
         strategy_class = cls._strategies[mode]
-        strategy_factory = cast(Callable[..., SquareWaveStrategy], strategy_class)
-        return strategy_factory(**kwargs)
+        return strategy_class(**kwargs)
 
     @classmethod
     def get_available_modes(cls) -> list[str]:
         return list(cls._strategies.keys())
 
     @classmethod
-    def register_strategy(cls, name: str, strategy_class: type[SquareWaveStrategy]):
+    def register_strategy(
+        cls, name: str, strategy_class: type[SquareWaveStrategy]
+    ) -> None:
         if not issubclass(strategy_class, SquareWaveStrategy):
             raise TypeError(f"{strategy_class} must inherit from SquareWaveStrategy")
         cls._strategies[name] = strategy_class
@@ -225,7 +445,7 @@ class SquareOscillator(Oscillator):
         pulsewidth: float = 0.5,
         mode: SquareWaveMode = "ideal",
         **mode_kwargs,
-    ):
+    ) -> None:
         kwargs = filter_provided_args(
             self._provided_args,  # noqa
             frequency=frequency,
@@ -242,45 +462,93 @@ class SquareOscillator(Oscillator):
             )
         self._pulsewidth = pulsewidth
         self._mode = mode
-        self._pulsewidth_threshold = pulsewidth * 2 * np.pi
+        self._pulsewidth_threshold = pulsewidth * TWO_PI
         self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)
         self._mode_kwargs = mode_kwargs
+        self._sync_strategy_runtime()
+        self._sync_smoothing_strategy(initial=True)
 
     @property
     def pulsewidth(self) -> float:
         return self._pulsewidth
 
     @pulsewidth.setter
-    def pulsewidth(self, value: float):
+    def pulsewidth(self, value: float) -> None:
         if not 0.0 <= value <= 1.0:
             raise ValueError(f"pulsewidth must be between 0.0 and 1.0, got {value}")
         self._pulsewidth = value
-        self._pulsewidth_threshold = value * 2 * np.pi
+        self._pulsewidth_threshold = value * TWO_PI
 
-    def _post_freq_set(self):
-        self._step = (2 * np.pi * self._f) / self._sample_rate
+    def _post_freq_set(self) -> None:
+        self._step = (TWO_PI * self._f) / self._sample_rate
+        self._sync_strategy_runtime()
 
-    def _post_phase_set(self):
+    def _post_amp_set(self) -> None:
+        if self._strategy_handles_amplitude():
+            strategy = self._strategy
+            assert isinstance(strategy, IdealSquareStrategySmoothing)
+            strategy.set_amplitude(self._target_amplitude)
+            self._smoothing_samples_remaining = 0
+            self._current_amplitude = self._target_amplitude
+
+    def _post_phase_set(self) -> None:
         self._p = np.deg2rad(self._p)
 
-    def _initialize_osc(self):
+    def _post_sample_rate_set(self) -> None:
+        self._post_freq_set()
+        self._sync_strategy_runtime()
+
+    def _initialize_osc(self) -> None:
         self._i = 0.0
+        strategy = getattr(self, "_strategy", None)
+        if isinstance(strategy, _ResettableStrategy):
+            strategy.reset_state()
 
     @property
     def mode(self) -> SquareWaveMode:
         return self._mode
 
-    def set_mode(self, mode: SquareWaveMode, **mode_kwargs):
+    def set_mode(self, mode: SquareWaveMode, **mode_kwargs) -> None:
         self._mode = mode
         self._mode_kwargs = mode_kwargs
         self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)
+        self._sync_strategy_runtime()
+        self._sync_smoothing_strategy(initial=False)
 
     @classmethod
     def get_available_modes(cls) -> list[str]:
         return SquareWaveFactory.get_available_modes()
 
-    def __next__(self):
-        current_phase = (self._i + self._p) % (2 * np.pi)
+    def _strategy_handles_amplitude(self) -> bool:
+        return isinstance(
+            getattr(self, "_strategy", None), IdealSquareStrategySmoothing
+        )
+
+    def _sync_smoothing_strategy(self, *, initial: bool) -> None:
+        if not self._strategy_handles_amplitude():
+            return
+
+        strategy = self._strategy
+        assert isinstance(strategy, IdealSquareStrategySmoothing)
+        strategy.set_sample_rate(self._sample_rate)
+        if initial:
+            strategy.set_amplitude(self._target_amplitude)
+        else:
+            strategy.reset_amplitude(self._current_amplitude)
+            strategy.set_amplitude(self._target_amplitude)
+
+        self._smoothing_samples_remaining = 0
+        self._current_amplitude = self._target_amplitude
+
+    def _sync_strategy_runtime(self) -> None:
+        strategy = getattr(self, "_strategy", None)
+        if isinstance(strategy, _SampleRateAwareStrategy):
+            strategy.set_sample_rate(self._sample_rate)
+        if isinstance(strategy, _FrequencyAwareStrategy):
+            strategy.set_frequency(self._f)
+
+    def __next__(self) -> float:
+        current_phase = (self._i + self._p) % TWO_PI
         val = self._strategy.generate_sample(
             phase=current_phase,
             pulsewidth_threshold=self._pulsewidth_threshold,
@@ -288,19 +556,24 @@ class SquareOscillator(Oscillator):
             high_value=self._wave_range[1],
         )
         self._i += self._step
-        if self._i >= 2 * np.pi:
-            self._i -= 2 * np.pi
-        return val * self._a
+        if self._i >= TWO_PI:
+            self._i -= TWO_PI
+        if self._strategy_handles_amplitude():
+            return float(val)
+        return float(self._apply_amplitude_to_buffer(np.asarray([val]))[0])
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         phases = (self._i + self._p) + self._step * np.arange(n)
-        wrapped_phases = phases % (2 * np.pi)
+        wrapped_phases = phases % TWO_PI
         val = self._strategy.generate_samples(
             phases=wrapped_phases,
             pulsewidth_threshold=self._pulsewidth_threshold,
             low_value=self._wave_range[0],
             high_value=self._wave_range[1],
         )
-        samples = self._apply_amplitude_to_buffer(val)
-        self._i = (self._i + self._step * n) % (2 * np.pi)
+        if self._strategy_handles_amplitude():
+            samples = val
+        else:
+            samples = self._apply_amplitude_to_buffer(val)
+        self._i = (self._i + self._step * n) % TWO_PI
         return samples.astype(np.float32)

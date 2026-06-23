@@ -22,17 +22,17 @@ class CVFrequencyOutput(AudioComponent):
         super().__init__()
         self.cv_converter = cv_converter
 
-    def get_samples(self, num_samples: int, **kwargs) -> np.ndarray:
+    def get_samples(self, n: int, **kwargs) -> np.ndarray:
         """Get frequency samples.
 
         Args:
-            num_samples: Number of samples to generate
+            n: Number of samples to generate
             **kwargs: Additional arguments (ignored, for compatibility)
 
         Returns:
             Array of frequency values in Hz
         """
-        return self.cv_converter.get_samples(num_samples)
+        return self.cv_converter.get_samples(n)
 
     def __iter__(self):
         """Make component iterable for ModulatedOscillator."""
@@ -55,17 +55,17 @@ class CVGateOutput(AudioComponent):
         super().__init__()
         self.cv_converter = cv_converter
 
-    def get_samples(self, num_samples: int, **kwargs) -> np.ndarray:
+    def get_samples(self, n: int, **kwargs) -> np.ndarray:
         """Get gate samples.
 
         Args:
-            num_samples: Number of samples to generate
+            n: Number of samples to generate
             **kwargs: Additional arguments (ignored, for compatibility)
 
         Returns:
             Array of gate values (0.0 or 1.0)
         """
-        return self.cv_converter.get_gate_samples(num_samples)
+        return self.cv_converter.get_gate_samples(n)
 
     def __iter__(self):
         """Make component iterable for ModulatedOscillator."""

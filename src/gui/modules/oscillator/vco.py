@@ -6,22 +6,22 @@ by an external CV source (like MIDI Input). Perfect for MIDI-controlled synthesi
 
 from typing import Any
 
-from PyQt6.QtGui import QColor
 from PyQt6 import QtWidgets
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QLabel
 
 from src.constants import DEFAULT_GAIN_DB
 from src.engine import (
-    SineOscillator,
     SawtoothOscillator,
-    TriangleOscillator,
+    SineOscillator,
     SquareOscillator,
+    TriangleOscillator,
 )
 from src.engine.oscillator_modulated import ModulatedOscillator
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.widgets import Knob, HSlider
-from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.core.module_registry import register_module
+from src.gui.widgets import HSlider, Knob
+from src.gui.widgets.module_widget import ModuleWidget
 
 
 @register_module()
@@ -298,6 +298,7 @@ class ModulatedOscillatorModule(ModuleWidget):
             num_samples: Number of samples to generate
         """
         import logging
+
         import numpy as np
 
         logger = logging.getLogger(__name__)

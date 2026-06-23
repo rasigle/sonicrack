@@ -1,8 +1,9 @@
 """Generate AudioPlayground application icon."""
 
+import os
+
 import numpy as np
 from PIL import Image, ImageDraw
-import os
 
 
 def create_app_icon(size=512):

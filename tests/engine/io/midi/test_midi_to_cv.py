@@ -1,16 +1,16 @@
 """Test MIDI to CV converter component."""
 
-import pytest
 import numpy as np
+import pytest
 
 from src.engine.io.midi import (
-    MIDIToCV,
-    NoteOnMessage,
-    NoteOffMessage,
     ControlChangeMessage,
+    MIDIToCV,
+    NoteOffMessage,
+    NoteOnMessage,
     PitchBendMessage,
+    midi_to_frequency,
 )
-from src.engine.io.midi import midi_to_frequency
 
 
 class TestMIDIToCV:

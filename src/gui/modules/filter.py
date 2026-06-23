@@ -5,14 +5,13 @@ from __future__ import annotations
 from typing import Any, cast
 
 import numpy as np
-
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QHBoxLayout,
-    QVBoxLayout,
-    QLabel,
     QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QVBoxLayout,
 )
 
 from src.engine.filter import ButterworthFilter

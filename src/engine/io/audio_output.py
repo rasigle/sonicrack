@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 import sounddevice as sd
@@ -324,9 +324,19 @@ class AudioOutput:
             logger.error(f"Failed to start playback: {e}", exc_info=True)
             raise
 
-    def stop_playback(self):
-        """Stop audio playback with fade-out to prevent clicks."""
+    def stop_playback(self, graceful: bool = True):
+        """Stop audio playback.
+
+        Args:
+            graceful: If True, perform a short fade-out before closing the stream.
+                If False, close the stream immediately.
+        """
         if not self.is_playing:
+            return
+
+        if not graceful:
+            logger.info("Stopping playback immediately")
+            self._finalize_stop()
             return
 
         try:
@@ -368,7 +378,11 @@ class AudioOutput:
         except Exception as e:
             logger.error(f"Failed to finalize stop: {e}", exc_info=True)
 
-    def cleanup(self):
-        """Clean up resources with graceful fade-out."""
+    def cleanup(self, graceful: bool = True):
+        """Clean up resources.
+
+        Args:
+            graceful: If True, perform a short fade-out before closing playback.
+        """
         if self.is_playing:
-            self.stop_playback()
+            self.stop_playback(graceful=graceful)

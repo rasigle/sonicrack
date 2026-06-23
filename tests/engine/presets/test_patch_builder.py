@@ -204,7 +204,7 @@ class TestPatchBuilderIntegration(unittest.TestCase):
 
         # Both should generate similar samples
         manual_samples = manual_patch.get_samples(1000, reset=True)
-        builder_samples = builder_patch.get_samples(1000, reset=True)
+        builder_samples = builder_patch.get_samples(1000)
 
         # Should be very similar (allow for small differences)
         correlation = np.corrcoef(manual_samples, builder_samples)[0, 1]

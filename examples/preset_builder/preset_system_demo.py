@@ -458,7 +458,7 @@ def example_10_export_import():
     if export_path.exists():
         import json
 
-        with open(export_path, "r") as f:
+        with open(export_path) as f:
             config = json.load(f)
 
         print("\n3. JSON structure:")

@@ -25,9 +25,9 @@ Example:
 """
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
-from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_BUFFER_SIZE
+from src.constants import DEFAULT_BUFFER_SIZE, DEFAULT_SAMPLE_RATE
 
 logger = logging.getLogger(__name__)
 

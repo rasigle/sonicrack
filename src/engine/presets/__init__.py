@@ -24,8 +24,8 @@ Example:
     >>> loaded = library.load("leads/my_sound").build()
 """
 
-from src.engine.presets.preset_library import PresetLibrary
 from src.engine.presets.preset_builder import PresetBuilder
+from src.engine.presets.preset_library import PresetLibrary
 
 __all__ = [
     "PresetBuilder",

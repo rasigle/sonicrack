@@ -1,12 +1,13 @@
 """Tests for MIDI input module."""
 
+import time
 from unittest.mock import Mock, patch
 
 import pytest
 
-from src.engine.io.midi import MIDIInput, NoteOnMessage, NoteOffMessage
-from src.engine.io.midi.input import MIDO_AVAILABLE
 import src.engine.io.midi.input as midi_input_module
+from src.engine.io.midi import MIDIInput, NoteOffMessage, NoteOnMessage
+from src.engine.io.midi.input import MIDO_AVAILABLE
 
 # Skip all tests if mido not available
 pytestmark = pytest.mark.skipif(not MIDO_AVAILABLE, reason="mido not installed")
@@ -64,6 +65,106 @@ class TestMIDIInput:
         # Stop
         midi.stop()
         assert midi._running is False
+
+    @patch.object(midi_input_module, "mido")
+    def test_close_stops_input_before_closing_port(self, mock_mido):
+        """Test that close() shuts down receiving before closing the port."""
+        mock_port = Mock()
+        mock_port.iter_pending.return_value = []
+        mock_mido.open_input.return_value = mock_port
+
+        midi = MIDIInput("TestDevice")
+        midi.start()
+
+        midi.close()
+
+        assert midi.is_running is False
+        mock_port.close.assert_called_once()
+        assert midi._port is None
+
+    @patch.object(midi_input_module, "mido")
+    def test_open_while_running_raises(self, mock_mido):
+        """Test that ports cannot be reopened while receive thread is active."""
+        mock_port = Mock()
+        mock_port.iter_pending.return_value = []
+        mock_mido.open_input.return_value = mock_port
+
+        midi = MIDIInput("TestDevice")
+        midi.start()
+
+        with pytest.raises(RuntimeError, match="while input is running"):
+            midi.open("OtherDevice")
+
+        midi.close()
+
+    @patch.object(midi_input_module, "mido")
+    def test_get_messages_default_is_non_blocking(self, mock_mido):
+        """Test that default polling drains queued messages without blocking."""
+        mock_mido.open_input.return_value = Mock()
+
+        midi = MIDIInput("TestDevice")
+
+        start = time.monotonic()
+        messages = midi.get_messages()
+        elapsed = time.monotonic() - start
+
+        assert messages == []
+        assert elapsed < 0.1
+
+    @patch.object(midi_input_module, "mido")
+    def test_get_messages_drains_queued_messages(self, mock_mido):
+        """Test non-blocking polling returns all currently queued messages."""
+        mock_mido.open_input.return_value = Mock()
+        first = NoteOnMessage(timestamp=0.0, channel=0, note=60, velocity=100)
+        second = NoteOffMessage(timestamp=0.1, channel=0, note=60, velocity=64)
+
+        midi = MIDIInput("TestDevice")
+        midi._message_queue.put(first)
+        midi._message_queue.put(second)
+
+        assert midi.get_messages() == [first, second]
+        assert midi.get_messages() == []
+
+    @patch.object(midi_input_module, "mido")
+    def test_handle_raw_message_queues_and_dispatches_callback(self, mock_mido):
+        """Test callback and polling receive the same converted message."""
+        mock_mido.open_input.return_value = Mock()
+        callback = Mock()
+        midi = MIDIInput("TestDevice")
+        midi._callback = callback
+
+        raw_msg = Mock()
+        raw_msg.type = "note_on"
+        raw_msg.note = 60
+        raw_msg.velocity = 100
+        raw_msg.channel = 0
+        raw_msg.time = 0.25
+
+        midi._handle_raw_message(raw_msg)
+
+        messages = midi.get_messages()
+        assert len(messages) == 1
+        callback.assert_called_once_with(messages[0])
+
+    @patch.object(midi_input_module, "mido")
+    def test_callback_exception_does_not_drop_queued_message(self, mock_mido, caplog):
+        """Test callback failures are isolated from polling delivery."""
+        mock_mido.open_input.return_value = Mock()
+        callback = Mock(side_effect=RuntimeError("boom"))
+        midi = MIDIInput("TestDevice")
+        midi._callback = callback
+
+        raw_msg = Mock()
+        raw_msg.type = "note_on"
+        raw_msg.note = 60
+        raw_msg.velocity = 100
+        raw_msg.channel = 0
+        raw_msg.time = 0.25
+
+        midi._handle_raw_message(raw_msg)
+
+        assert len(midi.get_messages()) == 1
+        assert "MIDI input callback failed" in caplog.text
 
     @patch.object(midi_input_module, "mido")
     def test_message_conversion_note_on(self, mock_mido):

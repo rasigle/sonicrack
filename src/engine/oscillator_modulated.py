@@ -60,18 +60,19 @@ Note:
     making it suitable for voice management in polyphonic synthesizers.
 """
 
-import numpy as np
 from typing import cast
+
+import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import ComponentDescriptor, Generator
-from src.engine.audio_component_registry import register_component, ComponentCategory
+from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import (
     Oscillator,
+    SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
     TriangleOscillator,
-    SawtoothOscillator,
 )
 
 
@@ -277,7 +278,7 @@ class ModulatedOscillator(Generator):
         mod_arrays = []
         for modulator in self.modulators:
             if hasattr(modulator, "get_samples"):
-                mod_vals = modulator.get_samples(n, reset=False, mode="vectorized")
+                mod_vals = modulator.get_samples(n, mode="vectorized")
             else:
                 # Fallback to iterator for modulators without get_samples
                 mod_vals = np.array(
@@ -614,7 +615,7 @@ class ModulatedOscillator(Generator):
             >>> env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
             >>> mod_osc = ModulatedOscillator(osc, env, amp_mod=lambda a, e: a * e)
             >>> samples1 = mod_osc.get_samples(1000)  # Auto mode
-            >>> samples2 = mod_osc.get_samples(100, mode="iterator", reset=True)
+            >>> samples2 = mod_osc.get_samples(100,mode="iterator")
         """
         if mode not in ("auto", "iterator", "vectorized"):
             raise ValueError(

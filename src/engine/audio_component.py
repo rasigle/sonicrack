@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Any, TypeVar, Type
+from typing import Any, TypeVar
 
 import numpy as np
 
@@ -73,7 +74,9 @@ class ComponentDescriptor:
         if self.config_params:
             if args:
                 # Add positional args mapped to config_params
-                for i, (param, value) in enumerate(zip(self.config_params, args)):
+                for _i, (param, value) in enumerate(
+                    zip(self.config_params, args, strict=False)
+                ):
                     config[param] = value
 
             if kwargs:
@@ -110,11 +113,11 @@ class AudioComponent(ABC):
         return self.get_samples_vectorized(n)
 
     @classmethod
-    def create_instance(cls: Type[T], *args: Any, **kwargs: Any) -> T:
+    def create_instance(cls: type[T], *args: Any, **kwargs: Any) -> T:
         return cls(*args, **kwargs)
 
     @classmethod
-    def from_config(cls: Type[T], config: dict[str, Any]) -> T:
+    def from_config(cls: type[T], config: dict[str, Any]) -> T:
         """Creates an audio component instance from given configuration dictionary.
 
         Example:

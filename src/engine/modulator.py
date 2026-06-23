@@ -48,8 +48,8 @@ from typing import Any
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import AudioComponent, Generator, ComponentDescriptor
-from src.engine.audio_component_registry import register_component, ComponentCategory
+from src.engine.audio_component import AudioComponent, ComponentDescriptor, Generator
+from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.utils.logging_config import get_engine_logger
 
 logger = get_engine_logger("modulator")
@@ -326,7 +326,7 @@ class ADSREnvelope(Modulator):
         Examples:
             >>> env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
             >>> samples1 = env.get_samples(1000)  # Fast vectorized
-            >>> samples2 = env.get_samples(100, reset=True)  # Also vectorized
+            >>> samples2 = env.get_samples(100)  # Also vectorized
 
         Note:
             For the reference iterator implementation (75x slower), use

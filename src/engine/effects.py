@@ -7,17 +7,18 @@ effects.
 
 from __future__ import annotations
 
-import numpy as np
 from typing import TYPE_CHECKING, Any, cast
+
+import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import (
+    AudioComponent,
     ComponentCategory,
     ComponentDescriptor,
-    AudioComponent,
 )
-from src.engine.modifier import Modifier
 from src.engine.audio_component_registry import register_component
+from src.engine.modifier import Modifier
 
 if TYPE_CHECKING:
     pass
@@ -60,6 +61,8 @@ class Distortion(Modifier):
         mix: float = 1.0,
         output_gain: float = 0.5,
         distortion_type: str = "soft",
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize distortion effect.
 
@@ -73,6 +76,7 @@ class Distortion(Modifier):
         Raises:
             ValueError: If parameters are out of valid range
         """
+        super().__init__(*args, **kwargs)
         self.source = source  # Optional!
         self._drive = np.clip(drive, 0.0, 10.0)
         self._mix = np.clip(mix, 0.0, 1.0)
@@ -255,12 +259,12 @@ class Distortion(Modifier):
         # Apply output gain
         return (mixed * self._output_gain).astype(np.float32)
 
-    def get_samples(self, n: int, mode: str = "vectorized") -> np.ndarray:
+    def get_samples(self, n: int, mode: str = "vectorized", **kwargs) -> np.ndarray:
         """Get n samples using specified mode."""
         if mode == "vectorized":
             return self.get_samples_vectorized(n)
-        else:
-            return np.array([next(self) for _ in range(n)], dtype=np.float32)
+
+        return np.array([next(self) for _ in range(n)], dtype=np.float32)
 
 
 @register_component()
@@ -300,6 +304,8 @@ class Delay(Modifier):
         feedback: float = 0.3,
         mix: float = 0.5,
         sample_rate: float = DEFAULT_SAMPLE_RATE,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize delay effect.
 
@@ -313,6 +319,7 @@ class Delay(Modifier):
         Raises:
             ValueError: If parameters are out of valid range
         """
+        super().__init__(*args, **kwargs)
         self.source = source  # Optional!
         self._sample_rate = sample_rate
         self._delay_time = np.clip(delay_time, 0.001, 2.0)
@@ -528,6 +535,8 @@ class Reverb(Modifier):
         damping: float = 0.5,
         mix: float = 0.3,
         sample_rate: float = DEFAULT_SAMPLE_RATE,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize reverb effect.
 
@@ -538,6 +547,7 @@ class Reverb(Modifier):
             mix: Dry/wet mix (0.0-1.0)
             sample_rate: Sample rate
         """
+        super().__init__(*args, **kwargs)
         self.source = source  # Optional!
         self._sample_rate = sample_rate
         self._room_size = np.clip(room_size, 0.0, 1.0)

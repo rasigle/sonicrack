@@ -9,6 +9,7 @@ This allows you to play the synthesizer with a MIDI keyboard!
 """
 
 import sys
+
 from PyQt6.QtWidgets import QApplication
 
 # Import the modular synth window

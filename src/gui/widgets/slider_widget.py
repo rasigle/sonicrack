@@ -1,7 +1,7 @@
 """Slider widgets for parameter control."""
 
-from PyQt6.QtWidgets import QWidget, QSlider, QLabel, QVBoxLayout, QHBoxLayout
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QSlider, QVBoxLayout, QWidget
 
 
 class VSlider(QWidget):

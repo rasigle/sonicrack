@@ -4,12 +4,11 @@ from typing import Any
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QComboBox
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel
 
 from src.constants import DEFAULT_GAIN_DB
 from src.engine.noise import NoiseGenerator
-from src.gui.core.module import ModuleCategory
-from src.gui.core.module import ModuleMetadata
+from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget

@@ -7,7 +7,7 @@ and notifies all registered listeners.
 import pytest
 
 from src.engine.oscillator import SineOscillator
-from src.gui.audio_config import audio_config, AudioConfig
+from src.gui.audio_config import AudioConfig, audio_config
 
 
 def test_singleton():

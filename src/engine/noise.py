@@ -65,11 +65,11 @@ Note:
 
 import numpy as np
 
-from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_GAIN_DB
-from src.engine.audio_component import Generator, ComponentDescriptor
-from src.engine.audio_component_registry import register_component, ComponentCategory
+from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
+from src.engine.audio_component import ComponentDescriptor, Generator
+from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import _derive_amplitude_from_init
-from src.utils.math import linear_to_db, db_to_linear
+from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
 
 

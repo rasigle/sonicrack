@@ -9,14 +9,14 @@ To use this plugin:
 3. The module will appear in the module registry automatically
 """
 
-from typing import Optional, List, Any
+from typing import Any
 
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from engine import Modifier
-from gui.core.module import ModuleMetadata, ModuleCategory
+from gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
@@ -113,14 +113,14 @@ class SimpleFilterModule(ModuleWidget):
         self.component = self.create_engine_component()
 
     # AudioModuleInterface implementation
-    def get_required_inputs(self) -> List[str]:
+    def get_required_inputs(self) -> list[str]:
         """Filter requires the In port to be connected."""
         return ["In"]
 
     def create_engine_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[dict[str, Any]] = None,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
     ):
         """Create the filter component."""
         cutoff = self.cutoff_knob.get_value()

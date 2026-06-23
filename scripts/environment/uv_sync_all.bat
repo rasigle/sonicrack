@@ -5,6 +5,6 @@
 call .\uv_check_activate_venv.bat
 
 echo uv Synchronize Environment (all groups)
-uv sync --all-groups
+uv sync --extra full --all-groups
 echo - done
 echo.

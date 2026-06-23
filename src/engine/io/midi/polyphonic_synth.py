@@ -56,13 +56,14 @@ See Also:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Any
+from typing import Any
 
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.io.midi.messages import NoteOnMessage, NoteOffMessage
+from src.engine.io.midi.messages import NoteOffMessage, NoteOnMessage
 from src.engine.io.midi.utils import midi_to_frequency
 
 logger = logging.getLogger(__name__)
@@ -144,12 +145,10 @@ class Voice:
             return True
         if hasattr(self.component, "modifiers"):
             for modifier in self.component.modifiers:
-                if hasattr(modifier, "modulator"):
-                    if (
-                        hasattr(modifier.modulator, "ended")
-                        and modifier.modulator.ended
-                    ):
-                        return True
+                if hasattr(modifier, "modulator") and (
+                    hasattr(modifier.modulator, "ended") and modifier.modulator.ended
+                ):
+                    return True
         return False
 
     def clear(self) -> None:

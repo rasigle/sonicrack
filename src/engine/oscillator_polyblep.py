@@ -20,12 +20,12 @@ from enum import Enum
 
 import numpy as np
 
-from src.constants import DEFAULT_SAMPLE_RATE, DEFAULT_GAIN_DB
+from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import Generator
 from src.engine.audio_component_registry import (
-    register_component,
-    ComponentDescriptor,
     ComponentCategory,
+    ComponentDescriptor,
+    register_component,
 )
 from src.engine.oscillator import _derive_amplitude_from_init
 from src.utils.utils import track_provided_args
@@ -571,10 +571,10 @@ class PolyBLEPOscillator(Generator):
 
         if mode == "iterator":
             return self.get_samples_iterator(n, reset=reset)
-        else:
-            if reset:
-                iter(self)
-            return self.get_samples_vectorized(n)
+
+        if reset:
+            iter(self)
+        return self.get_samples_vectorized(n)
 
 
 # Convenience functions

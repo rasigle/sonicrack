@@ -4,15 +4,16 @@ Tests the CVScaler component and helper functions to ensure correct
 signal range conversion for modular synthesis.
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from src.engine import (
-    CVScaler,
-    bipolar_to_unipolar,
-    unipolar_to_bipolar,
-    scale_cv,
-    SineOscillator,
     ADSREnvelope,
+    CVScaler,
+    SineOscillator,
+    bipolar_to_unipolar,
+    scale_cv,
+    unipolar_to_bipolar,
 )
 
 

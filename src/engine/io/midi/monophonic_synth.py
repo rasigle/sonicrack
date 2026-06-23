@@ -25,12 +25,14 @@ Example:
 """
 
 import logging
-from typing import Callable, Optional, Any
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 
-from src.engine.io.midi.messages import NoteOnMessage, NoteOffMessage
-from src.engine.io.midi.utils import midi_to_frequency
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.io.midi.messages import NoteOffMessage, NoteOnMessage
+from src.engine.io.midi.utils import midi_to_frequency
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +87,8 @@ class MonophonicSynth:
         self._sample_rate = sample_rate
 
         # Voice state
-        self.voice: Optional[Any] = None
-        self.current_note: Optional[int] = None
+        self.voice: Any | None = None
+        self.current_note: int | None = None
         self.current_velocity: int = 0
         self.is_playing: bool = False
 

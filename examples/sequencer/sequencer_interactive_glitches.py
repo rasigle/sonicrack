@@ -1,8 +1,9 @@
-import numpy as np
-import sounddevice as sd
 import threading
 import tkinter as tk
 from tkinter import ttk
+
+import numpy as np
+import sounddevice as sd
 
 
 class SequencerAudio:

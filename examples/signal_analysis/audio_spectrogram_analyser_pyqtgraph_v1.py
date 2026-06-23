@@ -1,5 +1,6 @@
 """PyQt6 Audio FFT Analyser"""
 
+import contextlib
 import sys
 import threading
 from pathlib import Path
@@ -8,7 +9,7 @@ import numpy as np
 import pyaudio
 import pyqtgraph as pg
 import soundfile as sf
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 # Ensure OpenGL if available for performance
 pg.setConfigOptions(useOpenGL=True)
@@ -56,10 +57,7 @@ def compute_spectrogram(data, sr, nfft=2048, hop=None, scale="dB"):
     # apply window and fft
     S = np.fft.rfft(frames * window[None, :], axis=1)
     S_mag = np.abs(S).T  # shape (freq_bins, time_frames)
-    if scale == "dB":
-        S_out = 20.0 * np.log10(S_mag + 1e-12)
-    else:
-        S_out = S_mag
+    S_out = 20.0 * np.log10(S_mag + 1e-12) if scale == "dB" else S_mag
     freqs = np.fft.rfftfreq(nfft, 1.0 / sr)
     times = np.arange(S_out.shape[1]) * hop / sr
     return S_out, freqs, times
@@ -305,7 +303,7 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         try:
             default_info = self.pyaudio_inst.get_default_output_device_info()
             default_index = default_info.get("index", None)
-        except IOError:
+        except OSError:
             default_index = None
 
         for i in range(self.pyaudio_inst.get_device_count()):
@@ -497,7 +495,8 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
         pct = slider_value / self.position_slider.maximum()
         cur = int(pct * len(self.data))
         self.time_label.setText(
-            f"{self._format_time(cur / self.sr)} / {self._format_time(len(self.data) / self.sr)}"
+            f"{self._format_time(cur / self.sr)} / "
+            f"{self._format_time(len(self.data) / self.sr)}"
         )
 
     @staticmethod
@@ -520,7 +519,8 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
 
         # update time label
         self.time_label.setText(
-            f"{self._format_time(self.play_pos / self.sr)} / {self._format_time(len(self.data) / self.sr)}"
+            f"{self._format_time(self.play_pos / self.sr)} / "
+            f"{self._format_time(len(self.data) / self.sr)}"
         )
 
         self.update_display()
@@ -536,7 +536,8 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
             self.stop_playback()
 
     def _update_spec_playback_line(self):
-        """Update spectrogram playback line position (called less frequently than UI timer)."""
+        """Update spectrogram playback line position (called less frequently than
+        UI timer)."""
         if self.data is None or self.sr is None:
             return
         # Update spectrogram play line (time in seconds)
@@ -643,10 +644,8 @@ class FFTAnalyserWindow(QtWidgets.QMainWindow):
                 self.stream.close()
         except (OSError, RuntimeError):
             pass
-        try:
+        with contextlib.suppress(OSError, RuntimeError):
             self.pyaudio_inst.terminate()
-        except (OSError, RuntimeError):
-            pass
         super().closeEvent(event)
 
 

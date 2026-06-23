@@ -3,24 +3,25 @@
 import logging
 from pathlib import Path
 from typing import Any
+
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QComboBox,
     QDialog,
-    QVBoxLayout,
+    QFileDialog,
+    QGroupBox,
     QHBoxLayout,
-    QListWidget,
-    QListWidgetItem,
-    QPushButton,
     QLabel,
     QLineEdit,
-    QTextEdit,
-    QGroupBox,
-    QComboBox,
-    QFileDialog,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
+    QPushButton,
     QSplitter,
+    QTextEdit,
+    QVBoxLayout,
     QWidget,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
 
 from src.gui.core.preset_manager import PresetManager
 

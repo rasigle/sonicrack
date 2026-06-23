@@ -1,76 +1,180 @@
-"""Modular Synthesizer GUI Application
-
-A full-featured modular synthesizer with visual patching, real-time audio,
-and comprehensive visualization.
+"""Packaged entry point for the AudioPlayground modular synthesizer.
 
 Usage:
-    python modular_synth_app.py
+    python -m src.modular_synth_app
 """
 
+from __future__ import annotations
+
+import argparse
+import logging
 import sys
+from collections.abc import Callable, Sequence
 
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QApplication, QSplashScreen
 
-from src.constants import SPLASH_PATH, LOG_FILENAME
+from src.constants import LOG_FILENAME, SPLASH_PATH
 from src.gui.main_window import ModularSynthWindow
 from src.utils import setup_logging
 
+APP_NAME = "AudioPlayground Modular Synth"
+ORG_NAME = "AudioPlayground"
 
-def activate_ui_exception_logging():
-    """Activate exception logging for the UI thread."""
-    sys._excepthook = sys.excepthook
+logger = logging.getLogger(__name__)
 
-    def exception_hook(exctype, value, traceback):
-        print(exctype, value, traceback)
-        sys._excepthook(exctype, value, traceback)
-        sys.exit(1)
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    """Build command-line parser for packaged and development launches."""
+    parser = argparse.ArgumentParser(description=APP_NAME)
+    parser.add_argument(
+        "--log-level",
+        choices=("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
+        default="INFO",
+        help="Console logging level.",
+    )
+    parser.add_argument(
+        "--detailed-log",
+        action="store_true",
+        help="Include source file and line number in log messages.",
+    )
+    parser.add_argument(
+        "--no-console-log",
+        action="store_true",
+        help="Disable console logging and write only to the log file.",
+    )
+    parser.add_argument(
+        "--no-splash",
+        action="store_true",
+        help="Start without showing the splash screen.",
+    )
+    return parser
+
+
+def _configure_logging(args: argparse.Namespace) -> None:
+    """Configure app logging from parsed command-line arguments."""
+    setup_logging(
+        level=getattr(logging, args.log_level),
+        log_file=LOG_FILENAME,
+        console_output=not args.no_console_log,
+        detailed=args.detailed_log,
+    )
+
+
+def _create_application(qt_args: Sequence[str]) -> QApplication:
+    """Create or reuse the QApplication instance."""
+    existing_app = QApplication.instance()
+    if existing_app is not None:
+        app = existing_app
+    else:
+        app = QApplication([sys.argv[0], *qt_args])
+
+    app.setApplicationName(APP_NAME)
+    app.setOrganizationName(ORG_NAME)
+    return app
+
+
+def _create_splash(app: QApplication, enabled: bool) -> QSplashScreen | None:
+    """Create and display the splash screen if the resource is available."""
+    if not enabled:
+        return None
+
+    if not SPLASH_PATH.exists():
+        logger.info("Splash image not found: %s", SPLASH_PATH)
+        return None
+
+    splash_pixmap = QPixmap(str(SPLASH_PATH))
+    if splash_pixmap.isNull():
+        logger.warning("Splash image could not be loaded: %s", SPLASH_PATH)
+        return None
+
+    splash = QSplashScreen(splash_pixmap, Qt.WindowType.WindowStaysOnTopHint)
+    splash.show()
+    app.processEvents()
+
+    splash.showMessage(
+        "Loading modules...",
+        Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
+        Qt.GlobalColor.white,
+    )
+    app.processEvents()
+    return splash
+
+
+def _shutdown_window(
+    get_window: Callable[[], ModularSynthWindow | None],
+    *,
+    graceful: bool,
+) -> None:
+    """Shut down the main window if it has been created."""
+    window = get_window()
+    if window is None:
+        return
+
+    try:
+        window.shutdown(graceful=graceful)
+    except Exception:
+        logger.exception("Error during application shutdown")
+
+
+def activate_ui_exception_logging(
+    app: QApplication,
+    get_window: Callable[[], ModularSynthWindow | None],
+) -> None:
+    """Log uncaught UI exceptions and request a controlled application exit."""
+    previous_hook = sys.excepthook
+
+    def exception_hook(exc_type, exc_value, exc_traceback) -> None:
+        if issubclass(exc_type, KeyboardInterrupt):
+            previous_hook(exc_type, exc_value, exc_traceback)
+            app.exit(130)
+            return
+
+        logger.critical(
+            "Unhandled exception in UI thread",
+            exc_info=(exc_type, exc_value, exc_traceback),
+        )
+        _shutdown_window(get_window, graceful=False)
+        app.exit(1)
 
     sys.excepthook = exception_hook
 
 
-def main():
-    """Main entry point for the modular synthesizer application."""
-    setup_logging(log_file=LOG_FILENAME, console_output=True, detailed=False)
-    activate_ui_exception_logging()
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run the modular synthesizer application and return its exit code."""
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+    args, qt_args = _build_arg_parser().parse_known_args(raw_args)
 
-    # Create application
-    app = QApplication(sys.argv)
-    app.setApplicationName("AudioPlayground Modular Synth")
-    app.setOrganizationName("AudioPlayground")
+    _configure_logging(args)
+    logger.info("Starting %s", APP_NAME)
 
-    # Show splash screen
-    from PyQt6.QtWidgets import QSplashScreen
-    from PyQt6.QtGui import QPixmap
-    from PyQt6.QtCore import Qt
+    app = _create_application(qt_args)
+    window: ModularSynthWindow | None = None
 
-    if SPLASH_PATH.exists():
-        splash_pixmap = QPixmap(str(SPLASH_PATH))
-        splash = QSplashScreen(splash_pixmap, Qt.WindowType.WindowStaysOnTopHint)
-        splash.show()
-        app.processEvents()
+    def get_window() -> ModularSynthWindow | None:
+        return window
 
-        # Show loading message
-        splash.showMessage(
-            "Loading modules...",
-            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
-            Qt.GlobalColor.white,
-        )
-        app.processEvents()
-    else:
-        splash = None
+    activate_ui_exception_logging(app, get_window)
+    app.aboutToQuit.connect(lambda: _shutdown_window(get_window, graceful=True))
 
-    # Create and show main window
-    window = ModularSynthWindow()
+    splash = _create_splash(app, enabled=not args.no_splash)
 
-    # Close splash screen when main window is ready
-    if splash:
-        splash.finish(window)
+    try:
+        window = ModularSynthWindow()
 
-    window.show()
+        if splash is not None:
+            splash.finish(window)
 
-    # Run application
-    sys.exit(app.exec())
+        window.show()
+        return app.exec()
+    except Exception:
+        logger.critical("Failed to start application", exc_info=True)
+        if splash is not None:
+            splash.close()
+        _shutdown_window(get_window, graceful=False)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

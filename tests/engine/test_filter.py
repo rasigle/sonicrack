@@ -1,10 +1,11 @@
 """Tests for Butterworth filter implementation."""
 
 import unittest
+
 import numpy as np
 
-from src.engine.filter import ButterworthFilter, butter, apply_filter
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.filter import ButterworthFilter, apply_filter, butter
 
 
 class TestButterworthFilterBasics(unittest.TestCase):

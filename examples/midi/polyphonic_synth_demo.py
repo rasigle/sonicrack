@@ -4,7 +4,7 @@ Demonstrates the PolyphonicSynth playing multiple notes simultaneously.
 """
 
 from engine.io.midi import PolyphonicSynth, midi_to_note_name
-from src.engine import SineOscillator, ADSREnvelope, Chain
+from src.engine import ADSREnvelope, Chain, SineOscillator
 from src.engine.modifier import ModulatedVolume
 
 
@@ -66,7 +66,8 @@ scale = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76]  # C major scale + more
 for note in scale:
     synth.note_on(note, 100)
     print(
-        f"  Note ON: {midi_to_note_name(note):4s} - Active: {synth.get_active_voice_count()}, Free: {synth.get_free_voice_count()}"
+        f"  Note ON: {midi_to_note_name(note):4s} - Active: "
+        f"{synth.get_active_voice_count()}, Free: {synth.get_free_voice_count()}"
     )
 
 print(f"\n{synth}")

@@ -7,15 +7,15 @@ import numpy as np
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import (
-    QPainter,
-    QPen,
-    QColor,
-    QPainterPath,
-    QLinearGradient,
     QBrush,
+    QColor,
     QFont,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
 )
-from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module

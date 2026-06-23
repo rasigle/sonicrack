@@ -1,13 +1,14 @@
 """Tests for MIDI utility functions."""
 
 import pytest
+
 from src.engine.io.midi import (
-    midi_to_frequency,
     frequency_to_midi,
-    note_name_to_midi,
+    get_note_range,
+    midi_to_frequency,
     midi_to_note_name,
     note_name_to_frequency,
-    get_note_range,
+    note_name_to_midi,
     transpose,
 )
 

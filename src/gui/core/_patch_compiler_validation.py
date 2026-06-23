@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.gui.core.module import AudioModule
-from src.gui.core.module import ModuleCategory
+from src.gui.core.module import AudioModule, ModuleCategory
 from src.gui.widgets.port_widget import PortWidget
 
 
@@ -86,10 +85,7 @@ class PatchCompilerValidationMixin:
 
             if start_port.parent_module == end_port.parent_module:
                 module_name = getattr(start_port.parent_module, "metadata", None)
-                if module_name:
-                    module_name = module_name.title
-                else:
-                    module_name = "Unknown"
+                module_name = module_name.title if module_name else "Unknown"
                 errors.append(
                     f"Invalid self-connection in module '{module_name}': "
                     f"output cannot connect to own input"

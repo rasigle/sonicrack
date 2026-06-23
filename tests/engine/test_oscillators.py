@@ -13,10 +13,10 @@ import unittest
 import numpy as np
 
 from src.engine.oscillator import (
-    SineOscillator,
     SawtoothOscillator,
-    TriangleOscillator,
+    SineOscillator,
     SquareOscillator,
+    TriangleOscillator,
 )
 from src.engine.synthesis import synth
 

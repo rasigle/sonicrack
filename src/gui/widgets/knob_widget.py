@@ -1,11 +1,11 @@
 """Rotary knob widget for parameter control."""
 
 import math
-from typing import Callable
+from collections.abc import Callable
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import Qt, QPointF, QRectF
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont
+from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QWidget
 
 

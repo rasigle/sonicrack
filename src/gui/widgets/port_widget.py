@@ -9,16 +9,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-
-from PyQt6.QtCore import Qt, QPointF, QRectF
-from PyQt6.QtGui import QPainter, QPen, QColor
+from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QGraphicsItem
 
 from src.gui.core.port import Port
 
 if TYPE_CHECKING:
-    from src.gui.widgets.module_widget import ModuleWidget
     from src.gui.widgets.cable_widget import Cable
+    from src.gui.widgets.module_widget import ModuleWidget
 
 
 class PortWidget(QGraphicsItem):

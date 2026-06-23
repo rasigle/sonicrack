@@ -1,10 +1,10 @@
 """Test cases for OutputModule stereo routing functionality."""
 
-import pytest
 import numpy as np
+import pytest
 
 from src.gui.modules.output.output import OutputModule
-from src.utils.audio_utils import mono_to_stereo, combine_lr_to_stereo
+from src.utils.audio_utils import combine_lr_to_stereo, mono_to_stereo
 
 
 @pytest.fixture

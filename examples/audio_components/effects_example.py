@@ -9,13 +9,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from engine import (
-    SineOscillator,
-    Chain,
-    Distortion,
-    Delay,
-    Reverb,
     ADSREnvelope,
+    Chain,
+    Delay,
+    Distortion,
     ModulatedOscillator,
+    Reverb,
+    SineOscillator,
     SquareOscillator,
 )
 

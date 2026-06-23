@@ -1,18 +1,19 @@
 """Tests for the dynamic module registration system."""
 
-import pytest
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.gui.core.module_registry import (
     ModuleRegistry,
-    get_registry,
-    register_module,
     discover_modules,
-    load_module,
+    get_registry,
     initialize_module_registry,
+    load_module,
+    register_module,
 )
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -252,8 +253,8 @@ class TestRecursiveModuleSearch:
 
         try:
             # Count files found
-            from pathlib import Path
             import importlib
+            from pathlib import Path
 
             # Get package
             pkg = importlib.import_module("test_package")

@@ -6,15 +6,15 @@ seamlessly with the modular synth GUI using the generic AudioModuleInterface.
 
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGraphicsProxyWidget
+from PyQt6.QtWidgets import QGraphicsProxyWidget, QVBoxLayout, QWidget
 
 from engine import Modifier
-from src.gui.core.module import ModuleMetadata, ModuleCategory
+from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -125,7 +125,7 @@ class LowPassFilterModule(ModuleWidget):
 
     # === AudioModuleInterface Implementation ===
 
-    def get_required_inputs(self) -> List[str]:
+    def get_required_inputs(self) -> list[str]:
         """Return list of required input port names.
 
         The patch compiler will validate that these ports are connected.
@@ -133,7 +133,7 @@ class LowPassFilterModule(ModuleWidget):
         """
         return ["In"]
 
-    def get_modulation_inputs(self) -> List[str]:
+    def get_modulation_inputs(self) -> list[str]:
         """Return list of optional modulation port names.
 
         For this simple filter, we don't support modulation.
@@ -146,8 +146,8 @@ class LowPassFilterModule(ModuleWidget):
 
     def create_engine_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[Dict[str, Any]] = None,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
     ) -> Any:
         """Create the filter audio component.
 
@@ -155,8 +155,8 @@ class LowPassFilterModule(ModuleWidget):
         processing component with the current parameter values.
 
         Args:
-            input_components: List of connected input components (unused for this module,
-                            as the compiler handles chaining automatically)
+            input_components: List of connected input components (unused for this
+                module, as the compiler handles chaining automatically)
             modulation_components: Dict of modulation sources (none for this module)
 
         Returns:
@@ -170,7 +170,7 @@ class LowPassFilterModule(ModuleWidget):
 
     # === Parameter Management (for presets) ===
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get current parameter values for saving presets.
 
         Returns:
@@ -178,7 +178,7 @@ class LowPassFilterModule(ModuleWidget):
         """
         return {"cutoff": self.cutoff_knob.get_value()}
 
-    def set_parameters(self, params: Dict[str, Any]):
+    def set_parameters(self, params: dict[str, Any]):
         """Set parameter values from a loaded preset.
 
         Args:
@@ -212,7 +212,8 @@ def example_usage():
     # When compiled, the PatchCompiler:
     # 1. Finds the Output module
     # 2. Follows connection to Low-Pass Filter
-    # 3. Calls filter.create_component(input_components=[osc], modulation_components=None)
+    # 3. Calls filter.create_component(input_components=[osc], modulation_
+    #   components=None)
     # 4. Creates: Chain(Oscillator(440), LowPassFilter(1000))
     # 5. Returns the chain to the audio player
 
@@ -251,16 +252,16 @@ class ModulatedLowPassFilterModule(ModuleWidget):
 
         # ... setup UI ...
 
-    def get_required_inputs(self) -> List[str]:
+    def get_required_inputs(self) -> list[str]:
         return ["In"]  # Audio input is required
 
-    def get_modulation_inputs(self) -> List[str]:
+    def get_modulation_inputs(self) -> list[str]:
         return ["Cutoff Mod"]  # Modulation is optional
 
     def create_engine_component(
         self,
-        input_components: Optional[List[Any]] = None,
-        modulation_components: Optional[Dict[str, Any]] = None,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
     ):
         """Create filter with optional cutoff modulation."""
         base_cutoff = self.cutoff_knob.get_value()

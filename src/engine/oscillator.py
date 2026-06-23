@@ -63,6 +63,8 @@ from src.engine.oscillator_base import (
 from src.engine.oscillator_ramp import SawtoothOscillator, TriangleOscillator
 from src.engine.oscillator_sine import SineOscillator
 from src.engine.oscillator_square import (
+    BandlimitedSquareStrategy,
+    ComparatorSquareStrategy,
     IdealSquareStrategy,
     IdealSquareStrategySmoothing,
     SoftSquareStrategy,
@@ -81,6 +83,8 @@ __all__ = [
     "SquareOscillator",
     "SquareWaveMode",
     "SquareWaveStrategy",
+    "BandlimitedSquareStrategy",
+    "ComparatorSquareStrategy",
     "IdealSquareStrategy",
     "IdealSquareStrategySmoothing",
     "SoftSquareStrategy",

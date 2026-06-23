@@ -6,12 +6,12 @@ and restore them, including all modules, connections, and parameters.
 
 import json
 import logging
-from typing import Any
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from src.gui.ui_constants import DEFAULT_PRESET_DIRECTORY
 from src.constants import PRESET_FILE_EXTENSION
+from src.gui.ui_constants import DEFAULT_PRESET_DIRECTORY
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,7 @@ class PresetManager:
             Preset data dictionary, or None if load failed
         """
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with open(filepath, encoding="utf-8") as f:
                 preset_data = json.load(f)
 
             logger.info(f"Preset loaded: {filepath}")
@@ -219,7 +219,7 @@ class PresetManager:
         module_ids = {id(module): idx for idx, module in enumerate(modules)}
 
         # Serialize modules
-        for module_id, module in zip(module_ids.values(), modules):
+        for module_id, module in zip(module_ids.values(), modules, strict=False):
             module_metadata = module.metadata
             module_data = {
                 "id": module_id,

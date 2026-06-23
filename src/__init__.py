@@ -1,3 +1,3 @@
-from ._version import version, version_info, __version__
+from ._version import __version__, version_info
 
-__all__ = ["__version__", "version", "version_info"]
+__all__ = ["__version__", "version_info"]

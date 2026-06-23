@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.engine.io.midi import MIDIFile, ControlChangeMessage
+from src.engine.io.midi import ControlChangeMessage, MIDIFile
 from src.engine.io.midi.input import MIDO_AVAILABLE
 
 # Skip all tests if mido not available
@@ -103,7 +103,7 @@ class TestMIDIFile:
     def test_get_message_types(self, sample_midi_file):
         """Test getting message type counts."""
         midi = MIDIFile(sample_midi_file)
-        types = midi.get_message_types()
+        types = midi.count_per_message_type()
 
         assert isinstance(types, dict)
         assert "NoteOnMessage" in types or "NoteOffMessage" in types

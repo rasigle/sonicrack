@@ -10,8 +10,8 @@ Usage:
     python examples/midi_monophonic_synth.py
 """
 
-import sys
 import time
+
 import numpy as np
 
 try:
@@ -21,20 +21,10 @@ except ImportError:
     print("Warning: sounddevice not installed. Audio playback disabled.")
     print("Install with: pip install sounddevice")
 
-try:
-    from engine.io.midi import (
-        MonophonicSynth,
-        MIDIInput,
-        midi_to_note_name,
-    )
-    from engine.io.midi import MIDO_AVAILABLE
-    from src.engine import SineOscillator, ADSREnvelope, Chain
-    from src.engine.modifier import ModulatedVolume
-    from src.constants import DEFAULT_SAMPLE_RATE
-except ImportError as e:
-    print(f"Error: Could not import modules: {e}")
-    print("Make sure you're running from the project root directory")
-    sys.exit(1)
+from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine import ADSREnvelope, Chain, SineOscillator
+from src.engine.io.midi import MIDIInput, MonophonicSynth, midi_to_note_name
+from src.engine.modifier import ModulatedVolume
 
 
 # ANSI colors
@@ -74,12 +64,14 @@ def create_voice():
 def demo_programmatic():
     """Demo: Play notes programmatically (no MIDI input needed)."""
     print(
-        f"\n{Colors.BOLD}{Colors.CYAN}=== Monophonic Synth - Programmatic Demo ==={Colors.ENDC}\n"
+        f"\n{Colors.BOLD}{Colors.CYAN}=== Monophonic Synth - Programmatic Demo ==="
+        f"{Colors.ENDC}\n"
     )
 
     if sd is None:
         print(
-            f"{Colors.RED}sounddevice not installed - skipping audio playback{Colors.ENDC}"
+            f"{Colors.RED}sounddevice not installed - skipping audio playback"
+            f"{Colors.ENDC}"
         )
         return
 
@@ -128,13 +120,9 @@ def demo_programmatic():
 def demo_midi_input():
     """Demo: Use real MIDI input."""
     print(
-        f"\n{Colors.BOLD}{Colors.CYAN}=== Monophonic Synth - MIDI Input Demo ==={Colors.ENDC}\n"
+        f"\n{Colors.BOLD}{Colors.CYAN}=== Monophonic Synth - MIDI Input Demo ==="
+        f"{Colors.ENDC}\n"
     )
-
-    if not MIDO_AVAILABLE:
-        print(f"{Colors.RED}mido not installed{Colors.ENDC}")
-        print("Install with: pip install mido python-rtmidi")
-        return
 
     if sd is None:
         print(f"{Colors.RED}sounddevice not installed{Colors.ENDC}")
@@ -196,7 +184,7 @@ def demo_midi_input():
     # MIDI message handler
     def on_midi_message(msg):
         """Handle incoming MIDI messages."""
-        from engine.io.midi import NoteOnMessage, NoteOffMessage
+        from engine.io.midi import NoteOffMessage, NoteOnMessage
 
         if isinstance(msg, NoteOnMessage):
             note_name = midi_to_note_name(msg.note)
@@ -213,23 +201,26 @@ def demo_midi_input():
             synth.note_off(msg.note)
 
     print(
-        f"\n{Colors.BOLD}Listening for MIDI input... (Press Ctrl+C to stop){Colors.ENDC}\n"
+        f"\n{Colors.BOLD}Listening for MIDI input... (Press Ctrl+C to stop)"
+        f"{Colors.ENDC}\n"
     )
 
     # Start audio and MIDI
     try:
-        with sd.OutputStream(
-            channels=2,
-            samplerate=DEFAULT_SAMPLE_RATE,
-            blocksize=1024,
-            callback=audio_callback,
+        with (
+            sd.OutputStream(
+                channels=2,
+                samplerate=DEFAULT_SAMPLE_RATE,
+                blocksize=1024,
+                callback=audio_callback,
+            ),
+            MIDIInput(selected_device) as midi,
         ):
-            with MIDIInput(selected_device) as midi:
-                midi.start(on_midi_message)
+            midi.start(on_midi_message)
 
-                # Keep running
-                while True:
-                    time.sleep(0.1)
+            # Keep running
+            while True:
+                time.sleep(0.1)
 
     except KeyboardInterrupt:
         print(f"\n\n{Colors.BOLD}Stopped.{Colors.ENDC}")

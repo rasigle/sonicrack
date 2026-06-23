@@ -11,6 +11,7 @@ Architecture:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections.abc import Sequence
 
@@ -121,10 +122,8 @@ class Port:
                 logger.debug(f"Port disconnected (all): {self.port_name}")
                 # Remove this port from all connected ports
                 for connected_port in self.connected_to:
-                    try:
+                    with contextlib.suppress(ValueError):
                         connected_port.connected_to.remove(self)
-                    except ValueError:
-                        pass
             self.connected_to.clear()
             # Clear port data to prevent stale audio
             self.clear()

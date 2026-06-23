@@ -6,9 +6,9 @@ from unittest.mock import Mock, patch
 import numpy as np
 
 from src.engine.io.audio_output import (
-    AudioOutput,
-    DEFAULT_FADEOUT_DURATION_MS,
     DEFAULT_FADEIN_DURATION_MS,
+    DEFAULT_FADEOUT_DURATION_MS,
+    AudioOutput,
 )
 
 

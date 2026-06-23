@@ -6,16 +6,16 @@ import threading
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
-from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
-from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.modules.visualization.visualizer_utils import (
     get_samples_hybrid,
     validate_samples,
 )
+from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)
 

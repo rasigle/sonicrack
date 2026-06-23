@@ -6,9 +6,9 @@ import logging
 from typing import TYPE_CHECKING, cast
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import Qt, QPointF
-from PyQt6.QtGui import QPainter, QColor
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QMessageBox
+from PyQt6.QtCore import QPointF, Qt
+from PyQt6.QtGui import QColor, QPainter
+from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QMessageBox
 
 from src.gui.core.module import ModuleCategory
 from src.gui.widgets.cable_widget import Cable

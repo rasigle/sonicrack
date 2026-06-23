@@ -39,10 +39,11 @@ Note:
 from typing import Literal, cast
 
 import numpy as np
-from scipy.signal import filtfilt, butter as scipy_butter, lfilter, lfilter_zi
+from scipy.signal import butter as scipy_butter
+from scipy.signal import filtfilt, lfilter, lfilter_zi
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import ComponentDescriptor, ComponentCategory
+from src.engine.audio_component import ComponentCategory, ComponentDescriptor
 from src.engine.audio_component_registry import register_component
 from src.engine.modifier import Modifier
 

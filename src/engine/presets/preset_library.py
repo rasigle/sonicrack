@@ -5,9 +5,10 @@ audio synthesis builder in a structured manner with category support.
 """
 
 from __future__ import annotations
-from typing import Any, TYPE_CHECKING
-from pathlib import Path
+
 import json
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from src.utils.logging_config import get_logger
 

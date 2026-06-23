@@ -6,14 +6,14 @@ import logging
 from abc import ABCMeta
 from typing import Any
 
-from PyQt6.QtCore import Qt, QRectF, pyqtSignal
-from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient, QFont
+from PyQt6.QtCore import QRectF, Qt, pyqtSignal
+from PyQt6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import (
-    QGraphicsWidget,
     QGraphicsItem,
-    QWidget,
-    QVBoxLayout,
     QGraphicsProxyWidget,
+    QGraphicsWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from src.gui.core.module import AudioModule
@@ -403,7 +403,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
     def contextMenuEvent(self, event):
         """Handle right-click context menu."""
-        from PyQt6.QtWidgets import QMenu, QInputDialog
+        from PyQt6.QtWidgets import QInputDialog, QMenu
 
         menu = QMenu()
         rename_action = menu.addAction("Rename...")

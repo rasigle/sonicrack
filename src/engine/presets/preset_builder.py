@@ -25,11 +25,12 @@ Example:
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component_registry import audio_registry, ComponentCategory
+from src.engine.audio_component_registry import ComponentCategory, audio_registry
 from src.utils.logging_config import get_logger
 
 logger = get_logger("builder.preset_builder")
@@ -575,7 +576,8 @@ class PresetBuilder:
         osc_nodes = [
             node
             for node in self._component_tree.children
-            if self._get_node_category(node.component_type) == ComponentCategory.OSCILLATOR
+            if self._get_node_category(node.component_type)
+            == ComponentCategory.OSCILLATOR
         ]
         if index < len(osc_nodes):
             node = osc_nodes[index]
@@ -858,7 +860,8 @@ class PresetBuilder:
         self._component_tree.children = [
             node
             for node in self._component_tree.children
-            if self._get_node_category(node.component_type) != ComponentCategory.MODIFIER
+            if self._get_node_category(node.component_type)
+            != ComponentCategory.MODIFIER
         ]
 
         logger.debug("Cleared all effects")
@@ -935,7 +938,7 @@ class PresetBuilder:
         """
         filepath = Path(filepath)
 
-        with open(filepath, "r") as f:
+        with open(filepath) as f:
             config = json.load(f)
 
         # Create builder

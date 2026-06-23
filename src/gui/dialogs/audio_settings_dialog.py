@@ -7,7 +7,7 @@ import logging
 from PyQt6 import QtWidgets
 
 from src.gui.audio_config import audio_config
-from src.gui.ui_constants import DEFAULT_SAMPLE_RATES, DEFAULT_BUFFER_SIZES
+from src.gui.ui_constants import DEFAULT_BUFFER_SIZES, DEFAULT_SAMPLE_RATES
 
 logger = logging.getLogger(__name__)
 

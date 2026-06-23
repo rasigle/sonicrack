@@ -22,7 +22,6 @@ Example:
 
 import logging
 from pathlib import Path
-from typing import Optional, List
 
 try:
     import mido
@@ -33,10 +32,10 @@ except ImportError:
     logging.warning("mido not installed. Install with: pip install mido")
 
 from src.engine.io.midi.messages import (
-    MIDIMessage,
-    NoteOnMessage,
-    NoteOffMessage,
     ControlChangeMessage,
+    MIDIMessage,
+    NoteOffMessage,
+    NoteOnMessage,
     PitchBendMessage,
     ProgramChangeMessage,
 )
@@ -82,7 +81,7 @@ class MIDIFile:
         """
         if not MIDO_AVAILABLE:
             raise RuntimeError(
-                "mido library not installed. " "Install with: pip install mido"
+                "mido library not installed. Install with: pip install mido"
             )
 
         self.filepath = Path(filepath)
@@ -94,14 +93,14 @@ class MIDIFile:
         try:
             self._midi = mido.MidiFile(str(self.filepath))
         except Exception as e:
-            raise IOError(f"Failed to read MIDI file '{filepath}': {e}")
+            raise OSError(f"Failed to read MIDI file '{filepath}': {e}") from e
 
         # Extract properties
         self.ticks_per_beat = self._midi.ticks_per_beat
         self._tempo = 500000  # Default: 120 BPM (500000 microseconds per beat)
 
         # Parse all messages with timestamps
-        self.messages: List[MIDIMessage] = []
+        self.messages: list[MIDIMessage] = []
         self._parse_messages()
 
         # Calculate duration
@@ -140,7 +139,7 @@ class MIDIFile:
             if converted is not None:
                 self.messages.append(converted)
 
-    def _convert_message(self, msg, timestamp: float) -> Optional[MIDIMessage]:
+    def _convert_message(self, msg, timestamp: float) -> MIDIMessage | None:
         """Convert mido message to our internal format.
 
         Args:
@@ -158,13 +157,13 @@ class MIDIFile:
                 return NoteOffMessage(
                     timestamp=timestamp, channel=channel, note=msg.note, velocity=0
                 )
-            else:
-                return NoteOnMessage(
-                    timestamp=timestamp,
-                    channel=channel,
-                    note=msg.note,
-                    velocity=msg.velocity,
-                )
+
+            return NoteOnMessage(
+                timestamp=timestamp,
+                channel=channel,
+                note=msg.note,
+                velocity=msg.velocity,
+            )
 
         elif msg.type == "note_off":
             return NoteOffMessage(
@@ -207,8 +206,8 @@ class MIDIFile:
         return max(msg.timestamp for msg in self.messages)
 
     def get_notes_in_range(
-        self, start_time: float, end_time: float, channel: Optional[int] = None
-    ) -> List[MIDIMessage]:
+        self, start_time: float, end_time: float, channel: int | None = None
+    ) -> list[MIDIMessage]:
         """Get all MIDI messages in a time range.
 
         Args:
@@ -221,7 +220,8 @@ class MIDIFile:
 
         Example:
             >>> # Get first 10 seconds
-            >>> messages = midi.get_notes_in_range(0, 10.0)
+            >>> midi = MIDIFile("example.mid")
+            >>> msgs = midi.get_notes_in_range(0, 10.0)
             >>>
             >>> # Get messages on channel 1 only
             >>> ch1_messages = midi.get_notes_in_range(0, 10.0, channel=0)
@@ -272,7 +272,7 @@ class MIDIFile:
             if isinstance(msg, (NoteOnMessage, NoteOffMessage))
         )
 
-    def get_channel_messages(self, channel: int) -> List[MIDIMessage]:
+    def get_channel_messages(self, channel: int) -> list[MIDIMessage]:
         """Get all messages for a specific channel.
 
         Args:
@@ -283,14 +283,15 @@ class MIDIFile:
         """
         return [msg for msg in self.messages if msg.channel == channel]
 
-    def get_message_types(self) -> dict[str, int]:
+    def count_per_message_type(self) -> dict[str, int]:
         """Get count of each message type.
 
         Returns:
             Dictionary mapping message type name to count
 
         Example:
-            >>> counts = midi.get_message_types()
+            >>> midi = MIDIFile("example.mid")>>>
+            >>> counts = midi.count_per_message_type()
             >>> print(counts)
             {'NoteOnMessage': 450, 'NoteOffMessage': 450, 'ControlChangeMessage': 23}
         """
@@ -300,7 +301,7 @@ class MIDIFile:
             type_counts[type_name] = type_counts.get(type_name, 0) + 1
         return type_counts
 
-    def get_used_channels(self) -> List[int]:
+    def get_used_channels(self) -> list[int]:
         """Get list of channels that have messages.
 
         Returns:
@@ -322,9 +323,9 @@ class MIDIFile:
         ]
 
         if not notes:
-            return (0, 0)
+            return 0, 0
 
-        return (min(notes), max(notes))
+        return min(notes), max(notes)
 
     def __repr__(self) -> str:
         """String representation."""

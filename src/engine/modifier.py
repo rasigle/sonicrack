@@ -38,10 +38,10 @@ import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB
 from src.engine.audio_component import AudioComponent, ComponentDescriptor
-from src.engine.audio_component_registry import register_component, ComponentCategory
+from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import _derive_amplitude_from_init
 from src.utils.logging_config import get_engine_logger
-from src.utils.math import linear_to_db, db_to_linear
+from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
 
 logger = get_engine_logger("modifier")
@@ -85,15 +85,16 @@ def _get_modulation_values(
     """
     # Prefer calling `get_samples` on the original source if available
     if hasattr(modulator_source, "get_samples"):
-        return modulator_source.get_samples(num_samples, reset=False, mode="vectorized")
-    elif hasattr(modulator_iter, "get_samples"):
+        return modulator_source.get_samples(num_samples, mode="vectorized")
+
+    if hasattr(modulator_iter, "get_samples"):
         # Iterator might itself expose get_samples
-        return modulator_iter.get_samples(num_samples, reset=False, mode="vectorized")
-    else:
-        # Fallback to iterator if vectorization not available
-        return np.array(
-            [next(modulator_iter) for _ in range(num_samples)], dtype=np.float32
-        )
+        return modulator_iter.get_samples(num_samples, mode="vectorized")
+
+    # Fallback to iterator if vectorization not available
+    return np.array(
+        [next(modulator_iter) for _ in range(num_samples)], dtype=np.float32
+    )
 
 
 def _get_next_modulation_value(

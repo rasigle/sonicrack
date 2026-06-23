@@ -1,5 +1,5 @@
-from typing import Any
 import logging
+from typing import Any
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
@@ -7,9 +7,9 @@ from PyQt6.QtWidgets import QHBoxLayout
 from src.engine import Volume
 from src.engine.modifier import ModulatedVolume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.core.module_registry import register_module
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,14 @@
+import contextlib
 import sys
+
 import numpy as np
-from PyQt6 import QtWidgets, QtCore
 import pyqtgraph as pg
+from PyQt6 import QtCore, QtWidgets
+
 from engine import (
     Oscillator,
-    SineOscillator,
     SawtoothOscillator,
+    SineOscillator,
     SquareOscillator,
     TriangleOscillator,
 )
@@ -117,10 +120,8 @@ class WaveformViewer(QtWidgets.QMainWindow):
             osc = cls(freq=freq, amplitude=amp, phase=phase, sample_rate=sr)
         except TypeError:
             osc = cls(freq, amp, phase, sr)
-        try:
+        with contextlib.suppress(TypeError):
             iter(osc)
-        except TypeError:
-            pass
         self._osc = osc
 
     def _change_waveform(self, _):
@@ -133,10 +134,8 @@ class WaveformViewer(QtWidgets.QMainWindow):
             osc = cls(freq=freq, amplitude=amp, phase=phase, sample_rate=sr)
         except TypeError:
             osc = cls(freq, amp, phase, sr)
-        try:
+        with contextlib.suppress(TypeError):
             iter(osc)
-        except TypeError:
-            pass
         self._osc = osc
 
     def _update_osc_params(self):

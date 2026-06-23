@@ -3,12 +3,14 @@ Unit tests for audio effects (Distortion, Delay, Reverb).
 """
 
 import unittest
+
 import numpy as np
+
 from src.engine import (
-    SineOscillator,
-    Distortion,
     Delay,
+    Distortion,
     Reverb,
+    SineOscillator,
 )
 
 

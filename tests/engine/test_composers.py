@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from src.engine.composer import Chain, WaveAdder
-from src.engine.modifier import Volume, Panner, Clipper, ModulatedPanner
+from src.engine.modifier import Clipper, ModulatedPanner, Panner, Volume
 from src.engine.oscillator import SineOscillator, TriangleOscillator
 
 
@@ -226,7 +226,8 @@ class TestWaveAdderMixedInputs(unittest.TestCase):
         self.assertTrue(isinstance(samples, np.ndarray))
 
     def test_stereo_mode_with_two_stereo_one_mono(self):
-        """Test WaveAdder stereo mode with two stereo and one mono input (original bug case)."""
+        """Test WaveAdder stereo mode with two stereo and one mono input (original
+        bug case)."""
         # Two stereo inputs
         stereo1 = Chain(
             SineOscillator(440, amplitude=0.3, sample_rate=1000),

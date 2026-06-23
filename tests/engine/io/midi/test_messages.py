@@ -1,14 +1,15 @@
 """Comprehensive tests for MIDI messages module."""
 
 import pytest
+
 from src.engine.io.midi import (
-    MIDIMessage,
-    NoteOnMessage,
-    NoteOffMessage,
+    AftertouchMessage,
     ControlChangeMessage,
+    MIDIMessage,
+    NoteOffMessage,
+    NoteOnMessage,
     PitchBendMessage,
     ProgramChangeMessage,
-    AftertouchMessage,
 )
 
 

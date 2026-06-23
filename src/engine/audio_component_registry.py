@@ -14,11 +14,11 @@ The interface system provides:
 from __future__ import annotations
 
 import inspect
-from typing import Type, Callable
+from collections.abc import Callable
 
 from src.engine.audio_component import (
-    ComponentCategory,
     AudioComponent,
+    ComponentCategory,
     ComponentDescriptor,
 )
 from src.utils.logging_config import get_engine_logger
@@ -37,7 +37,7 @@ class AudioComponentRegistry:
     def __init__(self):
         """Initialize empty registry."""
 
-        self._components: dict[str, Type[AudioComponent]] = {}
+        self._components: dict[str, type[AudioComponent]] = {}
         self._initialized = False
 
     def _ensure_initialized(self):
@@ -55,7 +55,7 @@ class AudioComponentRegistry:
             logger.error(f"Failed to auto-load engine components: {e}")
 
     def register(
-        self, component_class: Type[AudioComponent], override: bool = False
+        self, component_class: type[AudioComponent], override: bool = False
     ) -> None:
         """Register a component descriptor.
 
@@ -114,7 +114,7 @@ class AudioComponentRegistry:
         )
 
     @property
-    def components(self) -> dict[str, Type[AudioComponent]]:
+    def components(self) -> dict[str, type[AudioComponent]]:
         """Get all registered components.
 
         Returns:
@@ -123,7 +123,7 @@ class AudioComponentRegistry:
         self._ensure_initialized()
         return self._components
 
-    def get(self, name: str, strict: bool = False) -> Type[AudioComponent] | None:
+    def get(self, name: str, strict: bool = False) -> type[AudioComponent] | None:
         """Get component class by name.
 
         Args:
@@ -266,7 +266,7 @@ def _class_name_to_component_name(class_name: str) -> str:
     return name.lower()
 
 
-def _extract_parameter_names(cls: Type) -> list[str]:
+def _extract_parameter_names(cls: type) -> list[str]:
     """Extract parameter names from __init__ signature.
 
     Args:
@@ -279,7 +279,7 @@ def _extract_parameter_names(cls: Type) -> list[str]:
         sig = inspect.signature(cls.__init__)
         return [
             param_name
-            for param_name in sig.parameters.keys()
+            for param_name in sig.parameters
             if param_name not in ("self", "args", "kwargs")
         ]
     except Exception as e:
@@ -312,7 +312,7 @@ def register_component(override: bool = False) -> Callable:
         ...         pass
     """
 
-    def decorator(cls: Type[AudioComponent]) -> Type[AudioComponent]:
+    def decorator(cls: type[AudioComponent]) -> type[AudioComponent]:
         # Validate that the class has a descriptor
         if not hasattr(cls, "descriptor"):
             logger.error(

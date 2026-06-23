@@ -9,14 +9,14 @@ This example shows how the registry system makes it easy to:
 
 import numpy as np
 
-from engine.presets import PresetBuilder, ComponentCategory
 from constants import DEFAULT_SAMPLE_RATE
 from engine import (
-    Oscillator,
-    Modifier,
-    audio_registry,
     ComponentDescriptor,
+    Modifier,
+    Oscillator,
+    audio_registry,
 )
+from engine.presets import ComponentCategory, PresetBuilder
 
 
 def example_1_basic_usage():
@@ -239,7 +239,7 @@ def example_5_preset_compatibility():
     print("\n3. Preset JSON content:")
     import json
 
-    with open(preset_file, "r") as f:
+    with open(preset_file) as f:
         data = json.load(f)
     print(json.dumps(data, indent=2))
 

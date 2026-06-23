@@ -35,12 +35,13 @@ Note:
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import AudioComponent, ComponentDescriptor
-from src.engine.audio_component_registry import register_component, ComponentCategory
+from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import Oscillator
 from src.engine.oscillator_modulated import ModulatedOscillator
 from src.utils.logging_config import get_engine_logger
@@ -51,7 +52,8 @@ logger = get_engine_logger("composer")
 class Composer(AudioComponent, ABC):
     """Base for components that combine signals (chain, mixer)."""
 
-    def __init__(self, *components: AudioComponent):
+    def __init__(self, *components: AudioComponent, **kwargs: Any):
+        super().__init__(*components, **kwargs)
         self.components = components
 
     @abstractmethod
@@ -114,7 +116,7 @@ class Composer(AudioComponent, ABC):
             >>>
             >>> chain = Chain(SineOscillator(), Volume(0.5))
             >>> samples1 = chain.get_samples(1000)  # Auto mode
-            >>> samples2 = chain.get_samples(100, mode="iterator", reset=True)
+            >>> samples2 = chain.get_samples(100,mode="iterator")
         """
         if mode not in ("auto", "iterator", "vectorized"):
             raise ValueError(
@@ -351,8 +353,9 @@ class WaveAdder(Composer):
         if isinstance(_val, Sequence) and not self.stereo:
             if self.mix_mode == "sum":
                 return sum(_val)
-            else:  # average
-                return sum(_val) / len(_val)
+
+            # average
+            return sum(_val) / len(_val)
         return _val
 
     def trigger_release(self):
@@ -372,16 +375,16 @@ class WaveAdder(Composer):
     def __next__(self):
         vals = [self._mod_channels(next(gen)) for gen in self.generators]
         if self.stereo:
-            l, r = zip(*vals)
+            l, r = zip(*vals, strict=False)
             if self.mix_mode == "sum":
                 return sum(l), sum(r)
-            else:  # average
-                return sum(l) / len(l), sum(r) / len(r)
+            # average
+            return sum(l) / len(l), sum(r) / len(r)
 
         if self.mix_mode == "sum":
             return sum(vals)
-        else:  # average
-            return sum(vals) / len(vals)
+        # average
+        return sum(vals) / len(vals)
 
     def get_samples_vectorized(self, n: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
         """Generate n samples using fully vectorized operations.
@@ -403,7 +406,7 @@ class WaveAdder(Composer):
         """
         # Fast path for single generator (no mixing needed)
         if len(self.generators) == 1:
-            samples = self.generators[0].get_samples(n, reset=False, mode="vectorized")
+            samples = self.generators[0].get_samples(n, mode="vectorized")
 
             # Handle stereo conversion if needed
             if self.stereo and samples.ndim == 1:
@@ -419,7 +422,7 @@ class WaveAdder(Composer):
         # Generate samples from all generators (vectorized)
         all_samples = []
         for gen in self.generators:
-            samples = gen.get_samples(n, reset=False, mode="vectorized")
+            samples = gen.get_samples(n, mode="vectorized")
             all_samples.append(samples)
 
         # Optimize for mono mode (most common case)
@@ -433,8 +436,9 @@ class WaveAdder(Composer):
                 stacked = np.stack(all_samples, axis=0)
                 if self.mix_mode == "sum":
                     return stacked.sum(axis=0, dtype=np.float32)
-                else:  # average
-                    return stacked.mean(axis=0, dtype=np.float32)
+                # average
+                return stacked.mean(axis=0, dtype=np.float32)
+
             else:
                 # Mixed mono/stereo: convert stereo to mono, then sum/mean
                 mono_samples = []
@@ -449,8 +453,8 @@ class WaveAdder(Composer):
                 stacked = np.stack(mono_samples, axis=0)
                 if self.mix_mode == "sum":
                     return stacked.sum(axis=0, dtype=np.float32)
-                else:  # average
-                    return stacked.mean(axis=0, dtype=np.float32)
+                # average
+                return stacked.mean(axis=0, dtype=np.float32)
 
         # Stereo mode
         # Check if we have mixed mono/stereo inputs
@@ -472,5 +476,5 @@ class WaveAdder(Composer):
         stacked = np.stack(all_samples, axis=0)
         if self.mix_mode == "sum":
             return stacked.sum(axis=0, dtype=np.float32)
-        else:  # average
-            return stacked.mean(axis=0, dtype=np.float32)
+        # average
+        return stacked.mean(axis=0, dtype=np.float32)

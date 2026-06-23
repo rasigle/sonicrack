@@ -22,22 +22,19 @@ Press Ctrl+C to exit.
 import sys
 import time
 
-try:
-    from engine.io.midi import MIDIInput, MIDO_AVAILABLE
-    from engine.io.midi import (
-        MIDIMessage,
-        NoteOnMessage,
-        NoteOffMessage,
-        ControlChangeMessage,
-        PitchBendMessage,
-        ProgramChangeMessage,
-        AftertouchMessage,
-    )
-    from engine.io.midi import midi_to_note_name, midi_to_frequency
-except ImportError:
-    print("Error: Could not import MIDI modules")
-    print("Make sure you're running from the project root directory")
-    sys.exit(1)
+from engine.io.midi import (
+    AftertouchMessage,
+    ControlChangeMessage,
+    MIDIInput,
+    MIDIMessage,
+    NoteOffMessage,
+    NoteOnMessage,
+    PitchBendMessage,
+    ProgramChangeMessage,
+    midi_to_frequency,
+    midi_to_note_name,
+)
+from engine.io.midi.input import MIDO_AVAILABLE
 
 
 # ANSI color codes for terminal output
@@ -123,7 +120,8 @@ def format_message(msg: MIDIMessage) -> str:
         else:
             return (
                 f"{Colors.YELLOW}{timestamp_str} {channel_str} "
-                f"CC       {cc_name:20s} = {msg.value:3d} ({value_percent:3d}%){Colors.ENDC}"
+                f"CC       {cc_name:20s} = {msg.value:3d} ({value_percent:3d}%)"
+                f"{Colors.ENDC}"
             )
 
     elif isinstance(msg, PitchBendMessage):
@@ -145,7 +143,8 @@ def format_message(msg: MIDIMessage) -> str:
         pressure_percent = int(msg.normalize_pressure() * 100)
         return (
             f"{Colors.CYAN}{timestamp_str} {channel_str} "
-            f"AFTERTCH Pressure: {msg.pressure:3d} ({pressure_percent:3d}%){Colors.ENDC}"
+            f"AFTERTCH Pressure: {msg.pressure:3d} ({pressure_percent:3d}%)"
+            f"{Colors.ENDC}"
         )
 
     else:
@@ -208,7 +207,8 @@ def main():
 
     # Show exit instructions
     print(
-        f"\n{Colors.BOLD}Listening for MIDI messages... (Press Ctrl+C to exit){Colors.ENDC}\n"
+        f"\n{Colors.BOLD}Listening for MIDI messages... (Press Ctrl+C to exit)"
+        f"{Colors.ENDC}\n"
     )
     print("=" * 80)
 

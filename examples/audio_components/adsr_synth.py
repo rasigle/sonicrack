@@ -4,12 +4,11 @@ import threading
 
 import numpy as np
 import sounddevice as sd
-from PyQt6 import QtWidgets, QtCore
-
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PyQt6 import QtCore, QtWidgets
 
-from engine import synth, SineOscillator
+from engine import SineOscillator, synth
 
 
 def generate_adsr_envelope(t, attack, decay, sustain, release, total_time):

@@ -6,14 +6,14 @@ import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.noise import (
-    white_noise,
-    pink_noise,
-    brownian_noise,
     blue_noise,
-    perlin_noise,
-    velvet_noise,
+    brownian_noise,
     grey_noise,
+    perlin_noise,
+    pink_noise,
     sample_hold_noise,
+    velvet_noise,
+    white_noise,
 )
 
 

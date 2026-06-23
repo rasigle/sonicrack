@@ -7,9 +7,9 @@ from PyQt6.QtGui import QColor
 
 from src.engine import Clipper
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
-from src.gui.core.module_registry import register_module
 
 logger = logging.getLogger(__name__)
 

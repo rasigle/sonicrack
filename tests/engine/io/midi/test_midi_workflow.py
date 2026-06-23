@@ -6,14 +6,14 @@ works correctly.
 
 import numpy as np
 
+from src.engine import ADSREnvelope, ModulatedOscillator, SineOscillator
 from src.engine.io.midi import (
-    MIDIToCV,
-    NoteOnMessage,
-    NoteOffMessage,
     CVFrequencyOutput,
     CVGateOutput,
+    MIDIToCV,
+    NoteOffMessage,
+    NoteOnMessage,
 )
-from src.engine import SineOscillator, ADSREnvelope, ModulatedOscillator
 from src.engine.modulator import GateTriggeredADSR
 
 

@@ -11,8 +11,8 @@ import importlib
 import importlib.util
 import inspect
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Type, Callable
 
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -35,13 +35,13 @@ class ModuleRegistry:
 
     def __init__(self):
         """Initialize the module registry."""
-        self._modules: dict[str, Type[ModuleWidget]] = {}
+        self._modules: dict[str, type[ModuleWidget]] = {}
         self._categories: dict[str, list[str]] = {}
         self._metadata: dict[str, dict] = {}
 
     def register(
-        self, module_class: Type[ModuleWidget], **override_metadata
-    ) -> Type[ModuleWidget]:
+        self, module_class: type[ModuleWidget], **override_metadata
+    ) -> type[ModuleWidget]:
         """Register a module class.
 
         Args:
@@ -134,7 +134,7 @@ class ModuleRegistry:
         logger.debug(f"Unregistered module: {name}")
         return True
 
-    def get(self, name: str, strict: bool = False) -> Type[ModuleWidget] | None:
+    def get(self, name: str, strict: bool = False) -> type[ModuleWidget] | None:
         """Get a module class by name.
 
         Args:
@@ -157,7 +157,7 @@ class ModuleRegistry:
 
         return module
 
-    def get_all(self) -> dict[str, Type[ModuleWidget]]:
+    def get_all(self) -> dict[str, type[ModuleWidget]]:
         """Get all registered modules.
 
         Returns:
@@ -165,7 +165,7 @@ class ModuleRegistry:
         """
         return self._modules.copy()
 
-    def get_by_category(self, category: str) -> dict[str, Type[ModuleWidget]]:
+    def get_by_category(self, category: str) -> dict[str, type[ModuleWidget]]:
         """Get all modules in a category.
 
         Args:
@@ -254,7 +254,7 @@ def register_module(**override_metadata) -> Callable:
         ```
     """
 
-    def decorator(cls: Type[ModuleWidget]) -> Type[ModuleWidget]:
+    def decorator(cls: type[ModuleWidget]) -> type[ModuleWidget]:
         _global_registry.register(module_class=cls, **override_metadata)
         return cls
 

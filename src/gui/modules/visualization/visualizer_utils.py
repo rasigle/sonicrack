@@ -5,7 +5,6 @@ including hybrid active/passive mode sample acquisition.
 """
 
 import logging
-from typing import Optional
 
 import numpy as np
 
@@ -42,7 +41,7 @@ def check_output_module_exists(visualizer_module) -> bool:
     return False
 
 
-def get_samples_passive_mode(input_port) -> Optional[np.ndarray]:
+def get_samples_passive_mode(input_port) -> np.ndarray | None:
     """Get samples in PASSIVE mode - read cached port value.
 
     In passive mode, the audio thread has already written samples to port.value.
@@ -87,9 +86,7 @@ def get_samples_passive_mode(input_port) -> Optional[np.ndarray]:
     return None
 
 
-def get_samples_active_mode(
-    input_port, num_samples: int = 1024
-) -> Optional[np.ndarray]:
+def get_samples_active_mode(input_port, num_samples: int = 1024) -> np.ndarray | None:
     """Get samples in ACTIVE mode - actively generate samples.
 
     In active mode (no output module exists), we directly call process() on
@@ -119,17 +116,16 @@ def get_samples_active_mode(
                     connected_port.parent_module.process(num_samples)
 
                 # Now read the generated value from the port
-                if connected_port.value is not None:
-                    if (
-                        isinstance(connected_port.value, np.ndarray)
-                        and connected_port.value.size > 0
-                    ):
-                        samples = connected_port.value
-                        logger.debug(
-                            f"ACTIVE: Got {len(samples)} samples from "
-                            f"{connected_port.port_name}"
-                        )
-                        break
+                if connected_port.value is not None and (
+                    isinstance(connected_port.value, np.ndarray)
+                    and connected_port.value.size > 0
+                ):
+                    samples = connected_port.value
+                    logger.debug(
+                        f"ACTIVE: Got {len(samples)} samples from "
+                        f"{connected_port.port_name}"
+                    )
+                    break
 
         # Fallback: try port.read() if direct call didn't work
         if samples is None:
@@ -152,7 +148,7 @@ def get_samples_active_mode(
 
 def get_samples_hybrid(
     visualizer_module, input_port, num_samples: int = 1024
-) -> Optional[np.ndarray]:
+) -> np.ndarray | None:
     """Get samples using hybrid active/passive mode.
 
     This is the main entry point for visualizers. It automatically detects

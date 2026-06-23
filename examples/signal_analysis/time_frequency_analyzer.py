@@ -1,24 +1,25 @@
 import sys
+
 import numpy as np
-from scipy import signal
-from PyQt6.QtWidgets import (
-    QApplication,
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QLabel,
-    QComboBox,
-    QDoubleSpinBox,
-    QWidget,
-    QScrollArea,
-    QFrame,
-    QGroupBox,
-    QCheckBox,
-)
-from PyQt6.QtCore import QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFrame,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+from scipy import signal
 
 
 # --- Matplotlib Canvas ---

@@ -29,25 +29,26 @@ Example Patch:
 """
 
 import logging
-from typing import Any, Optional
+from contextlib import suppress
+from typing import Any
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
+    QComboBox,
     QHBoxLayout,
     QLabel,
-    QComboBox,
     QPushButton,
 )
 
 from src.engine.io.midi import (
-    MIDIToCV,
-    MIDIMessage,
-    NoteOnMessage,
-    NoteOffMessage,
     CVFrequencyOutput,
     CVGateOutput,
     CVVelocityOutput,
+    MIDIMessage,
+    MIDIToCV,
+    NoteOffMessage,
+    NoteOnMessage,
 )
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
@@ -94,7 +95,7 @@ class MIDIInputModule(ModuleWidget):
         self.vel_port = self.add_output("Vel")
 
         # MIDI components
-        self.midi_worker: Optional[MIDIWorkerThread] = None
+        self.midi_worker: MIDIWorkerThread | None = None
         self.cv_converter = MIDIToCV()
 
         # Create specialized output components for each port
@@ -159,8 +160,8 @@ class MIDIInputModule(ModuleWidget):
         """Refresh the list of available MIDI devices."""
         try:
             # Import MIDIInput only for device listing
-            from src.engine.io.midi.input import MIDO_AVAILABLE
             from src.engine.io.midi import MIDIInput
+            from src.engine.io.midi.input import MIDO_AVAILABLE
 
             if not MIDO_AVAILABLE:
                 self.device_status_changed.emit("MIDI library not installed")
@@ -250,6 +251,16 @@ class MIDIInputModule(ModuleWidget):
 
         logger.info("Stopped MIDI input")
 
+    def shutdown(self, graceful: bool = True):
+        """Release MIDI resources before application shutdown.
+
+        Args:
+            graceful: Accepted for a common module shutdown interface. MIDI input has
+                no fade-out phase, so it always stops promptly.
+        """
+        del graceful
+        self._stop_midi()
+
     def _on_worker_status_changed(self, status: str):
         """Handle status change from worker thread (thread-safe).
 
@@ -288,13 +299,12 @@ class MIDIInputModule(ModuleWidget):
                 self.note_label.setStyleSheet(
                     "color: #00ff00; font-size: 14px; font-weight: bold;"
                 )
-        elif isinstance(msg, NoteOffMessage):
-            # Check if gate is off (no lock needed)
-            if self.cv_converter.gate == 0.0:  # Only if no notes active
-                self.note_label.setText("--")
-                self.note_label.setStyleSheet(
-                    "color: white; font-size: 14px; font-weight: bold;"
-                )
+        elif isinstance(msg, NoteOffMessage) and self.cv_converter.gate == 0.0:
+            # Only clear the display when no notes remain active.
+            self.note_label.setText("--")
+            self.note_label.setStyleSheet(
+                "color: white; font-size: 14px; font-weight: bold;"
+            )
 
     def _on_status_changed(self, status: str):
         """Update status label.
@@ -352,19 +362,14 @@ class MIDIInputModule(ModuleWidget):
         Returns:
             The specialized CV output component for that port
         """
-        if port_name == "Freq":
-            return self.freq_output
-        elif port_name == "Gate":
-            return self.gate_output
-        elif port_name == "Vel":
-            return self.vel_output
-        else:
-            # Default to frequency output
-            return self.freq_output
+        outputs = {
+            "Freq": self.freq_output,
+            "Gate": self.gate_output,
+            "Vel": self.vel_output,
+        }
+        return outputs.get(port_name, self.freq_output)
 
     def __del__(self):
         """Destructor - ensure MIDI input is stopped."""
-        try:
+        with suppress(Exception):
             self._stop_midi()
-        except Exception:
-            pass

@@ -11,12 +11,12 @@ import pytest
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.utils.audio_utils import (
-    to_int16,
-    save_wave,
-    load_wave,
-    note_to_frequency,
-    mono_to_stereo,
     combine_lr_to_stereo,
+    load_wave,
+    mono_to_stereo,
+    note_to_frequency,
+    save_wave,
+    to_int16,
 )
 
 

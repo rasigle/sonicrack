@@ -9,20 +9,20 @@ from typing import TYPE_CHECKING, Any, cast
 from PyQt6 import QtGui, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QToolBar,
+    QDialog,
+    QFileDialog,
     QLabel,
-    QStatusBar,
+    QMainWindow,
     QMessageBox,
     QScrollArea,
     QSplitter,
-    QDialog,
-    QFileDialog,
+    QStatusBar,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
 )
 
-from src import version
+from src import __version__
 from src.constants import PRESET_FILE_EXTENSION
 from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory
@@ -34,7 +34,7 @@ from src.gui.dialogs.preset_library_dialog import (
     SaveLibraryPresetDialog,
 )
 from src.gui.patch_canvas import PatchCanvas
-from src.gui.ui_constants import APP_TITLE, APP_ICON_PATH
+from src.gui.ui_constants import APP_ICON_PATH, APP_TITLE
 
 if TYPE_CHECKING:
     from src.gui.core.module_registry import ModuleRegistry
@@ -61,6 +61,7 @@ class ModularSynthWindow(QMainWindow):
         # Patch file tracking
         self.current_patch_path = None  # Path to currently loaded patch file
         self.patch_modified: bool = False  # Track if patch has unsaved changes
+        self._is_shutting_down = False
 
         # Initialize core components
         logger.debug("Initializing ModularSynthWindow core components")
@@ -225,7 +226,7 @@ class ModularSynthWindow(QMainWindow):
         # Help menu
         help_menu = menubar.addMenu("&Help")
         about_action = QtGui.QAction("&About", self)
-        about_action.triggered.connect(lambda: show_about(self, version=version))
+        about_action.triggered.connect(lambda: show_about(self, version=__version__))
         help_menu.addAction(about_action)
 
     def _setup_toolbar(self):
@@ -312,7 +313,7 @@ class ModularSynthWindow(QMainWindow):
             from src.gui.modules.output.output import OutputModule
 
             output_module = cast(OutputModule, module_instance)
-            setattr(output_module, "audio_engine", self.audio_engine)
+            output_module.audio_engine = self.audio_engine
             logger.debug("Set audio_engine reference on Output module")
 
     def _on_audio_error(self, error: str):
@@ -632,7 +633,7 @@ class ModularSynthWindow(QMainWindow):
 
         try:
             # Load patch data
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 patch_data = json.load(f)
 
             # Clear current patch
@@ -694,11 +695,14 @@ class ModularSynthWindow(QMainWindow):
         patch_canvas.clear_all()
         self._require_statusbar().showMessage("Canvas cleared")
 
-    def _stop_all_output_modules(self):
+    def _stop_all_output_modules(self, graceful: bool = True):
         """Stop playback on all Output modules in the current patch.
 
         This ensures that when loading a new patch or clearing the canvas,
         audio from the old patch doesn't continue playing.
+
+        Args:
+            graceful: If True, allow Output modules to fade out before stopping.
         """
         if self.patch_canvas is None:
             return
@@ -709,7 +713,7 @@ class ModularSynthWindow(QMainWindow):
 
         if output_module.audio_output.is_playing:
             logger.info("Stopping Output module before clearing patch")
-            output_module.stop_playback()
+            output_module.stop_playback(graceful=graceful)
 
     def _save_as_library_preset(self):
         """Save the current patch as a preset."""
@@ -842,6 +846,46 @@ class ModularSynthWindow(QMainWindow):
         # Compile the loaded patch
         self._require_statusbar().showMessage("Preset loaded successfully")
 
+    def shutdown(self, graceful: bool = True) -> None:
+        """Release app-owned resources before quitting.
+
+        Args:
+            graceful: If True, allow audio modules to fade out. If False, stop
+                streams and worker resources as quickly as possible.
+        """
+        if self._is_shutting_down:
+            return
+
+        self._is_shutting_down = True
+        logger.info("Shutting down ModularSynthWindow")
+
+        modules = []
+        if self.patch_canvas is not None:
+            modules = list(self.patch_canvas.get_modules())
+
+        for module in modules:
+            try:
+                shutdown = getattr(module, "shutdown", None)
+                if callable(shutdown):
+                    shutdown(graceful=graceful)
+                    continue
+
+                stop_playback = getattr(module, "stop_playback", None)
+                if callable(stop_playback):
+                    stop_playback(graceful=graceful)
+
+                timer = getattr(module, "_viz_timer", None)
+                if timer is not None and hasattr(timer, "stop"):
+                    timer.stop()
+            except Exception as exc:
+                logger.warning(
+                    "Error while shutting down module %s: %s",
+                    type(module).__name__,
+                    exc,
+                    exc_info=True,
+                )
+
     def closeEvent(self, event):
         """Handle window close event."""
+        self.shutdown(graceful=True)
         event.accept()

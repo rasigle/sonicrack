@@ -1,8 +1,8 @@
 """Widgets package for modular synth interface."""
 
 from src.gui.widgets.knob_widget import Knob
-from src.gui.widgets.slider_widget import VSlider, HSlider
 from src.gui.widgets.port_widget import PortWidget
+from src.gui.widgets.slider_widget import HSlider, VSlider
 
 __all__ = [
     "Knob",

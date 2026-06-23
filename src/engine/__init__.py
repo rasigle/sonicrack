@@ -91,14 +91,14 @@ from src.engine.audio_component import (
 )
 from src.engine.audio_component_registry import (
     AudioComponentRegistry,
-    register_component,
     audio_registry,
+    register_component,
 )
 
 # Composers
 from src.engine.composer import (
-    Composer,
     Chain,
+    Composer,
     WaveAdder,
 )
 
@@ -106,69 +106,69 @@ from src.engine.composer import (
 from src.engine.cv_utils import (
     CVScaler,
     bipolar_to_unipolar,
-    unipolar_to_bipolar,
     scale_cv,
+    unipolar_to_bipolar,
 )
 
 # Effects
 from src.engine.effects import (
-    Distortion,
     Delay,
+    Distortion,
     Reverb,
 )
 
 # Filters
-from src.engine.filter import butter, apply_filter, ButterworthFilter
+from src.engine.filter import ButterworthFilter, apply_filter, butter
 from src.engine.io.audio_output import AudioOutput
 
 # Modifiers
 from src.engine.modifier import (
-    Modifier,
-    Panner,
-    ModulatedPanner,
-    Volume,
-    ModulatedVolume,
-    Frequency,
     Clipper,
+    Frequency,
+    Modifier,
     ModulatedClipper,
+    ModulatedPanner,
+    ModulatedVolume,
+    Panner,
+    Volume,
 )
 
 # Modulators
 from src.engine.modulator import (
-    Modulator,
     ADSREnvelope,
+    Modulator,
     getadsr,
 )
 
 # Noise generators
 from src.engine.noise import (
-    white_noise,
-    pink_noise,
-    brownian_noise,
-    blue_noise,
-    perlin_noise,
-    velvet_noise,
-    grey_noise,
-    sample_hold_noise,
     NoiseGenerator,
+    blue_noise,
+    brownian_noise,
+    grey_noise,
+    perlin_noise,
+    pink_noise,
+    sample_hold_noise,
+    velvet_noise,
+    white_noise,
 )
 
 # Oscillators
 from src.engine.oscillator import (
     Oscillator,
-    SineOscillator,
     SawtoothOscillator,
-    TriangleOscillator,
+    SineOscillator,
     SquareOscillator,
+    TriangleOscillator,
 )
-from src.engine.synthesis import synth
 
 # Modulated Oscillator
-from src.engine.oscillator_modulated import ModulatedOscillator, ModulatedFrequency
+from src.engine.oscillator_modulated import ModulatedFrequency, ModulatedOscillator
 
 # Presets
 from src.engine.presets.preset_builder import PresetBuilder
 from src.engine.presets.preset_library import PresetLibrary
+from src.engine.synthesis import synth
 
 __all__ = [
     # IO

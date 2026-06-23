@@ -1466,7 +1466,8 @@ class TestPortComponentBackwardCompatibility:
         assert port2.component is None  # No component set
 
     def test_mixed_old_and_new_style(self):
-        """Test mixing old-style ports (no component) with new-style (with component)."""
+        """Test mixing old-style ports (no component) with new-style
+        (with component)."""
         osc = SineOscillator(440)
 
         # New style - with component

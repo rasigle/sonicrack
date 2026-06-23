@@ -10,7 +10,7 @@ Tests cover:
 
 import unittest
 
-from src.engine.audio_component import ComponentDescriptor, ComponentCategory
+from src.engine.audio_component import ComponentCategory, ComponentDescriptor
 
 
 class TestComponentDescriptor(unittest.TestCase):

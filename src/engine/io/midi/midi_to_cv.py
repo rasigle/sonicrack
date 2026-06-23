@@ -24,18 +24,18 @@ Example:
 """
 
 import logging
-from typing import Optional
+
 import numpy as np
 
+from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import AudioComponent
 from src.engine.io.midi.messages import (
-    MIDIMessage,
-    NoteOnMessage,
-    NoteOffMessage,
     ControlChangeMessage,
+    MIDIMessage,
+    NoteOffMessage,
+    NoteOnMessage,
     PitchBendMessage,
 )
-from src.constants import DEFAULT_SAMPLE_RATE
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ class MIDIToCV(AudioComponent):
         self.mod_wheel: float = 0.0
         self.expression: float = 1.0
         self.pitch_bend: float = 0.0  # In semitones
-        self.current_note: Optional[int] = None
+        self.current_note: int | None = None
 
         logger.debug("MIDIToCV initialized")
 

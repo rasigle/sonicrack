@@ -5,11 +5,11 @@ import logging
 from PyQt6 import QtWidgets
 from PyQt6.QtWidgets import (
     QDialog,
-    QVBoxLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QTextEdit,
-    QGroupBox,
+    QVBoxLayout,
 )
 
 from src.gui.core.module import AudioModule

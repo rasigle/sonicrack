@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QPointF, QRectF
-from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath
+from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QGraphicsItem
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class Cable(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setAcceptHoverEvents(True)
         self.setAcceptedMouseButtons(
-            Qt.MouseButtons(Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton)
+            Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
         )
         self.setZValue(-1)  # Draw cables behind modules
 
@@ -214,8 +214,8 @@ class Cable(QGraphicsItem):
 
     def contextMenuEvent(self, event):
         """Handle right-click context menu."""
-        from PyQt6.QtWidgets import QMenu
         from PyQt6.QtGui import QAction
+        from PyQt6.QtWidgets import QMenu
 
         # Select this cable to highlight it visually
         self.setSelected(True)

@@ -7,7 +7,8 @@ class Sequencer:
     Phase-continuous sine-wave sequencer for N steps (default 16) with per-step tempo.
     - Maintains phase continuity between notes to avoid discontinuities.
     - Applies a short attack and release envelope per note (ms) to avoid clicks.
-    - Can render to a numpy array, save as WAV, or play (via IPython Audio if available).
+    - Can render to a numpy array, save as WAV, or play (via IPython Audio if
+        available).
     """
 
     def __init__(
@@ -29,7 +30,8 @@ class Sequencer:
         self.frequencies = arr.copy()
 
     def set_tempo(self, bpm_or_list, beats_per_step=None):
-        """Set BPM per step (can be scalar or list). beats_per_step can be scalar or list."""
+        """Set BPM per step (can be scalar or list). beats_per_step can be scalar or
+        list."""
         bpm = np.asarray(bpm_or_list, dtype=float)
         if bpm.size == 1:
             self.bpm = np.full(self.steps, float(bpm), dtype=float)
@@ -52,7 +54,8 @@ class Sequencer:
         return float(self.beats_per_step[idx]) * 60.0 / float(self.bpm[idx])
 
     def render(self, sample_type=np.float32):
-        """Render the whole sequence as a single continuous waveform (phase-continuous)."""
+        """Render the whole sequence as a single continuous waveform
+        (phase-continuous)."""
         durations = [self._note_duration_seconds(i) for i in range(self.steps)]
         samples_per_step = [int(np.round(d * self.sr)) for d in durations]
         total_samples = sum(samples_per_step)

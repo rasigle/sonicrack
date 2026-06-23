@@ -21,10 +21,10 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Run engine tests
-        run: uv run --extra audio-io --extra midi pytest tests/engine -q
+        run: uv run --extra audio-io --extra midi pytest tests/engine_t -q
 
       - name: Run engine lint
-        run: uv run ruff check src/engine src/audio_io src/midi_io tests/engine
+        run: uv run ruff check src/engine src/audio_io src/midi_io tests/engine_t
 
       - name: Run engine type check
         run: uv run mypy src/engine src/audio_io src/midi_io

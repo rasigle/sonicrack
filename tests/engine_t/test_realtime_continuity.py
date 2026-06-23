@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from src.engine import (
+    ADSREnvelope,
     Chain,
     Delay,
     ModulatedOscillator,
@@ -45,6 +46,83 @@ def test_butterworth_filter_preserves_state_across_buffers():
         chunks.append(chunked_filter.scale_vectorized(chunk))
         offset += chunk_size
     chunked = np.concatenate(chunks)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+def test_butterworth_filter_preserves_stereo_state_across_buffers():
+    rng = np.random.default_rng(5678)
+    signal = rng.normal(0.0, 0.25, (TOTAL_SAMPLES, 2)).astype(np.float32)
+
+    continuous_filter = ButterworthFilter(cutoff=1200, order=4, sample_rate=44100)
+    chunked_filter = ButterworthFilter(cutoff=1200, order=4, sample_rate=44100)
+
+    continuous = continuous_filter.scale_vectorized(signal)
+
+    offset = 0
+    chunks = []
+    for chunk_size in CHUNKS:
+        chunk = signal[offset : offset + chunk_size]
+        chunks.append(chunked_filter.scale_vectorized(chunk))
+        offset += chunk_size
+    chunked = np.concatenate(chunks)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+def test_stereo_chain_with_filter_preserves_state_across_buffers():
+    def make_chain() -> Chain:
+        return Chain(
+            SineOscillator(frequency=440, gain_db=-12),
+            Panner(position=0.35),
+            ButterworthFilter(cutoff=1800, order=4, sample_rate=44100),
+        )
+
+    continuous = make_chain().get_samples_vectorized(TOTAL_SAMPLES)
+    chunked_chain = make_chain()
+    chunked = _render_chunked(chunked_chain.get_samples_vectorized)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+def _make_release_ready_adsr() -> ADSREnvelope:
+    adsr = ADSREnvelope(
+        attack_duration=0.002,
+        decay_duration=0.003,
+        sustain_level=0.4,
+        release_duration=0.05,
+        sample_rate=44100,
+    )
+    adsr.trigger_note_on()
+    adsr.get_samples(512, mode="vectorized")
+    adsr.trigger_release()
+    return adsr
+
+
+def test_adsr_release_preserves_state_across_buffers():
+    continuous_adsr = _make_release_ready_adsr()
+    chunked_adsr = _make_release_ready_adsr()
+
+    continuous = continuous_adsr.get_samples(TOTAL_SAMPLES, mode="vectorized")
+    chunked = _render_chunked(
+        lambda chunk_size: chunked_adsr.get_samples(chunk_size, mode="vectorized")
+    )
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+def test_modulated_oscillator_adsr_release_preserves_state_across_buffers():
+    def make_voice() -> ModulatedOscillator:
+        envelope = _make_release_ready_adsr()
+        return ModulatedOscillator(
+            SineOscillator(frequency=220, gain_db=-12),
+            envelope,
+            amp_mod=lambda base_amp, env_value: base_amp * env_value,
+        )
+
+    continuous = make_voice().get_samples_vectorized(TOTAL_SAMPLES)
+    chunked_voice = make_voice()
+    chunked = _render_chunked(chunked_voice.get_samples_vectorized)
 
     np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
 

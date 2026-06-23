@@ -125,8 +125,8 @@ class ButterworthFilter(Modifier):
         # Design filter coefficients
         self._b, self._a = self._design_filter()
 
-        # Initialize filter state for stateful processing (iterator mode)
-        self._zi = lfilter_zi(self._b, self._a)
+        # Initialize zero filter state for realtime-style streaming.
+        self._zi = np.zeros_like(lfilter_zi(self._b, self._a))
         self._filter_state = self._zi.copy()
 
     def _design_filter(self) -> tuple[np.ndarray, np.ndarray]:
@@ -155,8 +155,12 @@ class ButterworthFilter(Modifier):
 
     def __iter__(self):
         """Initialize iterator - reset filter state."""
-        self._filter_state = self._zi.copy()
+        self.reset_state()
         return self
+
+    def reset_state(self) -> None:
+        """Reset the filter delay state."""
+        self._filter_state = self._zi.copy()
 
     def __next__(self):
         """Not used - filter requires buffered processing."""
@@ -212,11 +216,32 @@ class ButterworthFilter(Modifier):
         if samples.size == 0:
             return samples
 
-        # Use lfilter for one-pass filtering (faster than filtfilt)
-        # For offline processing, filtfilt gives zero-phase but is 2x slower
-        filtered = lfilter(self._b, self._a, samples)
+        filter_state = self._filter_state_for(samples)
+        filtered, self._filter_state = lfilter(
+            self._b,
+            self._a,
+            samples,
+            axis=0,
+            zi=filter_state,
+        )
 
         return filtered.astype(np.float32)
+
+    def _filter_state_for(self, samples: np.ndarray) -> np.ndarray:
+        """Return filter state shaped for filtering along the sample axis."""
+        expected_shape = (self._zi.shape[0],) + samples.shape[1:]
+        if self._filter_state.shape == expected_shape:
+            return self._filter_state
+
+        if samples.ndim == 1:
+            self._filter_state = self._zi.copy()
+            return self._filter_state
+
+        self._filter_state = np.broadcast_to(
+            self._zi.reshape((self._zi.shape[0],) + (1,) * (samples.ndim - 1)),
+            expected_shape,
+        ).copy()
+        return self._filter_state
 
     @property
     def cutoff(self) -> float | tuple[float, float]:
@@ -228,8 +253,8 @@ class ButterworthFilter(Modifier):
         """Set cutoff frequency and redesign filter."""
         self._cutoff = value
         self._b, self._a = self._design_filter()
-        self._zi = lfilter_zi(self._b, self._a)
-        self._filter_state = self._zi.copy()
+        self._zi = np.zeros_like(lfilter_zi(self._b, self._a))
+        self.reset_state()
 
     @property
     def order(self) -> int:
@@ -241,8 +266,8 @@ class ButterworthFilter(Modifier):
         """Set filter order and redesign filter."""
         self._order = value
         self._b, self._a = self._design_filter()
-        self._zi = lfilter_zi(self._b, self._a)
-        self._filter_state = self._zi.copy()
+        self._zi = np.zeros_like(lfilter_zi(self._b, self._a))
+        self.reset_state()
 
     @property
     def filter_type(self) -> str:

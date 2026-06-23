@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import statistics
 import time
+import tracemalloc
 
 import numpy as np
 
@@ -36,6 +37,27 @@ def benchmark_buffer_size(buffer_size: int, iterations: int) -> dict[str, float]
     }
 
 
+def track_allocations(buffer_size: int, iterations: int) -> dict[str, int]:
+    source = np.zeros((buffer_size, 2), dtype=np.float32)
+    outdata = np.zeros((buffer_size, 2), dtype=np.float32)
+    audio = AudioOutput(buffer_size=buffer_size, audio_callback=lambda n: source[:n])
+    audio._master_volume_smoothing_samples = 0
+
+    for _ in range(32):
+        audio._sounddevice_callback(outdata, buffer_size, None, None)
+
+    tracemalloc.start()
+    for _ in range(iterations):
+        audio._sounddevice_callback(outdata, buffer_size, None, None)
+    current_bytes, peak_bytes = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    return {
+        "current_bytes": current_bytes,
+        "peak_bytes": peak_bytes,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -45,17 +67,29 @@ def main() -> None:
         default=[64, 128, 256, 512, 1024, 2048],
     )
     parser.add_argument("--iterations", type=int, default=5000)
+    parser.add_argument("--track-allocations", action="store_true")
     args = parser.parse_args()
 
-    print("buffer_size,min_us,mean_us,max_us")
+    if args.track_allocations:
+        print("buffer_size,min_us,mean_us,max_us,current_bytes,peak_bytes")
+    else:
+        print("buffer_size,min_us,mean_us,max_us")
+
     for buffer_size in args.buffer_sizes:
         result = benchmark_buffer_size(buffer_size, args.iterations)
-        print(
+        row = (
             f"{buffer_size},"
             f"{result['min_us']:.3f},"
             f"{result['mean_us']:.3f},"
             f"{result['max_us']:.3f}"
         )
+        if args.track_allocations:
+            allocation_result = track_allocations(buffer_size, args.iterations)
+            row += (
+                f",{allocation_result['current_bytes']},"
+                f"{allocation_result['peak_bytes']}"
+            )
+        print(row)
 
 
 if __name__ == "__main__":

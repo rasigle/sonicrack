@@ -1,5 +1,7 @@
 """Realtime-oriented tests for the audio output callback path."""
 
+import tracemalloc
+
 import numpy as np
 import pytest
 
@@ -40,3 +42,23 @@ def test_callback_grows_reusable_buffers_for_unexpected_larger_buffers():
     assert audio._ramp_buffer.shape[0] >= 256
     assert audio._ramp_index_buffer.shape[0] >= 256
     assert audio.callback_error_count == 0
+
+
+def test_callback_has_bounded_python_allocations_in_steady_state():
+    """Track Python allocations after warmup for the common callback path."""
+    buffer_size = 512
+    source = np.ones((buffer_size, 2), dtype=np.float32)
+    outdata = np.zeros((buffer_size, 2), dtype=np.float32)
+    audio = AudioOutput(buffer_size=buffer_size, audio_callback=lambda n: source[:n])
+    audio._master_volume_smoothing_samples = 0
+
+    for _ in range(32):
+        audio._sounddevice_callback(outdata, buffer_size, None, None)
+
+    tracemalloc.start()
+    for _ in range(256):
+        audio._sounddevice_callback(outdata, buffer_size, None, None)
+    _, peak_bytes = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert peak_bytes < 8192

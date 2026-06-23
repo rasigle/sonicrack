@@ -89,10 +89,14 @@ class SawtoothOscillator(Oscillator):
     def get_available_modes(cls) -> list[str]:
         return ["pure", "analog"]
 
-    def _apply_analog_character(self, val: float | np.ndarray) -> float | np.ndarray:
+    def _apply_analog_character(
+        self, val: float | np.ndarray, sample_indices: np.ndarray | None = None
+    ) -> float | np.ndarray:
         analog = np.tanh(val * 1.15)
         if isinstance(val, np.ndarray):
-            phase_mod = np.sin(np.arange(len(val)) * 0.1) * 0.03
+            if sample_indices is None:
+                sample_indices = np.arange(len(val), dtype=np.float64)
+            phase_mod = np.sin(sample_indices * 0.1) * 0.03
             analog = analog * (1.0 + phase_mod)
         else:
             analog = analog * 1.02
@@ -115,7 +119,7 @@ class SawtoothOscillator(Oscillator):
         else:
             val = np.zeros(n, dtype=np.float32)
         if self._mode == "analog":
-            val = self._apply_analog_character(val)
+            val = self._apply_analog_character(val, indices)
         val = self._apply_wave_range_values(val)
         samples = self._apply_amplitude_to_buffer(val)
         self._i += n
@@ -144,11 +148,13 @@ class TriangleOscillator(SawtoothOscillator):
     )
 
     def _apply_analog_character_triangle(
-        self, val: float | np.ndarray
+        self, val: float | np.ndarray, sample_indices: np.ndarray | None = None
     ) -> float | np.ndarray:
         analog = np.tanh(val * 1.08)
         if isinstance(val, np.ndarray):
-            phase_mod = np.sin(np.arange(len(val)) * 0.08) * 0.02
+            if sample_indices is None:
+                sample_indices = np.arange(len(val), dtype=np.float64)
+            phase_mod = np.sin(sample_indices * 0.08) * 0.02
             analog = analog * (1.0 + phase_mod)
         else:
             analog = analog * 1.01
@@ -173,7 +179,7 @@ class TriangleOscillator(SawtoothOscillator):
         else:
             val = np.zeros(n, dtype=np.float32)
         if self._mode == "analog":
-            val = self._apply_analog_character_triangle(val)
+            val = self._apply_analog_character_triangle(val, indices)
         val = self._apply_wave_range_values(val)
         samples = self._apply_amplitude_to_buffer(val)
         self._i += n

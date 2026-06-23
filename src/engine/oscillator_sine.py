@@ -63,6 +63,7 @@ class SineOscillator(Oscillator):
 
     def _initialize_osc(self):
         self._i = 0
+        self._sample_index = 0
 
     @property
     def mode(self) -> Literal["pure", "warm", "bright", "analog"]:
@@ -80,14 +81,18 @@ class SineOscillator(Oscillator):
     def get_available_modes(cls) -> list[str]:
         return ["pure", "warm", "bright", "analog"]
 
-    def _generate_waveform(self, phase: float | np.ndarray) -> float | np.ndarray:
+    def _generate_waveform(
+        self,
+        phase: float | np.ndarray,
+        sample_indices: float | np.ndarray | None = None,
+    ) -> float | np.ndarray:
         if self._mode == "pure":
             return self._generate_pure_sine(phase)
         if self._mode == "warm":
             return self._generate_warm_sine(phase)
         if self._mode == "bright":
             return self._generate_bright_sine(phase)
-        return self._generate_analog_sine(phase)
+        return self._generate_analog_sine(phase, sample_indices)
 
     def _generate_pure_sine(self, phase: float | np.ndarray) -> float | np.ndarray:
         return np.sin(phase)
@@ -114,29 +119,40 @@ class SineOscillator(Oscillator):
         bright = bright + (bright**3) * 0.08
         return bright * 0.75
 
-    def _generate_analog_sine(self, phase: float | np.ndarray) -> float | np.ndarray:
+    def _generate_analog_sine(
+        self,
+        phase: float | np.ndarray,
+        sample_indices: float | np.ndarray | None = None,
+    ) -> float | np.ndarray:
         fundamental = np.sin(phase)
         second_harmonic = np.sin(2 * phase) * 0.08
         third_harmonic = np.sin(3 * phase) * 0.04
         vcv = fundamental + second_harmonic + third_harmonic
         vcv = np.tanh(vcv * 1.1)
-        phase_mod = np.sin(phase * 0.5) * 0.02
+        if sample_indices is not None:
+            phase_mod = np.sin(sample_indices * 0.5) * 0.02
+        else:
+            phase_mod = np.sin(phase * 0.5) * 0.02
         vcv = vcv * (1.0 + phase_mod)
         return vcv * 0.88
 
     def __next__(self):
         current_phase = self._i + self._p
-        val = self._generate_waveform(current_phase)
+        val = self._generate_waveform(current_phase, self._sample_index)
         self._i += self._step
         if self._i >= 2 * np.pi:
             self._i -= 2 * np.pi
+        self._sample_index += 1
         val = self._apply_wave_range_value(val)
         return val * self._a
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
-        phases = (self._i + self._p) + self._step * np.arange(n)
-        val = np.asarray(self._generate_waveform(phases))
+        sample_indices = np.arange(n, dtype=np.float64)
+        phases = (self._i + self._p) + self._step * sample_indices
+        absolute_indices = self._sample_index + sample_indices
+        val = np.asarray(self._generate_waveform(phases, absolute_indices))
         val = self._apply_wave_range_values(val)
         samples = self._apply_amplitude_to_buffer(val)
         self._i = (self._i + self._step * n) % (2 * np.pi)
+        self._sample_index += n
         return samples.astype(np.float32)

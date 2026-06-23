@@ -551,11 +551,11 @@ class TestEdgeCases(unittest.TestCase):
     @patch("src.engine.io.audio_output.sd.OutputStream")
     def test_stream_creation_failure(self, mock_stream_class):
         """Test handling of stream creation failure."""
-        mock_stream_class.side_effect = Exception("Failed to create stream")
+        mock_stream_class.side_effect = RuntimeError("Failed to create stream")
 
         audio = AudioOutput()
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(RuntimeError):
             audio.start_playback()
 
         # Should not be marked as playing

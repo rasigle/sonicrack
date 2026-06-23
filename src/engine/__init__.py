@@ -119,7 +119,6 @@ from src.engine.effects import (
 
 # Filters
 from src.engine.filter import ButterworthFilter, apply_filter, butter
-from src.engine.io.audio_output import AudioOutput
 
 # Modifiers
 from src.engine.modifier import (
@@ -171,8 +170,6 @@ from src.engine.presets.preset_library import PresetLibrary
 from src.engine.synthesis import synth
 
 __all__ = [
-    # IO
-    "AudioOutput",
     # Audio Component Base
     "AudioComponent",
     "ComponentCategory",

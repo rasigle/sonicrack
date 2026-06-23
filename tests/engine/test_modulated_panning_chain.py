@@ -24,17 +24,19 @@ class TestModulatedPanningInChain(unittest.TestCase):
         samples = gen.get_samples(500)
 
         # Extract left and right channels
-        l, r = np.array(samples).T
+        left, right = np.array(samples).T
 
         # Channels should NOT be identical
         self.assertFalse(
-            np.allclose(l, r),
+            np.allclose(left, right),
             "Left and right channels should be different with modulated panning",
         )
 
         # Verify we got different values
-        self.assertGreater(len(set(l)), 1, "Left channel should have varying values")
-        self.assertGreater(len(set(r)), 1, "Right channel should have varying values")
+        self.assertGreater(len(set(left)), 1, "Left channel should have varying values")
+        self.assertGreater(
+            len(set(right)), 1, "Right channel should have varying values"
+        )
 
     def test_modulated_panning_with_oscillator_modulator(self):
         """Test modulated panning using an oscillator as the modulator."""
@@ -48,14 +50,14 @@ class TestModulatedPanningInChain(unittest.TestCase):
 
         # Generate samples
         samples = gen.get_samples(1000)
-        l, r = np.array(samples).T
+        left, right = np.array(samples).T
 
         # Channels should be different
-        self.assertFalse(np.allclose(l, r))
+        self.assertFalse(np.allclose(left, right))
 
         # Verify stereo
-        self.assertEqual(len(l), 1000)
-        self.assertEqual(len(r), 1000)
+        self.assertEqual(len(left), 1000)
+        self.assertEqual(len(right), 1000)
 
     def test_modulated_panning_iterator_mode(self):
         """Test that modulated panning also works in iterator mode."""
@@ -67,10 +69,10 @@ class TestModulatedPanningInChain(unittest.TestCase):
         samples = gen.get_samples(100, mode="iterator")
 
         # Extract channels
-        l, r = np.array(samples).T
+        left, right = np.array(samples).T
 
         # Should be different
-        self.assertFalse(np.allclose(l, r))
+        self.assertFalse(np.allclose(left, right))
 
     def test_panning_power_preservation(self):
         """Test that constant-power law is maintained with modulated panning."""
@@ -81,11 +83,11 @@ class TestModulatedPanningInChain(unittest.TestCase):
 
         # Generate samples
         samples = gen.get_samples(200)
-        l, r = np.array(samples).T
+        left, right = np.array(samples).T
 
         # Check power preservation for non-zero samples
         # Note: Due to the 220Hz oscillator, some values will be zero (zero crossings)
-        non_zero_indices = np.where(np.abs(l) + np.abs(r) > 0.01)[0]
+        non_zero_indices = np.where(np.abs(left) + np.abs(right) > 0.01)[0]
 
         self.assertGreater(
             len(non_zero_indices), 100, "Should have many non-zero samples"
@@ -93,7 +95,7 @@ class TestModulatedPanningInChain(unittest.TestCase):
 
         # For non-zero samples, check that panning preserves power ratio
         for i in non_zero_indices[:50]:  # Check first 50 non-zero samples
-            power = l[i] ** 2 + r[i] ** 2
+            power = left[i] ** 2 + right[i] ** 2
             # Power should be reasonable (not extremely large)
             self.assertLess(power, 2.0)
 

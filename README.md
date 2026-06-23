@@ -32,7 +32,7 @@ The engine exposes a fairly broad synthesis surface:
 - **Noise:** white, pink, brownian, blue, grey, velvet, sample-and-hold, Perlin
 - **Filters:** Butterworth filter utilities and filter component support
 - **Effects:** distortion, delay, reverb
-- **I/O:** `AudioOutput` using `sounddevice`
+- **I/O:** optional `AudioOutput` via `src.engine.io.audio_output` using the `audio-io` extra
 - **Preset/build helpers:** preset builder and preset library modules
 
 Example:
@@ -216,8 +216,13 @@ from src.engine import (
     ADSREnvelope,
     Chain,
     WaveAdder,
-    AudioOutput,
 )
+```
+
+Audio-device output is optional and intentionally kept out of the core engine import:
+
+```python
+from src.engine.io.audio_output import AudioOutput
 ```
 
 ## What this README intentionally does not claim

@@ -135,7 +135,7 @@ class SineOscillator(Oscillator):
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         phases = (self._i + self._p) + self._step * np.arange(n)
-        val = self._generate_waveform(phases)
+        val = np.asarray(self._generate_waveform(phases))
         val = self._apply_wave_range_values(val)
         samples = self._apply_amplitude_to_buffer(val)
         self._i = (self._i + self._step * n) % (2 * np.pi)

@@ -295,7 +295,7 @@ class MIDIFile:
             >>> print(counts)
             {'NoteOnMessage': 450, 'NoteOffMessage': 450, 'ControlChangeMessage': 23}
         """
-        type_counts = {}
+        type_counts: dict[str, int] = {}
         for msg in self.messages:
             type_name = type(msg).__name__
             type_counts[type_name] = type_counts.get(type_name, 0) + 1

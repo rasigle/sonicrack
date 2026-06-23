@@ -276,7 +276,7 @@ def _extract_parameter_names(cls: type) -> list[str]:
         List of parameter names (excluding 'self', 'args', 'kwargs')
     """
     try:
-        sig = inspect.signature(cls.__init__)
+        sig = inspect.signature(cls)
         return [
             param_name
             for param_name in sig.parameters

@@ -218,6 +218,10 @@ class Chain(Composer):
         ended.extend([m.ended for m in self.modifiers if hasattr(m, e)])
         return all(ended)
 
+    @ended.setter
+    def ended(self, value: bool) -> None:
+        self._ended = value
+
     def __iter__(self):
         iter(self.oscillator)
         for modifier in self.modifiers:
@@ -368,6 +372,10 @@ class WaveAdder(Composer):
         ended = [gen.ended for gen in self.generators if hasattr(gen, "ended")]
         return all(ended)
 
+    @ended.setter
+    def ended(self, value: bool) -> None:
+        self._ended = value
+
     def __iter__(self):
         [iter(gen) for gen in self.generators]
         return self
@@ -375,11 +383,14 @@ class WaveAdder(Composer):
     def __next__(self):
         vals = [self._mod_channels(next(gen)) for gen in self.generators]
         if self.stereo:
-            l, r = zip(*vals, strict=False)
+            left_values, right_values = zip(*vals, strict=False)
             if self.mix_mode == "sum":
-                return sum(l), sum(r)
+                return sum(left_values), sum(right_values)
             # average
-            return sum(l) / len(l), sum(r) / len(r)
+            return (
+                sum(left_values) / len(left_values),
+                sum(right_values) / len(right_values),
+            )
 
         if self.mix_mode == "sum":
             return sum(vals)

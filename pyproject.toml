@@ -29,12 +29,17 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.4.6",
     "scipy",
-    "sounddevice>=0.5.5", # Audio I/O
-    "pyqt6", # GUI library
 ]
 
 [project.optional-dependencies]
 # install with e.g.: uv sync --extra examples
+audio-io = [
+    "sounddevice>=0.5.5", # Audio I/O
+]
+gui = [
+    "pyqt6", # GUI library
+    "audioplayground[audio-io]",
+]
 midi = [
     "mido", # MIDI support is optional in code and only required for MIDI features
     "python-rtmidi>=1.5.8", # Common real-time MIDI backend for mido
@@ -49,7 +54,7 @@ examples = [
 
 ]
 full = [
-    "audioplayground[midi, examples]",
+    "audioplayground[audio-io, gui, midi, examples]",
 ]
 
 [dependency-groups]
@@ -80,9 +85,7 @@ source = "code"
 path = "src/_version.py"
 
 [tool.hatch.build.targets.wheel]
-include = [
-  "src/*.py",
-]
+packages = ["src"]
 
 [tool.ruff]
 line-length = 88

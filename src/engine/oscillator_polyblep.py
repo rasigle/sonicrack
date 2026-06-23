@@ -416,16 +416,22 @@ class PolyBLEPOscillator(Generator):
             Array of n samples
         """
         # Generate phase array
-        phases = (self._phase_normalized + self._increment * np.arange(n)) % 1.0
+        phases: np.ndarray | None = (
+            self._phase_normalized + self._increment * np.arange(n)
+        ) % 1.0
 
         # Generate waveform
         if self.wave_shape == WaveShape.SINE:
+            assert phases is not None
             samples = np.sin(2.0 * np.pi * phases)
         elif self.wave_shape == WaveShape.SQUARE:
+            assert phases is not None
             samples = self._generate_square_vectorized(phases)
         elif self.wave_shape == WaveShape.SAWTOOTH_UP:
+            assert phases is not None
             samples = self._generate_sawtooth_vectorized(phases)
         elif self.wave_shape == WaveShape.SAWTOOTH_DOWN:
+            assert phases is not None
             samples = -self._generate_sawtooth_vectorized(phases)
         elif self.wave_shape == WaveShape.TRIANGLE:
             samples = self._generate_triangle_vectorized(n)

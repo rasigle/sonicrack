@@ -99,6 +99,7 @@ class AudioComponent(ABC):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Permit dynamic construction through registry-returned base types."""
+        _ = args, kwargs
 
     def __iter__(self) -> AudioComponent:
         return self

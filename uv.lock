@@ -224,13 +224,14 @@ name = "audioplayground"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
-    { name = "pyqt6" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "sounddevice" },
 ]
 
 [package.optional-dependencies]
+audio-io = [
+    { name = "sounddevice" },
+]
 examples = [
     { name = "ipykernel" },
     { name = "librosa" },
@@ -246,8 +247,14 @@ full = [
     { name = "mido" },
     { name = "notebook" },
     { name = "pyaudio" },
+    { name = "pyqt6" },
     { name = "pyqtgraph" },
     { name = "python-rtmidi" },
+    { name = "sounddevice" },
+]
+gui = [
+    { name = "pyqt6" },
+    { name = "sounddevice" },
 ]
 midi = [
     { name = "mido" },
@@ -272,21 +279,31 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "audioplayground", extras = ["examples", "midi"], marker = "extra == 'full'" },
     { name = "ipykernel", marker = "extra == 'examples'", specifier = ">=7.3.0" },
+    { name = "ipykernel", marker = "extra == 'full'", specifier = ">=7.3.0" },
     { name = "librosa", marker = "extra == 'examples'", specifier = ">=0.11.0" },
+    { name = "librosa", marker = "extra == 'full'", specifier = ">=0.11.0" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.11.0" },
+    { name = "matplotlib", marker = "extra == 'full'", specifier = ">=3.11.0" },
+    { name = "mido", marker = "extra == 'full'" },
     { name = "mido", marker = "extra == 'midi'" },
     { name = "notebook", marker = "extra == 'examples'", specifier = ">=7.4.7" },
+    { name = "notebook", marker = "extra == 'full'", specifier = ">=7.4.7" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "pyaudio", marker = "extra == 'examples'" },
-    { name = "pyqt6" },
+    { name = "pyaudio", marker = "extra == 'full'" },
+    { name = "pyqt6", marker = "extra == 'full'" },
+    { name = "pyqt6", marker = "extra == 'gui'" },
     { name = "pyqtgraph", marker = "extra == 'examples'", specifier = ">=0.13.7" },
+    { name = "pyqtgraph", marker = "extra == 'full'", specifier = ">=0.13.7" },
+    { name = "python-rtmidi", marker = "extra == 'full'", specifier = ">=1.5.8" },
     { name = "python-rtmidi", marker = "extra == 'midi'", specifier = ">=1.5.8" },
     { name = "scipy" },
-    { name = "sounddevice", specifier = ">=0.5.5" },
+    { name = "sounddevice", marker = "extra == 'audio-io'", specifier = ">=0.5.5" },
+    { name = "sounddevice", marker = "extra == 'full'", specifier = ">=0.5.5" },
+    { name = "sounddevice", marker = "extra == 'gui'", specifier = ">=0.5.5" },
 ]
-provides-extras = ["midi", "examples", "full"]
+provides-extras = ["audio-io", "examples", "full", "gui", "midi"]
 
 [package.metadata.requires-dev]
 dev = [

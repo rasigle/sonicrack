@@ -25,15 +25,15 @@ Example:
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component_registry import ComponentCategory, audio_registry
-from src.utils.logging_config import get_logger
 
-logger = get_logger("builder.preset_builder")
+logger = logging.getLogger(__name__)
 
 
 class PresetNode:

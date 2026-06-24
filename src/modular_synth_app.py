@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import QApplication, QSplashScreen
 
 from src.constants import LOG_FILENAME, SPLASH_PATH
 from src.gui.main_window import ModularSynthWindow
-from src.utils import setup_logging
+from src.utils.logging_config import setup_logging
 
 APP_NAME = "AudioPlayground Modular Synth"
 ORG_NAME = "AudioPlayground"

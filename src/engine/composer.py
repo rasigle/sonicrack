@@ -32,7 +32,7 @@ Note:
     handling of stereo/mono conversion where needed. They also propagate
     trigger_release() and ended properties to all child components.
 """
-
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any
@@ -49,9 +49,8 @@ from src.engine.audio_component_registry import ComponentCategory, register_comp
 from src.engine.oscillator import Oscillator
 from src.engine.oscillator_modulated import ModulatedOscillator
 from src.engine.validation import validate_sample_count
-from src.utils.logging_config import get_engine_logger
 
-logger = get_engine_logger("composer")
+logger = logging.getLogger(__name__)
 
 
 def _get_vectorized_samples(component: Any, n: int) -> np.ndarray:

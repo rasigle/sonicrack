@@ -7,7 +7,7 @@ effects.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import numpy as np
 
@@ -25,9 +25,6 @@ from src.engine.validation import (
     validate_sample_count,
     validate_sample_rate,
 )
-
-if TYPE_CHECKING:
-    pass
 
 
 @register_component()

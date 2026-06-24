@@ -7,15 +7,14 @@ audio synthesis builder in a structured manner with category support.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-from src.utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from src.engine.presets.preset_builder import PresetBuilder
 
-logger = get_logger("builder.preset_library")
+logger = logging.getLogger(__name__)
 
 
 class PresetLibrary:

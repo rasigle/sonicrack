@@ -14,6 +14,7 @@ The interface system provides:
 from __future__ import annotations
 
 import inspect
+import logging
 from collections.abc import Callable
 
 from src.engine.audio_component import (
@@ -21,10 +22,8 @@ from src.engine.audio_component import (
     ComponentCategory,
     ComponentDescriptor,
 )
-from src.utils.logging_config import get_engine_logger
 
-logger = get_engine_logger("audio_component_registry")
-
+logger = logging.getLogger(__name__)
 
 class AudioComponentRegistry:
     """Central registry for all audio components with auto-discovery.

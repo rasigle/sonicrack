@@ -9,7 +9,6 @@ Main modules:
 
 Quick imports:
     >>> from src.utils import save_wave, load_wave, play_wave, note_to_frequency
-    >>> from src.utils import get_logger, setup_logging
 """
 
 # Audio utilities
@@ -23,12 +22,7 @@ from src.utils.audio_utils import (
 )
 
 # Logging utilities
-from src.utils.logging_config import (
-    DEFAULT_LOG_LEVEL,
-    get_engine_logger,
-    get_logger,
-    setup_logging,
-)
+from src.utils.logging_config import DEFAULT_LOG_LEVEL
 
 __all__ = [
     # Audio utilities - primary API
@@ -43,8 +37,5 @@ __all__ = [
     "load_wave",
     "note_to_frequency",
     # Logging
-    "setup_logging",
-    "get_logger",
-    "get_engine_logger",
     "DEFAULT_LOG_LEVEL",
 ]

@@ -42,6 +42,7 @@ Note:
 """
 
 import itertools
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -57,9 +58,8 @@ from src.engine.audio_component import (
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.validation import validate_sample_count, validate_sample_rate
-from src.utils.logging_config import get_engine_logger
 
-logger = get_engine_logger("modulator")
+logger = logging.getLogger(__name__)
 
 
 class Modulator(Generator):

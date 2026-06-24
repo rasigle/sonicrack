@@ -30,6 +30,7 @@ Note:
 
 from __future__ import annotations
 
+import logging
 from abc import abstractmethod
 from collections.abc import Iterable
 from typing import Any
@@ -46,11 +47,10 @@ from src.engine.audio_component_registry import ComponentCategory, register_comp
 from src.engine.oscillator import _derive_amplitude_from_init
 from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.validation import validate_numeric_range, validate_sample_rate
-from src.utils.logging_config import get_engine_logger
 from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
 
-logger = get_engine_logger("modifier")
+logger = logging.getLogger(__name__)
 
 
 def _validate_modulator(modulator: Any) -> None:

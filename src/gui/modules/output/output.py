@@ -176,10 +176,7 @@ class OutputModule(ModuleWidget):
         super().closeEvent(event)
 
     def _generate_samples(self, num_samples: int) -> np.ndarray:
-        """Generate audio samples by pulling from input ports.
-
-        This is called directly by the audio callback in the real-time audio thread.
-        It pulls samples from connected input ports and converts them to stereo.
+        """Generate stereo audio samples by pulling from input ports.
 
         Routing behavior:
         - Only L connected: L signal duplicated to both stereo channels
@@ -193,60 +190,50 @@ class OutputModule(ModuleWidget):
         Returns:
             Stereo audio samples as (N, 2) numpy array
         """
+        def silence() -> np.ndarray:
+            return np.zeros((num_samples, 2), dtype=np.float32)
+
+        def read_port(port):
+            samples = port.read(num_samples)
+            if samples is None:
+                return None
+
+            samples = np.asarray(samples)
+            return None if samples.size == 0 else samples
+
         # Invalidate all module caches at the start of each audio cycle
-        # This ensures all modules regenerate their samples for this cycle
         if hasattr(self, "audio_engine") and self.audio_engine:
             self.audio_engine.invalidate_all_caches()
 
-        # Check which ports are connected
         l_connected = self.inp_port_l.is_connected
         r_connected = self.inp_port_r.is_connected
 
         if not l_connected and not r_connected:
-            # No input - return silence
-            return np.zeros((num_samples, 2), dtype=np.float32)
+            return silence()
 
         # Read from connected ports (with num_samples to trigger upstream generation)
-        left_samples = self.inp_port_l.read(num_samples) if l_connected else None
-        right_samples = self.inp_port_r.read(num_samples) if r_connected else None
+        left_samples = read_port(self.inp_port_l) if l_connected else None
+        right_samples = read_port(self.inp_port_r) if r_connected else None
 
-        # Convert to numpy arrays and handle None/empty cases
-        if left_samples is not None:
-            left_samples = np.asarray(left_samples)
-            if left_samples.size == 0:
-                left_samples = None
-
-        if right_samples is not None:
-            right_samples = np.asarray(right_samples)
-            if right_samples.size == 0:
-                right_samples = None
-
-        # If both are None/empty after conversion, return silence
         if left_samples is None and right_samples is None:
-            return np.zeros((num_samples, 2), dtype=np.float32)
+            return silence()
 
-        # Build stereo output based on what's connected
         if left_samples is not None and right_samples is not None:
-            # Both connected: use L for left channel, R for right channel
             stereo_samples = combine_lr_to_stereo(left_samples, right_samples)
-        elif left_samples is not None:
-            # Only L connected: duplicate to both channels
-            stereo_samples = mono_to_stereo(left_samples)
         else:
-            # Only R connected: duplicate to both channels
-            stereo_samples = mono_to_stereo(right_samples)
+            mono_samples = left_samples if left_samples is not None else right_samples
+            stereo_samples = mono_to_stereo(mono_samples)
 
-        # Apply master gain (convert dB to linear)
+        # Apply master gain
         if self.gain_db <= -80.0:
-            # Treat -80 dB as silence (effectively -infinity)
-            return np.zeros((num_samples, 2), dtype=np.float32)
-        elif self.gain_db != 0.0:
-            linear_gain = 10.0 ** (self.gain_db / 20.0)
-            stereo_samples = stereo_samples * linear_gain
+            return silence()
 
-        # Ensure correct length (pad or trim if needed)
+        if self.gain_db != 0.0:
+            stereo_samples = stereo_samples * (10.0 ** (self.gain_db / 20.0))
+
+        # Ensure correct length
         if stereo_samples.shape[0] != num_samples:
-            result = np.zeros((num_samples, 2), dtype=np.float32)
+            result = silence()
             length = min(stereo_samples.shape[0], num_samples)
             result[:length] = stereo_samples[:length]
             return result

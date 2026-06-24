@@ -51,7 +51,7 @@ examples = [
     "pyqtgraph>=0.13.7", # Example visual analyzers
     "notebook>=7.4.7", # Jupyter notebooks in examples/
     "ipykernel>=7.3.0",
-
+    "ipython>=9.14.1", # Interactive Python shell for examples
 ]
 full = [
     "audioplayground[audio-io, gui, midi, examples]",

@@ -234,6 +234,7 @@ audio-io = [
 ]
 examples = [
     { name = "ipykernel" },
+    { name = "ipython" },
     { name = "librosa" },
     { name = "matplotlib" },
     { name = "notebook" },
@@ -242,6 +243,7 @@ examples = [
 ]
 full = [
     { name = "ipykernel" },
+    { name = "ipython" },
     { name = "librosa" },
     { name = "matplotlib" },
     { name = "mido" },
@@ -281,6 +283,8 @@ dev = [
 requires-dist = [
     { name = "ipykernel", marker = "extra == 'examples'", specifier = ">=7.3.0" },
     { name = "ipykernel", marker = "extra == 'full'", specifier = ">=7.3.0" },
+    { name = "ipython", marker = "extra == 'examples'", specifier = ">=9.14.1" },
+    { name = "ipython", marker = "extra == 'full'", specifier = ">=9.14.1" },
     { name = "librosa", marker = "extra == 'examples'", specifier = ">=0.11.0" },
     { name = "librosa", marker = "extra == 'full'", specifier = ">=0.11.0" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.11.0" },

@@ -22,6 +22,7 @@ from src.engine import (
     WaveAdder,
 )
 from src.engine.filter import ButterworthFilter
+from src.engine.presets import PresetBuilder
 
 CHUNKS = [64, 128, 320, 511, 1024, 2049]
 TOTAL_SAMPLES = sum(CHUNKS)
@@ -29,6 +30,35 @@ TOTAL_SAMPLES = sum(CHUNKS)
 
 def _render_chunked(render: Callable[[int], np.ndarray]) -> np.ndarray:
     return np.concatenate([render(chunk_size) for chunk_size in CHUNKS])
+
+
+def _render_chunked_total(
+    render: Callable[[int], np.ndarray], total_samples: int
+) -> np.ndarray:
+    chunks = []
+    remaining = total_samples
+    index = 0
+    while remaining > 0:
+        chunk_size = min(CHUNKS[index % len(CHUNKS)], remaining)
+        chunks.append(render(chunk_size))
+        remaining -= chunk_size
+        index += 1
+    return np.concatenate(chunks)
+
+
+def _trigger(component, method_name: str) -> None:
+    method = getattr(component, method_name, None)
+    if callable(method):
+        method()
+
+    oscillator = getattr(component, "oscillator", None)
+    if oscillator is not None:
+        _trigger(oscillator, method_name)
+
+    for child_name in ("modulators", "modifiers", "generators"):
+        children = getattr(component, child_name, ())
+        for child in children:
+            _trigger(child, method_name)
 
 
 def test_butterworth_filter_preserves_state_across_buffers():
@@ -271,6 +301,93 @@ def test_stateful_chain_preserves_state_across_sample_rates(sample_rate: int):
     continuous = make_chain().get_samples_vectorized(TOTAL_SAMPLES)
     chunked_chain = make_chain()
     chunked = _render_chunked(chunked_chain.get_samples_vectorized)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("sample_rate", [44100, 48000, 96000])
+def test_adsr_note_events_preserve_state_across_sample_rates(sample_rate: int):
+    pre_event_samples = int(sample_rate * 0.017)
+    post_event_samples = int(sample_rate * 0.041)
+
+    def make_envelope() -> ADSREnvelope:
+        envelope = ADSREnvelope(
+            attack_duration=0.003,
+            decay_duration=0.007,
+            sustain_level=0.45,
+            release_duration=0.025,
+            sample_rate=sample_rate,
+        )
+        envelope.trigger_note_on()
+        return envelope
+
+    continuous_envelope = make_envelope()
+    continuous_pre = continuous_envelope.get_samples(
+        pre_event_samples, mode="vectorized"
+    )
+    continuous_envelope.trigger_note_off()
+    continuous_post = continuous_envelope.get_samples(
+        post_event_samples, mode="vectorized"
+    )
+    continuous = np.concatenate((continuous_pre, continuous_post))
+
+    chunked_envelope = make_envelope()
+    chunked_pre = _render_chunked_total(
+        lambda n: chunked_envelope.get_samples(n, mode="vectorized"),
+        pre_event_samples,
+    )
+    chunked_envelope.trigger_note_off()
+    chunked_post = _render_chunked_total(
+        lambda n: chunked_envelope.get_samples(n, mode="vectorized"),
+        post_event_samples,
+    )
+    chunked = np.concatenate((chunked_pre, chunked_post))
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("sample_rate", [44100, 48000, 96000])
+def test_preset_built_event_graph_preserves_state_across_sample_rates(
+    sample_rate: int,
+):
+    pre_event_samples = int(sample_rate * 0.019)
+    post_event_samples = int(sample_rate * 0.037)
+
+    def make_patch() -> Chain:
+        return (
+            PresetBuilder("Cross-rate event graph")
+            .set_sample_rate(sample_rate)
+            .sine(frequency=sample_rate / 160, gain_db=-12, mode="analog")
+            .adsr(
+                attack_duration=0.004,
+                decay_duration=0.006,
+                sustain_level=0.5,
+                release_duration=0.022,
+            )
+            .volume(gain_db=-3, sample_rate=sample_rate, smoothing_time_ms=4.0)
+            .panner(position=0.2, sample_rate=sample_rate, smoothing_time_ms=4.0)
+            .build()
+        )
+
+    continuous_patch = make_patch()
+    _trigger(continuous_patch, "trigger_note_on")
+    continuous_pre = continuous_patch.get_samples_vectorized(pre_event_samples)
+    _trigger(continuous_patch, "trigger_note_off")
+    continuous_post = continuous_patch.get_samples_vectorized(post_event_samples)
+    continuous = np.concatenate((continuous_pre, continuous_post))
+
+    chunked_patch = make_patch()
+    _trigger(chunked_patch, "trigger_note_on")
+    chunked_pre = _render_chunked_total(
+        chunked_patch.get_samples_vectorized,
+        pre_event_samples,
+    )
+    _trigger(chunked_patch, "trigger_note_off")
+    chunked_post = _render_chunked_total(
+        chunked_patch.get_samples_vectorized,
+        post_event_samples,
+    )
+    chunked = np.concatenate((chunked_pre, chunked_post))
 
     np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
 

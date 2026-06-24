@@ -30,21 +30,44 @@ Note:
 
 from __future__ import annotations
 
+import math
 from abc import abstractmethod
 from collections.abc import Iterable
+from numbers import Real
 from typing import Any
 
 import numpy as np
 
-from src.constants import DEFAULT_GAIN_DB
-from src.engine.audio_component import AudioComponent, ComponentDescriptor
+from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
+from src.engine.audio_component import (
+    AudioComponent,
+    ComponentDescriptor,
+    ParameterDescriptor,
+)
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import _derive_amplitude_from_init
+from src.engine.validation import validate_sample_rate
 from src.utils.logging_config import get_engine_logger
 from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
 
 logger = get_engine_logger("modifier")
+
+
+def _smoothing_sample_count(
+    sample_rate: float, smoothing_time_ms: float, *, name: str = "smoothing_time_ms"
+) -> int:
+    """Return a finite non-negative smoothing duration in samples."""
+    if isinstance(smoothing_time_ms, bool) or not isinstance(smoothing_time_ms, Real):
+        raise TypeError(
+            f"{name} must be a real number, got {type(smoothing_time_ms).__name__}"
+        )
+
+    smoothing_time_ms = float(smoothing_time_ms)
+    if not math.isfinite(smoothing_time_ms) or smoothing_time_ms < 0.0:
+        raise ValueError(f"{name} must be finite and non-negative")
+
+    return int(smoothing_time_ms * sample_rate / 1000)
 
 
 def _validate_modulator(modulator: Any) -> None:
@@ -153,23 +176,55 @@ class Panner(Modifier):
     descriptor = ComponentDescriptor(
         name="Panner",
         category=ComponentCategory.MODIFIER,
-        config_params=["position"],
+        parameters={
+            "position": ParameterDescriptor(
+                name="position",
+                default=0.0,
+                minimum=-1.0,
+                maximum=1.0,
+                clamp=True,
+                description="Pan position from hard left to hard right.",
+            ),
+            "sample_rate": ParameterDescriptor(
+                name="sample_rate",
+                default=DEFAULT_SAMPLE_RATE,
+                minimum=1.0,
+                unit="Hz",
+                description="Processing sample rate.",
+            ),
+            "smoothing_time_ms": ParameterDescriptor(
+                name="smoothing_time_ms",
+                default=10.0,
+                minimum=0.0,
+                unit="ms",
+                description="Pan smoothing duration.",
+            ),
+        },
         description="Stereo panner with constant-power panning law",
         fluent_api_name="panner",
         tags=["modifier", "panner", "stereo"],
     )
 
-    def __init__(self, position: float = 0.0) -> None:
+    def __init__(
+        self,
+        position: float = 0.0,
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
+        smoothing_time_ms: float = 10.0,
+    ) -> None:
         """Initialize panner with pan position.
 
         Args:
             position: Pan value, -1.0 means 100% left panned, 1.0 means 100% right
                 panned, 0.0 is center panned.
+            sample_rate: Processing sample rate used for smoothing duration.
+            smoothing_time_ms: Pan transition duration in milliseconds.
 
         Raises:
             TypeError: If position is not a number.
         """
         super().__init__()
+        self.sample_rate = validate_sample_rate(sample_rate)
+        self.smoothing_time_ms = smoothing_time_ms
 
         # Input validation
         if not isinstance(position, (int, float, np.number)):
@@ -188,7 +243,9 @@ class Panner(Modifier):
         self._current_left_gain = self._left_gain  # Start at current position
         self._current_right_gain = self._right_gain  # Start at current position
         self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = 441  # 10ms at 44.1kHz
+        self._smoothing_duration_samples = _smoothing_sample_count(
+            self.sample_rate, self.smoothing_time_ms
+        )
 
     @property
     def position(self) -> float:
@@ -329,20 +386,31 @@ class ModulatedPanner(Panner):
         tags=["modifier", "panner", "modulated", "stereo"],
     )
 
-    def __init__(self, modulator: Any) -> None:
+    def __init__(
+        self,
+        modulator: Any,
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
+        smoothing_time_ms: float = 10.0,
+    ) -> None:
         """Initialize modulated panner.
 
         Args:
             modulator: Any kind of generator that returns a value within the range
                 of [-1, 1]. This value directly sets the pan position:
                 -1 = hard left, 0 = center, 1 = hard right.
+            sample_rate: Processing sample rate used for smoothing duration.
+            smoothing_time_ms: Pan transition duration in milliseconds.
 
         Raises:
             TypeError: If modulator is None or not iterable.
         """
         _validate_modulator(modulator)
 
-        super().__init__(position=0.0)
+        super().__init__(
+            position=0.0,
+            sample_rate=sample_rate,
+            smoothing_time_ms=smoothing_time_ms,
+        )
 
         # Keep the original modulator object (source) so we can re-create
         # fresh iterators when needed (some modulators are iterable but not
@@ -466,13 +534,44 @@ class Volume(Modifier):
         category=ComponentCategory.MODIFIER,
         description="Volume control modifier with dB support",
         fluent_api_name="volume",
-        config_params=["amplitude", "gain_db"],
+        parameters={
+            "amplitude": ParameterDescriptor(
+                name="amplitude",
+                default=1.0,
+                minimum=0.0,
+                description="Linear gain multiplier.",
+            ),
+            "gain_db": ParameterDescriptor(
+                name="gain_db",
+                default=DEFAULT_GAIN_DB,
+                unit="dB",
+                description="Gain in decibels.",
+            ),
+            "sample_rate": ParameterDescriptor(
+                name="sample_rate",
+                default=DEFAULT_SAMPLE_RATE,
+                minimum=1.0,
+                unit="Hz",
+                description="Processing sample rate.",
+            ),
+            "smoothing_time_ms": ParameterDescriptor(
+                name="smoothing_time_ms",
+                default=10.0,
+                minimum=0.0,
+                unit="ms",
+                description="Gain smoothing duration.",
+            ),
+        },
         tags=["modifier", "gain_db", "volume", "amplitude", "gain", "db"],
     )
 
     @track_provided_args
     def __init__(
-        self, amplitude: float = 1.0, gain_db: float | None = DEFAULT_GAIN_DB
+        self,
+        amplitude: float = 1.0,
+        gain_db: float | None = DEFAULT_GAIN_DB,
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
+        smoothing_time_ms: float = 10.0,
     ) -> None:
         """Initialize volume modifier.
 
@@ -487,6 +586,8 @@ class Volume(Modifier):
             ValueError: If amplitude is negative.
         """
         super().__init__()
+        self.sample_rate = validate_sample_rate(sample_rate)
+        self.smoothing_time_ms = smoothing_time_ms
 
         # Input validation
         if not isinstance(amplitude, (int, float, np.number)):
@@ -504,7 +605,9 @@ class Volume(Modifier):
         self._target_amplitude = self._amplitude
         self._current_amplitude = self._amplitude
         self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = 441  # 10ms at 44.1kHz
+        self._smoothing_duration_samples = _smoothing_sample_count(
+            self.sample_rate, self.smoothing_time_ms
+        )
 
         logger.debug(f"Volume initialized with amplitude: {self._amplitude}")
 
@@ -690,7 +793,13 @@ class ModulatedVolume(Volume):
         tags=["modifier", "volume", "amplitude", "modulation", "tremolo", "envelope"],
     )
 
-    def __init__(self, modulator, modulation_target: str = "amplitude"):
+    def __init__(
+        self,
+        modulator,
+        modulation_target: str = "amplitude",
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
+        smoothing_time_ms: float = 10.0,
+    ):
         """Initialize modulated volume.
 
         Args:
@@ -715,7 +824,11 @@ class ModulatedVolume(Volume):
                 f"got '{modulation_target}'"
             )
 
-        super().__init__(0.0)
+        super().__init__(
+            0.0,
+            sample_rate=sample_rate,
+            smoothing_time_ms=smoothing_time_ms,
+        )
 
         # Keep the original modulator object (source) so we can re-create
         # fresh iterators when needed. Also keep an iterator instance.
@@ -924,7 +1037,13 @@ class Clipper(Modifier):
         name="Clipper",
         category=ComponentCategory.MODIFIER,
         description="Audio clipper/limiter",
-        config_params=["wave_range"],
+        parameters={
+            "wave_range": ParameterDescriptor(
+                name="wave_range",
+                default=(-1.0, 1.0),
+                description="Clipping range as minimum and maximum values.",
+            )
+        },
         fluent_api_name="clipper",
         tags=["modifier", "clipper", "limiter"],
     )
@@ -1041,7 +1160,6 @@ class ModulatedClipper(Modifier):
         name="ModulatedClipper",
         category=ComponentCategory.MODIFIER,
         description="Clipper with CV threshold control (CV range: [0, 1])",
-        config_params=[],
         fluent_api_name="modulated_clipper",
         tags=["modifier", "clipper", "modulation"],
     )

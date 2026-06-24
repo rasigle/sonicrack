@@ -62,6 +62,14 @@ def test_panner_smoothing():
     print("✓ Panner smoothing works correctly")
 
 
+def test_panner_smoothing_duration_uses_explicit_sample_rate():
+    panner = Panner(position=0.0, sample_rate=48000, smoothing_time_ms=5.0)
+
+    assert panner.sample_rate == 48000
+    assert panner.smoothing_time_ms == 5.0
+    assert panner._smoothing_duration_samples == 240
+
+
 def test_volume_smoothing():
     """Test that volume/gain changes are smoothed."""
     vol = Volume(amplitude=1.0)
@@ -90,6 +98,14 @@ def test_volume_smoothing():
     assert abs(result2[-1] - 0.25) < 0.05
 
     print("✓ Volume smoothing works correctly")
+
+
+def test_volume_smoothing_duration_uses_explicit_sample_rate():
+    vol = Volume(amplitude=1.0, sample_rate=96000, smoothing_time_ms=2.5)
+
+    assert vol.sample_rate == 96000
+    assert vol.smoothing_time_ms == 2.5
+    assert vol._smoothing_duration_samples == 240
 
 
 def test_volume_gain_db_smoothing():

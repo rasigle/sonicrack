@@ -84,8 +84,11 @@ Note:
 
 from src.engine.audio_component import (
     AudioComponent,
+    COMMON_PARAMETER_DESCRIPTORS,
     ComponentCategory,
     ComponentDescriptor,
+    ParameterDescriptor,
+    make_parameter_descriptors,
 )
 from src.engine.audio_component_registry import (
     AudioComponentRegistry,
@@ -149,8 +152,11 @@ from src.engine.synthesis import synth
 
 __all__ = [
     "AudioComponent",
+    "COMMON_PARAMETER_DESCRIPTORS",
     "ComponentCategory",
     "ComponentDescriptor",
+    "ParameterDescriptor",
+    "make_parameter_descriptors",
     "AudioComponentRegistry",
     "register_component",
     "audio_registry",

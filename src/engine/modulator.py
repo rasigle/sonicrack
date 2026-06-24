@@ -48,7 +48,13 @@ from typing import Any
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import AudioComponent, ComponentDescriptor, Generator
+from src.engine.audio_component import (
+    AudioComponent,
+    ComponentDescriptor,
+    Generator,
+    ParameterDescriptor,
+    make_parameter_descriptors,
+)
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.logging_config import get_engine_logger
@@ -68,7 +74,7 @@ class Modulator(Generator):
         category=ComponentCategory.MODULATOR,
         description="Base class for modulators",
         tags=["modulator", "base"],
-        config_params=["sample_rate"],
+        parameters=make_parameter_descriptors("sample_rate"),
         fluent_api_name="modulator",
     )
 
@@ -94,13 +100,42 @@ class ADSREnvelope(Modulator):
         category=ComponentCategory.MODULATOR,
         description="ADSR envelope generator",
         tags=["envelope", "modulator", "adsr"],
-        config_params=[
+        parameters=make_parameter_descriptors(
             "attack_duration",
             "decay_duration",
             "sustain_level",
             "release_duration",
             "sample_rate",
-        ],
+            attack_duration=ParameterDescriptor(
+                name="attack_duration",
+                default=0.05,
+                minimum=0.0,
+                unit="s",
+                description="Attack duration.",
+            ),
+            decay_duration=ParameterDescriptor(
+                name="decay_duration",
+                default=0.2,
+                minimum=0.0,
+                unit="s",
+                description="Decay duration.",
+            ),
+            sustain_level=ParameterDescriptor(
+                name="sustain_level",
+                default=0.7,
+                minimum=0.0,
+                maximum=1.0,
+                unit="level",
+                description="Sustain level.",
+            ),
+            release_duration=ParameterDescriptor(
+                name="release_duration",
+                default=0.3,
+                minimum=0.0,
+                unit="s",
+                description="Release duration.",
+            ),
+        ),
         fluent_api_name="adsr",
     )
 

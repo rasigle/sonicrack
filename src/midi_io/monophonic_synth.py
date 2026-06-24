@@ -5,8 +5,8 @@ to MIDI note on/off messages. It plays one note at a time, with the most recent
 note taking priority.
 
 Example:
-    >>> from src.engine.midi import MonophonicSynth, NoteOnMessage, NoteOffMessage
-    >>> from src.engine import SineOscillator, ADSREnvelope, Chain
+    >>> from src.midi_io import MonophonicSynth, NoteOnMessage, NoteOffMessage
+    >>> from src.engine import SineOscillator, ADSREnvelope, Chain, ModulatedVolume
     >>>
     >>> # Create a simple synth
     >>> def voice_factory():
@@ -53,6 +53,8 @@ class MonophonicSynth:
 
     Example:
         >>> # Create voice factory
+        >>> from src.engine import SineOscillator, ADSREnvelope, Chain, ModulatedVolume
+        >>>
         >>> def make_voice():
         ...     osc = SineOscillator(440)
         ...     env = ADSREnvelope(attack_duration=0.05, release_duration=0.1)

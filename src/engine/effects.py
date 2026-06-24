@@ -16,6 +16,7 @@ from src.engine.audio_component import (
     AudioComponent,
     ComponentCategory,
     ComponentDescriptor,
+    ParameterDescriptor,
 )
 from src.engine.audio_component_registry import register_component
 from src.engine.modifier import Modifier
@@ -51,7 +52,38 @@ class Distortion(Modifier):
         category=ComponentCategory.EFFECT,
         description="Distortion effect with multiple distortion types",
         tags=["effect", "distortion", "overdrive", "waveshaper"],
-        config_params=["drive", "mix", "output_gain", "distortion_type"],
+        parameters={
+            "drive": ParameterDescriptor(
+                name="drive",
+                default=1.0,
+                minimum=0.0,
+                maximum=10.0,
+                clamp=True,
+                description="Distortion pre-gain amount.",
+            ),
+            "mix": ParameterDescriptor(
+                name="mix",
+                default=1.0,
+                minimum=0.0,
+                maximum=1.0,
+                clamp=True,
+                description="Dry/wet mix.",
+            ),
+            "output_gain": ParameterDescriptor(
+                name="output_gain",
+                default=0.5,
+                minimum=0.0,
+                maximum=2.0,
+                clamp=True,
+                description="Post-distortion output gain.",
+            ),
+            "distortion_type": ParameterDescriptor(
+                name="distortion_type",
+                default="soft",
+                choices=("soft", "hard", "fuzz", "tube"),
+                description="Waveshaping algorithm.",
+            ),
+        },
         fluent_api_name="distortion",
     )
 
@@ -294,7 +326,40 @@ class Delay(Modifier):
         category=ComponentCategory.EFFECT,
         description="Digital delay effect with feedback",
         tags=["effect", "delay", "echo"],
-        config_params=["delay_time", "feedback", "mix", "sample_rate"],
+        parameters={
+            "delay_time": ParameterDescriptor(
+                name="delay_time",
+                default=0.5,
+                minimum=0.001,
+                maximum=2.0,
+                unit="s",
+                clamp=True,
+                description="Delay time.",
+            ),
+            "feedback": ParameterDescriptor(
+                name="feedback",
+                default=0.3,
+                minimum=0.0,
+                maximum=0.95,
+                clamp=True,
+                description="Delay feedback amount.",
+            ),
+            "mix": ParameterDescriptor(
+                name="mix",
+                default=0.5,
+                minimum=0.0,
+                maximum=1.0,
+                clamp=True,
+                description="Dry/wet mix.",
+            ),
+            "sample_rate": ParameterDescriptor(
+                name="sample_rate",
+                default=DEFAULT_SAMPLE_RATE,
+                minimum=1.0,
+                unit="Hz",
+                description="Processing sample rate.",
+            ),
+        },
         fluent_api_name="delay",
     )
 
@@ -532,7 +597,39 @@ class Reverb(Modifier):
         category=ComponentCategory.EFFECT,
         description="Reverb effect using comb and allpass filters",
         tags=["effect", "reverb", "space", "room"],
-        config_params=["room_size", "damping", "mix", "sample_rate"],
+        parameters={
+            "room_size": ParameterDescriptor(
+                name="room_size",
+                default=0.5,
+                minimum=0.0,
+                maximum=1.0,
+                clamp=True,
+                description="Room size control.",
+            ),
+            "damping": ParameterDescriptor(
+                name="damping",
+                default=0.5,
+                minimum=0.0,
+                maximum=1.0,
+                clamp=True,
+                description="High-frequency damping amount.",
+            ),
+            "mix": ParameterDescriptor(
+                name="mix",
+                default=0.3,
+                minimum=0.0,
+                maximum=1.0,
+                clamp=True,
+                description="Dry/wet mix.",
+            ),
+            "sample_rate": ParameterDescriptor(
+                name="sample_rate",
+                default=DEFAULT_SAMPLE_RATE,
+                minimum=1.0,
+                unit="Hz",
+                description="Processing sample rate.",
+            ),
+        },
         fluent_api_name="reverb",
     )
 

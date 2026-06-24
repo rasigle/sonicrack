@@ -66,7 +66,12 @@ Note:
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import ComponentDescriptor, Generator
+from src.engine.audio_component import (
+    ComponentDescriptor,
+    Generator,
+    ParameterDescriptor,
+    make_parameter_descriptors,
+)
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import _derive_amplitude_from_init
 from src.engine.validation import validate_sample_count, validate_sample_rate
@@ -736,6 +741,32 @@ class NoiseGenerator(Generator):
         description="Generates various types of noise for synthesis and modulation.",
         fluent_api_name="noise",
         tags=["oscillator", "noise", "modulation", "synthesis"],
+        parameters=make_parameter_descriptors(
+            "noise_type",
+            "amplitude",
+            "gain_db",
+            "sample_rate",
+            noise_type=ParameterDescriptor(
+                name="noise_type",
+                default="White",
+                choices=(
+                    "White",
+                    "Pink",
+                    "Brown",
+                    "Blue",
+                    "Grey",
+                    "Velvet",
+                    "Sample & Hold",
+                ),
+                description="Noise algorithm.",
+            ),
+            amplitude=ParameterDescriptor(
+                name="amplitude",
+                default=0.5,
+                minimum=0.0,
+                description="Linear gain multiplier.",
+            ),
+        ),
     )
 
     @track_provided_args

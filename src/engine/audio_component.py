@@ -8,7 +8,7 @@ from typing import Any, TypeVar
 
 import numpy as np
 
-from src.constants import DEFAULT_SAMPLE_RATE
+from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.validation import validate_sample_count, validate_sample_rate
 
 T = TypeVar("T", bound="AudioComponent")
@@ -26,13 +26,83 @@ class ComponentCategory(Enum):
 
 
 @dataclass(frozen=True)
+class ParameterDescriptor:
+    """Metadata describing a component parameter."""
+
+    name: str
+    default: Any
+    minimum: float | None = None
+    maximum: float | None = None
+    unit: str | None = None
+    clamp: bool = False
+    choices: tuple[Any, ...] | None = None
+    description: str = ""
+
+
+COMMON_PARAMETER_DESCRIPTORS: dict[str, ParameterDescriptor] = {
+    "frequency": ParameterDescriptor(
+        name="frequency",
+        default=440.0,
+        minimum=0.0,
+        unit="Hz",
+        description="Oscillator frequency.",
+    ),
+    "amplitude": ParameterDescriptor(
+        name="amplitude",
+        default=1.0,
+        minimum=0.0,
+        description="Linear gain multiplier.",
+    ),
+    "gain_db": ParameterDescriptor(
+        name="gain_db",
+        default=DEFAULT_GAIN_DB,
+        unit="dB",
+        description="Gain in decibels.",
+    ),
+    "phase": ParameterDescriptor(
+        name="phase",
+        default=0.0,
+        unit="deg",
+        description="Initial phase offset.",
+    ),
+    "sample_rate": ParameterDescriptor(
+        name="sample_rate",
+        default=DEFAULT_SAMPLE_RATE,
+        minimum=1.0,
+        unit="Hz",
+        description="Processing sample rate.",
+    ),
+    "wave_range": ParameterDescriptor(
+        name="wave_range",
+        default=(-1, 1),
+        description="Output range as minimum and maximum values.",
+    ),
+}
+
+
+def make_parameter_descriptors(
+    *names: str, **overrides: ParameterDescriptor
+) -> dict[str, ParameterDescriptor]:
+    """Build ordered parameter metadata from common descriptors and overrides."""
+    parameters: dict[str, ParameterDescriptor] = {}
+    for name in names:
+        if name in overrides:
+            parameters[name] = overrides[name]
+        elif name in COMMON_PARAMETER_DESCRIPTORS:
+            parameters[name] = COMMON_PARAMETER_DESCRIPTORS[name]
+        else:
+            raise KeyError(f"No ParameterDescriptor registered for {name!r}")
+    return parameters
+
+
+@dataclass(frozen=True)
 class ComponentDescriptor:
     """Metadata describing a component type.
 
     Attributes:
         name: Unique identifier for the component (e.g., "sine_oscillator")
         category: Component category (oscillator, modulator, modifier, composer)
-        config_params: List of parameter names to store in preset configs
+        parameters: Ordered runtime parameter metadata for config/UI policy.
         description: More detailed and human-readable description of the component.
         fluent_api_name: Optional name of the component for the fluent API
         serializer: Optional custom serializer function
@@ -42,26 +112,34 @@ class ComponentDescriptor:
     name: str
     category: ComponentCategory
     description: str = ""
-    config_params: list[str] | None = None
+    parameters: dict[str, ParameterDescriptor] | None = None
     tags: list[str] | None = None
     fluent_api_name: str | None = None
     serializer: Callable | None = None
     deserializer: Callable | None = None
 
+    @property
+    def parameter_names(self) -> list[str]:
+        """Return serializable parameter names in constructor/config order."""
+        return list(self.parameters or {})
+
     def to_config(self, *args, **kwargs) -> dict[str, Any]:
         """Convert the given component configuration parameters to dictionary.
 
         Args:
-            *args: Positional arguments (matched to config_params in order)
+            *args: Positional arguments (matched to parameters in order)
             **kwargs: Keyword arguments
 
         Example:
             >>> descriptor = ComponentDescriptor(
             ...     name="sine_oscillator",
             ...     category=ComponentCategory.OSCILLATOR,
-            ...     config_params=["frequency", "amplitude"]
+            ...     parameters={
+            ...         "frequency": ParameterDescriptor("frequency", 440.0),
+            ...         "amplitude": ParameterDescriptor("amplitude", 1.0),
+            ...     }
             ... )
-            >>>     >>> conf = descriptor.to_config(frequency=440, amplitude=0.5)
+            >>> conf = descriptor.to_config(frequency=440, amplitude=0.5)
             >>> print(conf)
             {'name': 'sine_oscillator', 'frequency': 440, 'amplitude': 0.5}
 
@@ -72,17 +150,18 @@ class ComponentDescriptor:
         if self.description:
             config["description"] = self.description
 
-        if self.config_params:
+        parameter_names = self.parameter_names
+        if parameter_names:
             if args:
-                # Add positional args mapped to config_params
+                # Add positional args mapped to parameters.
                 for _i, (param, value) in enumerate(
-                    zip(self.config_params, args, strict=False)
+                    zip(parameter_names, args, strict=False)
                 ):
                     config[param] = value
 
             if kwargs:
-                # Add keyword args if they're in config_params
-                for param in self.config_params[len(args) :]:
+                # Add keyword args if they're declared parameters.
+                for param in parameter_names[len(args) :]:
                     if param in kwargs:
                         config[param] = kwargs[param]
 
@@ -133,10 +212,10 @@ class AudioComponent(ABC):
             Component instance
         """
         descr = cls.descriptor
-        config_params = descr.config_params or []
+        parameter_names = descr.parameter_names
 
         # Extract parameters from config
-        kwargs = {param: config[param] for param in config if param in config_params}
+        kwargs = {param: config[param] for param in config if param in parameter_names}
         return cls(**kwargs)
 
     def get_component_name(self) -> str:

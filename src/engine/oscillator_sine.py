@@ -5,7 +5,11 @@ from typing import Literal
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import ComponentDescriptor
+from src.engine.audio_component import (
+    ComponentDescriptor,
+    ParameterDescriptor,
+    make_parameter_descriptors,
+)
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator_base import Oscillator
 from src.engine.validation import validate_sample_count
@@ -22,7 +26,7 @@ class SineOscillator(Oscillator):
         description="Pure sine wave oscillator with harmonic modes",
         tags=["basic", "oscillator", "sine", "harmonics", "analog"],
         fluent_api_name="sine",
-        config_params=[
+        parameters=make_parameter_descriptors(
             "frequency",
             "gain_db",
             "amplitude",
@@ -30,7 +34,13 @@ class SineOscillator(Oscillator):
             "sample_rate",
             "wave_range",
             "mode",
-        ],
+            mode=ParameterDescriptor(
+                name="mode",
+                default="pure",
+                choices=("pure", "warm", "bright", "analog"),
+                description="Sine oscillator harmonic mode.",
+            ),
+        ),
     )
 
     @track_provided_args

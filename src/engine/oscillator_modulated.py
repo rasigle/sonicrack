@@ -65,7 +65,11 @@ from typing import cast
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import ComponentDescriptor, Generator
+from src.engine.audio_component import (
+    ComponentDescriptor,
+    Generator,
+    make_parameter_descriptors,
+)
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import (
     Oscillator,
@@ -96,11 +100,11 @@ class ModulatedOscillator(Generator):
         category=ComponentCategory.OSCILLATOR,
         description="Oscillator with modulation support (amplitude, frequency, phase)",
         tags=["oscillator", "modulated", "advanced"],
-        config_params=[
+        parameters=make_parameter_descriptors(
             "gain_db",
             "frequency",
             "phase",
-        ],
+        ),
     )
 
     def __init__(
@@ -724,7 +728,7 @@ class ModulatedFrequency(ModulatedOscillator):
         category=ComponentCategory.OSCILLATOR,
         description="Frequency-modulated oscillator (vibrato, FM synthesis)",
         tags=["oscillator", "modulated", "frequency", "vibrato", "fm"],
-        config_params=["gain_db", "frequency", "phase"],
+        parameters=make_parameter_descriptors("gain_db", "frequency", "phase"),
     )
 
     def __init__(self, oscillator, modulator, freq_mod_func=None):

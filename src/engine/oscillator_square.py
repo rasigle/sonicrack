@@ -8,7 +8,11 @@ from typing import Literal, Protocol, runtime_checkable
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import ComponentDescriptor
+from src.engine.audio_component import (
+    ComponentDescriptor,
+    ParameterDescriptor,
+    make_parameter_descriptors,
+)
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator_base import Oscillator
 from src.engine.validation import validate_sample_count, validate_sample_rate
@@ -625,7 +629,7 @@ class SquareOscillator(Oscillator):
         description="Square/Pulse wave oscillator with variable pulse width",
         tags=["basic", "oscillator", "square", "pulse"],
         fluent_api_name="square",
-        config_params=[
+        parameters=make_parameter_descriptors(
             "frequency",
             "gain_db",
             "amplitude",
@@ -633,7 +637,14 @@ class SquareOscillator(Oscillator):
             "sample_rate",
             "wave_range",
             "pulsewidth",
-        ],
+            pulsewidth=ParameterDescriptor(
+                name="pulsewidth",
+                default=0.5,
+                minimum=0.0,
+                maximum=1.0,
+                description="Square wave pulse width.",
+            ),
+        ),
     )
 
     @track_provided_args

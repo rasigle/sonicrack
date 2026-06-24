@@ -5,7 +5,11 @@ from typing import Literal
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import ComponentDescriptor
+from src.engine.audio_component import (
+    ComponentDescriptor,
+    ParameterDescriptor,
+    make_parameter_descriptors,
+)
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator_base import Oscillator
 from src.engine.validation import validate_sample_count
@@ -21,7 +25,7 @@ class SawtoothOscillator(Oscillator):
         category=ComponentCategory.OSCILLATOR,
         description="Sawtooth wave oscillator with analog mode",
         fluent_api_name="sawtooth",
-        config_params=[
+        parameters=make_parameter_descriptors(
             "frequency",
             "gain_db",
             "amplitude",
@@ -29,7 +33,13 @@ class SawtoothOscillator(Oscillator):
             "sample_rate",
             "wave_range",
             "mode",
-        ],
+            mode=ParameterDescriptor(
+                name="mode",
+                default="pure",
+                choices=("pure", "analog"),
+                description="Ramp oscillator generation mode.",
+            ),
+        ),
         tags=["basic", "oscillator", "sawtooth", "analog"],
     )
 
@@ -138,7 +148,7 @@ class TriangleOscillator(SawtoothOscillator):
         description="Triangle wave oscillator with analog mode",
         tags=["basic", "oscillator", "triangle", "analog"],
         fluent_api_name="triangle",
-        config_params=[
+        parameters=make_parameter_descriptors(
             "frequency",
             "gain_db",
             "amplitude",
@@ -146,7 +156,13 @@ class TriangleOscillator(SawtoothOscillator):
             "sample_rate",
             "wave_range",
             "mode",
-        ],
+            mode=ParameterDescriptor(
+                name="mode",
+                default="pure",
+                choices=("pure", "analog"),
+                description="Triangle oscillator generation mode.",
+            ),
+        ),
     )
 
     def _apply_analog_character_triangle(

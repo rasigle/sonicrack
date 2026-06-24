@@ -21,10 +21,14 @@ from enum import Enum
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import Generator
+from src.engine.audio_component import (
+    ComponentDescriptor,
+    Generator,
+    ParameterDescriptor,
+    make_parameter_descriptors,
+)
 from src.engine.audio_component_registry import (
     ComponentCategory,
-    ComponentDescriptor,
     register_component,
 )
 from src.engine.oscillator import _derive_amplitude_from_init
@@ -147,6 +151,29 @@ class PolyBLEPOscillator(Generator):
         category=ComponentCategory.OSCILLATOR,
         description="PolyBLEP Bandlimited Oscillator",
         tags=["oscillator", "polyblep", "bandlimited", "synthesis"],
+        parameters=make_parameter_descriptors(
+            "frequency",
+            "gain_db",
+            "amplitude",
+            "phase",
+            "sample_rate",
+            "wave_range",
+            "wave_shape",
+            "pulsewidth",
+            wave_shape=ParameterDescriptor(
+                name="wave_shape",
+                default=WaveShape.SAWTOOTH_UP,
+                choices=tuple(WaveShape),
+                description="PolyBLEP waveform shape.",
+            ),
+            pulsewidth=ParameterDescriptor(
+                name="pulsewidth",
+                default=0.5,
+                minimum=0.0,
+                maximum=1.0,
+                description="Square wave pulse width.",
+            ),
+        ),
     )
 
     @track_provided_args

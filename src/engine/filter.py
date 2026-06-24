@@ -43,7 +43,12 @@ from scipy.signal import butter as scipy_butter
 from scipy.signal import filtfilt, lfilter, lfilter_zi
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import ComponentCategory, ComponentDescriptor
+from src.engine.audio_component import (
+    ComponentCategory,
+    ComponentDescriptor,
+    ParameterDescriptor,
+    make_parameter_descriptors,
+)
 from src.engine.audio_component_registry import register_component
 from src.engine.modifier import Modifier
 from src.engine.validation import validate_sample_rate
@@ -76,7 +81,32 @@ class ButterworthFilter(Modifier):
     descriptor = ComponentDescriptor(
         name="ButterworthFilter",
         category=ComponentCategory.MODIFIER,
-        config_params=["cutoff", "order", "filter_type", "sample_rate"],
+        parameters=make_parameter_descriptors(
+            "cutoff",
+            "order",
+            "filter_type",
+            "sample_rate",
+            cutoff=ParameterDescriptor(
+                name="cutoff",
+                default=1000.0,
+                minimum=0.0,
+                unit="Hz",
+                description="Cutoff frequency or band-pass frequency range.",
+            ),
+            order=ParameterDescriptor(
+                name="order",
+                default=4,
+                minimum=1,
+                maximum=10,
+                description="Butterworth filter order.",
+            ),
+            filter_type=ParameterDescriptor(
+                name="filter_type",
+                default="low",
+                choices=("low", "high", "band"),
+                description="Butterworth filter type.",
+            ),
+        ),
         description="Butterworth IIR filter (low-pass, high-pass, band-pass)",
         tags=["filter", "frequency", "butterworth", "iir"],
     )

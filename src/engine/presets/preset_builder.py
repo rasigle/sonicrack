@@ -888,12 +888,12 @@ class PresetBuilder:
             )
 
             # Extract only actual component parameters (exclude metadata)
+            parameter_names = descriptor.parameter_names
             params = {
                 k: v
                 for k, v in component.items()
                 if k not in ["name", "category", "description"]
-                and descriptor.config_params
-                and k in descriptor.config_params
+                and k in parameter_names
             }
 
             # Call method with keyword arguments
@@ -961,12 +961,12 @@ class PresetBuilder:
             )
 
             # Extract only actual component parameters (exclude metadata)
+            parameter_names = descriptor.parameter_names
             params = {
                 k: v
                 for k, v in component.items()
                 if k not in ["name", "category", "description"]
-                and descriptor.config_params
-                and k in descriptor.config_params
+                and k in parameter_names
             }
 
             # Call method with keyword arguments

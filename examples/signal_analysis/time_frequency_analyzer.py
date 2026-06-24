@@ -282,7 +282,7 @@ class TimeFreqDialog(QDialog):
         self.timer.start(150)  # refresh every 150 ms
 
     def get_group_names(self):
-        return [f"Signal {i+1}" for i in range(len(self.groups))]
+        return [f"Signal {i + 1}" for i in range(len(self.groups))]
 
     def add_composite_signal(self):
         widget = CompositeSignalWidget(
@@ -336,7 +336,7 @@ class TimeFreqDialog(QDialog):
             if show_time:
                 style = "-" if show_fft else ":"  # dashed if hidden in FFT
                 self.time_canvas.axes.plot(
-                    t, y, label=f"Signal {i+1}", color=color, linestyle=style
+                    t, y, label=f"Signal {i + 1}", color=color, linestyle=style
                 )
             else:
                 # Dimmed version if hidden in time
@@ -346,7 +346,9 @@ class TimeFreqDialog(QDialog):
             if show_fft:
                 freqs = np.fft.rfftfreq(len(t), d=t[1] - t[0])
                 Y = np.abs(np.fft.rfft(y))
-                self.freq_canvas.axes.plot(freqs, Y, label=f"Signal {i+1}", color=color)
+                self.freq_canvas.axes.plot(
+                    freqs, Y, label=f"Signal {i + 1}", color=color
+                )
 
         # --- Plot composite signals ---
         for c_idx, comp in enumerate(self.composites):
@@ -368,7 +370,7 @@ class TimeFreqDialog(QDialog):
 
             color = "black"
             style = "--"
-            label = f"Composite {c_idx+1} ({op})"
+            label = f"Composite {c_idx + 1} ({op})"
 
             show_time, show_fft = comp.get_visibility()
 

@@ -211,6 +211,7 @@ class LibraryPresetBrowserDialog(QDialog):
             current: Currently selected item
             previous: Previously selected item
         """
+        _ = previous
         if current:
             preset = current.data(Qt.ItemDataRole.UserRole)
             self._show_details(preset)

@@ -562,7 +562,7 @@ class PresetBuilder:
 
         if index < 0 or index >= len(sources):
             raise IndexError(
-                f"Oscillator index {index} out of range (0-{len(sources)-1})"
+                f"Oscillator index {index} out of range (0-{len(sources) - 1})"
             )
 
         # Modify the specific oscillator

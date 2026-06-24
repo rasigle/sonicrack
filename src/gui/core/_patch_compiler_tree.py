@@ -55,7 +55,7 @@ class PatchCompilerTreeMixin:
             return self._build_tree_node(output_module, output_visited)
 
         connected_as_input = set()
-        for _start_port, end_port in connections:
+        for _, end_port in connections:
             connected_as_input.add(end_port.parent_module)
 
         root_modules = [

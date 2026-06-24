@@ -13,13 +13,10 @@ import logging
 import numpy as np
 import pytest
 
-from src.engine import SquareOscillator
 from src.engine.modifier import ModulatedVolume, Volume
-from src.engine.oscillator import (
-    SawtoothOscillator,
-    SineOscillator,
-    TriangleOscillator,
-)
+from src.engine.oscillator_ramp import SawtoothOscillator, TriangleOscillator
+from src.engine.oscillator_sine import SineOscillator
+from src.engine.oscillator_square import SquareOscillator
 
 
 class TestOscillatorDBControl:
@@ -180,7 +177,6 @@ class TestModulatedVolumeInheritance:
 
     def test_modulated_volume_has_gain_db(self):
         """Test ModulatedVolume has gain_db property from parent."""
-        from src.engine.oscillator import SineOscillator
 
         lfo = SineOscillator(frequency=5, amplitude=0.5, gain_db=None)
         mod_vol = ModulatedVolume(lfo)

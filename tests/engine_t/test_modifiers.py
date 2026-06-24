@@ -6,6 +6,7 @@ from typing import cast
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB
+from src.engine.composer import Chain
 from src.engine.modifier import (
     Clipper,
     Frequency,
@@ -15,8 +16,10 @@ from src.engine.modifier import (
     Volume,
 )
 from src.engine.modulator import ADSREnvelope
-from src.engine.oscillator import SineOscillator
 from src.engine.oscillator_modulated import ModulatedFrequency
+from src.engine.oscillator_ramp import TriangleOscillator
+from src.engine.oscillator_sine import SineOscillator
+from src.engine.oscillator_square import SquareOscillator
 
 
 class TestPanner(unittest.TestCase):
@@ -144,9 +147,9 @@ class TestPanner(unittest.TestCase):
         self.assertEqual(len(right), len(samples))
 
         # Check each sample
-        for i in range(len(samples)):
-            expected_left = samples[i] * np.sqrt(0.5)
-            expected_right = samples[i] * np.sqrt(0.5)
+        for i, sample in enumerate(samples):
+            expected_left = sample * np.sqrt(0.5)
+            expected_right = sample * np.sqrt(0.5)
             self.assertAlmostEqual(left[i], expected_left, places=5)
             self.assertAlmostEqual(right[i], expected_right, places=5)
 
@@ -1019,10 +1022,8 @@ class TestModulatedFrequency(unittest.TestCase):
     def test_input_validation_none_modulator(self):
         """Test ModulatedFrequency rejects None modulator."""
         with self.assertRaises(TypeError):
+            # pylint: disable=no-value-for-parameter
             ModulatedFrequency(cast(object, None))
-
-
-"""Test cases for ModulatedVolume and ModulatedFrequency vectorization."""
 
 
 class TestModulatedVolumeVectorization(unittest.TestCase):
@@ -1035,8 +1036,6 @@ class TestModulatedVolumeVectorization(unittest.TestCase):
         This test ensures that the bug where Chain fell back to Python loops
         for ModulatedVolume has been fixed.
         """
-        from src.engine import SquareOscillator
-        from src.engine.composer import Chain
 
         # Create chain with ModulatedVolume (the problematic case)
         osc = SquareOscillator(440, amplitude=0.5, gain_db=None, sample_rate=1000)
@@ -1069,9 +1068,6 @@ class TestChainVectorizationPerformance(unittest.TestCase):
         This is the core regression test for the bug where Chain was
         falling back to Python loops instead of using vectorized methods.
         """
-        from src.engine.composer import Chain
-        from src.engine.oscillator import SineOscillator
-
         # Setup chain with all vectorized-capable modifiers
         osc = SineOscillator(440, amplitude=1.0, sample_rate=1000)
         env = ADSREnvelope(0.1, 0.1, 0.7, 0.1, sample_rate=1000)
@@ -1089,10 +1085,6 @@ class TestChainVectorizationPerformance(unittest.TestCase):
 
     def test_chain_with_multiple_modulated_modifiers(self):
         """Test Chain with multiple modulated modifiers (complex case)."""
-        from src.engine import SquareOscillator
-        from src.engine.composer import Chain
-        from src.engine.modifier import ModulatedPanner
-        from src.engine.oscillator import TriangleOscillator
 
         # This is similar to the user's original code
         osc = SquareOscillator(440, amplitude=0.3, sample_rate=1000)

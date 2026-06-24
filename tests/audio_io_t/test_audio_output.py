@@ -286,6 +286,7 @@ class TestPlaybackControl(unittest.TestCase):
     @patch("time.sleep")
     def test_cleanup(self, mock_sleep, mock_stream_class):
         """Test cleanup method."""
+        _ = mock_sleep
         mock_stream = Mock()
         mock_stream_class.return_value = mock_stream
 
@@ -500,6 +501,7 @@ class TestIntegrationScenarios(unittest.TestCase):
     @patch("time.sleep")
     def test_full_playback_cycle(self, mock_sleep, mock_stream_class):
         """Test complete playback start -> change settings -> stop cycle."""
+        _ = mock_sleep
         mock_stream = Mock()
         mock_stream_class.return_value = mock_stream
 

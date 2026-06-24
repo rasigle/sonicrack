@@ -56,6 +56,7 @@ class AudioEngine(QtCore.QObject):
 
         Just update local values - no timer to update anymore.
         """
+        _ = value
         self.sample_rate = audio_config.sample_rate
         self.buffer_size = audio_config.buffer_size
         logger.debug(

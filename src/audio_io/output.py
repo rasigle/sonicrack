@@ -184,6 +184,7 @@ class AudioOutput:
             time_info: Time information
             status: Stream status
         """
+        _ = time_info
         if status:
             self.callback_status_count += 1
             self.last_callback_status = status

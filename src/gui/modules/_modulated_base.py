@@ -97,6 +97,7 @@ class ModulatedModuleBase(ModuleWidget):
             - Volume/Clipper: (0.0, 1.0) - unipolar
             - Panner: (-1.0, 1.0) - bipolar
         """
+        _ = port_name
         return 0.0, 1.0  # Default: unipolar [0, 1]
 
     @staticmethod
@@ -131,9 +132,7 @@ class ModulatedModuleBase(ModuleWidget):
             mod_comp = self.modulator_component
 
         logger.debug(
-            "%s modulator: %s",
-            self.__class__.__name__,
-            self._describe_component(mod_comp),
+            "%s modulator: %s", type(self).__name__, self._describe_component(mod_comp)
         )
 
         if mod_comp:
@@ -146,16 +145,16 @@ class ModulatedModuleBase(ModuleWidget):
                 )
 
             return self.create_modulated_component(mod_comp)
-        else:
-            # No modulation - update UI and create simple component
-            if self.control_knob:
-                self.control_knob.setEnabled(True)
-                self.control_knob.setStyleSheet("")
-                self.control_knob.setToolTip(
-                    f"Manual {self.control_knob.label.lower()} control"
-                )
 
-            return self.create_unmodulated_component()
+        # No modulation - update UI and create simple component
+        if self.control_knob:
+            self.control_knob.setEnabled(True)
+            self.control_knob.setStyleSheet("")
+            self.control_knob.setToolTip(
+                f"Manual {self.control_knob.label.lower()} control"
+            )
+
+        return self.create_unmodulated_component()
 
     def create_modulated_component(self, mod_comp):
         """Create the modulated version of the component.
@@ -169,7 +168,7 @@ class ModulatedModuleBase(ModuleWidget):
         Must be implemented by subclass.
         """
         raise NotImplementedError(
-            f"{self.__class__.__name__} must implement create_modulated_component()"
+            f"{type(self).__name__} must implement create_modulated_component()"
         )
 
     def create_unmodulated_component(self):
@@ -181,8 +180,8 @@ class ModulatedModuleBase(ModuleWidget):
         Must be implemented by subclass.
         """
         raise NotImplementedError(
-            f"{self.__class__.__name__} must implement create_unmodulated_component()"
+            f"{type(self).__name__} must implement create_unmodulated_component()"
         )
 
-    def process(self):
-        pass
+    def process(self, num_samples: int = 1):
+        raise NotImplementedError(f"{type(self).__name__} must implement process()")

@@ -190,6 +190,7 @@ class OutputModule(ModuleWidget):
         Returns:
             Stereo audio samples as (N, 2) numpy array
         """
+
         def silence() -> np.ndarray:
             return np.zeros((num_samples, 2), dtype=np.float32)
 
@@ -240,11 +241,11 @@ class OutputModule(ModuleWidget):
 
         return stereo_samples.astype(np.float32)
 
-    def process(self, num_samples: int):
+    def process(self, num_samples: int = 1):
         """Process method for compatibility with QTimer-based architecture.
 
         NOTE: This method is no longer used when using callback-based pulling.
         The audio callback directly calls _generate_samples() instead.
         Kept for backward compatibility during transition.
         """
-        pass  # No-op - audio callback drives everything now
+        # No-op - audio callback drives everything now

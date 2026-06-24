@@ -111,7 +111,6 @@ class DelayModule(ModulatedModuleBase):
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
         """Create modulated delay (not implemented yet)."""
-        pass
 
     def create_unmodulated_component(self):
         """Create simple Delay without modulation."""

@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, cast
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
@@ -49,9 +49,7 @@ class ADSRModule(ModuleWidget):
 
         self.attack_knob = Knob("Attack", 0.005, 5.0, 0.01)  # Min 5ms, default 10ms
         self.attack_knob.setToolTip(
-            "Attack time (seconds)\n"
-            "Range: 0.005-5.0s\n"
-            "Lower values may cause clicks"
+            "Attack time (seconds)\nRange: 0.005-5.0s\nLower values may cause clicks"
         )
         self.attack_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -138,27 +136,33 @@ class ADSRModule(ModuleWidget):
 
         self.component = self.create_engine_component()
 
-    def _on_trigger_pressed(self):
-        """Handle trigger button press - start attack phase."""
-        if self._adsr_component is not None:
-            try:
-                # If wrapped in GateTriggeredADSR, access the inner ADSR
-                adsr = getattr(self._adsr_component, "adsr", self._adsr_component)
+    def _trigger_adsr(self, note_on: bool) -> None:
+        """Trigger ADSR note on/off if available."""
+        if self._adsr_component is None:
+            return
+
+        try:
+            adsr = getattr(self._adsr_component, "adsr", self._adsr_component)
+            adsr = cast(ADSREnvelope, adsr)
+
+            if note_on:
                 adsr.trigger_note_on()
                 logging.debug("ADSR manually triggered (note on)")
-            except (AttributeError, Exception) as e:
-                logging.warning(f"Failed to trigger ADSR: {e}")
-
-    def _on_trigger_released(self):
-        """Handle trigger button release - start release phase."""
-        if self._adsr_component is not None:
-            try:
-                # If wrapped in GateTriggeredADSR, access the inner ADSR
-                adsr = getattr(self._adsr_component, "adsr", self._adsr_component)
+            else:
                 adsr.trigger_note_off()
                 logging.debug("ADSR manually released (note off)")
-            except (AttributeError, Exception) as e:
-                logging.warning(f"Failed to release ADSR: {e}")
+
+        except AttributeError as e:
+            action = "trigger" if note_on else "release"
+            logging.warning(f"Failed to {action} ADSR: {e}")
+
+    def _on_trigger_pressed(self) -> None:
+        """Handle trigger button press - start attack phase."""
+        self._trigger_adsr(note_on=True)
+
+    def _on_trigger_released(self) -> None:
+        """Handle trigger button release - start release phase."""
+        self._trigger_adsr(note_on=False)
 
     def get_required_inputs(self) -> list[str]:
         """Gate input is optional - ADSR works without gate triggering."""

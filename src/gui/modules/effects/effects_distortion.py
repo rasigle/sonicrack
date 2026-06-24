@@ -120,7 +120,6 @@ class DistortionModule(ModulatedModuleBase):
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
         """Create modulated distortion (not implemented yet)."""
-        pass
 
     def create_unmodulated_component(self):
         """Create simple Distortion without modulation."""

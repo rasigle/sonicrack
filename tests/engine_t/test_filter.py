@@ -150,7 +150,11 @@ class TestButterworthFilterProcessing(unittest.TestCase):
         """Test that vectorized processing preserves array shape."""
         filt = ButterworthFilter()
 
-        for n in [10, 100, 1000]:
+        for n in (
+            10,
+            100,
+            1000,
+        ):
             samples = np.random.randn(n).astype(np.float32)
             result = filt.scale_vectorized(samples)
 

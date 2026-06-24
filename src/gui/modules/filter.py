@@ -197,6 +197,7 @@ class FilterModule(ModuleWidget):
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int):
         """Redesign filter coefficients when the global sample rate changes."""
+        _ = new_sample_rate
         self.component = self.create_engine_component()
 
     def _cleanup_audio_config_listeners(self, *_args):

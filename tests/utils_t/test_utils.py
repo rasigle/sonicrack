@@ -115,7 +115,7 @@ class TestTrackProvidedArgs:
             # This function is decorated, but since it's not a method,
             # the decorator won't be able to set _provided_args on an instance.
             # The test is to ensure it doesn't crash.
-            pass
+            _ = a, b
 
         # Act & Assert
         try:

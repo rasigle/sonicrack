@@ -453,7 +453,6 @@ class ADSREnvelope(Modulator):
 
         # Process samples through current and subsequent phases
         while remaining > 0 and not self.ended:
-
             if self._phase == "idle":
                 # Idle phase: output zeros until triggered
                 samples[idx : idx + remaining] = 0.0

@@ -1,5 +1,6 @@
 """Tests for the dynamic module registration system."""
 
+import importlib
 import shutil
 import tempfile
 from pathlib import Path
@@ -7,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import (
     ModuleRegistry,
     discover_modules,
@@ -157,14 +159,19 @@ class TestModuleRegistry:
 
         @register_module()
         class DecoratorTest(ModuleWidget):
-            class metadata:
-                title = "Decorator Test"
-                category = "test"
-                description = "Test"
-                version = "1.0.0"
-                author = "Test"
+            metadata = ModuleMetadata(
+                title="Decorator Test",
+                category=ModuleCategory.MODIFIER,
+                description="Test",
+                version="1.0.0",
+                author="Test",
+            )
+
+            def process(self, num_samples: int = 1):
+                pass
 
         # Should be in global registry
+        _ = DecoratorTest
         assert global_registry.count() == initial_count + 1
         assert "Decorator Test" in global_registry.list_modules()
 
@@ -252,10 +259,6 @@ class TestRecursiveModuleSearch:
         sys.path.insert(0, self.temp_dir)
 
         try:
-            # Count files found
-            import importlib
-            from pathlib import Path
-
             # Get package
             pkg = importlib.import_module("test_package")
             pkg_path = Path(pkg.__file__).parent

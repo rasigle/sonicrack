@@ -220,10 +220,16 @@ class TestPerlinNoise(unittest.TestCase):
     def test_scale_parameter(self) -> None:
         """Test scale parameter affects variation rate."""
         noise_fine = perlin_noise(
-            dur=1.0, scale=5, sr=1000, seed=42  # Smaller scale = finer variation
+            dur=1.0,
+            scale=5,
+            sr=1000,
+            seed=42,  # Smaller scale = finer variation
         )
         noise_coarse = perlin_noise(
-            dur=1.0, scale=50, sr=1000, seed=42  # Larger scale = coarser variation
+            dur=1.0,
+            scale=50,
+            sr=1000,
+            seed=42,  # Larger scale = coarser variation
         )
 
         # Fine scale should have more variation

@@ -1,5 +1,6 @@
 """Tests for MIDI file reader."""
 
+import mido
 import pytest
 
 from src.midi_io import ControlChangeMessage, MIDIFile
@@ -9,13 +10,9 @@ from src.midi_io.input import MIDO_AVAILABLE
 pytestmark = pytest.mark.skipif(not MIDO_AVAILABLE, reason="mido not installed")
 
 
-@pytest.fixture
-def sample_midi_file(tmp_path):
+@pytest.fixture(name="sample_midi_file")
+def fixture_sample_midi_file(tmp_path):
     """Create a simple MIDI file for testing."""
-    if not MIDO_AVAILABLE:
-        return None
-
-    import mido
 
     # Create a simple MIDI file
     mid = mido.MidiFile()
@@ -156,13 +153,9 @@ class TestMIDIFile:
 class TestMIDIFileWithComplexFile:
     """Test with more complex MIDI file."""
 
-    @pytest.fixture
-    def complex_midi_file(self, tmp_path):
+    @pytest.fixture(name="complex_midi_file")
+    def fixture_complex_midi_file(self, tmp_path):
         """Create a more complex MIDI file."""
-        if not MIDO_AVAILABLE:
-            return None
-
-        import mido
 
         mid = mido.MidiFile()
         track = mido.MidiTrack()
@@ -173,7 +166,11 @@ class TestMIDIFileWithComplexFile:
 
         # Add notes on different channels (all at time 0)
         for channel in range(2):
-            for note in [60, 64, 67]:  # C major chord
+            for note in (
+                60,
+                64,
+                67,
+            ):  # C major chord
                 track.append(
                     mido.Message(
                         "note_on",
@@ -187,7 +184,11 @@ class TestMIDIFileWithComplexFile:
         # Add CC message after 240 ticks (delta time from last message)
         track.append(
             mido.Message(
-                "control_change", control=7, value=100, channel=0, time=240  # Volume
+                "control_change",
+                control=7,
+                value=100,
+                channel=0,
+                time=240,  # Volume
             )
         )
 
@@ -244,9 +245,9 @@ class TestMIDIFileWithComplexFile:
             msg for msg in midi.messages if isinstance(msg, ControlChangeMessage)
         ]
 
-        assert (
-            len(cc_messages) > 0
-        ), f"Expected CC messages but got: {[type(m).__name__ for m in midi.messages]}"
+        assert len(cc_messages) > 0, (
+            f"Expected CC messages but got: {[type(m).__name__ for m in midi.messages]}"
+        )
         assert cc_messages[0].controller == 7  # Volume
 
 

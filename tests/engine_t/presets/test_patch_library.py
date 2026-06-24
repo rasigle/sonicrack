@@ -82,7 +82,7 @@ class TestPresetSaveLoad(unittest.TestCase):
             builder.save_preset(filepath)
 
             # Read JSON directly
-            with open(filepath) as f:
+            with open(filepath, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Check structure
@@ -235,7 +235,7 @@ class TestPresetLibrary(unittest.TestCase):
 
             # Load and check metadata
             preset_file = Path(tmpdir) / "preset_with_meta.json"
-            with open(preset_file) as f:
+            with open(preset_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             self.assertIn("metadata", data)

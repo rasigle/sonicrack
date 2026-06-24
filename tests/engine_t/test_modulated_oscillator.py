@@ -115,7 +115,6 @@ class TestFrequencyModulation(unittest.TestCase):
 
         # Frequency should have been modulated
         # (Hard to test precisely, but we can verify it didn't crash)
-        self.assertTrue(True)
 
 
 class TestPhaseModulation(unittest.TestCase):

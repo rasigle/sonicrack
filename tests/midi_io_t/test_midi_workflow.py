@@ -31,6 +31,7 @@ class TestMIDIWorkflow:
 
         # Frequency modulation function: use CV frequency directly
         def freq_mod_func(base_freq, cv_freq):
+            _ = base_freq
             return cv_freq
 
         mod_osc = ModulatedOscillator(base_osc, freq_output, freq_mod=freq_mod_func)
@@ -97,6 +98,7 @@ class TestMIDIWorkflow:
         base_osc = SineOscillator(440)
 
         def freq_mod_func(base, cv_freq):
+            _ = base
             return cv_freq
 
         mod_osc = ModulatedOscillator(base_osc, freq_output, freq_mod=freq_mod_func)

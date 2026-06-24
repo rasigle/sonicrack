@@ -23,6 +23,7 @@ class MockOscillatorModule:
 
     def create_component(self, input_components=None, modulation_components=None):
         """Create a SineOscillator component."""
+        _ = input_components, modulation_components
         return SineOscillator(frequency=440, gain_db=DEFAULT_GAIN_DB)
 
     def get_required_inputs(self):

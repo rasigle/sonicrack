@@ -98,7 +98,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         knobs_layout = QHBoxLayout()
         self.freq_knob = Knob("Base Hz", 20, 2000, self._base_frequency)
         self.freq_knob.setToolTip(
-            "Base frequency (Hz)\n" "Active when Freq input is disconnected"
+            "Base frequency (Hz)\nActive when Freq input is disconnected"
         )
         self.freq_knob.value_changed.connect(self._on_frequency_changed)
         knobs_layout.addWidget(self.freq_knob)
@@ -106,7 +106,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Gain in dB
         self.gain_knob = Knob("Gain (dB)", -60, 12, DEFAULT_GAIN_DB, logarithmic=False)
         self.gain_knob.setToolTip(
-            "Oscillator gain (dB)\n" "Range: -60 to +12 dB\n" "Default: -20 dB"
+            "Oscillator gain (dB)\nRange: -60 to +12 dB\nDefault: -20 dB"
         )
         self.gain_knob.value_changed.connect(self._on_gain_changed)
         knobs_layout.addWidget(self.gain_knob)
@@ -342,7 +342,7 @@ class ModulatedOscillatorModule(ModuleWidget):
                     self.signal = signal
                     self.idx = 0
 
-                def get_samples(self, n):
+                def get_samples(self, n: int):
                     if isinstance(self.signal, (int, float)):
                         return np.full(n, self.signal)
                     result = self.signal[self.idx : self.idx + n]

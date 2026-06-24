@@ -120,12 +120,9 @@ class PortWidget(QGraphicsItem):
         elif hasattr(other, "model"):
             # Handle wrapped PortModel
             self.port.connect(other.port)
-        else:
+        elif isinstance(other, Port):
             # Assume it's a PortModel directly
-            from src.gui.core.port import Port
-
-            if isinstance(other, Port):
-                self.port.connect(other)
+            self.port.connect(other)
 
     def disconnect(self) -> None:
         """Disconnect from any connected port."""
@@ -236,10 +233,6 @@ class PortWidget(QGraphicsItem):
             Scene position as QPointF
         """
         return self.scenePos()
-
-    # ========================================================================
-    # Debugging
-    # ========================================================================
 
     def __repr__(self) -> str:
         """String representation for debugging.

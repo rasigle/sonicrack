@@ -118,7 +118,7 @@ class MIDIInput:
                 first available.
 
         Raises:
-            IOError: If device cannot be opened
+            OSError: If device cannot be opened
             RuntimeError: If called while MIDI input is running
         """
         with self._state_lock:

@@ -280,7 +280,6 @@ class ModularSynthWindow(QMainWindow):
 
         # Check if trying to add an Output module when one already exists
         if module_class.metadata.category == ModuleCategory.OUTPUT:
-
             # Check if an Output module already exists
             for module in patch_canvas.get_modules():
                 if module.metadata.category == ModuleCategory.OUTPUT:

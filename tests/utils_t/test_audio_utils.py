@@ -114,7 +114,7 @@ class TestSaveLoadWave:
             save_wave(left, audio_right=right, filename=str(filepath), amplitude=0.5)
 
             # Load without mono conversion
-            sr, loaded_audio = load_wave(str(filepath), mono=False)
+            _, loaded_audio = load_wave(str(filepath), mono=False)
 
             assert loaded_audio.ndim == 2
             assert loaded_audio.shape[1] == 2  # Two channels
@@ -162,7 +162,7 @@ class TestSaveLoadWave:
             save_wave(left, audio_right=right, filename=str(filepath))
 
             # Load as mono (default)
-            sr, mono_audio = load_wave(str(filepath), mono=True)
+            _, mono_audio = load_wave(str(filepath), mono=True)
 
             assert mono_audio.ndim == 1  # Should be mono
             assert len(mono_audio) == len(left)
@@ -274,7 +274,7 @@ class TestEdgeCases:
             filepath = Path(tmpdir) / "short.wav"
 
             save_wave(audio, filename=str(filepath))
-            sr, loaded = load_wave(str(filepath))
+            _, loaded = load_wave(str(filepath))
 
             assert len(loaded) >= 1  # At least one sample
 
@@ -286,7 +286,7 @@ class TestEdgeCases:
             filepath = Path(tmpdir) / "silent.wav"
 
             save_wave(audio, filename=str(filepath))
-            sr, loaded = load_wave(str(filepath))
+            _, loaded = load_wave(str(filepath))
 
             assert len(loaded) == len(audio)
             assert np.all(np.abs(loaded) < 0.01)  # Should be very quiet

@@ -1,5 +1,7 @@
 """Tests for shared engine runtime contracts."""
 
+import math
+
 import numpy as np
 import pytest
 
@@ -23,8 +25,8 @@ from src.engine.validation import validate_numeric_range
         (lambda: SineOscillator(sample_rate=0), ValueError),
         (lambda: ADSREnvelope(sample_rate=-1), ValueError),
         (lambda: ButterworthFilter(sample_rate=0), ValueError),
-        (lambda: Delay(sample_rate=float("nan")), ValueError),
-        (lambda: Reverb(sample_rate=float("inf")), ValueError),
+        (lambda: Delay(sample_rate=math.nan), ValueError),
+        (lambda: Reverb(sample_rate=math.inf), ValueError),
         (lambda: NoiseGenerator(sample_rate=True), TypeError),
     ],
 )
@@ -59,7 +61,7 @@ def test_validate_numeric_range_accepts_inclusive_bounds():
     assert validate_numeric_range(1, 0.0, 1.0, name="mix") == 1.0
 
 
-@pytest.mark.parametrize("value", [-0.1, 1.1, float("nan"), float("inf")])
+@pytest.mark.parametrize("value", [-0.1, 1.1, math.nan, math.inf])
 def test_validate_numeric_range_rejects_invalid_values(value):
     with pytest.raises(ValueError):
         validate_numeric_range(value, 0.0, 1.0, name="mix")

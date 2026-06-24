@@ -297,7 +297,6 @@ def discover_modules(
 
         count = 0
         for module_file in module_files:
-
             # Skip files and directories that start with '_' (private / __init__.py)
             rel_path = module_file.relative_to(package_dir)
             if any(part.startswith("_") for part in rel_path.parts):

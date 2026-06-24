@@ -412,7 +412,10 @@ class TestVCVRackSquareStrategy:
 
     def test_vcv_clamps_pulse_width_like_vcv_rack(self):
         """VCV mode should internally clamp pulse width to 1%-99%."""
-        for pulsewidth, expected in [(0.0, 0.01), (1.0, 0.99)]:
+        for pulsewidth, expected in (
+            (0.0, 0.01),
+            (1.0, 0.99),
+        ):
             osc = SquareOscillator(
                 frequency=10,
                 sample_rate=10000,
@@ -608,7 +611,7 @@ class TestPerformance:
         # Sample by sample
         start = time.perf_counter()
         for _ in range(100):
-            [strategy.generate_sample(p, threshold, -1, 1) for p in phases]
+            _ = [strategy.generate_sample(p, threshold, -1, 1) for p in phases]
         loop_time = time.perf_counter() - start
 
         # Vectorized should be significantly faster

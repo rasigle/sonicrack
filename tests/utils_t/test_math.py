@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pytest
 
@@ -21,7 +23,7 @@ class TestOscillatorDBControl:
         assert linear_to_db(0.5) == pytest.approx(-6.0, rel=0.1)
         assert linear_to_db(0.1) == pytest.approx(-20.0)
         assert linear_to_db(2.0) == pytest.approx(6.0, rel=0.1)
-        assert linear_to_db(0.0) == float("-inf")
+        assert linear_to_db(0.0) == -math.inf
 
     def test_converts_db_to_linear_correctly(self):
         assert db_to_linear(0) == 1.0
@@ -38,12 +40,11 @@ class TestOscillatorDBControl:
         assert np.isclose(linear_to_db(0.1), -20.0)
 
     def test_handles_zero_or_negative_linear_values(self):
-        assert linear_to_db(0.0) == float("-inf")
-        assert linear_to_db(-1.0) == float("-inf")
+        assert linear_to_db(0.0) == -math.inf
+        assert linear_to_db(-1.0) == -math.inf
 
 
 class TestSquishVal:
-
     def test_maps_value_to_range_correctly(self):
         assert squish_val(0, 0, 10) == 5.0
         assert squish_val(-1, 0, 10) == 0.0

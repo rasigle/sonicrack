@@ -27,31 +27,31 @@ def test_oscillator_has_smoothing_state(osc_class, name):
     osc = osc_class(frequency=440, gain_db=-20)
 
     # Check smoothing state exists (these are in the base Oscillator class)
-    assert hasattr(
-        osc, "_smoothing_samples_remaining"
-    ), f"{name} missing _smoothing_samples_remaining!"
+    assert hasattr(osc, "_smoothing_samples_remaining"), (
+        f"{name} missing _smoothing_samples_remaining!"
+    )
     assert hasattr(osc, "_target_amplitude"), f"{name} missing _target_amplitude!"
     assert hasattr(osc, "_current_amplitude"), f"{name} missing _current_amplitude!"
-    assert hasattr(
-        osc, "_smoothing_samples_duration_total"
-    ), f"{name} missing _smoothing_samples_duration_total!"
+    assert hasattr(osc, "_smoothing_samples_duration_total"), (
+        f"{name} missing _smoothing_samples_duration_total!"
+    )
 
     # Note: After construction, __iter__() is called which sets amplitude,
     # triggering initial smoothing. This is expected behavior.
-    assert (
-        osc._smoothing_samples_remaining > 0
-    ), f"{name} should have initial smoothing active"
+    assert osc._smoothing_samples_remaining > 0, (
+        f"{name} should have initial smoothing active"
+    )
 
     # Complete initial smoothing
     osc.get_samples_vectorized(osc._smoothing_samples_remaining)
 
     # Now smoothing should be complete
-    assert (
-        osc._smoothing_samples_remaining == 0
-    ), f"{name} should have no smoothing after completion"
-    assert (
-        osc._current_amplitude == osc._target_amplitude
-    ), f"{name} current and target should match after smoothing"
+    assert osc._smoothing_samples_remaining == 0, (
+        f"{name} should have no smoothing after completion"
+    )
+    assert osc._current_amplitude == osc._target_amplitude, (
+        f"{name} current and target should match after smoothing"
+    )
 
 
 @pytest.mark.parametrize(
@@ -71,18 +71,18 @@ def test_oscillator_smoothing_triggers_on_gain_change(osc_class, name):
     osc.get_samples_vectorized(osc._smoothing_samples_remaining)
 
     # Now should have no smoothing active
-    assert (
-        osc._smoothing_samples_remaining == 0
-    ), f"{name} should have no smoothing after initial smoothing completes"
+    assert osc._smoothing_samples_remaining == 0, (
+        f"{name} should have no smoothing after initial smoothing completes"
+    )
 
     # Change gain (should trigger smoothing immediately)
     osc.gain_db = -6
 
     # Check smoothing triggered
     assert osc._smoothing_samples_remaining > 0, f"{name} smoothing not triggered!"
-    assert (
-        osc._target_amplitude > osc._current_amplitude
-    ), f"{name} target should be higher than current"
+    assert osc._target_amplitude > osc._current_amplitude, (
+        f"{name} target should be higher than current"
+    )
 
     # Smoothing duration should be reasonable (default is 10ms at sample_rate)
     expected_duration = int(10 * osc.sample_rate / 1000)  # 10ms default
@@ -129,8 +129,8 @@ def test_oscillator_smoothing_prevents_instant_jump(osc_class, name):
     # or flat)
     for i in range(1, 5):
         assert rms_values[i] >= rms_values[i - 1] * 0.95, (
-            f"{name} amplitude decreased during smoothing! Segment {i-1}: "
-            f"{rms_values[i-1]:.3f}, Segment {i}: {rms_values[i]:.3f}"
+            f"{name} amplitude decreased during smoothing! Segment {i - 1}: "
+            f"{rms_values[i - 1]:.3f}, Segment {i}: {rms_values[i]:.3f}"
         )
 
     # Last segment should be significantly higher than first segment
@@ -214,14 +214,14 @@ def test_oscillator_smoothing_completes(osc_class, name):
     )
 
     # Current amplitude should now equal target
-    assert (
-        abs(osc._current_amplitude - osc._target_amplitude) < 1e-6
-    ), f"{name} current amplitude doesn't match target after smoothing!"
+    assert abs(osc._current_amplitude - osc._target_amplitude) < 1e-6, (
+        f"{name} current amplitude doesn't match target after smoothing!"
+    )
 
     # No more smoothing should be active
-    assert (
-        osc._smoothing_samples_remaining == 0
-    ), f"{name} smoothing reactivated unexpectedly!"
+    assert osc._smoothing_samples_remaining == 0, (
+        f"{name} smoothing reactivated unexpectedly!"
+    )
 
 
 @pytest.mark.parametrize(
@@ -241,20 +241,20 @@ def test_oscillator_smoothing_triggers_on_amplitude_change(osc_class, name):
     osc.get_samples_vectorized(osc._smoothing_samples_remaining)
 
     # Initial state - no smoothing active after completion
-    assert (
-        osc._smoothing_samples_remaining == 0
-    ), f"{name} should have no smoothing after completion"
+    assert osc._smoothing_samples_remaining == 0, (
+        f"{name} should have no smoothing after completion"
+    )
 
     # Change amplitude (should trigger smoothing)
     osc.amplitude = 0.5
 
     # Check smoothing triggered
-    assert (
-        osc._smoothing_samples_remaining > 0
-    ), f"{name} smoothing not triggered by amplitude change!"
-    assert (
-        osc._target_amplitude > osc._current_amplitude
-    ), f"{name} target should be higher than current"
+    assert osc._smoothing_samples_remaining > 0, (
+        f"{name} smoothing not triggered by amplitude change!"
+    )
+    assert osc._target_amplitude > osc._current_amplitude, (
+        f"{name} target should be higher than current"
+    )
 
 
 @pytest.mark.parametrize(

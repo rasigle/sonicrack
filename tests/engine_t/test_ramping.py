@@ -1,5 +1,7 @@
 """Tests for shared ramp and smoothing helpers."""
 
+import math
+
 import numpy as np
 import pytest
 
@@ -15,7 +17,7 @@ def test_duration_ms_to_samples_uses_sample_rate():
     assert duration_ms_to_samples(44100, 10.0) == 441
 
 
-@pytest.mark.parametrize("duration", [-1.0, float("nan"), float("inf")])
+@pytest.mark.parametrize("duration", [-1.0, math.nan, math.inf])
 def test_duration_ms_to_samples_rejects_invalid_durations(duration):
     with pytest.raises(ValueError, match="finite and non-negative"):
         duration_ms_to_samples(44100, duration)

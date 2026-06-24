@@ -167,9 +167,9 @@ def test_listener_exception_handling():
     # Should not raise, and good listener should still be called
     audio_config.sample_rate = 96000
 
-    assert (
-        len(notifications) == 1
-    ), "Good listener should be called despite bad listener"
+    assert len(notifications) == 1, (
+        "Good listener should be called despite bad listener"
+    )
     assert notifications[0] == 96000
 
     # Cleanup
@@ -181,7 +181,7 @@ def test_remove_nonexistent_listener():
     """Test removing a listener that was never added."""
 
     def listener(new_rate):
-        pass
+        _ = new_rate
 
     # Should not raise
     audio_config.remove_sample_rate_listener(listener)

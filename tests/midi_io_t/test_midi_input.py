@@ -108,7 +108,7 @@ class TestMIDIInput:
         messages = midi.get_messages()
         elapsed = time.monotonic() - start
 
-        assert messages == []
+        assert not messages
         assert elapsed < 0.1
 
     @patch.object(midi_input_module, "mido")
@@ -123,7 +123,7 @@ class TestMIDIInput:
         midi._message_queue.put(second)
 
         assert midi.get_messages() == [first, second]
-        assert midi.get_messages() == []
+        assert not midi.get_messages()
 
     @patch.object(midi_input_module, "mido")
     def test_handle_raw_message_queues_and_dispatches_callback(self, mock_mido):

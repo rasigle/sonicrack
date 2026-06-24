@@ -794,7 +794,9 @@ class NoiseGenerator(Generator):
 
         # Handle amplitude vs gain_db priority (same as oscillators)
         self._amplitude = _derive_amplitude_from_init(
-            self._provided_args, amplitude, gain_db  # noqa
+            self._provided_args,
+            amplitude,
+            gain_db,  # noqa
         )
 
         # Amplitude smoothing to prevent clicks when changing gain

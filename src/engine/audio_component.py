@@ -154,9 +154,7 @@ class ComponentDescriptor:
         if parameter_names:
             if args:
                 # Add positional args mapped to parameters.
-                for _i, (param, value) in enumerate(
-                    zip(parameter_names, args, strict=False)
-                ):
+                for param, value in zip(parameter_names, args, strict=False):
                     config[param] = value
 
             if kwargs:
@@ -192,6 +190,7 @@ class AudioComponent(ABC):
         raise NotImplementedError
 
     def get_samples(self, n: int, *args: Any, **kwargs: Any) -> np.ndarray:
+        _ = args, kwargs
         n = validate_sample_count(n)
         return self.get_samples_vectorized(n)
 
@@ -240,4 +239,5 @@ class Generator(AudioComponent):
 
     def __init__(self, sample_rate: float = DEFAULT_SAMPLE_RATE):
         super().__init__()
+
         self.sample_rate = validate_sample_rate(sample_rate)

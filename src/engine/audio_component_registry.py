@@ -153,8 +153,7 @@ class AudioComponentRegistry:
             if len(self._components) > 10:
                 available += ", ..."
             raise ValueError(
-                f"Component '{name}' not registered. "
-                f"Available components: {available}"
+                f"Component '{name}' not registered. Available components: {available}"
             )
 
         return component

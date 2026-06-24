@@ -112,13 +112,13 @@ class TestPolyBLEPOscillatorConstruction:
 
     def test_wave_shape_parameter(self):
         """Test construction with different wave shapes."""
-        for shape in [
+        for shape in (
             WaveShape.SINE,
             WaveShape.SQUARE,
             WaveShape.SAWTOOTH_UP,
             WaveShape.SAWTOOTH_DOWN,
             WaveShape.TRIANGLE,
-        ]:
+        ):
             osc = PolyBLEPOscillator(wave_shape=shape)
             assert osc.wave_shape == shape
 
@@ -330,12 +330,12 @@ class TestPolyBLEPOscillatorWaveShapes:
 
         # Triangle via integration may have wider bounds initially
         # as the integrator stabilizes
-        assert (
-            -2.0 <= samples.min() <= 2.0
-        ), f"Triangle min out of bounds: {samples.min()}"
-        assert (
-            -2.0 <= samples.max() <= 2.0
-        ), f"Triangle max out of bounds: {samples.max()}"
+        assert -2.0 <= samples.min() <= 2.0, (
+            f"Triangle min out of bounds: {samples.min()}"
+        )
+        assert -2.0 <= samples.max() <= 2.0, (
+            f"Triangle max out of bounds: {samples.max()}"
+        )
 
         # After stabilization, should be closer to ±1
         # Check the last 500 samples (after integrator stabilizes)
@@ -522,9 +522,9 @@ class TestPolyBLEPOscillatorAntialiasing:
         high_freq_naive = np.mean(fft_naive[nyquist_idx:])
 
         # PolyBLEP should have less high-frequency content
-        assert (
-            high_freq_polyblep < high_freq_naive
-        ), "PolyBLEP should reduce high-frequency aliasing"
+        assert high_freq_polyblep < high_freq_naive, (
+            "PolyBLEP should reduce high-frequency aliasing"
+        )
 
 
 class TestPolyBLEPOscillatorPhaseContinuity:

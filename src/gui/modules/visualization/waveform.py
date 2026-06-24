@@ -345,8 +345,7 @@ class WaveformModule(ModuleWidget):
                             ):
                                 samples_l = connected_port.value.copy()
                                 logger.debug(
-                                    f"Waveform: Got L samples, "
-                                    f"shape={samples_l.shape}"
+                                    f"Waveform: Got L samples, shape={samples_l.shape}"
                                 )
                                 break
                         except Exception as e:

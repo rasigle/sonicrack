@@ -7,4 +7,5 @@ call .\uv_sync_all.bat
 
 :: Ruff analyze
 echo Running ruff code checking (fix)
+uv run ruff format
 uv run ruff check --fix

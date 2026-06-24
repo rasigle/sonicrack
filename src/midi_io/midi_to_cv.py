@@ -24,6 +24,7 @@ Example:
 """
 
 import logging
+from typing import Any
 
 import numpy as np
 
@@ -78,6 +79,7 @@ class MIDIToCV(AudioComponent):
             pitch_bend_range: Pitch bend range in semitones (default ±2)
         """
         super().__init__()
+
         self.sample_rate = sample_rate
         self.pitch_bend_range = pitch_bend_range
 
@@ -153,19 +155,19 @@ class MIDIToCV(AudioComponent):
             # The formula works fine with fractional MIDI notes for microtonal tuning
             self.frequency = 440.0 * (2 ** ((note_with_bend - 69) / 12))
 
-    def get_samples(self, num_samples: int) -> np.ndarray:
+    def get_samples(self, n: int, *args: Any, **kwargs: Any) -> np.ndarray:
         """Generate constant CV output.
 
         This returns the frequency as a constant signal. For gate/velocity/etc,
         access the attributes directly.
 
         Args:
-            num_samples: Number of samples to generate
+            n: Number of samples to generate
 
         Returns:
             Array of frequency values (constant)
         """
-        return np.full(num_samples, self.frequency, dtype=np.float32)
+        return np.full(n, self.frequency, dtype=np.float32)
 
     def get_gate_samples(self, num_samples: int) -> np.ndarray:
         """Get gate signal (0 or 1).

@@ -64,7 +64,6 @@ def compute_spectrogram(data, sr, nfft=2048, hop=None, scale="dB"):
 
 
 class SpectrogramWidget(pg.PlotItem):
-
     def __init__(self):
         super().__init__(title="Spectrogram")
 

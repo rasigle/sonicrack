@@ -137,7 +137,6 @@ class AudioModule(ABC):
             processed = [Chain(inp, Volume(gain)) for inp, gain in ...]
             return WaveAdder(*processed, mix_mode="sum")
         """
-        pass
 
     def get_output_component(self, port_name: str) -> AudioComponent | None:
         """Get the component for a SPECIFIC output port.
@@ -182,7 +181,7 @@ class AudioModule(ABC):
             to calling create_engine_component() and use that for ALL outputs.
         """
         # Default: not implemented - use create_engine_component() instead
-        return None
+        raise NotImplementedError()
 
     def get_required_inputs(self) -> list[str]:
         """Return list of required input port names.
@@ -259,7 +258,7 @@ class AudioModule(ABC):
         return port
 
     @abstractmethod
-    def process(self, num_samples: int):
+    def process(self, num_samples: int = 1):
         """Process method placeholder.
 
         This method can be overridden by subclasses to implement

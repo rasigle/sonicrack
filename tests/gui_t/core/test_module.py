@@ -3,7 +3,6 @@
 import logging
 
 import pytest
-from PyQt6.QtWidgets import QApplication
 
 from src.engine.oscillator import SineOscillator
 from src.gui.core.module import ModuleCategory
@@ -12,16 +11,7 @@ from src.gui.modules.oscillator.oscillator import OscillatorModule
 from src.gui.modules.volume_mod import VolumeModule
 
 
-@pytest.fixture(scope="session")
-def qapp():
-    """Create QApplication for tests."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    yield app
-
-
-def test_oscillator_interface(qapp):
+def test_oscillator_interface():
     """Test oscillator implements interface correctly."""
     module = OscillatorModule()
 
@@ -29,8 +19,8 @@ def test_oscillator_interface(qapp):
     assert module.metadata.category == ModuleCategory.SOURCE
 
     # Check no required inputs (oscillator is a source)
-    assert module.get_required_inputs() == []
-    assert module.get_modulation_inputs() == []
+    assert not module.get_required_inputs()
+    assert not module.get_modulation_inputs()
 
     # Check component creation with no ports connected returns None
     component = module.create_engine_component(
@@ -56,7 +46,7 @@ def test_oscillator_interface(qapp):
     assert hasattr(module, "square_port")
 
 
-def test_volume_interface(qapp):
+def test_volume_interface():
     """Test volume modifier implements interface correctly."""
     module = VolumeModule()
 
@@ -74,7 +64,7 @@ def test_volume_interface(qapp):
     assert component is not None
 
 
-def test_volume_with_modulation(qapp, caplog):
+def test_volume_with_modulation(caplog):
     """Test volume with modulation input."""
     module = VolumeModule()
 
@@ -92,7 +82,7 @@ def test_volume_with_modulation(qapp, caplog):
     assert "VolumeModule modulator: SineOscillator(Sine)" in caplog.text
 
 
-def test_mixer_interface(qapp):
+def test_mixer_interface():
     """Test mixer implements interface correctly."""
     module = MixerModule()
 
@@ -100,7 +90,7 @@ def test_mixer_interface(qapp):
     assert module.metadata.category == ModuleCategory.MIXER
 
     # Check no required inputs (accepts multiple)
-    assert module.get_required_inputs() == []
+    assert not module.get_required_inputs()
 
     # Check component creation with multiple inputs
     osc1 = SineOscillator(440)

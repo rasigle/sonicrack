@@ -40,15 +40,15 @@ class TestModulatedFrequencyBasics:
     def test_instantiation_with_different_oscillator_types(self):
         """Test with different oscillator combinations."""
         # Square carrier, sine LFO
-        carrier = SquareOscillator(frequency=220)
-        lfo = SineOscillator(frequency=3.0, amplitude=30.0)
-        fm = ModulatedFrequency(carrier, lfo)
+        carrier_square = SquareOscillator(frequency=220)
+        lfo_sine = SineOscillator(frequency=3.0, amplitude=30.0)
+        fm = ModulatedFrequency(carrier_square, lfo_sine)
         assert isinstance(fm, ModulatedFrequency)
 
         # Sawtooth carrier, triangle LFO
-        carrier = SawtoothOscillator(frequency=110)
-        lfo = TriangleOscillator(frequency=2.0, amplitude=20.0)
-        fm = ModulatedFrequency(carrier, lfo)
+        carrier_saw = SawtoothOscillator(frequency=110)
+        lfo_tri = TriangleOscillator(frequency=2.0, amplitude=20.0)
+        fm = ModulatedFrequency(carrier_saw, lfo_tri)
         assert isinstance(fm, ModulatedFrequency)
 
     def test_default_freq_mod_function(self):

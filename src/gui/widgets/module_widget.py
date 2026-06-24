@@ -451,7 +451,6 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 for cable in cables_to_remove:
                     # Cable or port might already be deleted - this is okay
                     with contextlib.suppress(RuntimeError, AttributeError):
-
                         # Disconnect the underlying Port data models
                         if (
                             cable.start_port

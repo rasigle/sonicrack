@@ -3,7 +3,7 @@
 from src.gui.main_window import ModularSynthWindow
 
 
-def test_apply_preset_recreates_saved_cables(app, monkeypatch):
+def test_apply_preset_recreates_saved_cables(monkeypatch):
     """Loading a patch with connections should recreate its cables."""
     window = ModularSynthWindow()
     monkeypatch.setattr(window, "_start_output_playback", lambda: None)

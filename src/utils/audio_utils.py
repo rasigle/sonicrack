@@ -218,6 +218,7 @@ def note_to_frequency(note: str) -> float:
 
     Raises:
         ValueError: If note name is not valid.
+        TypeError: If note name is not a string.
 
     Returns:
         float: Frequency in Hz.
@@ -278,9 +279,9 @@ def mono_to_stereo(samples: np.ndarray) -> np.ndarray:
         if samples.size == 1:
             val = float(samples[0])
             return np.array([[val, val]])
-        else:
-            # Duplicate to stereo: (N,) -> (N, 2)
-            return np.column_stack((samples, samples))
+
+        # Duplicate to stereo: (N,) -> (N, 2)
+        return np.column_stack((samples, samples))
 
     # Handle 2D array
     if samples.ndim == 2:
@@ -311,8 +312,8 @@ def mono_to_stereo(samples: np.ndarray) -> np.ndarray:
     if flat.size == 1:
         val = float(flat[0])
         return np.array([[val, val]])
-    else:
-        return np.column_stack((flat, flat))
+
+    return np.column_stack((flat, flat))
 
 
 def combine_lr_to_stereo(left: np.ndarray, right: np.ndarray) -> np.ndarray:

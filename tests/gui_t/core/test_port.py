@@ -6,6 +6,7 @@ The Port class now uses PortWidget (UI) + Port (logic).
 For pure logic tests without Qt, see tests/core/test_port_model.py
 """
 
+import math
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -203,7 +204,7 @@ class TestPortDisconnect:
 
         port1.disconnect()
         assert not port1.is_connected
-        assert port1.connected_to == []
+        assert not port1.connected_to
 
     def test_disconnect_clears_connection(self):
         """Test that disconnect clears the connected_to attribute."""
@@ -213,7 +214,7 @@ class TestPortDisconnect:
         port1.connect(port2)
         port1.disconnect()
 
-        assert port1.connected_to == []
+        assert not port1.connected_to
 
     def test_disconnect_affects_read(self):
         """Test that disconnecting affects read behavior."""
@@ -311,18 +312,16 @@ class TestPortEdgeCases:
         port = Port("input", "test", mock_parent())
 
         # Test with infinity
-        port.write(float("inf"))
-        assert port.value == float("inf")
+        port.write(math.inf)
+        assert port.value == math.inf
 
         # Test with negative infinity
-        port.write(float("-inf"))
-        assert port.value == float("-inf")
+        port.write(-math.inf)
+        assert port.value == -math.inf
 
         # Test with NaN
-        port.write(float("nan"))
+        port.write(math.nan)
         # NaN != NaN, so we check using isnan
-        import math
-
         assert math.isnan(port.value)
 
 
@@ -455,7 +454,7 @@ def test_port_connection():
     # Disconnect
     input_port.disconnect()
     assert not input_port.is_connected
-    assert input_port.connected_to == []
+    assert not input_port.connected_to
 
 
 def test_port_read_write():
@@ -515,7 +514,7 @@ class TestPortModelBasics:
         assert port.port_name == "test_port"
         assert port.port_type == "input"
         assert port.value == 0.0
-        assert port.connected_to == []
+        assert not port.connected_to
         assert not port.is_connected
 
     def test_port_types(self):
@@ -629,7 +628,7 @@ class TestPortModelDisconnect:
 
         port1.disconnect()
         assert not port1.is_connected
-        assert port1.connected_to == []
+        assert not port1.connected_to
 
     def test_disconnect_affects_read(self):
         """Test that disconnecting affects read behavior."""
@@ -704,13 +703,11 @@ class TestPortModelEdgeCases:
         port = Port("output", "test")
 
         # Test infinity
-        port.write(float("inf"))
-        assert port.value == float("inf")
+        port.write(math.inf)
+        assert port.value == math.inf
 
         # Test NaN
-        port.write(float("nan"))
-        import math
-
+        port.write(math.nan)
         assert math.isnan(port.value)
 
     def test_empty_name(self):
@@ -953,7 +950,7 @@ class TestPortMultipleConnections:
         output_port1 = Port("output", "audio_out_1")
         output_port2 = Port("output", "audio_out_2")
 
-        assert input_port.connected_ports == []
+        assert not input_port.connected_ports
 
         input_port.connect(output_port1)
         input_port.connect(output_port2)

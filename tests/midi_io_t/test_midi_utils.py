@@ -57,7 +57,13 @@ class TestFrequencyToMIDI:
 
     def test_roundtrip(self):
         """Converting MIDI->freq->MIDI should return original."""
-        for note in [21, 40, 60, 80, 100]:
+        for note in (
+            21,
+            40,
+            60,
+            80,
+            100,
+        ):
             freq = midi_to_frequency(note)
             back = frequency_to_midi(freq)
             assert back == note

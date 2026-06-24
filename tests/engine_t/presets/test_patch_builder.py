@@ -10,8 +10,10 @@ import unittest
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB
-from src.engine.oscillator import SineOscillator
-from src.engine.presets import PresetBuilder
+from src.engine.composer import Chain
+from src.engine.modifier import Panner, Volume
+from src.engine.oscillator_sine import SineOscillator
+from src.engine.presets.preset_builder import PresetBuilder
 
 
 class TestPatchBuilder(unittest.TestCase):
@@ -192,8 +194,6 @@ class TestPatchBuilderIntegration(unittest.TestCase):
     def test_output_consistency_with_manual_creation(self):
         """Test that builder output matches manually created patch."""
         # Create patch manually
-        from src.engine import Chain, SineOscillator, Volume
-
         manual_osc = SineOscillator(440, amplitude=0.8, gain_db=None)
         manual_patch = Chain(manual_osc, Volume(0.5))
 
@@ -246,8 +246,6 @@ class TestPatchBuilderConvenience(unittest.TestCase):
 
     def test_get_source(self):
         """Test accessing source oscillator."""
-        from src.engine.oscillator import SineOscillator
-
         patch = PresetBuilder().sine(440)
         source = patch.get_source()
 
@@ -256,7 +254,6 @@ class TestPatchBuilderConvenience(unittest.TestCase):
 
     def test_get_modifiers(self):
         """Test accessing modifiers list."""
-        from src.engine.modifier import Panner, Volume
 
         patch = PresetBuilder().sine(440).volume(0.5).panner(0.3)
         modifiers = patch.get_modifiers()

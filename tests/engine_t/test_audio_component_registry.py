@@ -117,7 +117,7 @@ class TestComponentCategories(unittest.TestCase):
 
     def test_category_membership(self):
         """Test category enum membership."""
-        categories = [cat for cat in ComponentCategory]
+        categories = list(ComponentCategory)
 
         self.assertIn(ComponentCategory.OSCILLATOR, categories)
         self.assertIn(ComponentCategory.MODULATOR, categories)

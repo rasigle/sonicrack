@@ -114,7 +114,6 @@ class ReverbModule(ModulatedModuleBase):
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
         """Create modulated reverb (not implemented yet)."""
-        pass
 
     def create_unmodulated_component(self):
         """Create simple Reverb without modulation."""

@@ -351,5 +351,5 @@ class MonophonicSynth:
                 f"MonophonicSynth(note={self.current_note}, "
                 f"velocity={self.current_velocity})"
             )
-        else:
-            return "MonophonicSynth(idle)"
+
+        return "MonophonicSynth(idle)"

@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import QApplication
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
-@pytest.fixture(scope="session")
-def qapp():
+@pytest.fixture(name="qapp", scope="session")
+def fixture_qapp():
     """Create a single QApplication for the full GUI test session."""
     app = QApplication.instance()
     if app is None:
@@ -17,8 +17,8 @@ def qapp():
     yield app
 
 
-@pytest.fixture
-def app(qapp):
+@pytest.fixture(name="app")
+def fixture_app(qapp):
     """Backward-compatible alias used by existing GUI tests."""
     return qapp
 

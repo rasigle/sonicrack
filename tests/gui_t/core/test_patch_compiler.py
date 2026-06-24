@@ -51,7 +51,7 @@ def _as_modules(*modules: _Module) -> list[AudioModule]:
 
 
 def _as_connections(
-    *connections: tuple[_Port, _Port]
+    *connections: tuple[_Port, _Port],
 ) -> list[tuple[PortWidget, PortWidget]]:
     return cast(list[tuple[PortWidget, PortWidget]], list(connections))
 

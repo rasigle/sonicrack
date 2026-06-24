@@ -172,8 +172,7 @@ def note_name_to_midi(note_name: str) -> int:
     # Validate range
     if not 0 <= midi_note <= 127:
         raise ValueError(
-            f"Note '{note_name}' = MIDI note {midi_note}, "
-            f"which is out of range (0-127)"
+            f"Note '{note_name}' = MIDI note {midi_note}, which is out of range (0-127)"
         )
 
     return midi_note

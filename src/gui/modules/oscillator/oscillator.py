@@ -176,7 +176,7 @@ class OscillatorModule(ModuleWidget):
 
     def create_engine_component(
         self, input_components=None, modulation_components=None
-    ):
+    ) -> None:
         """Return no shared engine component for this module.
 
         The oscillator exposes independent components per output port via

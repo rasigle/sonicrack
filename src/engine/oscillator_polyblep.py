@@ -220,7 +220,9 @@ class PolyBLEPOscillator(Generator):
         # Store initial values
         self._freq = frequency
         self._initial_amp = _derive_amplitude_from_init(
-            self._provided_args, amplitude, gain_db  # noqa
+            self._provided_args,
+            amplitude,
+            gain_db,  # noqa
         )
         self._phase_degrees = phase
         self._wave_range = wave_range

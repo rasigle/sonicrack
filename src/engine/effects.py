@@ -843,8 +843,8 @@ class Reverb(Modifier):
         input_samples = np.asarray(val)
         output_samples = np.zeros(len(input_samples), dtype=np.float32)
 
-        for i in range(len(input_samples)):
-            output_samples[i] = self._process_sample(float(input_samples[i]))
+        for i, input_sample in enumerate(input_samples):
+            output_samples[i] = self._process_sample(float(input_sample))
 
         return output_samples
 

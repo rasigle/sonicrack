@@ -76,11 +76,10 @@ def track_provided_args(func):
             provided_args.remove("self")
 
         # Attach the set to the instance.
-        instance = None
         if args and hasattr(args[0], "__dict__"):
             instance = args[0]
-        elif "self" in kwargs:
-            instance = kwargs["self"]
+        else:
+            instance = kwargs.get("self")
 
         if instance:
             # Differentiate between a direct __init__ call and a super().__init__()

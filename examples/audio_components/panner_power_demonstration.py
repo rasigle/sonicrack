@@ -231,8 +231,7 @@ def demonstrate_stereo_audio() -> None:
     print(f"[OK] Generated {len(left_channel)} stereo samples")
     print(f"  Left channel range: [{left_channel.min():.4f}, {left_channel.max():.4f}]")
     print(
-        f"  Right channel range: "
-        f"[{right_channel.min():.4f}, {right_channel.max():.4f}]"
+        f"  Right channel range: [{right_channel.min():.4f}, {right_channel.max():.4f}]"
     )
 
     time_axis = np.arange(len(left_channel)) / sample_rate

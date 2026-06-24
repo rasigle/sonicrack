@@ -155,13 +155,9 @@ def test_no_clicking_on_rapid_changes():
         all_right.extend(right)
         sample_idx += 400
 
-    # Convert to arrays
-    all_left = np.array(all_left)
-    all_right = np.array(all_right)
-
     # Check for discontinuities (large jumps)
-    left_diff = np.abs(np.diff(all_left))
-    right_diff = np.abs(np.diff(all_right))
+    left_diff = np.abs(np.diff(np.asarray(all_left)))
+    right_diff = np.abs(np.diff(np.asarray(all_right)))
 
     # Max jump should be small (smooth transitions)
     max_left_jump = np.max(left_diff)

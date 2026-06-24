@@ -138,7 +138,6 @@ class Modifier(AudioComponent):
         Returns:
             Modified value (same type as input).
         """
-        pass
 
 
 @register_component()
@@ -300,12 +299,12 @@ class Panner(Modifier):
                 (samples * left_envelope).astype(np.float32),
                 (samples * right_envelope).astype(np.float32),
             )
-        else:
-            # No smoothing needed - use target gains (which match
-            # _left_gain/_right_gain)
-            left = (self._target_left_gain * samples).astype(np.float32)
-            right = (self._target_right_gain * samples).astype(np.float32)
-            return left, right
+
+        # No smoothing needed - use target gains (which match
+        # _left_gain/_right_gain)
+        left = (self._target_left_gain * samples).astype(np.float32)
+        right = (self._target_right_gain * samples).astype(np.float32)
+        return left, right
 
 
 @register_component()
@@ -588,7 +587,9 @@ class Volume(Modifier):
             raise ValueError(f"amplitude must be non-negative, got {amplitude}")
 
         self._amplitude = _derive_amplitude_from_init(
-            self._provided_args, amplitude, gain_db  # noqa
+            self._provided_args,
+            amplitude,
+            gain_db,  # noqa
         )
 
         # Amplitude smoothing to prevent clicks when changing gain
@@ -678,9 +679,9 @@ class Volume(Modifier):
                     self._amplitude = self._target_amplitude  # Update _amplitude too!
 
                 return float(result)
-            else:
-                # No smoothing needed - direct multiplication
-                return float(val * self._amplitude)
+
+            # No smoothing needed - direct multiplication
+            return float(val * self._amplitude)
 
         # Vectorized input
         if isinstance(val, (tuple, np.ndarray, Iterable)):
@@ -934,9 +935,9 @@ class ModulatedVolume(Volume):
             # Convert dB values to linear amplitude
             amplitude_values = np.asarray(db_to_linear(mod_values), dtype=np.float32)
             return (samples * amplitude_values).astype(np.float32)
-        else:
-            # Direct amplitude modulation
-            return (samples * mod_values).astype(np.float32)
+
+        # Direct amplitude modulation
+        return (samples * mod_values).astype(np.float32)
 
     def _get_next_modulation_value(self) -> float:
         """Get the next modulation value for scalar processing.
@@ -1063,7 +1064,9 @@ class Clipper(Modifier):
         tags=["modifier", "clipper", "limiter"],
     )
 
-    def __init__(self, wave_range: tuple[float, float] = (-1.0, 1.0)):
+    def __init__(
+        self, wave_range: tuple[float, float] = (-1.0, 1.0), *args: Any, **kwargs: Any
+    ):
         """Initialize clipper with wave range.
 
         Args:
@@ -1075,6 +1078,7 @@ class Clipper(Modifier):
             ValueError: If min >= max.
         """
         # Input validation
+        super().__init__(*args, **kwargs)
         if not isinstance(wave_range, (tuple, list)):
             raise TypeError(
                 f"wave_range must be a tuple or list, got {type(wave_range).__name__}"
@@ -1192,7 +1196,7 @@ class ModulatedClipper(Modifier):
         tags=["modifier", "clipper", "modulation"],
     )
 
-    def __init__(self, modulator):
+    def __init__(self, modulator, *args: Any, **kwargs: Any):
         """Initialize modulated clipper.
 
         Args:
@@ -1209,6 +1213,7 @@ class ModulatedClipper(Modifier):
             outside this range will be clipped. For best results, use CVScaler
             to properly scale your CV source.
         """
+        super().__init__(*args, **kwargs)
         if not (hasattr(modulator, "__iter__") and hasattr(modulator, "__next__")):
             raise TypeError(
                 f"modulator must be iterable or have __next__, "
@@ -1247,32 +1252,34 @@ class ModulatedClipper(Modifier):
         """Clip input using modulated threshold.
 
         Args:
-            val: Input value (mono float, stereo tuple, or array)
+            val: Input value: mono float, stereo tuple, or NumPy array.
 
         Returns:
-            Clipped value (same type as input)
+            Clipped value with the same shape/type category as input.
+            Arrays are returned as np.float32.
         """
         if isinstance(val, np.ndarray):
-            # Vectorized path
             mod_values = _get_modulation_values(
-                self._modulator_source, self.modulator, len(val)
+                self._modulator_source,
+                self.modulator,
+                len(val),
             )
-            # Clamp modulation to [0, 1] and use as threshold
+
             thresholds = np.clip(mod_values, 0.0, 1.0)
 
-            # Clip sample by sample (since threshold varies)
-            result = np.empty_like(val)
-            for i in range(len(val)):
-                thresh = thresholds[i]
-                result[i] = np.clip(val[i], -thresh, thresh)
+            # Fully vectorized clipping.
+            # For 1D audio: val.shape == (n,)
+            # For multi-channel audio: val.shape == (n, channels), so expand threshold
+            # dims.
+            if val.ndim > 1:
+                thresholds = thresholds.reshape(-1, *([1] * (val.ndim - 1)))
 
-            return result.astype(np.float32)
+            return np.clip(val, -thresholds, thresholds).astype(np.float32, copy=False)
 
-        # Scalar path
         mod_value = next(self.modulator)
-        threshold = np.clip(mod_value, 0.0, 1.0)
+        threshold = float(np.clip(mod_value, 0.0, 1.0))
 
-        if isinstance(val, Iterable):
+        if isinstance(val, tuple):
             # Stereo tuple
             return tuple(float(np.clip(v, -threshold, threshold)) for v in val)
 

@@ -1,5 +1,7 @@
 """Math utility functions for audio processing."""
 
+import math
+
 import numpy as np
 
 
@@ -41,7 +43,7 @@ def linear_to_db(linear: float) -> float:
         >>> linear_to_db(0.0)   # -inf (silence)
     """
     if linear <= 0:
-        return float("-inf")
+        return -math.inf
     return 20 * np.log10(linear)
 
 

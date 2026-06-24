@@ -159,7 +159,7 @@ class TestGetADSR(unittest.TestCase):
 
     def test_envelope_shape(self) -> None:
         """Test getadsr produces correct envelope shape."""
-        adsr_vals, down_len, up_len = getadsr(
+        adsr_vals, down_len, _ = getadsr(
             a=0.1,
             d=0.1,
             sl=0.5,

@@ -491,22 +491,21 @@ class WaveAdder(Composer):
                 # average
                 return stacked.mean(axis=0, dtype=np.float32)
 
-            else:
-                # Mixed mono/stereo: convert stereo to mono, then sum/mean
-                mono_samples = []
-                for samples in all_samples:
-                    if samples.ndim == 2:
-                        # Stereo to mono: average channels
-                        mono_samples.append(samples.mean(axis=1))
-                    else:
-                        # Already mono
-                        mono_samples.append(samples)
+            # Mixed mono/stereo: convert stereo to mono, then sum/mean
+            mono_samples = []
+            for samples in all_samples:
+                if samples.ndim == 2:
+                    # Stereo to mono: average channels
+                    mono_samples.append(samples.mean(axis=1))
+                else:
+                    # Already mono
+                    mono_samples.append(samples)
 
-                stacked = np.stack(mono_samples, axis=0)
-                if self.mix_mode == "sum":
-                    return stacked.sum(axis=0, dtype=np.float32)
-                # average
-                return stacked.mean(axis=0, dtype=np.float32)
+            stacked = np.stack(mono_samples, axis=0)
+            if self.mix_mode == "sum":
+                return stacked.sum(axis=0, dtype=np.float32)
+            # average
+            return stacked.mean(axis=0, dtype=np.float32)
 
         # Stereo mode
         # Check if we have mixed mono/stereo inputs

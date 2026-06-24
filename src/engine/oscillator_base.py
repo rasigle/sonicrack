@@ -40,7 +40,9 @@ class Oscillator(Generator):
         self._phase = phase
         self._wave_range = wave_range
         self._initial_amp = _derive_amplitude_from_init(
-            self._provided_args, amplitude, gain_db  # noqa
+            self._provided_args,
+            amplitude,
+            gain_db,  # noqa
         )
 
         self._i: float = 0.0

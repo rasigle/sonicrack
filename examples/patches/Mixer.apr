@@ -1,0 +1,112 @@
+{
+  "metadata": {
+    "name": "Untitled Preset",
+    "author": "",
+    "description": "",
+    "tags": [],
+    "category": "User",
+    "created": "2026-06-24T14:40:21.287137",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": {
+        "x": 248.0,
+        "y": -2.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 1,
+      "type": "Mixer",
+      "custom_name": "",
+      "module_category": "Mixer",
+      "position": {
+        "x": -155.0,
+        "y": -56.0
+      },
+      "parameters": {
+        "active": true,
+        "gain1": 0.705,
+        "gain2": 0.30000000000000004,
+        "gain3": 0.7049999999999997,
+        "gain4": 0.7
+      }
+    },
+    {
+      "id": 2,
+      "type": "Noise",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -489.0,
+        "y": -254.0
+      },
+      "parameters": {
+        "active": true,
+        "noise_type": "White",
+        "gain_db": -20.0
+      }
+    },
+    {
+      "id": 3,
+      "type": "Oscillator",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -502.0,
+        "y": 36.0
+      },
+      "parameters": {
+        "active": true,
+        "frequency": 120,
+        "pulsewidth": 0.4901999999999999
+      }
+    },
+    {
+      "id": 4,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": {
+        "x": 144.0,
+        "y": -359.0
+      },
+      "parameters": {
+        "active": false
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 0,
+      "target_port": "L/Mono"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Sine",
+      "target_module": 1,
+      "target_port": "In 2"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 1,
+      "target_port": "In 1"
+    }
+  ]
+}

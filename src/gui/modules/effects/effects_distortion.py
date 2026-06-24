@@ -2,8 +2,8 @@ import logging
 
 import numpy as np
 from PyQt6 import QtWidgets
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QHBoxLayout
 
 from src.engine.effects import Distortion
 from src.gui.core.module import ModuleCategory, ModuleMetadata
@@ -30,7 +30,7 @@ class DistortionModule(ModulatedModuleBase):
     def __init__(self):
         """Initialize panner module."""
         super().__init__(
-            width=140,
+            width=220,
             height=240,
             color=QColor(180, 80, 180),
         )
@@ -46,19 +46,21 @@ class DistortionModule(ModulatedModuleBase):
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
-        # Drive knob
+        knobs_row = QHBoxLayout()
+        knobs_row.setSpacing(10)
+
         self.drive_knob = Knob("Drive", 0.0, 1.0, 0.5)
         self.drive_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("drive", self.drive_knob.get_value())
         )
-        layout.addWidget(self.drive_knob, alignment=Qt.AlignmentFlag.AlignCenter)
+        knobs_row.addWidget(self.drive_knob)
 
-        # Mix knob
         self.mix_knob = Knob("Mix", 0.0, 1.0, 0.5)
         self.mix_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
         )
-        layout.addWidget(self.mix_knob, alignment=Qt.AlignmentFlag.AlignCenter)
+        knobs_row.addWidget(self.mix_knob)
+        layout.addLayout(knobs_row)
 
         self.distortion_combo = QtWidgets.QComboBox()
         self.distortion_combo.addItems(["soft", "hard", "fuzz", "tube"])

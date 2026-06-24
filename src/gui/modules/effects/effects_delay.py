@@ -1,8 +1,8 @@
 import logging
 
 import numpy as np
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QHBoxLayout
 
 from src.engine.effects import Delay
 from src.gui.core.module import ModuleCategory, ModuleMetadata
@@ -26,8 +26,8 @@ class DelayModule(ModulatedModuleBase):
     def __init__(self):
         """Initialize panner module."""
         super().__init__(
-            width=140,
-            height=280,
+            width=220,
+            height=240,
             color=QColor(180, 80, 180),
         )
 
@@ -40,30 +40,36 @@ class DelayModule(ModulatedModuleBase):
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
-        # Drive knob
+        knobs_row = QHBoxLayout()
+        knobs_row.setSpacing(10)
+
         self.delay_time = Knob("Time", 0.0, 3.0, 0.5)
         self.delay_time.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "delay_time", self.delay_time.get_value()
             )
         )
-        layout.addWidget(self.delay_time, alignment=Qt.AlignmentFlag.AlignCenter)
+        knobs_row.addWidget(self.delay_time)
 
-        # Damping knob
         self.feedback_knob = Knob("Feedback", 0.0, 1.0, 0.5)
         self.feedback_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "feedback", self.feedback_knob.get_value()
             )
         )
-        layout.addWidget(self.feedback_knob, alignment=Qt.AlignmentFlag.AlignCenter)
+        knobs_row.addWidget(self.feedback_knob)
+        layout.addLayout(knobs_row)
 
-        # Mix knob
+        mix_row = QHBoxLayout()
+        mix_row.setSpacing(10)
         self.mix_knob = Knob("Mix", 0.0, 1.0, 0.5)
         self.mix_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
         )
-        layout.addWidget(self.mix_knob, alignment=Qt.AlignmentFlag.AlignCenter)
+        mix_row.addStretch()
+        mix_row.addWidget(self.mix_knob)
+        mix_row.addStretch()
+        layout.addLayout(mix_row)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)

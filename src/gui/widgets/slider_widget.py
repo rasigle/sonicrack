@@ -37,6 +37,7 @@ class VSlider(QWidget):
         # Value label
         self.value_label = QLabel()
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.value_label.setStyleSheet("color: #c2e5ff;")
         layout.addWidget(self.value_label)
 
         # Slider
@@ -49,6 +50,7 @@ class VSlider(QWidget):
         # Label
         self.label = QLabel(label)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label.setStyleSheet("color: #edf1f5;")
         layout.addWidget(self.label)
 
         self.setLayout(layout)
@@ -115,6 +117,7 @@ class HSlider(QWidget):
 
         # Label
         self.label = QLabel(label)
+        self.label.setStyleSheet("color: #edf1f5;")
         layout.addWidget(self.label)
 
         # Slider
@@ -128,6 +131,7 @@ class HSlider(QWidget):
         self.value_label = QLabel()
         self.value_label.setMinimumWidth(50)
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.value_label.setStyleSheet("color: #c2e5ff;")
         layout.addWidget(self.value_label)
 
         self.setLayout(layout)

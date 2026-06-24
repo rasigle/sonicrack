@@ -63,7 +63,6 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
     COLOR_CUSTOM_NAME = QColor(255, 255, 100)
     COLOR_CATEGORY = QColor(160, 168, 174)
     COLOR_CATEGORY_NO_NAME = QColor(200, 200, 200)
-    COLOR_PORT_LABEL = QColor(220, 220, 220)
     COLOR_PANEL_TOP = QColor(46, 50, 55)
     COLOR_PANEL_BOTTOM = QColor(26, 29, 33)
     COLOR_INACTIVE_OVERLAY = QColor(0, 0, 0, 105)
@@ -132,7 +131,44 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             ```
         """
         widget = QWidget()
-        widget.setStyleSheet("background: transparent;")
+        widget.setStyleSheet(
+            """
+            QWidget {
+                background: transparent;
+                color: #edf1f5;
+            }
+            QLabel {
+                color: #edf1f5;
+                background: transparent;
+                font-size: 11px;
+            }
+            QComboBox {
+                color: #f3f6f8;
+                background-color: #262c33;
+                border: 1px solid #55606d;
+                border-radius: 4px;
+                padding: 3px 6px;
+                min-height: 22px;
+            }
+            QComboBox QAbstractItemView {
+                color: #f3f6f8;
+                background-color: #20252b;
+                selection-background-color: #2d6f9f;
+            }
+            QSlider::groove:horizontal {
+                height: 5px;
+                background: #4b5561;
+                border-radius: 2px;
+            }
+            QSlider::handle:horizontal {
+                background: #5ec4ff;
+                border: 1px solid #101418;
+                width: 14px;
+                margin: -5px 0;
+                border-radius: 7px;
+            }
+            """
+        )
         return widget
 
     def _add_controls_to_module(self, controls_widget: QWidget) -> QGraphicsProxyWidget:
@@ -154,10 +190,10 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         """
         proxy = QGraphicsProxyWidget(self)
         proxy.setWidget(controls_widget)
-        proxy.setPos(0, self.TITLE_BAR_HEIGHT)
+        proxy.setPos(0, self._title_bar_height())
         return proxy
 
-    def _create_standard_layout(self, spacing: int = 5) -> QVBoxLayout:
+    def _create_standard_layout(self, spacing: int = 10) -> QVBoxLayout:
         """Create a standard vertical layout with default margins.
 
         Args:
@@ -176,7 +212,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self._create_portwidgets()
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(spacing, spacing, spacing, spacing)
+        layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(spacing)
         return layout
 
@@ -478,24 +514,6 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             font_name = QFont("Arial", 10, QFont.Weight.Bold)
             painter.setFont(font_name)
             painter.drawText(name_rect, Qt.AlignmentFlag.AlignLeft, self.custom_name)
-
-        # Draw port labels
-        port_color = self.COLOR_PORT_LABEL if self.is_active else QColor(135, 138, 142)
-        painter.setPen(port_color)
-        font_port = QFont("Arial", 6)
-        painter.setFont(font_port)
-
-        # Input port labels (on the left)
-        for port in self.input_ports:
-            port_y = port.pos().y()
-            label_rect = QRectF(5, port_y - 6, 50, 12)
-            painter.drawText(label_rect, Qt.AlignmentFlag.AlignLeft, port.port_name)
-
-        # Output port labels (on the right)
-        for port in self.output_ports:
-            port_y = port.pos().y()
-            label_rect = QRectF(self.module_width - 55, port_y - 6, 50, 12)
-            painter.drawText(label_rect, Qt.AlignmentFlag.AlignRight, port.port_name)
 
         if not self.is_active:
             painter.fillRect(

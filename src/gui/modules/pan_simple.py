@@ -33,7 +33,7 @@ class SimplePannerModule(ModuleWidget):
         """Initialize simple panner module."""
         super().__init__(
             width=140,
-            height=150,
+            height=175,
             color=QColor(160, 60, 160),
         )
 

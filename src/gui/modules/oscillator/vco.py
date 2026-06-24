@@ -49,8 +49,8 @@ class ModulatedOscillatorModule(ModuleWidget):
     def __init__(self):
         """Initialize modulated oscillator module."""
         super().__init__(
-            width=220,
-            height=240,
+            width=240,
+            height=295,
             color=QColor(100, 140, 220),
         )
 

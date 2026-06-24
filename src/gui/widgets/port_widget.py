@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QColor, QPainter, QPen
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import QGraphicsItem
 
 from src.gui.core.port import Port
@@ -51,6 +51,7 @@ class PortWidget(QGraphicsItem):
         # UI-specific attributes
         self.cables: list[Cable] = []
         self.radius = 8
+        self.label_width = 46
         self.hovered = False
 
         # Qt setup
@@ -155,7 +156,8 @@ class PortWidget(QGraphicsItem):
             Bounding rectangle for painting
         """
         r = self.radius + 2
-        return QRectF(-r, -r, r * 2, r * 2)
+        width = max(r * 2, self.label_width)
+        return QRectF(-width / 2, -r, width, r * 2 + 13)
 
     def paint(self, painter: QPainter | None, option, widget=None):
         """Paint the port.
@@ -182,6 +184,31 @@ class PortWidget(QGraphicsItem):
         if self.cables:
             painter.setBrush(QColor(255, 255, 100))
             painter.drawEllipse(QPointF(0, 0), self.radius * 0.5, self.radius * 0.5)
+
+        font = QFont("Arial", 6)
+        painter.setFont(font)
+        metrics = QFontMetrics(font)
+        label_text = metrics.elidedText(
+            self.port_name,
+            Qt.TextElideMode.ElideRight,
+            self.label_width,
+        )
+        label_rect = QRectF(
+            -self.label_width / 2,
+            self.radius + 1,
+            self.label_width,
+            10,
+        )
+        text_color = QColor(232, 236, 240)
+        parent_active = getattr(self.parent_module, "is_active", True)
+        if not parent_active:
+            text_color = QColor(150, 154, 158)
+        painter.setPen(text_color)
+        painter.drawText(
+            label_rect,
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
+            label_text,
+        )
 
     def hoverEnterEvent(self, event):
         """Handle mouse hover enter.

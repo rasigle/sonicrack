@@ -45,7 +45,7 @@ class OscillatorModule(ModuleWidget):
         """Initialize oscillator module."""
         super().__init__(
             width=220,
-            height=240,
+            height=235,
             color=QColor(80, 120, 200),
         )
 

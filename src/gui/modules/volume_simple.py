@@ -28,7 +28,7 @@ class SimpleVolumeModule(ModuleWidget):
         """Initialize simple volume module."""
         super().__init__(
             width=140,
-            height=150,
+            height=175,
             color=QColor(160, 100, 60),
         )
 

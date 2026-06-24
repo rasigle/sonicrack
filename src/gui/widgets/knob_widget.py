@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import QWidget
 
 
@@ -49,9 +49,9 @@ class Knob(QWidget):
         self._value = self.default_value
 
         # Visual properties
-        self.knob_size = 50
-        self.setMinimumSize(70, 90)
-        self.setMaximumSize(70, 90)
+        self.knob_size = 44
+        self.setMinimumSize(82, 78)
+        self.setMaximumSize(96, 82)
 
         # Interaction state
         self.dragging = False
@@ -149,11 +149,11 @@ class Knob(QWidget):
 
         # Calculate center position
         center_x = self.width() / 2
-        center_y = 35
+        center_y = 30
         radius = self.knob_size / 2
 
         # Draw outer track (background arc) - inverted with gap at bottom
-        painter.setPen(QPen(QColor(60, 60, 60), 4))
+        painter.setPen(QPen(QColor(72, 78, 86), 4))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         track_rect = QRectF(
             center_x - radius - 2,
@@ -165,8 +165,8 @@ class Knob(QWidget):
         painter.drawArc(track_rect, int(-45 * 16), int(270 * 16))
 
         # Draw knob body (solid circle)
-        painter.setBrush(QColor(90, 90, 90))
-        painter.setPen(QPen(QColor(50, 50, 50), 2))
+        painter.setBrush(QColor(58, 63, 70))
+        painter.setPen(QPen(QColor(18, 20, 23), 2))
         painter.drawEllipse(QPointF(center_x, center_y), radius, radius)
 
         # Draw value arc (fills counter-clockwise from bottom-right)
@@ -175,7 +175,7 @@ class Knob(QWidget):
         current_angle = self.min_angle - norm_value * (self.min_angle - self.max_angle)
 
         # Arc from min_angle (225°) to current position
-        painter.setPen(QPen(QColor(100, 180, 255), 4))
+        painter.setPen(QPen(QColor(94, 196, 255), 4))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         value_arc_rect = QRectF(
             center_x - radius - 2,
@@ -201,37 +201,54 @@ class Knob(QWidget):
 
         painter.setPen(
             QPen(
-                QColor(255, 200, 50), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap
+                QColor(255, 207, 87), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap
             )
         )
         painter.drawLine(QPointF(start_x, start_y), QPointF(end_x, end_y))
 
         # Draw center dot for visual clarity
-        painter.setBrush(QColor(70, 70, 70))
+        painter.setBrush(QColor(22, 24, 28))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPointF(center_x, center_y), 4, 4)
 
         # Draw label
-        painter.setPen(QColor(220, 220, 220))
+        label_color = QColor(238, 241, 245)
+        painter.setPen(label_color)
         font = QFont("Arial", 8, QFont.Weight.Bold)
         painter.setFont(font)
+        label_metrics = QFontMetrics(font)
+        label_text = label_metrics.elidedText(
+            self.label,
+            Qt.TextElideMode.ElideRight,
+            max(10, self.width() - 6),
+        )
         painter.drawText(
-            QRectF(0, 70, self.width(), 20), Qt.AlignmentFlag.AlignCenter, self.label
+            QRectF(3, 62, self.width() - 6, 14),
+            Qt.AlignmentFlag.AlignCenter,
+            label_text,
         )
 
-        # Draw value text (larger and more visible)
+        # Draw value text.
         value_text = f"{self._value:.2f}"
         if abs(self._value) >= 100:
             value_text = f"{self._value:.1f}"
         elif abs(self._value) < 0.01:
             value_text = f"{self._value:.3f}"
 
-        font.setPointSize(8)
+        font.setPointSize(7)
         font.setWeight(QFont.Weight.Normal)
         painter.setFont(font)
-        painter.setPen(QColor(200, 230, 255))
+        value_metrics = QFontMetrics(font)
+        value_text = value_metrics.elidedText(
+            value_text,
+            Qt.TextElideMode.ElideRight,
+            max(10, self.width() - 8),
+        )
+        painter.setPen(QColor(194, 229, 255))
         painter.drawText(
-            QRectF(0, 52, self.width(), 16), Qt.AlignmentFlag.AlignCenter, value_text
+            QRectF(4, 48, self.width() - 8, 12),
+            Qt.AlignmentFlag.AlignCenter,
+            value_text,
         )
 
     def mousePressEvent(self, event):

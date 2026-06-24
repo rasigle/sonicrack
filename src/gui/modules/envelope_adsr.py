@@ -30,7 +30,7 @@ class ADSRModule(ModuleWidget):
         """Initialize ADSR module."""
         super().__init__(
             width=220,
-            height=260,
+            height=275,
             color=QColor(120, 180, 80),
         )
 

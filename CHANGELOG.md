@@ -23,6 +23,9 @@ All notable changes to AudioPlayground will be documented in this file.
 
 - Rack-style module headers with category labels, accent rails, and a shared
   power/bypass control.
+- Improved knob spacing, module sizing, and control contrast for denser rack
+  layouts.
+- Improved input/output port label placement and contrast.
 - Module active state persistence in patch parameters.
 - Patch compiler bypass behavior for inactive modules: sources mute, modifiers
   pass their input through.

@@ -30,7 +30,7 @@ class MixerModule(ModuleWidget):
 
     def __init__(self):
         """Initialize mixer module."""
-        super().__init__(width=220, height=280, color=QColor(100, 150, 100))
+        super().__init__(width=220, height=260, color=QColor(100, 150, 100))
 
         # Add multiple input ports
         self.in1_port = self.add_input("In 1")

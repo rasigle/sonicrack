@@ -99,7 +99,7 @@ class WaveformModule(ModuleWidget):
             logarithmic=False,
             callback=self._on_timerange_changed,
         )
-        self.timerange_knob.setFixedSize(60, 80)
+        self.timerange_knob.setFixedSize(88, 78)
         controls_row.addWidget(self.timerange_knob)
 
         controls_row.addStretch()

@@ -90,10 +90,10 @@ class WaveformModule(ModuleWidget):
         # Create controls row with timerange knob and freeze button
         controls_row = QHBoxLayout()
 
-        # Timerange knob (512 to 8192 samples)
+        # Timerange knob (64 to 8192 samples)
         self.timerange_knob = Knob(
             label="Time",
-            min_value=512,
+            min_value=64,
             max_value=8192,
             default_value=2048,
             logarithmic=False,

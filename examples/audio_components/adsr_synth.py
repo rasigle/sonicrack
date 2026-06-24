@@ -4,7 +4,7 @@ import threading
 
 import numpy as np
 import sounddevice as sd
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6 import QtCore, QtWidgets
 

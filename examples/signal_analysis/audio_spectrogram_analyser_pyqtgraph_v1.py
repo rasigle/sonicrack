@@ -121,8 +121,8 @@ class SpectrogramWidget(pg.PlotItem):
         try:
             cmap_obj = pg.colormap.get(cmap_name)
             self.spec.setColorMap(cmap_obj)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Colormap '{cmap_name}' not found.")
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"Colormap '{cmap_name}' not found.") from e
 
 
 class FFTAnalyserWindow(QtWidgets.QMainWindow):

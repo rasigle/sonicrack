@@ -25,6 +25,7 @@ from src.engine.audio_component import (
 
 logger = logging.getLogger(__name__)
 
+
 class AudioComponentRegistry:
     """Central registry for all audio components with auto-discovery.
 

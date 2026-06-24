@@ -110,8 +110,6 @@ class NoiseModule(ModuleWidget):
             playback. The audio engine directly calls get_samples() on the compiled
             AudioComponents. This method exists to satisfy the AudioModule interface.
         """
-        if self.out_port.is_connected:
-            # Generate noise samples
-            if self.component:
-                samples = self.component.get_samples(num_samples)
-                self.out_port.write(samples)
+        if self.out_port.is_connected and self.component:
+            samples = self.component.get_samples(num_samples)
+            self.out_port.write(samples)

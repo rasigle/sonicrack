@@ -208,9 +208,7 @@ class Panner(Modifier):
         self.sample_rate = validate_sample_rate(sample_rate)
         self.smoothing_time_ms = smoothing_time_ms
 
-        self._position = validate_numeric_range(
-            position, -1.0, 1.0, name="position"
-        )
+        self._position = validate_numeric_range(position, -1.0, 1.0, name="position")
 
         # Precompute gains
         self._left_gain: float = 0.0

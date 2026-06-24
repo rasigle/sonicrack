@@ -14,6 +14,7 @@ from src.engine.validation import validate_sample_count
 
 logger = logging.getLogger(__name__)
 
+
 class CVScaler:
     """Scales CV signals from one range to another.
 

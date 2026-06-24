@@ -57,15 +57,19 @@ def track_provided_args(func):
         # If there's a **kwargs parameter, its name will be in the set.
         # We need to remove it and add the actual keys from the kwargs dict.
         for param in sig.parameters.values():
-            if param.kind == inspect.Parameter.VAR_KEYWORD:
-                if param.name in provided_args:
-                    provided_args.remove(param.name)
-                    provided_args.update(kwargs.keys())
+            if (
+                param.kind == inspect.Parameter.VAR_KEYWORD
+                and param.name in provided_args
+            ):
+                provided_args.remove(param.name)
+                provided_args.update(kwargs.keys())
             # If there's a *args parameter, its name will be in the set.
             # We should remove it as it doesn't represent a single named argument.
-            if param.kind == inspect.Parameter.VAR_POSITIONAL:
-                if param.name in provided_args:
-                    provided_args.remove(param.name)
+            if (
+                param.kind == inspect.Parameter.VAR_POSITIONAL
+                and param.name in provided_args
+            ):
+                provided_args.remove(param.name)
 
         # Exclude 'self' if it was captured.
         if "self" in provided_args:

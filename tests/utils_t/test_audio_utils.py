@@ -301,7 +301,7 @@ class TestEdgeCases:
 
     def test_invalid_note_name(self):
         """Test that invalid note names raise errors."""
-        with pytest.raises(Exception):  # librosa raises various exceptions
+        with pytest.raises(ValueError):
             note_to_frequency("Invalid")
 
     def test_unicode_filename(self):

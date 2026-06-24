@@ -338,17 +338,17 @@ class WaveformModule(ModuleWidget):
                         try:
                             # Generate fresh samples
                             connected_port.parent_module.process(num_samples)
-                            if connected_port.value is not None:
-                                if (
-                                    isinstance(connected_port.value, np.ndarray)
-                                    and connected_port.value.size > 0
-                                ):
-                                    samples_l = connected_port.value.copy()
-                                    logger.debug(
-                                        f"Waveform: Got L samples, "
-                                        f"shape={samples_l.shape}"
-                                    )
-                                    break
+                            if (
+                                connected_port.value is not None
+                                and isinstance(connected_port.value, np.ndarray)
+                                and connected_port.value.size > 0
+                            ):
+                                samples_l = connected_port.value.copy()
+                                logger.debug(
+                                    f"Waveform: Got L samples, "
+                                    f"shape={samples_l.shape}"
+                                )
+                                break
                         except Exception as e:
                             logger.debug(f"Error generating L samples: {e}")
 
@@ -361,17 +361,16 @@ class WaveformModule(ModuleWidget):
                         try:
                             # Generate fresh samples
                             connected_port.parent_module.process(num_samples)
-                            if connected_port.value is not None:
-                                if (
-                                    isinstance(connected_port.value, np.ndarray)
-                                    and connected_port.value.size > 0
-                                ):
-                                    samples_r = connected_port.value.copy()
-                                    logger.debug(
-                                        f"Waveform: Got R samples, "
-                                        f"shape={samples_r.shape}"
-                                    )
-                                    break
+                            if (
+                                connected_port.value is not None
+                                and isinstance(connected_port.value, np.ndarray)
+                                and connected_port.value.size > 0
+                            ):
+                                samples_r = connected_port.value.copy()
+                                logger.debug(
+                                    f"Waveform: Got R samples, shape={samples_r.shape}"
+                                )
+                                break
                         except Exception as e:
                             logger.debug(f"Error generating R samples: {e}")
 

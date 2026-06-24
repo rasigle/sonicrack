@@ -863,9 +863,7 @@ class ModularSynthWindow(QMainWindow):
 
                 if source_port_obj and target_port_obj:
                     # Create cable connection
-                    patch_canvas.create_connection(
-                        source_port_obj, target_port_obj
-                    )
+                    patch_canvas.create_connection(source_port_obj, target_port_obj)
                 else:
                     logger.warning(
                         f"Could not find ports: {source_port} or {target_port}"

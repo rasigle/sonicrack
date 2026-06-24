@@ -150,9 +150,7 @@ class Distortion(Modifier):
     @output_gain.setter
     def output_gain(self, value: float):
         """Set output gain."""
-        self._output_gain = validate_numeric_range(
-            value, 0.0, 2.0, name="output_gain"
-        )
+        self._output_gain = validate_numeric_range(value, 0.0, 2.0, name="output_gain")
 
     @property
     def distortion_type(self) -> str:
@@ -392,9 +390,7 @@ class Delay(Modifier):
         self._delay_time = validate_numeric_range(
             delay_time, 0.001, 2.0, name="delay_time"
         )
-        self._feedback = validate_numeric_range(
-            feedback, 0.0, 0.95, name="feedback"
-        )
+        self._feedback = validate_numeric_range(feedback, 0.0, 0.95, name="feedback")
         self._mix = validate_numeric_range(mix, 0.0, 1.0, name="mix")
 
         # Create delay buffer (circular buffer)
@@ -420,9 +416,7 @@ class Delay(Modifier):
     @delay_time.setter
     def delay_time(self, value: float):
         """Set delay time."""
-        self._delay_time = validate_numeric_range(
-            value, 0.001, 2.0, name="delay_time"
-        )
+        self._delay_time = validate_numeric_range(value, 0.001, 2.0, name="delay_time")
         new_delay_samples = int(self._delay_time * self._sample_rate)
 
         # If delay time changed significantly, clear buffer to avoid clicks
@@ -657,9 +651,7 @@ class Reverb(Modifier):
         super().__init__(*args, **kwargs)
         self.source = source  # Optional!
         self._sample_rate = validate_sample_rate(sample_rate)
-        self._room_size = validate_numeric_range(
-            room_size, 0.0, 1.0, name="room_size"
-        )
+        self._room_size = validate_numeric_range(room_size, 0.0, 1.0, name="room_size")
         self._damping = validate_numeric_range(damping, 0.0, 1.0, name="damping")
         self._mix = validate_numeric_range(mix, 0.0, 1.0, name="mix")
 

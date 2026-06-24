@@ -4,6 +4,7 @@ Demonstrates the PolyphonicSynth playing multiple notes simultaneously.
 """
 
 from engine.io.midi import PolyphonicSynth, midi_to_note_name
+
 from src.engine import ADSREnvelope, Chain, SineOscillator
 from src.engine.modifier import ModulatedVolume
 

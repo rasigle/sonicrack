@@ -83,6 +83,7 @@ def setup_logging(
         detailed,
     )
 
+
 if __name__ == "__main__":
     # Example usage
     setup_logging(level=logging.DEBUG, log_file="test.log", detailed=True)

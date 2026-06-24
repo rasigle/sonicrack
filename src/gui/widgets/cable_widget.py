@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
@@ -165,36 +166,36 @@ class Cable(QGraphicsItem):
         end = self.end_port
 
         # Disconnect the underlying Port data models FIRST
-        # Use try-except to handle cases where ports might be deleted
-        if start and end:
-            try:
-                # Check if ports still exist and have valid port models
-                if hasattr(start, "port") and hasattr(end, "port"):
-                    if start.port and end.port:
-                        start.port.disconnect(end.port)
-            except (RuntimeError, AttributeError):
-                # Port might have been deleted - this is okay during cleanup
-                pass
+        # Check if ports still exist and have valid port models
+        if (
+            start
+            and end
+            and hasattr(start, "port")
+            and hasattr(end, "port")
+            and start.port
+            and end.port
+        ):
+            # Port might have been deleted - this is okay during cleanup
+            with contextlib.suppress(RuntimeError, AttributeError):
+                start.port.disconnect(end.port)
 
         # Remove cable from port widget's cable list
         if start:
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
+                # Port might already be deleted
                 start.remove_cable(self)
-            except (RuntimeError, AttributeError):
-                pass  # Port might be deleted
 
         if end:
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
+                # Port might be deleted
                 end.remove_cable(self)
-            except (RuntimeError, AttributeError):
-                pass  # Port might be deleted
 
         # Remove from scene
-        try:
-            if self.scene():
-                self.scene().removeItem(self)
-        except RuntimeError:
-            pass  # Already removed or scene deleted
+        scene = self.scene()
+        if scene:
+            with contextlib.suppress(RuntimeError):
+                # Already removed or scene deleted
+                scene.removeItem(self)
 
         # Clear references to help garbage collection
         self.start_port = None

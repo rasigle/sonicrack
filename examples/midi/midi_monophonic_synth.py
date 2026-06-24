@@ -22,9 +22,14 @@ except ImportError:
     print("Install with: pip install sounddevice")
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine import ADSREnvelope, Chain, SineOscillator
-from src.engine.io.midi import MIDIInput, MonophonicSynth, midi_to_note_name
-from src.engine.modifier import ModulatedVolume
+from src.engine import ADSREnvelope, Chain, ModulatedVolume, SineOscillator
+from src.midi_io import (
+    MIDIInput,
+    MonophonicSynth,
+    NoteOffMessage,
+    NoteOnMessage,
+    midi_to_note_name,
+)
 
 
 # ANSI colors
@@ -184,7 +189,6 @@ def demo_midi_input():
     # MIDI message handler
     def on_midi_message(msg):
         """Handle incoming MIDI messages."""
-        from engine.io.midi import NoteOffMessage, NoteOnMessage
 
         if isinstance(msg, NoteOnMessage):
             note_name = midi_to_note_name(msg.note)

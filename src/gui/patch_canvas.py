@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING, cast
 
@@ -241,19 +242,17 @@ class PatchCanvas(QGraphicsView):
             for module in modules_to_delete:
                 # Clear port data to prevent stale audio
                 for port in module.input_ports + module.output_ports:
-                    try:
+                    with contextlib.suppress(RuntimeError, AttributeError):
+                        # port might be already cleared
                         port.port.clear()
-                    except (RuntimeError, AttributeError):
-                        pass  # Port might already be cleared
 
                 # Emit signal that module is being deleted
                 self.module_deleted.emit(module)
 
                 # Remove the module itself
-                try:
+                with contextlib.suppress(RuntimeError):
+                    # already removed
                     self._scene.removeItem(module)
-                except RuntimeError:
-                    pass  # Already removed
 
             # NOW emit disconnection signals (after all deletions complete)
             # This triggers a SINGLE audio recompilation instead of many

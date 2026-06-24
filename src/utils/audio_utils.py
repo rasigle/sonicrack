@@ -216,6 +216,9 @@ def note_to_frequency(note: str) -> float:
     Args:
         note: Note name (e.g., 'A4', 'C#5', 'Bb3', 'F#4').
 
+    Raises:
+        ValueError: If note name is not valid.
+
     Returns:
         float: Frequency in Hz.
 

@@ -45,6 +45,53 @@ class TestOscillatorBase(unittest.TestCase):
         np.testing.assert_allclose(a, b, rtol=rtol)
 
 
+class TestOscillatorModeSelection(unittest.TestCase):
+    """Mode selection should use a consistent engine API across oscillators."""
+
+    def test_mode_property_assignment_updates_all_oscillators(self) -> None:
+        cases = (
+            (SineOscillator, "bright"),
+            (SawtoothOscillator, "analog"),
+            (TriangleOscillator, "analog"),
+            (SquareOscillator, "soft"),
+        )
+
+        for oscillator_cls, mode in cases:
+            with self.subTest(oscillator=oscillator_cls.__name__, mode=mode):
+                osc = oscillator_cls(frequency=440)
+
+                osc.mode = mode
+
+                self.assertEqual(osc.mode, mode)
+
+    def test_set_mode_updates_all_oscillators(self) -> None:
+        cases = (
+            (SineOscillator, "warm"),
+            (SawtoothOscillator, "analog"),
+            (TriangleOscillator, "analog"),
+            (SquareOscillator, "bandlimited"),
+        )
+
+        for oscillator_cls, mode in cases:
+            with self.subTest(oscillator=oscillator_cls.__name__, mode=mode):
+                osc = oscillator_cls(frequency=440)
+
+                osc.set_mode(mode)
+
+                self.assertEqual(osc.mode, mode)
+
+    def test_constructor_rejects_invalid_modes(self) -> None:
+        for oscillator_cls in (
+            SineOscillator,
+            SawtoothOscillator,
+            TriangleOscillator,
+            SquareOscillator,
+        ):
+            with self.subTest(oscillator=oscillator_cls.__name__):
+                with self.assertRaises(ValueError):
+                    oscillator_cls(frequency=440, mode="invalid")
+
+
 class TestSineOscillator(TestOscillatorBase):
     """Test suite for SineOscillator."""
 

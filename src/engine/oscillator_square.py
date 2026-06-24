@@ -683,13 +683,9 @@ class SquareOscillator(Oscillator):
             raise ValueError(
                 f"pulsewidth must be between 0.0 and 1.0, got {pulsewidth}"
             )
-        self._pulsewidth = pulsewidth
-        self._mode = mode
         self._pulsewidth_threshold = pulsewidth * TWO_PI
-        self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)
-        self._mode_kwargs = mode_kwargs
-        self._sync_strategy_runtime()
-        self._sync_smoothing_strategy(initial=True)
+        self._pulsewidth = pulsewidth
+        self._apply_mode(mode, initial=True, **mode_kwargs)
 
     @property
     def pulsewidth(self) -> float:
@@ -731,12 +727,21 @@ class SquareOscillator(Oscillator):
     def mode(self) -> SquareWaveMode:
         return self._mode
 
+    @mode.setter
+    def mode(self, value: SquareWaveMode) -> None:
+        self.set_mode(value)
+
     def set_mode(self, mode: SquareWaveMode, **mode_kwargs) -> None:
+        self._apply_mode(mode, initial=False, **mode_kwargs)
+
+    def _apply_mode(
+        self, mode: SquareWaveMode, *, initial: bool, **mode_kwargs
+    ) -> None:
         self._mode = mode
         self._mode_kwargs = mode_kwargs
         self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)
         self._sync_strategy_runtime()
-        self._sync_smoothing_strategy(initial=False)
+        self._sync_smoothing_strategy(initial=initial)
 
     @classmethod
     def get_available_modes(cls) -> list[str]:

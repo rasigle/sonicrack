@@ -54,7 +54,7 @@ class SineOscillator(Oscillator):
         wave_range: tuple[float, float] = (-1, 1),
         mode: Literal["pure", "warm", "bright", "analog"] = "pure",
     ):
-        self._mode = mode
+        self.set_mode(mode)
         kwargs = filter_provided_args(
             self._provided_args,  # noqa
             frequency=frequency,
@@ -82,11 +82,14 @@ class SineOscillator(Oscillator):
 
     @mode.setter
     def mode(self, value: Literal["pure", "warm", "bright", "analog"]):
-        if value not in ["pure", "warm", "bright", "analog"]:
+        self.set_mode(value)
+
+    def set_mode(self, mode: Literal["pure", "warm", "bright", "analog"]) -> None:
+        if mode not in self.get_available_modes():
             raise ValueError(
-                f"Invalid mode '{value}'. Must be 'pure', 'warm', 'bright', or 'analog'"
+                f"Invalid mode '{mode}'. Must be 'pure', 'warm', 'bright', or 'analog'"
             )
-        self._mode = value
+        self._mode = mode
 
     @classmethod
     def get_available_modes(cls) -> list[str]:

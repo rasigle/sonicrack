@@ -89,6 +89,12 @@ class PatchCompiler(
     ) -> bool:
         """Hot-swap a parameter value without recompiling."""
         source_module_name = module.metadata.title
+        if not getattr(module, "is_active", True):
+            logger.debug(
+                f"Skipping hot-swap for inactive module {source_module_name}."
+            )
+            return False
+
         if module not in self._module_to_component:
             logger.warning(
                 f"Cannot hot-swap parameter: module {source_module_name} "

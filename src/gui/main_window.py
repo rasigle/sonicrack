@@ -442,6 +442,10 @@ class ModularSynthWindow(QMainWindow):
         Args:
             output_module: The OutputModule to start playback on
         """
+        if not output_module.is_active:
+            logger.info("Skipping delayed playback restart for inactive Output module")
+            return
+
         try:
             logger.info("Restarting playback with refreshed connections")
             output_module.start_playback()

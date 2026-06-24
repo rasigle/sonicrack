@@ -105,6 +105,13 @@ class OutputModule(ModuleWidget):
         """This module has no output component (it's a sink)."""
         return None
 
+    def set_active(self, active: bool) -> None:
+        """Toggle output playback with the module power state."""
+        was_active = self.is_active
+        super().set_active(active)
+        if was_active and not active:
+            self.stop_playback()
+
     def start_playback(self):
         """Start audio playback using process-based architecture.
 
@@ -115,6 +122,16 @@ class OutputModule(ModuleWidget):
         logger.info(f"  input_port.is_connected = {self.inp_port_l.is_connected}")
         logger.info(f"  input_port.connected_to = {self.inp_port_l.connected_to}")
         logger.info(f"  Number of connections: {len(self.inp_port_l.connected_to)}")
+
+        if not self.is_active:
+            logger.info("Output module is inactive; playback will not start")
+            if self.audio_output.is_playing:
+                self.stop_playback()
+            self.status_label.setText("Off")
+            self.status_label.setStyleSheet(
+                "color: #888; font-size: 10px; font-style: italic;"
+            )
+            return
 
         # Check if we have any connections
         if not self.inp_port_l.is_connected:
@@ -195,6 +212,9 @@ class OutputModule(ModuleWidget):
 
         def silence() -> np.ndarray:
             return np.zeros((num_samples, 2), dtype=np.float32)
+
+        if not self.is_active:
+            return silence()
 
         def read_port(port):
             samples = port.read(num_samples)

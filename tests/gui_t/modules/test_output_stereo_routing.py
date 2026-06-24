@@ -162,6 +162,24 @@ class TestCombineLRToStereo:
 class TestOutputModuleRouting:
     """Test cases for OutputModule stereo routing logic (integration tests)."""
 
+    def test_inactive_output_does_not_start_playback(self, output_module):
+        """Inactive output module must not restart playback."""
+        output_module.set_active(False)
+
+        output_module.start_playback()
+
+        assert not output_module.audio_output.is_playing
+        assert output_module.status_label.text() == "Off"
+
+    def test_inactive_output_generates_silence(self, output_module):
+        """Inactive output callback must return silence even with inputs."""
+        output_module.set_active(False)
+
+        samples = output_module._generate_samples(8)
+
+        assert samples.shape == (8, 2)
+        assert np.allclose(samples, np.zeros((8, 2), dtype=np.float32))
+
     def test_mono_to_stereo_integration(self):
         """Test mono input is properly converted to stereo."""
         mono_input = np.array([0.1, 0.2, 0.3, 0.4])

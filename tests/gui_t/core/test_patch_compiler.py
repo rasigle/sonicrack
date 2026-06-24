@@ -161,3 +161,24 @@ def test_patch_compiler_bypasses_inactive_modifier():
     component = compiler.compile()
 
     assert isinstance(component, SineOscillator)
+
+
+def test_patch_compiler_ignores_hot_swap_for_inactive_module():
+    source = _Module("Osc", ModuleCategory.SOURCE)
+    source_out = source.add_output("Out")
+    output = _Module("Output", ModuleCategory.OUTPUT)
+    output_in = output.add_input("In")
+    compiler = PatchCompiler()
+    compiler.set_patch(
+        _as_modules(source, output), _as_connections((source_out, output_in))
+    )
+    component = compiler.compile()
+    assert isinstance(component, SineOscillator)
+
+    source.is_active = False
+
+    assert (
+        compiler.update_parameter(cast(AudioModule, source), "frequency", 220)
+        is False
+    )
+    assert component.frequency == 440

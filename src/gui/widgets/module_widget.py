@@ -7,6 +7,7 @@ import logging
 from abc import ABCMeta
 from typing import Any
 
+import numpy as np
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import (
@@ -17,7 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.gui.core.module import AudioModule
+from src.gui.core.module import AudioModule, ModuleCategory
 from src.gui.dialogs.module_info_dialog import ModuleInfoDialog
 from src.gui.widgets.port_widget import PortWidget
 
@@ -301,6 +302,11 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         if self.is_active == active:
             return
         self.is_active = active
+        controls_widget = getattr(self, "controls_widget", None)
+        if controls_widget is not None:
+            controls_widget.setEnabled(active)
+        if not active:
+            self._clear_output_ports()
         self.invalidate_cache()
         self.update()
         self._notify_patch_changed()
@@ -344,6 +350,12 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         if self._cache_valid and self._cache_num_samples == num_samples:
             return  # Already generated for this cycle
 
+        if not self.is_active:
+            self._process_inactive(num_samples)
+            self._cache_valid = True
+            self._cache_num_samples = num_samples
+            return
+
         # Generate samples by calling process()
         self.process(num_samples)
 
@@ -360,6 +372,27 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self._cache_valid = False
         self._cache_num_samples = 0
         self._cached_samples = None
+
+    def _clear_output_ports(self) -> None:
+        """Clear visible output values when a module is bypassed."""
+        for port in self.output_ports:
+            port.write(0.0)
+
+    def _process_inactive(self, num_samples: int) -> None:
+        """Apply bypass semantics for pull-based module processing."""
+        if self.metadata.category == ModuleCategory.MODIFIER:
+            required_inputs = self.get_required_inputs()
+            if required_inputs:
+                input_port = self._find_port_by_name(required_inputs[0])
+                if input_port is not None:
+                    value = input_port.port.read(num_samples)
+                    for output_port in self.output_ports:
+                        output_port.write(value)
+                    return
+
+        silence = np.zeros(num_samples, dtype=np.float32)
+        for output_port in self.output_ports:
+            output_port.write(silence)
 
     # === Naming ===
 

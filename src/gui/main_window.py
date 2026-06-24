@@ -862,11 +862,9 @@ class ModularSynthWindow(QMainWindow):
                         break
 
                 if source_port_obj and target_port_obj:
-                    source_port_widget = cast(PortWidget, source_port_obj)
-                    target_port_widget = cast(PortWidget, target_port_obj)
                     # Create cable connection
                     patch_canvas.create_connection(
-                        source_port_widget, target_port_widget
+                        source_port_obj, target_port_obj
                     )
                 else:
                     logger.warning(

@@ -59,16 +59,17 @@ class PatchCanvas(QGraphicsView):
 
     def mousePressEvent(self, event):
         """Handle mouse press for cable creation."""
-        item = self.itemAt(event.pos())
+        if event is None:
+            return
 
-        if isinstance(item, PortWidget):
+        item = self.itemAt(event.pos())
+        if isinstance(item, PortWidget) and item.port_type == "output":
             # Start dragging a cable from this port
-            if item.port_type == "output":
-                self.drag_start_port = item
-                self.dragging_cable = Cable(item)
-                self._scene.addItem(self.dragging_cable)
-                event.accept()
-                return
+            self.drag_start_port = item
+            self.dragging_cable = Cable(item)
+            self._scene.addItem(self.dragging_cable)
+            event.accept()
+            return
 
         super().mousePressEvent(event)
 

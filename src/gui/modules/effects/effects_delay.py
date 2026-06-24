@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
@@ -33,6 +34,7 @@ class DelayModule(ModulatedModuleBase):
         # Add ports
         self.in_port = self.add_input("In")
         self.out_port = self.add_output("Out")
+        self.component = None
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -84,12 +86,19 @@ class DelayModule(ModulatedModuleBase):
         Args:
             num_samples: Number of samples to process
         """
-        if self.in_port.is_connected:
-            samples = self.in_port.read()
-            if samples is not None:
-                # For process-based flow, we'd need to maintain delay buffer state
-                # This is a simplified placeholder
-                self.out_port.write(samples)
+        if not self.in_port.is_connected:
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+            return
+
+        samples = self.in_port.read(num_samples)
+        if samples is None:
+            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+            return
+
+        if self.component is None:
+            self.component = self.create_engine_component()
+
+        self.out_port.write(self.component(samples))
 
     def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
         """Delay expects bipolar CV range [-1, 1].

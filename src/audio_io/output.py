@@ -26,6 +26,10 @@ class AudioOutput:
     - Managing the audio callback
     - Volume control
     - Signal monitoring
+
+    The callback is called from the sounddevice audio thread. It should return
+    quickly, avoid blocking work, and produce mono `(frames,)` or stereo
+    `(frames, 2)` float-compatible samples for the requested frame count.
     """
 
     def __init__(
@@ -40,7 +44,8 @@ class AudioOutput:
             sample_rate: Sample rate in Hz (e.g., 44100, 48000)
             buffer_size: Audio buffer size in samples (e.g., 512, 1024, 2048)
             audio_callback: Callback function that generates audio samples.
-                Should accept num_samples and return stereo array.
+                Should accept the requested frame count and return mono or
+                stereo samples.
         """
         self.sample_rate = sample_rate
         self.buffer_size = buffer_size

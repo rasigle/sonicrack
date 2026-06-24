@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -459,6 +460,18 @@ class ModularSynthWindow(QMainWindow):
         logger.info(f"Module deleted: {module.metadata.title}")
         self._mark_patch_modified()
 
+        shutdown = getattr(module, "shutdown", None)
+        if callable(shutdown):
+            shutdown(graceful=True)
+
+        with contextlib.suppress(ValueError):
+            self.audio_engine.modules.remove(module)
+
+        from src.gui.modules.output.output import OutputModule
+
+        if isinstance(module, OutputModule):
+            return
+
         # Check if we need to stop/update playback
         # (This will stop playback if Output module has no more connections)
         self._start_output_playback()
@@ -687,12 +700,17 @@ class ModularSynthWindow(QMainWindow):
 
     def _clear_canvas(self):
         """Clear the patch canvas."""
-        # Stop all Output modules (process-based architecture)
-        self._stop_all_output_modules()
+        if self.patch_canvas is not None:
+            for module in list(self.patch_canvas.get_modules()):
+                shutdown = getattr(module, "shutdown", None)
+                if callable(shutdown):
+                    shutdown(graceful=True)
 
         # Clear the canvas
         patch_canvas = self._require_patch_canvas()
         patch_canvas.clear_all()
+        self.audio_engine.modules.clear()
+        self.audio_engine.connections.clear()
         self._require_statusbar().showMessage("Canvas cleared")
 
     def _stop_all_output_modules(self, graceful: bool = True):
@@ -764,12 +782,17 @@ class ModularSynthWindow(QMainWindow):
             preset_data: Dictionary containing preset data with 'modules' and
                 'connections'
         """
-        # Stop all Output modules (process-based architecture)
-        self._stop_all_output_modules()
         patch_canvas = self._require_patch_canvas()
+
+        for module in list(patch_canvas.get_modules()):
+            shutdown = getattr(module, "shutdown", None)
+            if callable(shutdown):
+                shutdown(graceful=True)
 
         # Clear current patch
         patch_canvas.clear_all()
+        self.audio_engine.modules.clear()
+        self.audio_engine.connections.clear()
 
         # Rebuild modules
         module_map = {}  # Maps old module IDs to new module instances
@@ -799,6 +822,13 @@ class ModularSynthWindow(QMainWindow):
 
             # Add to canvas
             patch_canvas.add_module(module_instance)
+            self.audio_engine.add_module(module_instance)
+
+            if module_instance.metadata.category == ModuleCategory.OUTPUT:
+                from src.gui.modules.output.output import OutputModule
+
+                output_module = cast(OutputModule, module_instance)
+                output_module.audio_engine = self.audio_engine
 
             # Set position
             module_instance.setPos(position["x"], position["y"])

@@ -156,6 +156,10 @@ class OutputModule(ModuleWidget):
         logger.debug("OutputModule shutdown requested")
         if hasattr(self, "audio_output") and self.audio_output:
             self.audio_output.cleanup(graceful=graceful)
+
+        audio_config.remove_sample_rate_listener(self._on_global_sample_rate_changed)
+        audio_config.remove_buffer_size_listener(self._on_global_buffer_size_changed)
+
         self.status_label.setText("Stopped")
         self.status_label.setStyleSheet(
             "color: #888; font-size: 10px; font-style: italic;"

@@ -15,8 +15,18 @@ from src.engine.audio_component import (
     ComponentDescriptor,
     ParameterDescriptor,
 )
+from src.engine.composer import WaveAdder
 from src.engine.effects import Delay, Distortion, Reverb
-from src.engine.modifier import Panner, Volume
+from src.engine.modifier import (
+    Frequency,
+    ModulatedClipper,
+    ModulatedPanner,
+    ModulatedVolume,
+    Panner,
+    Volume,
+)
+from src.engine.oscillator_modulated import ModulatedFrequency, ModulatedOscillator
+from src.engine.oscillator_square import SquareOscillator
 
 
 class TestComponentDescriptor(unittest.TestCase):
@@ -128,3 +138,72 @@ def test_volume_descriptor_exposes_sample_rate_smoothing_contract():
     assert parameters["sample_rate"].unit == "Hz"
     assert parameters["smoothing_time_ms"].default == 10.0
     assert parameters["smoothing_time_ms"].unit == "ms"
+
+
+def test_remaining_registry_descriptors_expose_ui_preset_limits():
+    expected_names = {
+        WaveAdder: ["generators", "stereo", "mix_mode"],
+        ModulatedPanner: ["modulator", "sample_rate", "smoothing_time_ms"],
+        ModulatedVolume: [
+            "modulator",
+            "modulation_target",
+            "sample_rate",
+            "smoothing_time_ms",
+        ],
+        Frequency: ["frequency"],
+        ModulatedClipper: ["modulator"],
+        ModulatedOscillator: [
+            "oscillator",
+            "modulators",
+            "amp_mod",
+            "freq_mod",
+            "phase_mod",
+        ],
+        ModulatedFrequency: ["oscillator", "modulator", "freq_mod_func"],
+        SquareOscillator: [
+            "frequency",
+            "gain_db",
+            "amplitude",
+            "phase",
+            "sample_rate",
+            "wave_range",
+            "pulsewidth",
+            "mode",
+        ],
+    }
+
+    for component, parameter_names in expected_names.items():
+        assert component.descriptor.parameter_names == parameter_names
+
+    assert WaveAdder.descriptor.parameters is not None
+    assert WaveAdder.descriptor.parameters["stereo"].choices == (False, True)
+    assert WaveAdder.descriptor.parameters["mix_mode"].choices == ("average", "sum")
+
+    assert ModulatedPanner.descriptor.parameters is not None
+    assert ModulatedPanner.descriptor.parameters["smoothing_time_ms"].minimum == 0.0
+    assert ModulatedPanner.descriptor.parameters["sample_rate"].unit == "Hz"
+
+    assert ModulatedVolume.descriptor.parameters is not None
+    assert ModulatedVolume.descriptor.parameters["modulation_target"].choices == (
+        "amplitude",
+        "gain_db",
+    )
+
+    assert Frequency.descriptor.parameters is not None
+    assert Frequency.descriptor.parameters["frequency"].minimum == 0.0
+
+    assert ModulatedClipper.descriptor.parameters is not None
+    clipper_modulator = ModulatedClipper.descriptor.parameters["modulator"]
+    assert clipper_modulator.minimum == 0.0
+    assert clipper_modulator.maximum == 1.0
+    assert clipper_modulator.clamp is True
+
+    assert SquareOscillator.descriptor.parameters is not None
+    assert SquareOscillator.descriptor.parameters["mode"].choices == (
+        "ideal",
+        "ideal_smooth",
+        "bandlimited",
+        "vcv",
+        "soft",
+        "comparator",
+    )

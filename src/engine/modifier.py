@@ -355,6 +355,30 @@ class ModulatedPanner(Panner):
         category=ComponentCategory.MODIFIER,
         description="Stereo panner with modulated position",
         fluent_api_name="panner (mod)",
+        parameters={
+            "modulator": ParameterDescriptor(
+                name="modulator",
+                default=None,
+                description=(
+                    "Generator providing pan position values; values are clamped "
+                    "to [-1, 1]."
+                ),
+            ),
+            "sample_rate": ParameterDescriptor(
+                name="sample_rate",
+                default=DEFAULT_SAMPLE_RATE,
+                minimum=1.0,
+                unit="Hz",
+                description="Processing sample rate.",
+            ),
+            "smoothing_time_ms": ParameterDescriptor(
+                name="smoothing_time_ms",
+                default=10.0,
+                minimum=0.0,
+                unit="ms",
+                description="Pan smoothing duration.",
+            ),
+        },
         tags=["modifier", "panner", "modulated", "stereo"],
     )
 
@@ -752,6 +776,33 @@ class ModulatedVolume(Volume):
         category=ComponentCategory.MODIFIER,
         description="Time-varying volume control with modulation support",
         fluent_api_name="volume (mod)",
+        parameters={
+            "modulator": ParameterDescriptor(
+                name="modulator",
+                default=None,
+                description="Generator providing amplitude or gain values.",
+            ),
+            "modulation_target": ParameterDescriptor(
+                name="modulation_target",
+                default="amplitude",
+                choices=("amplitude", "gain_db"),
+                description="Volume parameter controlled by the modulator.",
+            ),
+            "sample_rate": ParameterDescriptor(
+                name="sample_rate",
+                default=DEFAULT_SAMPLE_RATE,
+                minimum=1.0,
+                unit="Hz",
+                description="Processing sample rate.",
+            ),
+            "smoothing_time_ms": ParameterDescriptor(
+                name="smoothing_time_ms",
+                default=10.0,
+                minimum=0.0,
+                unit="ms",
+                description="Gain smoothing duration.",
+            ),
+        },
         tags=["modifier", "volume", "amplitude", "modulation", "tremolo", "envelope"],
     )
 
@@ -923,6 +974,14 @@ class Frequency(Modifier):
         category=ComponentCategory.MODIFIER,
         description="Frequency scaling modifier",
         fluent_api_name="frequency",
+        parameters={
+            "frequency": ParameterDescriptor(
+                name="frequency",
+                default=1.0,
+                minimum=0.0,
+                description="Frequency multiplier.",
+            )
+        },
         tags=["modifier", "frequency"],
     )
 
@@ -1123,6 +1182,19 @@ class ModulatedClipper(Modifier):
         category=ComponentCategory.MODIFIER,
         description="Clipper with CV threshold control (CV range: [0, 1])",
         fluent_api_name="modulated_clipper",
+        parameters={
+            "modulator": ParameterDescriptor(
+                name="modulator",
+                default=None,
+                minimum=0.0,
+                maximum=1.0,
+                clamp=True,
+                description=(
+                    "Generator providing clipping threshold values; values are "
+                    "clamped to [0, 1]."
+                ),
+            )
+        },
         tags=["modifier", "clipper", "modulation"],
     )
 

@@ -68,7 +68,7 @@ from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import (
     ComponentDescriptor,
     Generator,
-    make_parameter_descriptors,
+    ParameterDescriptor,
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import (
@@ -100,11 +100,36 @@ class ModulatedOscillator(Generator):
         category=ComponentCategory.OSCILLATOR,
         description="Oscillator with modulation support (amplitude, frequency, phase)",
         tags=["oscillator", "modulated", "advanced"],
-        parameters=make_parameter_descriptors(
-            "gain_db",
-            "frequency",
-            "phase",
-        ),
+        parameters={
+            "oscillator": ParameterDescriptor(
+                name="oscillator",
+                default=None,
+                description="Carrier oscillator component.",
+            ),
+            "modulators": ParameterDescriptor(
+                name="modulators",
+                default=(),
+                description=(
+                    "Modulator components used for amplitude, frequency, or phase "
+                    "modulation."
+                ),
+            ),
+            "amp_mod": ParameterDescriptor(
+                name="amp_mod",
+                default=None,
+                description="Optional amplitude modulation function.",
+            ),
+            "freq_mod": ParameterDescriptor(
+                name="freq_mod",
+                default=None,
+                description="Optional frequency modulation function.",
+            ),
+            "phase_mod": ParameterDescriptor(
+                name="phase_mod",
+                default=None,
+                description="Optional phase modulation function.",
+            ),
+        },
     )
 
     def __init__(
@@ -753,7 +778,23 @@ class ModulatedFrequency(ModulatedOscillator):
         category=ComponentCategory.OSCILLATOR,
         description="Frequency-modulated oscillator (vibrato, FM synthesis)",
         tags=["oscillator", "modulated", "frequency", "vibrato", "fm"],
-        parameters=make_parameter_descriptors("gain_db", "frequency", "phase"),
+        parameters={
+            "oscillator": ParameterDescriptor(
+                name="oscillator",
+                default=None,
+                description="Carrier oscillator component.",
+            ),
+            "modulator": ParameterDescriptor(
+                name="modulator",
+                default=None,
+                description="Frequency modulator component.",
+            ),
+            "freq_mod_func": ParameterDescriptor(
+                name="freq_mod_func",
+                default=None,
+                description="Optional custom frequency modulation function.",
+            ),
+        },
     )
 
     def __init__(self, oscillator, modulator, freq_mod_func=None):

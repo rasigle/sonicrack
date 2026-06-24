@@ -40,7 +40,11 @@ from typing import Any
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import AudioComponent, ComponentDescriptor
+from src.engine.audio_component import (
+    AudioComponent,
+    ComponentDescriptor,
+    ParameterDescriptor,
+)
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import Oscillator
 from src.engine.oscillator_modulated import ModulatedOscillator
@@ -324,6 +328,27 @@ class WaveAdder(Composer):
         name="WaveAdder",
         category=ComponentCategory.COMPOSER,
         description="Adds the output of multiple generators together.",
+        parameters={
+            "generators": ParameterDescriptor(
+                name="generators",
+                default=(),
+                description="Generator components to mix.",
+            ),
+            "stereo": ParameterDescriptor(
+                name="stereo",
+                default=False,
+                choices=(False, True),
+                description=(
+                    "Whether scalar generator output should be duplicated to stereo."
+                ),
+            ),
+            "mix_mode": ParameterDescriptor(
+                name="mix_mode",
+                default="average",
+                choices=("average", "sum"),
+                description="Mixing policy for combined generator output.",
+            ),
+        },
         tags=["composer", "wave_adder"],
     )
 

@@ -632,12 +632,26 @@ class SquareOscillator(Oscillator):
             "sample_rate",
             "wave_range",
             "pulsewidth",
+            "mode",
             pulsewidth=ParameterDescriptor(
                 name="pulsewidth",
                 default=0.5,
                 minimum=0.0,
                 maximum=1.0,
                 description="Square wave pulse width.",
+            ),
+            mode=ParameterDescriptor(
+                name="mode",
+                default="ideal",
+                choices=(
+                    "ideal",
+                    "ideal_smooth",
+                    "bandlimited",
+                    "vcv",
+                    "soft",
+                    "comparator",
+                ),
+                description="Square wave generation strategy.",
             ),
         ),
     )

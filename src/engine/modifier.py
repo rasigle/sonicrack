@@ -45,7 +45,7 @@ from src.engine.audio_component import (
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import _derive_amplitude_from_init
 from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
-from src.engine.validation import validate_sample_rate
+from src.engine.validation import validate_numeric_range, validate_sample_rate
 from src.utils.logging_config import get_engine_logger
 from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
@@ -165,7 +165,6 @@ class Panner(Modifier):
                 default=0.0,
                 minimum=-1.0,
                 maximum=1.0,
-                clamp=True,
                 description="Pan position from hard left to hard right.",
             ),
             "sample_rate": ParameterDescriptor(
@@ -209,11 +208,9 @@ class Panner(Modifier):
         self.sample_rate = validate_sample_rate(sample_rate)
         self.smoothing_time_ms = smoothing_time_ms
 
-        # Input validation
-        if not isinstance(position, (int, float, np.number)):
-            raise TypeError(f"position must be a number, got {type(position).__name__}")
-
-        self._position: float = np.clip(position, -1.0, 1.0)
+        self._position = validate_numeric_range(
+            position, -1.0, 1.0, name="position"
+        )
 
         # Precompute gains
         self._left_gain: float = 0.0
@@ -238,7 +235,7 @@ class Panner(Modifier):
     @position.setter
     def position(self, value: float):
         """Set pan position and update gains with smoothing."""
-        self._position = np.clip(value, -1.0, 1.0)
+        self._position = validate_numeric_range(value, -1.0, 1.0, name="position")
         self._update_gains()
 
         # Initiate smooth transition (prevents clicks)
@@ -431,8 +428,7 @@ class ModulatedPanner(Panner):
         Returns:
             Current pan position.
         """
-        # Property setter handles clipping, no need to clip here
-        self.position = next(self.modulator)  # Setter clips and updates gains
+        self.position = float(np.clip(next(self.modulator), -1.0, 1.0))
         return self.position
 
     def __call__(
@@ -456,7 +452,7 @@ class ModulatedPanner(Panner):
 
         # Scalar path: advance modulator once and update position
         mod_value = self._get_next_modulation_value()
-        self.position = mod_value
+        self.position = float(np.clip(mod_value, -1.0, 1.0))
         return super().__call__(val)
 
     def _get_next_modulation_value(self) -> float:

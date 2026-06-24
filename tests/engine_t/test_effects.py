@@ -32,13 +32,20 @@ class TestDistortion(unittest.TestCase):
         self.assertEqual(dist.output_gain, 0.7)
         self.assertEqual(dist.distortion_type, "soft")
 
-    def test_parameter_clipping(self):
-        """Test that parameters are clipped to valid ranges."""
-        dist = Distortion(self.osc, drive=15.0, mix=2.0, output_gain=5.0)
+    def test_strict_parameter_validation(self):
+        """Test that out-of-range parameters raise ValueError."""
+        invalid_cases = [
+            {"drive": 15.0},
+            {"drive": -0.1},
+            {"mix": 2.0},
+            {"mix": -0.1},
+            {"output_gain": 5.0},
+            {"output_gain": -0.1},
+        ]
 
-        self.assertEqual(dist.drive, 10.0)  # Clipped to max
-        self.assertEqual(dist.mix, 1.0)  # Clipped to max
-        self.assertEqual(dist.output_gain, 2.0)  # Clipped to max
+        for kwargs in invalid_cases:
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                Distortion(self.osc, **kwargs)
 
     def test_invalid_distortion_type(self):
         """Test that invalid distortion types raise ValueError."""
@@ -96,6 +103,10 @@ class TestDistortion(unittest.TestCase):
         dist.distortion_type = "hard"
         self.assertEqual(dist.distortion_type, "hard")
 
+        for name, value in (("drive", 15.0), ("mix", 2.0), ("output_gain", 5.0)):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                setattr(dist, name, value)
+
 
 class TestDelay(unittest.TestCase):
     """Test suite for Delay effect."""
@@ -119,15 +130,20 @@ class TestDelay(unittest.TestCase):
         self.assertEqual(delay.feedback, 0.4)
         self.assertEqual(delay.mix, 0.5)
 
-    def test_parameter_clipping(self):
-        """Test that parameters are clipped to valid ranges."""
-        delay = Delay(
-            self.osc, delay_time=5.0, feedback=1.5, mix=2.0  # > max  # > max  # > max
-        )
+    def test_strict_parameter_validation(self):
+        """Test that out-of-range parameters raise ValueError."""
+        invalid_cases = [
+            {"delay_time": 5.0},
+            {"delay_time": 0.0},
+            {"feedback": 1.5},
+            {"feedback": -0.1},
+            {"mix": 2.0},
+            {"mix": -0.1},
+        ]
 
-        self.assertEqual(delay.delay_time, 2.0)  # Clipped to max
-        self.assertEqual(delay.feedback, 0.95)  # Clipped to max
-        self.assertEqual(delay.mix, 1.0)  # Clipped to max
+        for kwargs in invalid_cases:
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                Delay(self.osc, **kwargs)
 
     def test_delay_creates_echo(self):
         """Test that delay creates echoes."""
@@ -181,6 +197,10 @@ class TestDelay(unittest.TestCase):
         delay.delay_time = 0.5
         self.assertEqual(delay.delay_time, 0.5)
 
+        for name, value in (("delay_time", 5.0), ("feedback", 1.5), ("mix", 2.0)):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                setattr(delay, name, value)
+
         # Should still generate valid samples
         samples = delay.get_samples_vectorized(1000)
         self.assertTrue(np.all(np.isfinite(samples)))
@@ -216,15 +236,20 @@ class TestReverb(unittest.TestCase):
         self.assertEqual(reverb.damping, 0.5)
         self.assertEqual(reverb.mix, 0.3)
 
-    def test_parameter_clipping(self):
-        """Test that parameters are clipped to valid ranges."""
-        reverb = Reverb(
-            self.osc, room_size=2.0, damping=2.0, mix=2.0  # > max  # > max  # > max
-        )
+    def test_strict_parameter_validation(self):
+        """Test that out-of-range parameters raise ValueError."""
+        invalid_cases = [
+            {"room_size": 2.0},
+            {"room_size": -0.1},
+            {"damping": 2.0},
+            {"damping": -0.1},
+            {"mix": 2.0},
+            {"mix": -0.1},
+        ]
 
-        self.assertEqual(reverb.room_size, 1.0)  # Clipped to max
-        self.assertEqual(reverb.damping, 1.0)  # Clipped to max
-        self.assertEqual(reverb.mix, 1.0)  # Clipped to max
+        for kwargs in invalid_cases:
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                Reverb(self.osc, **kwargs)
 
     def test_reverb_creates_decay(self):
         """Test that reverb creates a decay tail."""
@@ -305,6 +330,10 @@ class TestReverb(unittest.TestCase):
 
         reverb.mix = 0.4
         self.assertEqual(reverb.mix, 0.4)
+
+        for name, value in (("room_size", 2.0), ("damping", 2.0), ("mix", 2.0)):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                setattr(reverb, name, value)
 
         # Should still generate valid samples
         samples = reverb.get_samples_vectorized(1000)

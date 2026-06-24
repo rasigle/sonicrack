@@ -96,8 +96,8 @@ class TestComponentDescriptor(unittest.TestCase):
         self.assertEqual(config["phase"], 90)
 
 
-def test_effect_descriptors_expose_clamped_parameter_policy():
-    """Effects should publish their engine-level clamp policy as metadata."""
+def test_effect_descriptors_expose_strict_parameter_policy():
+    """Effects should publish strict engine-level range policy as metadata."""
     expected = {
         Distortion: {
             "drive": (0.0, 10.0),
@@ -127,7 +127,7 @@ def test_effect_descriptors_expose_clamped_parameter_policy():
             parameter = descriptor_parameters[name]
             assert parameter.minimum == minimum
             assert parameter.maximum == maximum
-            assert parameter.clamp is True
+            assert parameter.clamp is False
 
 
 def test_volume_descriptor_exposes_sample_rate_smoothing_contract():

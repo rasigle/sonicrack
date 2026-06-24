@@ -35,13 +35,13 @@ class TestPanner(unittest.TestCase):
         panner = Panner(0.7)
         self.assertEqual(panner.position, 0.7)
 
-    def test_initialization_clips_out_of_range(self) -> None:
-        """Test panner clips position to valid range."""
-        panner = Panner(-2.0)
-        self.assertEqual(panner.position, -1.0)
+    def test_initialization_rejects_out_of_range(self) -> None:
+        """Test panner rejects position values outside valid range."""
+        with self.assertRaises(ValueError):
+            Panner(-2.0)
 
-        panner = Panner(2.0)
-        self.assertEqual(panner.position, 1.0)
+        with self.assertRaises(ValueError):
+            Panner(2.0)
 
     def test_center_pan(self) -> None:
         """Test center panning produces equal left/right with constant power."""
@@ -204,6 +204,9 @@ class TestPanner(unittest.TestCase):
         panner.position = 1.0  # Full right
         self.assertNotEqual(panner._left_gain, old_left)
         self.assertNotEqual(panner._right_gain, old_right)
+
+        with self.assertRaises(ValueError):
+            panner.position = 2.0
 
     def test_call_with_scalar(self):
         """Test panner with scalar input."""

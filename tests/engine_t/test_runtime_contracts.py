@@ -14,6 +14,7 @@ from src.engine import (
 )
 from src.engine.cv_utils import CVScaler
 from src.engine.filter import ButterworthFilter
+from src.engine.validation import validate_numeric_range
 
 
 @pytest.mark.parametrize(
@@ -51,6 +52,23 @@ def test_noise_smoothing_duration_uses_explicit_sample_rate():
     noise = NoiseGenerator(sample_rate=48000)
 
     assert noise._smoothing_duration_samples == 480
+
+
+def test_validate_numeric_range_accepts_inclusive_bounds():
+    assert validate_numeric_range(0.0, 0.0, 1.0, name="mix") == 0.0
+    assert validate_numeric_range(1, 0.0, 1.0, name="mix") == 1.0
+
+
+@pytest.mark.parametrize("value", [-0.1, 1.1, float("nan"), float("inf")])
+def test_validate_numeric_range_rejects_invalid_values(value):
+    with pytest.raises(ValueError):
+        validate_numeric_range(value, 0.0, 1.0, name="mix")
+
+
+@pytest.mark.parametrize("value", [True, "0.5", object()])
+def test_validate_numeric_range_rejects_non_real_values(value):
+    with pytest.raises(TypeError):
+        validate_numeric_range(value, 0.0, 1.0, name="mix")
 
 
 @pytest.mark.parametrize(

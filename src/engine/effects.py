@@ -20,7 +20,11 @@ from src.engine.audio_component import (
 )
 from src.engine.audio_component_registry import register_component
 from src.engine.modifier import Modifier
-from src.engine.validation import validate_sample_count, validate_sample_rate
+from src.engine.validation import (
+    validate_numeric_range,
+    validate_sample_count,
+    validate_sample_rate,
+)
 
 if TYPE_CHECKING:
     pass
@@ -58,7 +62,6 @@ class Distortion(Modifier):
                 default=1.0,
                 minimum=0.0,
                 maximum=10.0,
-                clamp=True,
                 description="Distortion pre-gain amount.",
             ),
             "mix": ParameterDescriptor(
@@ -66,7 +69,6 @@ class Distortion(Modifier):
                 default=1.0,
                 minimum=0.0,
                 maximum=1.0,
-                clamp=True,
                 description="Dry/wet mix.",
             ),
             "output_gain": ParameterDescriptor(
@@ -74,7 +76,6 @@ class Distortion(Modifier):
                 default=0.5,
                 minimum=0.0,
                 maximum=2.0,
-                clamp=True,
                 description="Post-distortion output gain.",
             ),
             "distortion_type": ParameterDescriptor(
@@ -111,9 +112,11 @@ class Distortion(Modifier):
         """
         super().__init__(*args, **kwargs)
         self.source = source  # Optional!
-        self._drive = np.clip(drive, 0.0, 10.0)
-        self._mix = np.clip(mix, 0.0, 1.0)
-        self._output_gain = np.clip(output_gain, 0.0, 2.0)
+        self._drive = validate_numeric_range(drive, 0.0, 10.0, name="drive")
+        self._mix = validate_numeric_range(mix, 0.0, 1.0, name="mix")
+        self._output_gain = validate_numeric_range(
+            output_gain, 0.0, 2.0, name="output_gain"
+        )
 
         valid_types = ["soft", "hard", "fuzz", "tube"]
         if distortion_type not in valid_types:
@@ -130,7 +133,7 @@ class Distortion(Modifier):
     @drive.setter
     def drive(self, value: float):
         """Set drive amount."""
-        self._drive = np.clip(value, 0.0, 10.0)
+        self._drive = validate_numeric_range(value, 0.0, 10.0, name="drive")
 
     @property
     def mix(self) -> float:
@@ -140,7 +143,7 @@ class Distortion(Modifier):
     @mix.setter
     def mix(self, value: float):
         """Set mix amount."""
-        self._mix = np.clip(value, 0.0, 1.0)
+        self._mix = validate_numeric_range(value, 0.0, 1.0, name="mix")
 
     @property
     def output_gain(self) -> float:
@@ -150,7 +153,9 @@ class Distortion(Modifier):
     @output_gain.setter
     def output_gain(self, value: float):
         """Set output gain."""
-        self._output_gain = np.clip(value, 0.0, 2.0)
+        self._output_gain = validate_numeric_range(
+            value, 0.0, 2.0, name="output_gain"
+        )
 
     @property
     def distortion_type(self) -> str:
@@ -333,7 +338,6 @@ class Delay(Modifier):
                 minimum=0.001,
                 maximum=2.0,
                 unit="s",
-                clamp=True,
                 description="Delay time.",
             ),
             "feedback": ParameterDescriptor(
@@ -341,7 +345,6 @@ class Delay(Modifier):
                 default=0.3,
                 minimum=0.0,
                 maximum=0.95,
-                clamp=True,
                 description="Delay feedback amount.",
             ),
             "mix": ParameterDescriptor(
@@ -349,7 +352,6 @@ class Delay(Modifier):
                 default=0.5,
                 minimum=0.0,
                 maximum=1.0,
-                clamp=True,
                 description="Dry/wet mix.",
             ),
             "sample_rate": ParameterDescriptor(
@@ -390,9 +392,13 @@ class Delay(Modifier):
         super().__init__(*args, **kwargs)
         self.source = source  # Optional!
         self._sample_rate = validate_sample_rate(sample_rate)
-        self._delay_time = np.clip(delay_time, 0.001, 2.0)
-        self._feedback = np.clip(feedback, 0.0, 0.95)
-        self._mix = np.clip(mix, 0.0, 1.0)
+        self._delay_time = validate_numeric_range(
+            delay_time, 0.001, 2.0, name="delay_time"
+        )
+        self._feedback = validate_numeric_range(
+            feedback, 0.0, 0.95, name="feedback"
+        )
+        self._mix = validate_numeric_range(mix, 0.0, 1.0, name="mix")
 
         # Create delay buffer (circular buffer)
         max_delay_samples = int(2.0 * self._sample_rate)  # Max 2 seconds
@@ -417,7 +423,9 @@ class Delay(Modifier):
     @delay_time.setter
     def delay_time(self, value: float):
         """Set delay time."""
-        self._delay_time = np.clip(value, 0.001, 2.0)
+        self._delay_time = validate_numeric_range(
+            value, 0.001, 2.0, name="delay_time"
+        )
         new_delay_samples = int(self._delay_time * self._sample_rate)
 
         # If delay time changed significantly, clear buffer to avoid clicks
@@ -435,16 +443,16 @@ class Delay(Modifier):
     @feedback.setter
     def feedback(self, value: float):
         """Set feedback amount."""
-        self._feedback = np.clip(value, 0.0, 0.95)
+        self._feedback = validate_numeric_range(value, 0.0, 0.95, name="feedback")
         previous_feedback = getattr(self, "_prev_feedback", self._feedback)
 
         # If feedback is being reduced significantly, optionally reduce buffer content
         # to prevent lingering echoes that might sound like clicks
-        if previous_feedback > 0.7 and value < 0.3:
+        if previous_feedback > 0.7 and self._feedback < 0.3:
             # Fade out buffer content to prevent sudden silence
             self._buffer *= 0.5
 
-        self._prev_feedback = value
+        self._prev_feedback = self._feedback
 
     @property
     def mix(self) -> float:
@@ -454,7 +462,7 @@ class Delay(Modifier):
     @mix.setter
     def mix(self, value: float):
         """Set mix amount."""
-        self._mix = np.clip(value, 0.0, 1.0)
+        self._mix = validate_numeric_range(value, 0.0, 1.0, name="mix")
 
     def __call__(self, val: float | np.ndarray) -> float | np.ndarray:
         """Apply delay to value(s) - Modifier interface.
@@ -603,7 +611,6 @@ class Reverb(Modifier):
                 default=0.5,
                 minimum=0.0,
                 maximum=1.0,
-                clamp=True,
                 description="Room size control.",
             ),
             "damping": ParameterDescriptor(
@@ -611,7 +618,6 @@ class Reverb(Modifier):
                 default=0.5,
                 minimum=0.0,
                 maximum=1.0,
-                clamp=True,
                 description="High-frequency damping amount.",
             ),
             "mix": ParameterDescriptor(
@@ -619,7 +625,6 @@ class Reverb(Modifier):
                 default=0.3,
                 minimum=0.0,
                 maximum=1.0,
-                clamp=True,
                 description="Dry/wet mix.",
             ),
             "sample_rate": ParameterDescriptor(
@@ -655,9 +660,11 @@ class Reverb(Modifier):
         super().__init__(*args, **kwargs)
         self.source = source  # Optional!
         self._sample_rate = validate_sample_rate(sample_rate)
-        self._room_size = np.clip(room_size, 0.0, 1.0)
-        self._damping = np.clip(damping, 0.0, 1.0)
-        self._mix = np.clip(mix, 0.0, 1.0)
+        self._room_size = validate_numeric_range(
+            room_size, 0.0, 1.0, name="room_size"
+        )
+        self._damping = validate_numeric_range(damping, 0.0, 1.0, name="damping")
+        self._mix = validate_numeric_range(mix, 0.0, 1.0, name="mix")
 
         # Freeverb-inspired delay line lengths (in samples at 44.1kHz)
         # Scaled to current sample rate
@@ -720,7 +727,7 @@ class Reverb(Modifier):
     @room_size.setter
     def room_size(self, value: float):
         """Set room size."""
-        self._room_size = np.clip(value, 0.0, 1.0)
+        self._room_size = validate_numeric_range(value, 0.0, 1.0, name="room_size")
         self._update_coefficients()
 
     @property
@@ -731,7 +738,7 @@ class Reverb(Modifier):
     @damping.setter
     def damping(self, value: float):
         """Set damping amount."""
-        self._damping = np.clip(value, 0.0, 1.0)
+        self._damping = validate_numeric_range(value, 0.0, 1.0, name="damping")
         self._update_coefficients()
 
     @property
@@ -742,7 +749,7 @@ class Reverb(Modifier):
     @mix.setter
     def mix(self, value: float):
         """Set mix amount."""
-        self._mix = np.clip(value, 0.0, 1.0)
+        self._mix = validate_numeric_range(value, 0.0, 1.0, name="mix")
 
     def _process_comb(self, input_val: float, index: int) -> float:
         """Process one comb filter.

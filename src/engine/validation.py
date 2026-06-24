@@ -36,3 +36,25 @@ def validate_sample_count(value: Any, *, name: str = "n") -> int:
         raise ValueError(f"{name} must be non-negative, got {sample_count}")
 
     return sample_count
+
+
+def validate_numeric_range(
+    value: Any,
+    minimum: float,
+    maximum: float,
+    *,
+    name: str,
+) -> float:
+    """Return a finite real number inside an inclusive range."""
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise TypeError(f"{name} must be a real number, got {type(value).__name__}")
+
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError(f"{name} must be finite, got {value!r}")
+    if not minimum <= result <= maximum:
+        raise ValueError(
+            f"{name} must be between {minimum} and {maximum}, got {value!r}"
+        )
+
+    return result

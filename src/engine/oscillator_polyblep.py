@@ -32,6 +32,7 @@ from src.engine.audio_component_registry import (
     register_component,
 )
 from src.engine.oscillator import _derive_amplitude_from_init
+from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.utils import track_provided_args
 
@@ -240,7 +241,9 @@ class PolyBLEPOscillator(Generator):
         self._target_amplitude = self._initial_amp
         self._current_amplitude = self._initial_amp
         self._smoothing_samples_remaining = 0
-        self._smoothing_samples_duration_total = int(10 * sample_rate / 1000)  # 10ms
+        self._smoothing_samples_duration_total = duration_ms_to_samples(
+            sample_rate, 10.0
+        )
 
         # Wave range conversion
         self._update_range_conversion()
@@ -271,19 +274,17 @@ class PolyBLEPOscillator(Generator):
     def _get_current_amplitude(self) -> float:
         """Get amplitude with smoothing."""
         if self._smoothing_samples_remaining > 0:
-            # Linear interpolation
-            t = 1.0 - (
-                self._smoothing_samples_remaining
-                / self._smoothing_samples_duration_total
+            envelope, self._current_amplitude, self._smoothing_samples_remaining = (
+                consume_linear_ramp(
+                    self._current_amplitude,
+                    self._target_amplitude,
+                    self._smoothing_samples_remaining,
+                    1,
+                )
             )
-            amp = (
-                self._current_amplitude
-                + (self._target_amplitude - self._current_amplitude) * t
-            )
-            self._smoothing_samples_remaining -= 1
-            if self._smoothing_samples_remaining == 0:
+            if self._smoothing_samples_remaining <= 0:
                 self._current_amplitude = self._target_amplitude
-            return amp
+            return float(envelope[0])
         return self._current_amplitude
 
     # Properties matching Oscillator API
@@ -475,14 +476,15 @@ class PolyBLEPOscillator(Generator):
 
         # Apply amplitude with smoothing
         if self._smoothing_samples_remaining > 0:
-            smooth_count = min(n, self._smoothing_samples_remaining)
-            amp_envelope = np.linspace(
-                self._current_amplitude, self._target_amplitude, smooth_count
+            amp_envelope, self._current_amplitude, self._smoothing_samples_remaining = (
+                consume_linear_ramp(
+                    self._current_amplitude,
+                    self._target_amplitude,
+                    self._smoothing_samples_remaining,
+                    n,
+                )
             )
-            samples[:smooth_count] *= amp_envelope
-            if smooth_count < n:
-                samples[smooth_count:] *= self._target_amplitude
-            self._smoothing_samples_remaining -= smooth_count
+            samples *= amp_envelope
             if self._smoothing_samples_remaining <= 0:
                 self._current_amplitude = self._target_amplitude
         else:

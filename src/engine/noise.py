@@ -74,6 +74,7 @@ from src.engine.audio_component import (
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import _derive_amplitude_from_init
+from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
@@ -800,7 +801,9 @@ class NoiseGenerator(Generator):
         self._target_amplitude = self._amplitude
         self._current_amplitude = self._amplitude
         self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = max(1, int(0.01 * self.sample_rate))
+        self._smoothing_duration_samples = duration_ms_to_samples(
+            self.sample_rate, 10.0, min_samples=1
+        )
 
         self._buffer: np.ndarray | None = None
         self._buffer_index: int = 0
@@ -877,35 +880,51 @@ class NoiseGenerator(Generator):
         """
         # Generate the appropriate noise type
         if self.noise_type == "White":
-            return white_noise(
-                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
-            )
+            samples = white_noise(dur=duration, amplitude=1.0, sr=self.sample_rate)
+            return self._apply_amplitude_to_buffer(samples)
         if self.noise_type == "Pink":
-            return pink_noise(
-                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
-            )
+            samples = pink_noise(dur=duration, amplitude=1.0, sr=self.sample_rate)
+            return self._apply_amplitude_to_buffer(samples)
         if self.noise_type == "Brown":
-            return brownian_noise(
-                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
-            )
+            samples = brownian_noise(dur=duration, amplitude=1.0, sr=self.sample_rate)
+            return self._apply_amplitude_to_buffer(samples)
         if self.noise_type == "Blue":
-            return blue_noise(
-                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
-            )
+            samples = blue_noise(dur=duration, amplitude=1.0, sr=self.sample_rate)
+            return self._apply_amplitude_to_buffer(samples)
         if self.noise_type == "Grey":
-            return grey_noise(
-                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
-            )
+            samples = grey_noise(dur=duration, amplitude=1.0, sr=self.sample_rate)
+            return self._apply_amplitude_to_buffer(samples)
         if self.noise_type == "Velvet":
-            return velvet_noise(
-                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
-            )
+            samples = velvet_noise(dur=duration, amplitude=1.0, sr=self.sample_rate)
+            return self._apply_amplitude_to_buffer(samples)
         if self.noise_type == "Sample & Hold":
-            return sample_hold_noise(
-                dur=duration, amplitude=self.amplitude, sr=self.sample_rate
+            samples = sample_hold_noise(
+                dur=duration, amplitude=1.0, sr=self.sample_rate
             )
+            return self._apply_amplitude_to_buffer(samples)
 
         raise ValueError(f"Unknown noise type: {self.noise_type}")
+
+    def _apply_amplitude_to_buffer(self, samples: np.ndarray) -> np.ndarray:
+        """Apply current amplitude, consuming any active smoothing ramp."""
+        if len(samples) == 0:
+            return np.empty(0, dtype=np.float32)
+
+        if self._smoothing_samples_remaining > 0:
+            envelope, self._current_amplitude, self._smoothing_samples_remaining = (
+                consume_linear_ramp(
+                    self._current_amplitude,
+                    self._target_amplitude,
+                    self._smoothing_samples_remaining,
+                    len(samples),
+                )
+            )
+            if self._smoothing_samples_remaining <= 0:
+                self._amplitude = self._target_amplitude
+            return (samples * envelope).astype(np.float32)
+
+        self._current_amplitude = self._amplitude
+        return (samples * self._amplitude).astype(np.float32)
 
     def get_samples(
         self, num_samples: int, reset: bool = True, mode: str = "auto"

@@ -15,6 +15,7 @@ from src.engine.audio_component import (
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator_base import Oscillator
+from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.utils import filter_provided_args, track_provided_args
 
@@ -111,9 +112,6 @@ class IdealSquareStrategySmoothing(SquareWaveStrategy):
         self._smoothing_samples_total = 0
         self._smoothing_samples_remaining = 0
 
-    def _smoothing_sample_count(self) -> int:
-        return int(self.smoothing_time_ms * self.sample_rate / 1000)
-
     def set_sample_rate(self, sample_rate: float) -> None:
         self.sample_rate = validate_sample_rate(sample_rate)
 
@@ -126,7 +124,11 @@ class IdealSquareStrategySmoothing(SquareWaveStrategy):
 
     def set_amplitude(self, amplitude: float) -> None:
         if abs(amplitude - self._current_amplitude) > 0.001:
-            smoothing_samples = self._smoothing_sample_count()
+            smoothing_samples = duration_ms_to_samples(
+                self.sample_rate,
+                self.smoothing_time_ms,
+                name="smoothing_time_ms",
+            )
             self._start_amplitude = self._current_amplitude
             self._target_amplitude = amplitude
             self._smoothing_samples_total = smoothing_samples
@@ -140,25 +142,18 @@ class IdealSquareStrategySmoothing(SquareWaveStrategy):
         if self._smoothing_samples_remaining <= 0:
             return np.full(n, self._current_amplitude, dtype=np.float32)
 
-        smooth_count = min(n, self._smoothing_samples_remaining)
-        completed = self._smoothing_samples_total - self._smoothing_samples_remaining
-        positions = completed + np.arange(1, smooth_count + 1, dtype=np.float64)
-        progress = positions / self._smoothing_samples_total
-        envelope = (
-            self._start_amplitude
-            + (self._target_amplitude - self._start_amplitude) * progress
-        ).astype(np.float32)
-
-        self._smoothing_samples_remaining -= smooth_count
-        self._current_amplitude = float(envelope[-1])
+        envelope, self._current_amplitude, self._smoothing_samples_remaining = (
+            consume_linear_ramp(
+                self._current_amplitude,
+                self._target_amplitude,
+                self._smoothing_samples_remaining,
+                n,
+            )
+        )
         if self._smoothing_samples_remaining <= 0:
             self.reset_amplitude(self._target_amplitude)
 
-        if smooth_count == n:
-            return envelope
-
-        tail = np.full(n - smooth_count, self._target_amplitude, dtype=np.float32)
-        return np.concatenate((envelope, tail))
+        return envelope
 
     def generate_sample(
         self,

@@ -7,6 +7,7 @@ import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import Generator
+from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
@@ -52,8 +53,8 @@ class Oscillator(Generator):
         self._target_amplitude = self._initial_amp
         self._current_amplitude = self._initial_amp
         self._smoothing_samples_remaining = 0
-        self._smoothing_samples_duration_total = int(
-            DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS * sample_rate / 1000
+        self._smoothing_samples_duration_total = duration_ms_to_samples(
+            sample_rate, DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS
         )
 
         self._needs_range_conversion: bool = False
@@ -143,8 +144,8 @@ class Oscillator(Generator):
         value = validate_sample_rate(value)
         if value != self._sample_rate:
             self._sample_rate = value
-            self._smoothing_samples_duration_total = int(
-                DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS * value / 1000
+            self._smoothing_samples_duration_total = duration_ms_to_samples(
+                value, DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS
             )
             self._post_sample_rate_set()
 
@@ -182,15 +183,13 @@ class Oscillator(Generator):
 
         if self._smoothing_samples_remaining > 0:
             smooth_count = min(n, self._smoothing_samples_remaining)
-            smoothing_progress = (
-                np.arange(1, smooth_count + 1, dtype=np.float64)
-                / self._smoothing_samples_remaining
-            )
-            amp_envelope = np.asarray(
-                self._current_amplitude
-                + (self._target_amplitude - self._current_amplitude)
-                * smoothing_progress,
-                dtype=np.float32,
+            amp_envelope, self._current_amplitude, self._smoothing_samples_remaining = (
+                consume_linear_ramp(
+                    self._current_amplitude,
+                    self._target_amplitude,
+                    self._smoothing_samples_remaining,
+                    smooth_count,
+                )
             )
 
             samples = np.empty(n, dtype=np.float32)
@@ -198,9 +197,6 @@ class Oscillator(Generator):
 
             if smooth_count < n:
                 samples[smooth_count:] = values[smooth_count:] * self._target_amplitude
-
-            self._smoothing_samples_remaining -= smooth_count
-            self._current_amplitude = float(amp_envelope[-1])
 
             if self._smoothing_samples_remaining <= 0:
                 self._current_amplitude = self._target_amplitude

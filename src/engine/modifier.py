@@ -30,10 +30,8 @@ Note:
 
 from __future__ import annotations
 
-import math
 from abc import abstractmethod
 from collections.abc import Iterable
-from numbers import Real
 from typing import Any
 
 import numpy as np
@@ -46,28 +44,13 @@ from src.engine.audio_component import (
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.oscillator import _derive_amplitude_from_init
+from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.validation import validate_sample_rate
 from src.utils.logging_config import get_engine_logger
 from src.utils.math import db_to_linear, linear_to_db
 from src.utils.utils import track_provided_args
 
 logger = get_engine_logger("modifier")
-
-
-def _smoothing_sample_count(
-    sample_rate: float, smoothing_time_ms: float, *, name: str = "smoothing_time_ms"
-) -> int:
-    """Return a finite non-negative smoothing duration in samples."""
-    if isinstance(smoothing_time_ms, bool) or not isinstance(smoothing_time_ms, Real):
-        raise TypeError(
-            f"{name} must be a real number, got {type(smoothing_time_ms).__name__}"
-        )
-
-    smoothing_time_ms = float(smoothing_time_ms)
-    if not math.isfinite(smoothing_time_ms) or smoothing_time_ms < 0.0:
-        raise ValueError(f"{name} must be finite and non-negative")
-
-    return int(smoothing_time_ms * sample_rate / 1000)
 
 
 def _validate_modulator(modulator: Any) -> None:
@@ -243,8 +226,8 @@ class Panner(Modifier):
         self._current_left_gain = self._left_gain  # Start at current position
         self._current_right_gain = self._right_gain  # Start at current position
         self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = _smoothing_sample_count(
-            self.sample_rate, self.smoothing_time_ms
+        self._smoothing_duration_samples = duration_ms_to_samples(
+            self.sample_rate, self.smoothing_time_ms, name="smoothing_time_ms"
         )
 
     @property
@@ -298,41 +281,30 @@ class Panner(Modifier):
         """
         n = len(samples)
 
-        # Apply pan gains with smoothing if transitioning (prevents clicks!)
         if self._smoothing_samples_remaining > 0:
-            # Calculate how many samples to smooth in this buffer
-            smooth_count = min(n, self._smoothing_samples_remaining)
-
-            # Create smooth gain envelopes (linear ramp)
-            left_envelope = np.linspace(
-                self._current_left_gain, self._target_left_gain, smooth_count
+            remaining = self._smoothing_samples_remaining
+            left_envelope, self._current_left_gain, new_remaining = consume_linear_ramp(
+                self._current_left_gain,
+                self._target_left_gain,
+                remaining,
+                n,
             )
-            right_envelope = np.linspace(
-                self._current_right_gain, self._target_right_gain, smooth_count
+            right_envelope, self._current_right_gain, _ = consume_linear_ramp(
+                self._current_right_gain,
+                self._target_right_gain,
+                remaining,
+                n,
             )
+            self._smoothing_samples_remaining = new_remaining
 
-            # Apply smoothed gains to first part
-            left = np.zeros(n, dtype=np.float32)
-            right = np.zeros(n, dtype=np.float32)
-            left[:smooth_count] = samples[:smooth_count] * left_envelope
-            right[:smooth_count] = samples[:smooth_count] * right_envelope
-
-            # Apply target gains to rest (if any)
-            if smooth_count < n:
-                left[smooth_count:] = samples[smooth_count:] * self._target_left_gain
-                right[smooth_count:] = samples[smooth_count:] * self._target_right_gain
-
-            # Update state
-            self._smoothing_samples_remaining -= smooth_count
             if self._smoothing_samples_remaining <= 0:
                 self._current_left_gain = self._target_left_gain
                 self._current_right_gain = self._target_right_gain
-            else:
-                # Update current gain to end of ramp for next buffer
-                self._current_left_gain = left_envelope[-1]
-                self._current_right_gain = right_envelope[-1]
 
-            return left.astype(np.float32), right.astype(np.float32)
+            return (
+                (samples * left_envelope).astype(np.float32),
+                (samples * right_envelope).astype(np.float32),
+            )
         else:
             # No smoothing needed - use target gains (which match
             # _left_gain/_right_gain)
@@ -605,8 +577,8 @@ class Volume(Modifier):
         self._target_amplitude = self._amplitude
         self._current_amplitude = self._amplitude
         self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = _smoothing_sample_count(
-            self.sample_rate, self.smoothing_time_ms
+        self._smoothing_duration_samples = duration_ms_to_samples(
+            self.sample_rate, self.smoothing_time_ms, name="smoothing_time_ms"
         )
 
         logger.debug(f"Volume initialized with amplitude: {self._amplitude}")
@@ -670,20 +642,19 @@ class Volume(Modifier):
         """
         # Scalar input
         if isinstance(val, (float, int, np.number)):
-            # Apply amplitude with smoothing if transitioning (prevents clicks!)
             if self._smoothing_samples_remaining > 0:
-                # Create smooth amplitude envelope (linear ramp)
-                amp_envelope = np.linspace(
+                (
+                    amp_envelope,
+                    self._current_amplitude,
+                    self._smoothing_samples_remaining,
+                ) = consume_linear_ramp(
                     self._current_amplitude,
                     self._target_amplitude,
                     self._smoothing_samples_remaining,
+                    1,
                 )
-
-                # Apply smoothed amplitude to single sample
                 result = val * amp_envelope[0]
 
-                # Update state
-                self._smoothing_samples_remaining -= 1
                 if self._smoothing_samples_remaining <= 0:
                     self._current_amplitude = self._target_amplitude
                     self._amplitude = self._target_amplitude  # Update _amplitude too!
@@ -714,26 +685,17 @@ class Volume(Modifier):
         """
         n = len(samples)
 
-        # Apply amplitude with smoothing if transitioning (prevents clicks!)
         if self._smoothing_samples_remaining > 0:
-            # Calculate how many samples to smooth in this buffer
-            smooth_count = min(n, self._smoothing_samples_remaining)
-
-            # Create smooth amplitude envelope (linear ramp)
-            amp_envelope = np.linspace(
-                self._current_amplitude, self._target_amplitude, smooth_count
+            amp_envelope, self._current_amplitude, self._smoothing_samples_remaining = (
+                consume_linear_ramp(
+                    self._current_amplitude,
+                    self._target_amplitude,
+                    self._smoothing_samples_remaining,
+                    n,
+                )
             )
+            result = samples * amp_envelope
 
-            # Apply smoothed amplitude to first part
-            result = np.zeros(n, dtype=np.float32)
-            result[:smooth_count] = samples[:smooth_count] * amp_envelope
-
-            # Apply target amplitude to rest (if any)
-            if smooth_count < n:
-                result[smooth_count:] = samples[smooth_count:] * self._target_amplitude
-
-            # Update state
-            self._smoothing_samples_remaining -= smooth_count
             if self._smoothing_samples_remaining <= 0:
                 self._current_amplitude = self._target_amplitude
                 self._amplitude = self._target_amplitude  # Update _amplitude too!

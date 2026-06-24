@@ -41,6 +41,10 @@ from PyQt6.QtWidgets import (
     QPushButton,
 )
 
+from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.module_registry import register_module
+from src.gui.modules.input.midi_worker_thread import MIDIWorkerThread
+from src.gui.widgets.module_widget import ModuleWidget
 from src.midi_io import (
     CVFrequencyOutput,
     CVGateOutput,
@@ -50,10 +54,6 @@ from src.midi_io import (
     NoteOffMessage,
     NoteOnMessage,
 )
-from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.modules.input.midi_worker_thread import MIDIWorkerThread
-from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)
 

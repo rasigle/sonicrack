@@ -892,8 +892,7 @@ class PresetBuilder:
             params = {
                 k: v
                 for k, v in component.items()
-                if k not in ["name", "category", "description"]
-                and k in parameter_names
+                if k not in ["name", "category", "description"] and k in parameter_names
             }
 
             # Call method with keyword arguments
@@ -965,8 +964,7 @@ class PresetBuilder:
             params = {
                 k: v
                 for k, v in component.items()
-                if k not in ["name", "category", "description"]
-                and k in parameter_names
+                if k not in ["name", "category", "description"] and k in parameter_names
             }
 
             # Call method with keyword arguments

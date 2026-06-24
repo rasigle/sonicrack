@@ -698,9 +698,7 @@ class Reverb(Modifier):
         ]
         self._allpass_positions = [0] * len(self._allpass_delays)
         self._allpass_count = len(self._allpass_buffers)
-        self._allpass_buffer_lengths = [
-            len(buffer) for buffer in self._allpass_buffers
-        ]
+        self._allpass_buffer_lengths = [len(buffer) for buffer in self._allpass_buffers]
 
         # Update feedback coefficients
         self._update_coefficients()
@@ -795,9 +793,7 @@ class Reverb(Modifier):
         buffer[pos] = input_val + delayed * 0.5
 
         # Update position
-        self._allpass_positions[index] = (
-            pos + 1
-        ) % self._allpass_buffer_lengths[index]
+        self._allpass_positions[index] = (pos + 1) % self._allpass_buffer_lengths[index]
 
         return output
 
@@ -810,14 +806,11 @@ class Reverb(Modifier):
 
             output = float(buffer[pos])
             filtered = (
-                output * self._damp2
-                + self._comb_filter_states[index] * self._damp1
+                output * self._damp2 + self._comb_filter_states[index] * self._damp1
             )
             self._comb_filter_states[index] = filtered
             buffer[pos] = input_sample + filtered * self._feedback
-            self._comb_positions[index] = (
-                pos + 1
-            ) % self._comb_buffer_lengths[index]
+            self._comb_positions[index] = (pos + 1) % self._comb_buffer_lengths[index]
 
             comb_sum += output
 
@@ -830,9 +823,9 @@ class Reverb(Modifier):
             delayed = float(buffer[pos])
             output = -wet + delayed
             buffer[pos] = wet + delayed * 0.5
-            self._allpass_positions[index] = (
-                pos + 1
-            ) % self._allpass_buffer_lengths[index]
+            self._allpass_positions[index] = (pos + 1) % self._allpass_buffer_lengths[
+                index
+            ]
             wet = output
 
         return input_sample * (1.0 - self._mix) + wet * self._mix

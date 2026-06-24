@@ -83,8 +83,8 @@ Note:
 """
 
 from src.engine.audio_component import (
-    AudioComponent,
     COMMON_PARAMETER_DESCRIPTORS,
+    AudioComponent,
     ComponentCategory,
     ComponentDescriptor,
     ParameterDescriptor,

@@ -8,6 +8,7 @@ import numpy as np
 import sounddevice as sd
 
 from src.audio_io.realtime import RealtimeAudioCallback
+from src.engine.ramping import duration_ms_to_samples, fill_linear_ramp
 
 logger = logging.getLogger(__name__)
 
@@ -54,22 +55,24 @@ class AudioOutput:
         self._target_master_volume = 0.7
         self._current_master_volume = 0.7
         self._master_volume_smoothing_samples = 0
-        self._master_volume_smoothing_duration = 441  # 10ms @ 44.1kHz
+        self._master_volume_smoothing_duration = duration_ms_to_samples(
+            self.sample_rate, 10.0
+        )
 
         # Fade-out state to prevent clicks on stop
         self.is_fading_out: bool = False
         self.fade_out_samples_remaining: int = 0
         self.fade_out_duration_ms: float = DEFAULT_FADEOUT_DURATION_MS
-        self.fade_out_total_samples: int = int(
-            self.sample_rate * self.fade_out_duration_ms / 1000
+        self.fade_out_total_samples: int = duration_ms_to_samples(
+            self.sample_rate, self.fade_out_duration_ms
         )
 
         # Fade-in state to prevent clicks on start
         self.is_fading_in: bool = False
         self.fade_in_samples_remaining: int = 0
         self.fade_in_duration_ms: float = DEFAULT_FADEIN_DURATION_MS
-        self.fade_in_total_samples: int = int(
-            self.sample_rate * self.fade_in_duration_ms / 1000
+        self.fade_in_total_samples: int = duration_ms_to_samples(
+            self.sample_rate, self.fade_in_duration_ms
         )
 
         # Track if we're in post-fade silence mode
@@ -144,15 +147,15 @@ class AudioOutput:
 
     def _recalculate_fade_samples(self):
         """Recalculate fade sample counts based on current sample rate."""
-        self.fade_out_total_samples = int(
-            self.sample_rate * self.fade_out_duration_ms / 1000
+        self.fade_out_total_samples = duration_ms_to_samples(
+            self.sample_rate, self.fade_out_duration_ms
         )
-        self.fade_in_total_samples = int(
-            self.sample_rate * self.fade_in_duration_ms / 1000
+        self.fade_in_total_samples = duration_ms_to_samples(
+            self.sample_rate, self.fade_in_duration_ms
         )
-        self._master_volume_smoothing_duration = int(
-            self.sample_rate * 0.01
-        )  # 10ms smoothing
+        self._master_volume_smoothing_duration = duration_ms_to_samples(
+            self.sample_rate, 10.0
+        )
 
     def set_master_volume(self, volume: float):
         """Set the master output volume with smoothing to prevent clicks.
@@ -245,9 +248,8 @@ class AudioOutput:
                             / self.fade_out_total_samples
                         )
                         fade_stop = (
-                            (self.fade_out_samples_remaining - num_fade)
-                            / self.fade_out_total_samples
-                        )
+                            self.fade_out_samples_remaining - num_fade
+                        ) / self.fade_out_total_samples
                         fade_curve = self._fill_ramp(
                             fade_start,
                             fade_stop,
@@ -302,16 +304,13 @@ class AudioOutput:
     def _fill_ramp(self, start: float, stop: float, length: int) -> np.ndarray:
         """Fill and return a reusable linear ramp buffer."""
         self._ensure_callback_buffers(length)
-        ramp = self._ramp_buffer[:length]
-        if length == 1:
-            ramp[0] = stop
-            return ramp
-
-        indices = self._ramp_index_buffer[:length]
-        scale = (stop - start) / (length - 1)
-        np.multiply(indices, scale, out=ramp)
-        ramp += start
-        return ramp
+        return fill_linear_ramp(
+            start,
+            stop,
+            length,
+            out=self._ramp_buffer,
+            index_buffer=self._ramp_index_buffer,
+        )
 
     def _ensure_callback_buffers(self, frames: int) -> None:
         """Grow reusable callback buffers outside the steady-state hot path."""

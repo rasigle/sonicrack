@@ -17,7 +17,7 @@ def print_benchmark_table(
     if include_component:
         headers.append("Component")
 
-    headers.extend(["Buffer Size", "Min (µs)", "Mean (µs)", "Max (µs)"])
+    headers.extend(["Buffer Size", "Min (us)", "Mean (us)", "Max (us)"])
 
     if include_allocations:
         headers.extend(["Current Bytes", "Peak Bytes"])

@@ -826,6 +826,67 @@ class Reverb(Modifier):
 
         return input_sample * (1.0 - self._mix) + wet * self._mix
 
+    def _process_buffer(self, input_samples: np.ndarray) -> np.ndarray:
+        """Process a mono sample buffer through the reverb delay network."""
+        output_samples = np.empty(len(input_samples), dtype=np.float32)
+
+        comb_buffers = self._comb_buffers
+        comb_positions = self._comb_positions
+        comb_states = self._comb_filter_states
+        comb_lengths = self._comb_buffer_lengths
+        comb_count = self._comb_count
+
+        allpass_buffers = self._allpass_buffers
+        allpass_positions = self._allpass_positions
+        allpass_lengths = self._allpass_buffer_lengths
+        allpass_count = self._allpass_count
+
+        damp1 = self._damp1
+        damp2 = self._damp2
+        feedback = self._feedback
+        mix = self._mix
+        dry_mix = 1.0 - mix
+
+        for sample_index, input_sample in enumerate(input_samples):
+            input_value = float(input_sample)
+            comb_sum = 0.0
+
+            for index in range(comb_count):
+                buffer = comb_buffers[index]
+                pos = comb_positions[index]
+
+                output = float(buffer[pos])
+                filtered = output * damp2 + comb_states[index] * damp1
+                comb_states[index] = filtered
+                buffer[pos] = input_value + filtered * feedback
+
+                pos += 1
+                if pos == comb_lengths[index]:
+                    pos = 0
+                comb_positions[index] = pos
+
+                comb_sum += output
+
+            wet = comb_sum / comb_count
+
+            for index in range(allpass_count):
+                buffer = allpass_buffers[index]
+                pos = allpass_positions[index]
+
+                delayed = float(buffer[pos])
+                output = -wet + delayed
+                buffer[pos] = wet + delayed * 0.5
+
+                pos += 1
+                if pos == allpass_lengths[index]:
+                    pos = 0
+                allpass_positions[index] = pos
+                wet = output
+
+            output_samples[sample_index] = input_value * dry_mix + wet * mix
+
+        return output_samples
+
     def __call__(self, val: float | np.ndarray) -> float | np.ndarray:
         """Apply reverb to value(s) - Modifier interface.
 
@@ -841,12 +902,7 @@ class Reverb(Modifier):
 
         # Handle array
         input_samples = np.asarray(val)
-        output_samples = np.zeros(len(input_samples), dtype=np.float32)
-
-        for i, input_sample in enumerate(input_samples):
-            output_samples[i] = self._process_sample(float(input_sample))
-
-        return output_samples
+        return self._process_buffer(input_samples)
 
     def __iter__(self):
         """Initialize iterator."""
@@ -885,13 +941,7 @@ class Reverb(Modifier):
         # Get input samples
         source = cast(Any, self.source)
         input_samples = source.get_samples_vectorized(n)
-        output_samples = np.zeros(n, dtype=np.float32)
-
-        # Process each sample through the reverb
-        for i in range(n):
-            output_samples[i] = self._process_sample(float(input_samples[i]))
-
-        return output_samples
+        return self._process_buffer(input_samples)
 
     def get_samples(self, n: int, mode: str = "vectorized", **kwargs) -> np.ndarray:
         """Get n samples using specified mode."""

@@ -6,6 +6,7 @@ import time
 import tracemalloc
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -142,15 +143,15 @@ def plot_metric(
 
     for component in components:
         component_rows = [row for row in rows if str(row["component"]) == component]
-        component_rows.sort(key=lambda row: int(row["buffer_size"]))
+        component_rows.sort(key=lambda row: int(cast(int, row["buffer_size"])))
 
-        x = [int(row["buffer_size"]) for row in component_rows]
-        y = [float(row[metric_key]) for row in component_rows]
+        x = [int(cast(int, row["buffer_size"])) for row in component_rows]
+        y = [float(cast(float, row[metric_key])) for row in component_rows]
 
         plt.plot(x, y, marker="o", label=component)
 
     plt.xscale("log", base=2)
-    plt.xticks(sorted({int(row["buffer_size"]) for row in rows}))
+    plt.xticks(sorted({int(cast(int, row["buffer_size"])) for row in rows}))
     plt.xlabel("Buffer Size")
     plt.ylabel(metric_label)
     plt.title(title)
@@ -172,7 +173,7 @@ def plot_results(
     plot_metric(
         rows,
         metric_key="mean_us",
-        metric_label="Mean Time (µs)",
+        metric_label="Mean Time (us)",
         title="DSP Benchmark: Mean Time vs Buffer Size",
         output_path=output_dir / "dsp_mean_us.png",
     )
@@ -180,7 +181,7 @@ def plot_results(
     plot_metric(
         rows,
         metric_key="min_us",
-        metric_label="Min Time (µs)",
+        metric_label="Min Time (us)",
         title="DSP Benchmark: Min Time vs Buffer Size",
         output_path=output_dir / "dsp_min_us.png",
     )
@@ -188,7 +189,7 @@ def plot_results(
     plot_metric(
         rows,
         metric_key="max_us",
-        metric_label="Max Time (µs)",
+        metric_label="Max Time (us)",
         title="DSP Benchmark: Max Time vs Buffer Size",
         output_path=output_dir / "dsp_max_us.png",
     )

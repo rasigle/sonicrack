@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
+from src.engine import SineOscillator, Volume
 from src.gui.core.module import AudioModule, ModuleCategory
 from src.gui.core.patch_compiler import PatchCompiler
 from src.gui.widgets.port_widget import PortWidget
@@ -28,6 +29,7 @@ class _Module:
         self.metadata = _Metadata(title=title, category=category)
         self.input_ports: list[_Port] = []
         self.output_ports: list[_Port] = []
+        self.is_active = True
 
     def add_input(self, name: str) -> _Port:
         port = _Port(self, name, "input")
@@ -40,10 +42,24 @@ class _Module:
         return port
 
     def get_required_inputs(self) -> list[str]:
+        if self.metadata.category == ModuleCategory.MODIFIER:
+            return ["In"]
         return []
 
     def get_modulation_inputs(self) -> list[str]:
         return []
+
+    def create_engine_component(
+        self,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
+    ):
+        del input_components, modulation_components
+        if self.metadata.category == ModuleCategory.SOURCE:
+            return SineOscillator(frequency=440)
+        if self.metadata.category == ModuleCategory.MODIFIER:
+            return Volume(gain_db=-12)
+        return None
 
 
 def _as_modules(*modules: _Module) -> list[AudioModule]:
@@ -111,3 +127,37 @@ def test_patch_compiler_build_patch_tree_without_output_creates_root():
     assert tree["name"] == "Patch (no output)"
     assert tree["type"] == "ROOT"
     assert tree["inputs"][0]["node"]["name"] == "Osc"
+
+
+def test_patch_compiler_skips_inactive_source():
+    source = _Module("Osc", ModuleCategory.SOURCE)
+    source.is_active = False
+    source_out = source.add_output("Out")
+    output = _Module("Output", ModuleCategory.OUTPUT)
+    output_in = output.add_input("In")
+    compiler = PatchCompiler()
+    compiler.set_patch(
+        _as_modules(source, output), _as_connections((source_out, output_in))
+    )
+
+    assert compiler.compile() is None
+
+
+def test_patch_compiler_bypasses_inactive_modifier():
+    source = _Module("Osc", ModuleCategory.SOURCE)
+    source_out = source.add_output("Out")
+    modifier = _Module("Volume", ModuleCategory.MODIFIER)
+    modifier.is_active = False
+    modifier_in = modifier.add_input("In")
+    modifier_out = modifier.add_output("Out")
+    output = _Module("Output", ModuleCategory.OUTPUT)
+    output_in = output.add_input("In")
+    compiler = PatchCompiler()
+    compiler.set_patch(
+        _as_modules(source, modifier, output),
+        _as_connections((source_out, modifier_in), (modifier_out, output_in)),
+    )
+
+    component = compiler.compile()
+
+    assert isinstance(component, SineOscillator)

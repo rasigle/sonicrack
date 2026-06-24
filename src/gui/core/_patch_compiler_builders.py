@@ -46,6 +46,13 @@ class PatchCompilerBuilderMixin:
             return build_cache[module]
 
         category: ModuleCategory = module.metadata.category
+        if (
+            not getattr(module, "is_active", True)
+            and category != ModuleCategory.MODIFIER
+        ):
+            logger.debug(f"{module.metadata.title}: inactive - skipping")
+            return None
+
         builders: dict[ModuleCategory, Callable[[Any], AudioComponent | None]] = {
             ModuleCategory.SOURCE: self._build_source_module,
             ModuleCategory.MODULATED_SOURCE: self._build_modulated_source_module,
@@ -176,6 +183,10 @@ class PatchCompilerBuilderMixin:
             return None
 
         input_comp = WaveAdder(*components) if len(components) > 1 else components[0]
+        if not getattr(module, "is_active", True):
+            logger.info(f"{name}: inactive - bypassing modifier")
+            return input_comp
+
         modulation_components = self._collect_modulation_components(module)
 
         logger.info(

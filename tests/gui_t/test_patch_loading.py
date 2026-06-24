@@ -1,6 +1,8 @@
 """Regression tests for GUI patch loading."""
 
+from src.audio_io import AudioOutput
 from src.gui.main_window import ModularSynthWindow
+from src.gui.modules.output.output import OutputModule
 
 
 def test_apply_preset_recreates_saved_cables(monkeypatch):
@@ -40,3 +42,18 @@ def test_apply_preset_recreates_saved_cables(monkeypatch):
     assert len(connections) == 1
     assert connections[0][0].port_name == "Sine"
     assert connections[0][1].port_name == "Left/Mono"
+
+
+def test_add_output_keeps_audio_output_backend():
+    """Adding Output must not replace its playback backend with AudioEngine."""
+    window = ModularSynthWindow()
+
+    window._add_module("Output")
+
+    output_module = next(
+        module
+        for module in window._require_patch_canvas().get_modules()
+        if isinstance(module, OutputModule)
+    )
+    assert isinstance(output_module.audio_output, AudioOutput)
+    assert output_module.audio_engine is window.audio_engine

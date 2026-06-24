@@ -7,7 +7,7 @@ import logging
 from abc import ABCMeta
 from typing import Any
 
-from PyQt6.QtCore import QRectF, Qt, pyqtSignal
+from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import (
     QGraphicsItem,
@@ -48,21 +48,25 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
     """
 
     # === Visual Constants ===
-    TITLE_BAR_HEIGHT = 42
-    TITLE_BAR_HEIGHT_WITH_NAME = 50
+    TITLE_BAR_HEIGHT = 44
+    TITLE_BAR_HEIGHT_WITH_NAME = 54
     BORDER_RADIUS = 8
     SELECTION_BORDER_WIDTH = 3
     NORMAL_BORDER_WIDTH = 2
+    POWER_BUTTON_SIZE = 18
 
     # Colors
     COLOR_SELECTION_BORDER = QColor(255, 200, 0)
-    COLOR_NORMAL_BORDER = QColor(30, 30, 30)
-    COLOR_TITLE_BAR_BG = QColor(30, 30, 30, 200)
-    COLOR_MODULE_TYPE = QColor(150, 150, 150)
+    COLOR_NORMAL_BORDER = QColor(12, 14, 16)
+    COLOR_TITLE_BAR_BG = QColor(18, 20, 23, 235)
+    COLOR_MODULE_TYPE = QColor(232, 236, 240)
     COLOR_CUSTOM_NAME = QColor(255, 255, 100)
-    COLOR_CATEGORY = QColor(130, 130, 130)
+    COLOR_CATEGORY = QColor(160, 168, 174)
     COLOR_CATEGORY_NO_NAME = QColor(200, 200, 200)
     COLOR_PORT_LABEL = QColor(220, 220, 220)
+    COLOR_PANEL_TOP = QColor(46, 50, 55)
+    COLOR_PANEL_BOTTOM = QColor(26, 29, 33)
+    COLOR_INACTIVE_OVERLAY = QColor(0, 0, 0, 105)
 
     # Signals
     parameter_changed = pyqtSignal(str, object)  # (param_name, value)
@@ -87,6 +91,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self.module_color = color or QColor(80, 120, 180)
 
         self.custom_name = ""
+        self.is_active = True
 
         # Caching for pull-based architecture (Phase 3)
         self._cache_valid = False
@@ -104,6 +109,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
+        self.setToolTip("Click the power button to bypass this module.")
 
     # === UI Construction Helpers ===
     @staticmethod
@@ -225,7 +231,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         Returns:
             Dictionary of parameter names to values
         """
-        params = {}
+        params = {"active": self.is_active}
         for name, (widget, getter, _) in self._parameters.items():
             if hasattr(widget, getter):
                 params[name] = getattr(widget, getter)()
@@ -240,11 +246,48 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         Args:
             params: Dictionary of parameter names to values
         """
+        active_value = params.get("active")
+        if isinstance(active_value, bool):
+            self.set_active(active_value)
+
         for name, value in params.items():
+            if name == "active":
+                continue
             if name in self._parameters:
                 widget, _, setter = self._parameters[name]
                 if hasattr(widget, setter):
                     getattr(widget, setter)(value)
+
+    # === Active / Bypass State ===
+
+    def set_active(self, active: bool) -> None:
+        """Set whether this module participates in patch compilation."""
+        if self.is_active == active:
+            return
+        self.is_active = active
+        self.invalidate_cache()
+        self.update()
+        self._notify_patch_changed()
+
+    def toggle_active(self) -> None:
+        """Toggle the module active/bypassed state."""
+        self.set_active(not self.is_active)
+
+    def _notify_patch_changed(self) -> None:
+        """Notify the main window that module state changed."""
+        scene = self.scene()
+        if scene is None:
+            return
+
+        for view in scene.views():
+            main_window = view.window()
+            if main_window is None:
+                continue
+            if hasattr(main_window, "_mark_patch_modified"):
+                main_window._mark_patch_modified()
+            if hasattr(main_window, "_restart_output_playback"):
+                main_window._restart_output_playback()
+            break
 
     # === Pull-Based Audio Processing (Caching) ===
 
@@ -316,6 +359,19 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         """Return the bounding rectangle of the module."""
         return QRectF(0, 0, self.module_width, self.module_height)
 
+    def _title_bar_height(self) -> int:
+        """Return the current title bar height."""
+        if self.custom_name:
+            return self.TITLE_BAR_HEIGHT_WITH_NAME
+        return self.TITLE_BAR_HEIGHT
+
+    def _power_button_rect(self) -> QRectF:
+        """Return the title-bar power button hit rectangle."""
+        margin = 10
+        size = self.POWER_BUTTON_SIZE
+        y = (self._title_bar_height() - size) / 2
+        return QRectF(margin, y, size, size)
+
     def shape(self):
         """Return the shape for collision detection.
 
@@ -334,43 +390,98 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
         rect = self.boundingRect()
 
-        # Module background with gradient
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Rack panel background with subtle vertical shading.
         gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
-        gradient.setColorAt(0, self.module_color.lighter(120))
-        gradient.setColorAt(1, self.module_color)
+        gradient.setColorAt(0, self.COLOR_PANEL_TOP)
+        gradient.setColorAt(1, self.COLOR_PANEL_BOTTOM)
 
         painter.setBrush(QBrush(gradient))
 
         # Border
         if self.isSelected():
-            painter.setPen(QPen(QColor(255, 200, 0), 3))
+            painter.setPen(
+                QPen(self.COLOR_SELECTION_BORDER, self.SELECTION_BORDER_WIDTH)
+            )
         else:
-            painter.setPen(QPen(QColor(30, 30, 30), 2))
+            painter.setPen(QPen(self.COLOR_NORMAL_BORDER, self.NORMAL_BORDER_WIDTH))
 
-        painter.drawRoundedRect(rect, 8, 8)
+        painter.drawRoundedRect(rect, self.BORDER_RADIUS, self.BORDER_RADIUS)
 
-        # Title bar (taller to fit more info)
-        title_bar_height = 50 if self.custom_name else 42
+        # Left accent rail gives each module family a rack identity.
+        accent_rect = QRectF(0, 0, 6, self.module_height)
+        accent_color = self.module_color if self.is_active else QColor(82, 86, 90)
+        painter.fillRect(accent_rect, accent_color)
+
+        # Title bar.
+        title_bar_height = self._title_bar_height()
         title_rect = QRectF(0, 0, self.module_width, title_bar_height)
-        painter.fillRect(title_rect, QColor(30, 30, 30, 200))
+        painter.fillRect(title_rect, self.COLOR_TITLE_BAR_BG)
+        painter.setPen(QPen(self.module_color.darker(105), 1))
+        painter.drawLine(
+            8,
+            title_bar_height - 1,
+            self.module_width - 8,
+            title_bar_height - 1,
+        )
+
+        # Power icon and status lamp.
+        power_rect = self._power_button_rect()
+        lamp_color = QColor(100, 230, 140) if self.is_active else QColor(92, 96, 100)
+        painter.setPen(QPen(QColor(8, 10, 12), 1))
+        painter.setBrush(lamp_color)
+        painter.drawEllipse(power_rect)
+        painter.setPen(
+            QPen(
+                QColor(245, 248, 245),
+                2,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+            )
+        )
+        center = power_rect.center()
+        painter.drawLine(
+            QPointF(center.x(), power_rect.top() + 4),
+            QPointF(center.x(), center.y() + 1),
+        )
+        painter.drawArc(
+            power_rect.adjusted(4, 5, -4, -3),
+            int(205 * 16),
+            int(130 * 16),
+        )
 
         # Module type (always shown at top)
-        type_rect = QRectF(0, 3, self.module_width, 14)
-        painter.setPen(QColor(150, 150, 150))
+        type_rect = QRectF(34, 5, self.module_width - 44, 16)
+        title_color = (
+            self.COLOR_MODULE_TYPE if self.is_active else QColor(150, 154, 158)
+        )
+        painter.setPen(title_color)
         font_type = MODULE_TYPE_FONT
         painter.setFont(font_type)
-        painter.drawText(type_rect, Qt.AlignmentFlag.AlignCenter, self.metadata.title)
+        painter.drawText(type_rect, Qt.AlignmentFlag.AlignLeft, self.metadata.title)
+
+        # Category label.
+        category_rect = QRectF(34, 21, self.module_width - 44, 13)
+        painter.setPen(self.COLOR_CATEGORY)
+        painter.setFont(MODULE_CATEGORY_FONT)
+        painter.drawText(
+            category_rect,
+            Qt.AlignmentFlag.AlignLeft,
+            self.metadata.category.value.upper(),
+        )
 
         # Custom name (if set, shown prominently)
         if self.custom_name:
-            name_rect = QRectF(0, 16, self.module_width, 18)
-            painter.setPen(QColor(255, 255, 100))
+            name_rect = QRectF(34, 35, self.module_width - 44, 16)
+            painter.setPen(self.COLOR_CUSTOM_NAME)
             font_name = QFont("Arial", 10, QFont.Weight.Bold)
             painter.setFont(font_name)
-            painter.drawText(name_rect, Qt.AlignmentFlag.AlignCenter, self.custom_name)
+            painter.drawText(name_rect, Qt.AlignmentFlag.AlignLeft, self.custom_name)
 
         # Draw port labels
-        painter.setPen(QColor(220, 220, 220))
+        port_color = self.COLOR_PORT_LABEL if self.is_active else QColor(135, 138, 142)
+        painter.setPen(port_color)
         font_port = QFont("Arial", 6)
         painter.setFont(font_port)
 
@@ -385,6 +496,12 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             port_y = port.pos().y()
             label_rect = QRectF(self.module_width - 55, port_y - 6, 50, 12)
             painter.drawText(label_rect, Qt.AlignmentFlag.AlignRight, port.port_name)
+
+        if not self.is_active:
+            painter.fillRect(
+                rect.adjusted(6, title_bar_height, 0, 0),
+                self.COLOR_INACTIVE_OVERLAY,
+            )
 
     def _update_port_positions(self):
         """Update the positions of all ports."""
@@ -407,13 +524,17 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         from PyQt6.QtWidgets import QInputDialog, QMenu
 
         menu = QMenu()
+        active_action = menu.addAction("Bypass" if self.is_active else "Activate")
         rename_action = menu.addAction("Rename...")
         delete_action = menu.addAction("Delete")
         info_action = menu.addAction("Module Info...")
 
         action = menu.exec(event.screenPos())
 
-        if action == rename_action:
+        if action == active_action:
+            self.toggle_active()
+
+        elif action == rename_action:
             # Show rename dialog
             current_name = self.get_display_name()
             new_name, ok = QInputDialog.getText(
@@ -504,6 +625,11 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
     def mousePressEvent(self, event):
         """Handle mouse press to enable dragging from anywhere on the module."""
         if event.button() == Qt.MouseButton.LeftButton:
+            if self._power_button_rect().contains(event.pos()):
+                self.toggle_active()
+                event.accept()
+                return
+
             # Check if we clicked on a port (ports handle their own events)
             for port in self.input_ports + self.output_ports:
                 port_rect = port.boundingRect().translated(port.pos())
@@ -513,8 +639,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                     return
 
             # Check if we're in the title bar area (always draggable)
-            title_bar_height = 50 if self.custom_name else 42
-            if event.pos().y() <= title_bar_height:
+            if event.pos().y() <= self._title_bar_height():
                 # Title bar click - always allow dragging
                 self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
                 super().mousePressEvent(event)

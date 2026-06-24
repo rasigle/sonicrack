@@ -4,6 +4,7 @@ All notable changes to AudioPlayground will be documented in this file.
 
 
 ## Planned
+- Audio paths in GUI: compiled engine graphs and pull-based module processing. Which to continue with
 - Rework visualizers as modules
 - Visualization system as visualization modules
 - Rethink mono stereo channels
@@ -12,7 +13,6 @@ All notable changes to AudioPlayground will be documented in this file.
 - Improve LFO shapes
 - Better Architecture with UI/Logic Separation
 - Fullscreen support
-- Activate/deactivate modules
 - Undo / Redo system
 - Make communication between UI and engine fully preset based
 - Review the engine preset system (fluent API)
@@ -21,6 +21,11 @@ All notable changes to AudioPlayground will be documented in this file.
 
 ### Added
 
+- Rack-style module headers with category labels, accent rails, and a shared
+  power/bypass control.
+- Module active state persistence in patch parameters.
+- Patch compiler bypass behavior for inactive modules: sources mute, modifiers
+  pass their input through.
 - Added module subpackages and recursive search in module registry.
 - BLEP anti-aliasing for oscillators
 - Polish API and documentation and code (comprehensive update complete)

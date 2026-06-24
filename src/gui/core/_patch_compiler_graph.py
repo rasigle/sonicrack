@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from src.engine import CVScaler
-from src.gui.core.module import AudioModule
+from src.gui.core.module import AudioModule, ModuleCategory
 from src.gui.widgets.port_widget import PortWidget
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,16 @@ class PatchCompilerGraphMixin:
             f"_build_component_from_port: source_module={source_module.metadata.title}"
             f", port_name='{source_port_name}'"
         )
+
+        if (
+            not getattr(source_module, "is_active", True)
+            and source_module.metadata.category != ModuleCategory.MODIFIER
+        ):
+            logger.info(
+                f"_build_component_from_port: {source_module.metadata.title} "
+                "is inactive, skipping"
+            )
+            return None
 
         if hasattr(source_module, "get_output_component"):
             logger.info(

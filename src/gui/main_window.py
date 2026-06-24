@@ -313,7 +313,7 @@ class ModularSynthWindow(QMainWindow):
             from src.gui.modules.output.output import OutputModule
 
             output_module = cast(OutputModule, module_instance)
-            output_module.audio_output = self.audio_engine
+            output_module.audio_engine = self.audio_engine
             logger.debug("Set audio_engine reference on Output module")
 
     def _on_audio_error(self, error: str):

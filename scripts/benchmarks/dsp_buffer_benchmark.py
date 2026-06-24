@@ -1,10 +1,3 @@
-"""Benchmark core DSP buffer rendering paths.
-
-Run from the repository root:
-
-    uv run python scripts/benchmarks/dsp_buffer_benchmark.py --track-allocations
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -12,9 +5,12 @@ import statistics
 import time
 import tracemalloc
 from collections.abc import Callable
+from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
+from scripts.benchmarks._benchmark_output import print_benchmark_table
 from src.engine import (
     Chain,
     Delay,
@@ -99,6 +95,114 @@ def track_allocations(render: RenderFn, iterations: int) -> dict[str, int]:
     }
 
 
+def collect_rows(
+    buffer_sizes: list[int],
+    iterations: int,
+    include_allocations: bool,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+
+    for buffer_size in buffer_sizes:
+        print(f"Collecting rows for {buffer_size} bytes")
+        for name, render in _render_cases(buffer_size).items():
+            result = benchmark_render(render, iterations)
+
+            row: dict[str, object] = {
+                "component": name,
+                "buffer_size": buffer_size,
+                "min_us": result["min_us"],
+                "mean_us": result["mean_us"],
+                "max_us": result["max_us"],
+            }
+
+            if include_allocations:
+                allocation_result = track_allocations(render, iterations)
+                row.update(
+                    {
+                        "current_bytes": allocation_result["current_bytes"],
+                        "peak_bytes": allocation_result["peak_bytes"],
+                    }
+                )
+
+            rows.append(row)
+
+    return rows
+
+
+def plot_metric(
+    rows: list[dict[str, object]],
+    metric_key: str,
+    metric_label: str,
+    title: str,
+    output_path: Path,
+) -> None:
+    components = sorted({str(row["component"]) for row in rows})
+
+    plt.figure(figsize=(10, 6))
+
+    for component in components:
+        component_rows = [row for row in rows if str(row["component"]) == component]
+        component_rows.sort(key=lambda row: int(row["buffer_size"]))
+
+        x = [int(row["buffer_size"]) for row in component_rows]
+        y = [float(row[metric_key]) for row in component_rows]
+
+        plt.plot(x, y, marker="o", label=component)
+
+    plt.xscale("log", base=2)
+    plt.xticks(sorted({int(row["buffer_size"]) for row in rows}))
+    plt.xlabel("Buffer Size")
+    plt.ylabel(metric_label)
+    plt.title(title)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+
+
+def plot_results(
+    rows: list[dict[str, object]],
+    *,
+    include_allocations: bool,
+    output_dir: Path,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    plot_metric(
+        rows,
+        metric_key="mean_us",
+        metric_label="Mean Time (µs)",
+        title="DSP Benchmark: Mean Time vs Buffer Size",
+        output_path=output_dir / "dsp_mean_us.png",
+    )
+
+    plot_metric(
+        rows,
+        metric_key="min_us",
+        metric_label="Min Time (µs)",
+        title="DSP Benchmark: Min Time vs Buffer Size",
+        output_path=output_dir / "dsp_min_us.png",
+    )
+
+    plot_metric(
+        rows,
+        metric_key="max_us",
+        metric_label="Max Time (µs)",
+        title="DSP Benchmark: Max Time vs Buffer Size",
+        output_path=output_dir / "dsp_max_us.png",
+    )
+
+    if include_allocations:
+        plot_metric(
+            rows,
+            metric_key="peak_bytes",
+            metric_label="Peak Bytes",
+            title="DSP Benchmark: Peak Allocation vs Buffer Size",
+            output_path=output_dir / "dsp_peak_bytes.png",
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -108,30 +212,35 @@ def main() -> None:
         default=[64, 128, 256, 512, 1024, 2048],
     )
     parser.add_argument("--iterations", type=int, default=1000)
-    parser.add_argument("--track-allocations", action="store_true")
+    parser.add_argument("--track-allocations", action="store_true", default=True)
+    parser.add_argument("--plot", action="store_true", default=True)
+    parser.add_argument(
+        "--plot-dir",
+        type=Path,
+        default=Path("benchmark_plots"),
+    )
     args = parser.parse_args()
 
-    if args.track_allocations:
-        print("component,buffer_size,min_us,mean_us,max_us,current_bytes,peak_bytes")
-    else:
-        print("component,buffer_size,min_us,mean_us,max_us")
+    rows = collect_rows(
+        buffer_sizes=args.buffer_sizes,
+        iterations=args.iterations,
+        include_allocations=args.track_allocations,
+    )
 
-    for buffer_size in args.buffer_sizes:
-        for name, render in _render_cases(buffer_size).items():
-            result = benchmark_render(render, args.iterations)
-            row = (
-                f"{name},{buffer_size},"
-                f"{result['min_us']:.3f},"
-                f"{result['mean_us']:.3f},"
-                f"{result['max_us']:.3f}"
-            )
-            if args.track_allocations:
-                allocation_result = track_allocations(render, args.iterations)
-                row += (
-                    f",{allocation_result['current_bytes']},"
-                    f"{allocation_result['peak_bytes']}"
-                )
-            print(row)
+    print_benchmark_table(
+        title="DSP Buffer Benchmark",
+        rows=rows,
+        include_allocations=args.track_allocations,
+        include_component=True,
+    )
+
+    if args.plot:
+        plot_results(
+            rows,
+            include_allocations=args.track_allocations,
+            output_dir=args.plot_dir,
+        )
+        print(f"\nSaved plots to: {args.plot_dir}")
 
 
 if __name__ == "__main__":

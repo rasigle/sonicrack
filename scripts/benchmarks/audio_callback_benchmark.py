@@ -14,6 +14,7 @@ import tracemalloc
 
 import numpy as np
 
+from scripts.benchmarks._benchmark_output import print_benchmark_table
 from src.audio_io import AudioOutput
 
 
@@ -58,6 +59,72 @@ def track_allocations(buffer_size: int, iterations: int) -> dict[str, int]:
     }
 
 
+def print_results_table(
+    results: list[dict[str, float | int]],
+    track_allocations: bool,
+) -> None:
+    if track_allocations:
+        headers = [
+            "Buffer",
+            "Min (µs)",
+            "Mean (µs)",
+            "Max (µs)",
+            "Current Bytes",
+            "Peak Bytes",
+        ]
+    else:
+        headers = [
+            "Buffer",
+            "Min (µs)",
+            "Mean (µs)",
+            "Max (µs)",
+        ]
+
+    rows = []
+    for r in results:
+        row = [
+            str(r["buffer_size"]),
+            f"{r['min_us']:.3f}",
+            f"{r['mean_us']:.3f}",
+            f"{r['max_us']:.3f}",
+        ]
+
+        if track_allocations:
+            row.extend(
+                [
+                    f"{r['current_bytes']:,}",
+                    f"{r['peak_bytes']:,}",
+                ]
+            )
+
+        rows.append(row)
+
+    widths = [
+        max(len(header), *(len(row[i]) for row in rows))
+        for i, header in enumerate(headers)
+    ]
+
+    def format_row(values: list[str]) -> str:
+        return (
+            "│ "
+            + " │ ".join(value.rjust(widths[i]) for i, value in enumerate(values))
+            + " │"
+        )
+
+    separator = "├─" + "─┼─".join("─" * w for w in widths) + "─┤"
+    top = "┌─" + "─┬─".join("─" * w for w in widths) + "─┐"
+    bottom = "└─" + "─┴─".join("─" * w for w in widths) + "─┘"
+
+    print(top)
+    print(format_row(headers))
+    print(separator)
+
+    for row in rows:
+        print(format_row(row))
+
+    print(bottom)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -67,7 +134,7 @@ def main() -> None:
         default=[64, 128, 256, 512, 1024, 2048],
     )
     parser.add_argument("--iterations", type=int, default=5000)
-    parser.add_argument("--track-allocations", action="store_true")
+    parser.add_argument("--track-allocations", action="store_true", default=True)
     args = parser.parse_args()
 
     if args.track_allocations:
@@ -75,21 +142,34 @@ def main() -> None:
     else:
         print("buffer_size,min_us,mean_us,max_us")
 
+    rows: list[dict[str, object]] = []
+
     for buffer_size in args.buffer_sizes:
         result = benchmark_buffer_size(buffer_size, args.iterations)
-        row = (
-            f"{buffer_size},"
-            f"{result['min_us']:.3f},"
-            f"{result['mean_us']:.3f},"
-            f"{result['max_us']:.3f}"
-        )
+
+        row: dict[str, object] = {
+            "buffer_size": buffer_size,
+            "min_us": result["min_us"],
+            "mean_us": result["mean_us"],
+            "max_us": result["max_us"],
+        }
+
         if args.track_allocations:
             allocation_result = track_allocations(buffer_size, args.iterations)
-            row += (
-                f",{allocation_result['current_bytes']},"
-                f"{allocation_result['peak_bytes']}"
+            row.update(
+                {
+                    "current_bytes": allocation_result["current_bytes"],
+                    "peak_bytes": allocation_result["peak_bytes"],
+                }
             )
-        print(row)
+
+        rows.append(row)
+
+    print_benchmark_table(
+        title="Audio Callback Benchmark",
+        rows=rows,
+        include_allocations=args.track_allocations,
+    )
 
 
 if __name__ == "__main__":

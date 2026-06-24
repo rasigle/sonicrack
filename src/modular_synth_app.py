@@ -10,6 +10,7 @@ import argparse
 import logging
 import sys
 from collections.abc import Callable, Sequence
+from typing import cast
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
@@ -72,7 +73,7 @@ def _create_application(qt_args: Sequence[str]) -> QApplication:
 
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG_NAME)
-    return app
+    return cast(QApplication, app)
 
 
 def _create_splash(app: QApplication, enabled: bool) -> QSplashScreen | None:

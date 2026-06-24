@@ -112,7 +112,10 @@ line-ending = "cr-lf"
 [tool.mypy]
 check_untyped_defs = false
 disable_error_code = "annotation-unchecked"
-mypy_path = "src"
+exclude = [
+    "^docs/test_scripts/",
+    "^examples/",
+]
 
 [[tool.mypy.overrides]]
 module = ["mido", "mido.*", "sounddevice", "sounddevice.*"]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from typing import cast
 
 
 def print_benchmark_table(
@@ -33,17 +34,17 @@ def print_benchmark_table(
         values.extend(
             [
                 str(row["buffer_size"]),
-                f"{float(row['min_us']):.3f}",
-                f"{float(row['mean_us']):.3f}",
-                f"{float(row['max_us']):.3f}",
+                f"{float(cast(float, row['min_us'])):.3f}",
+                f"{float(cast(float, row['mean_us'])):.3f}",
+                f"{float(cast(float, row['max_us'])):.3f}",
             ]
         )
 
         if include_allocations:
             values.extend(
                 [
-                    f"{int(row['current_bytes']):,}",
-                    f"{int(row['peak_bytes']):,}",
+                    f"{int(cast(int, row['current_bytes'])):,}",
+                    f"{int(cast(int, row['peak_bytes'])):,}",
                 ]
             )
 
@@ -72,5 +73,5 @@ def print_benchmark_table(
     print(format_row(headers))
     print(format_row(["-" * width for width in widths]))
 
-    for row in formatted_rows:
-        print(format_row(row))
+    for formatted_row in formatted_rows:
+        print(format_row(formatted_row))

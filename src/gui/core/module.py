@@ -100,7 +100,7 @@ class AudioModule(ABC):
         self,
         input_components: list[AudioComponent] | None = None,
         modulation_components: dict[str, AudioComponent] | None = None,
-    ) -> AudioComponent:
+    ) -> AudioComponent | None:
         """Create the corresponding audio engine component for this module.
 
         This is called by the patch compiler to instantiate the actual

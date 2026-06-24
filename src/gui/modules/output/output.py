@@ -18,6 +18,7 @@ from src.gui.widgets.module_widget import ModuleWidget
 from src.utils.audio_utils import combine_lr_to_stereo, mono_to_stereo
 
 if TYPE_CHECKING:
+    from src.gui.audio_engine import AudioEngine
     from src.gui.core.port import Port
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ class OutputModule(ModuleWidget):
             buffer_size=audio_config.buffer_size,
             audio_callback=self._generate_samples,  # Callback pulls samples
         )
+        self.audio_engine: AudioEngine | None = None
 
         # Register for global audio setting changes
         audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
@@ -223,6 +225,8 @@ class OutputModule(ModuleWidget):
             stereo_samples = combine_lr_to_stereo(left_samples, right_samples)
         else:
             mono_samples = left_samples if left_samples is not None else right_samples
+            if mono_samples is None:
+                return silence()
             stereo_samples = mono_to_stereo(mono_samples)
 
         # Apply master gain

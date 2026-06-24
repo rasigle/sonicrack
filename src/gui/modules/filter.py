@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 from PyQt6.QtCore import Qt
@@ -204,9 +204,9 @@ class FilterModule(ModuleWidget):
         """Remove registered global listeners during Qt object teardown."""
         audio_config.remove_sample_rate_listener(self._sample_rate_listener)
 
-    def _get_filter_type(self) -> str:
+    def _get_filter_type(self) -> Literal["low", "high", "band"]:
         """Map UI filter type text to engine filter type."""
-        type_map = {
+        type_map: dict[str, Literal["low", "high", "band"]] = {
             "Low-pass": "low",
             "High-pass": "high",
             "Band-pass": "band",

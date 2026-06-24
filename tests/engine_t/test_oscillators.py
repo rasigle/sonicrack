@@ -87,9 +87,11 @@ class TestOscillatorModeSelection(unittest.TestCase):
             TriangleOscillator,
             SquareOscillator,
         ):
-            with self.subTest(oscillator=oscillator_cls.__name__):
-                with self.assertRaises(ValueError):
-                    oscillator_cls(frequency=440, mode="invalid")
+            with (
+                self.subTest(oscillator=oscillator_cls.__name__),
+                self.assertRaises(ValueError)
+            ):
+                oscillator_cls(frequency=440, mode="invalid")
 
 
 class TestSineOscillator(TestOscillatorBase):

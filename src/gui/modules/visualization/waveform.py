@@ -236,9 +236,11 @@ class WaveformModule(ModuleWidget):
             elif samples_l is not None:
                 # Only left channel - treat as mono
                 display_samples = samples_l
-            else:
+            elif samples_r is not None:
                 # Only right channel - treat as mono
                 display_samples = samples_r
+            else:
+                return
 
             # Store frozen samples if not frozen yet
             if not self._is_frozen:

@@ -609,7 +609,9 @@ class ModulatedOscillator(Generator):
         if kind == "angular":
             self.oscillator._i = float(phase_state["carrier_end"]) % (2.0 * np.pi)
             sample_index_end = phase_state.get("sample_index_end")
-            if sample_index_end is not None:
+            if sample_index_end is not None and isinstance(
+                self.oscillator, SineOscillator
+            ):
                 self.oscillator._sample_index = int(sample_index_end)
         elif kind == "cycle":
             carrier_cycle = float(phase_state["carrier_end"]) % 1.0

@@ -80,6 +80,9 @@ class Port:
 
         # Data state - can be scalar or numpy array
         self.value: float | np.ndarray = 0.0
+        self._latest_buffer: float | np.ndarray = 0.0
+        self._tap_history: np.ndarray | None = None
+        self._tap_history_limit = 65536
 
     def connect(self, other: Port) -> None:
         """Connect this port to another port (bidirectional).
@@ -148,54 +151,42 @@ class Port:
         from continuing to play after a module is deleted.
         """
         self.value = 0.0
+        self._latest_buffer = 0.0
+        self._tap_history = None
         logger.debug(f"Port data cleared: {self.port_name}")
 
     def read(self, num_samples: int | None = None) -> float | np.ndarray:
-        """Read value from connected ports, triggering upstream generation if needed.
+        """Read value from connected ports.
 
-        This method now supports the pull-based architecture by:
-        1. Triggering upstream modules to generate samples (if num_samples provided)
-        2. Reading and mixing values from all connected ports
+        During engine-owned renders, this delegates to the active render context.
+        The context owns graph ordering and cached input values; ports no longer
+        trigger upstream module processing themselves. Outside a render context,
+        this method keeps legacy value-mixing behavior for tests and direct
+        inspection.
 
         Args:
-            num_samples: Number of samples to request from upstream modules.
-                If None, just returns cached values (legacy behavior).
+            num_samples: Optional number of samples expected by the caller.
 
         Returns:
             Sum of values from connected ports (float or np.ndarray), or 0.0 if not
             connected
         """
+        render_context = None
+        if num_samples is not None:
+            try:
+                from src.gui.audio_engine import get_active_render_context
+
+                render_context = get_active_render_context()
+            except ImportError:
+                render_context = None
+
+        if render_context is not None:
+            return render_context.read_port(self)
+
         if not self.connected_to:
             if num_samples is not None and num_samples > 0:
-                # Return zeros with correct shape for audio processing
                 return np.zeros(num_samples, dtype=np.float32)
             return 0.0
-
-        # Trigger upstream module generation if num_samples is provided
-        if num_samples is not None:
-            for connected_port in self.connected_to:
-                # Safety check: ensure parent_module still exists (not deleted during
-                # shutdown)
-                try:
-                    if not connected_port.parent_module:
-                        continue
-
-                    # Skip non-processing modules (like visualizers)
-                    if (
-                        hasattr(connected_port.parent_module, "is_processing_module")
-                        and not connected_port.parent_module.is_processing_module
-                    ):
-                        continue
-
-                    if hasattr(connected_port.parent_module, "ensure_samples_ready"):
-                        # Pull-based: ask upstream module to generate samples
-                        connected_port.parent_module.ensure_samples_ready(num_samples)
-                    elif hasattr(connected_port.parent_module, "process"):
-                        # Fallback: call process() for modules not yet updated
-                        connected_port.parent_module.process(num_samples)
-                except (RuntimeError, AttributeError):
-                    # Module was deleted (Qt cleanup during shutdown) - skip it
-                    continue
 
         # Collect all values
         values = [p.value for p in self.connected_to]
@@ -272,10 +263,16 @@ class Port:
         """
         if isinstance(value, np.ndarray):
             self.value = value
+            self._latest_buffer = value.copy()
+            self._append_tap_history(value)
         elif isinstance(value, (float, int)):
             self.value = float(value)
+            self._latest_buffer = self.value
+            self._append_tap_history(np.array([self.value], dtype=np.float32))
         elif isinstance(value, Sequence):
             self.value = np.array(value, dtype=np.float32)
+            self._latest_buffer = self.value.copy()
+            self._append_tap_history(self.value)
         else:
             raise TypeError(
                 f"Port write value must be float or np.ndarray, "
@@ -296,7 +293,40 @@ class Port:
         Returns:
             Current cached value from the port
         """
-        return self.read(num_samples=None)  # Read without triggering generation
+        value = self._latest_buffer
+        if self._tap_history is not None and self._tap_history.size > 0:
+            if num_samples is not None and num_samples > 0:
+                return self._tap_history[-num_samples:].copy()
+            return self._tap_history.copy()
+        if isinstance(value, np.ndarray):
+            if num_samples is not None and num_samples > 0:
+                return value[-num_samples:].copy()
+            return value.copy()
+        return value
+
+    def _append_tap_history(self, value: np.ndarray) -> None:
+        """Append rendered samples to the passive tap history."""
+        samples = np.asarray(value)
+        if samples.size == 0:
+            return
+        if samples.ndim == 0:
+            samples = samples.reshape(1)
+
+        if self._tap_history is None:
+            self._tap_history = samples.copy()
+            return
+
+        if self._tap_history.ndim != samples.ndim:
+            self._tap_history = samples.copy()
+            return
+
+        if samples.ndim > 1 and self._tap_history.shape[1:] != samples.shape[1:]:
+            self._tap_history = samples.copy()
+            return
+
+        self._tap_history = np.concatenate((self._tap_history, samples), axis=0)
+        if len(self._tap_history) > self._tap_history_limit:
+            self._tap_history = self._tap_history[-self._tap_history_limit :].copy()
 
     @property
     def is_connected(self) -> bool:

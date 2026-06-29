@@ -167,9 +167,6 @@ class TestModuleRegistry:
                 author="Test",
             )
 
-            def process(self, num_samples: int = 1):
-                pass
-
         # Should be in global registry
         _ = DecoratorTest
         assert global_registry.count() == initial_count + 1

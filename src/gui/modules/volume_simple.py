@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from typing import Any
 
 from PyQt6.QtCore import Qt
@@ -8,6 +8,8 @@ from src.constants import DEFAULT_GAIN_DB
 from src.engine import Volume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -17,6 +19,11 @@ logger = logging.getLogger(__name__)
 @register_module()
 class SimpleVolumeModule(ModuleWidget):
     """Simple volume/gain module without modulation input."""
+
+    runtime_kind = "volume"
+    runtime_input_names = ("In",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("gain_db",)
 
     metadata = ModuleMetadata(
         title="Volume",
@@ -69,7 +76,7 @@ class SimpleVolumeModule(ModuleWidget):
         # Update the Volume component amplitude (click-free)
         self.component.amplitude = new_gain
 
-        logger.debug(f"🎚️ Volume: gain set to {new_gain:.3f}")
+        logger.debug(f"ðŸŽšï¸ Volume: gain set to {new_gain:.3f}")
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -85,30 +92,20 @@ class SimpleVolumeModule(ModuleWidget):
         gain_db = self.gain_knob.get_value()
         return Volume(gain_db=gain_db)
 
-    def process(self, num_samples: int = 1):
-        """Apply volume/gain to input signal.
-
-        Reads from the input port, applies gain control, and writes to the output port.
-
-        Args:
-            num_samples: Number of samples to process (default: 1 for per-sample
-                processing)
-        """
-        # Check if input is connected
-        if not self.in_port.is_connected or self.component is None:
-            self.out_port.write(0.0)
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Apply gain to the connected input for one render cycle."""
+        if not self.in_port.is_connected:
+            self.out_port.write(silence(num_samples))
             return
 
-        # Read input signal and make sure we get valid data
-        input_signal = self.in_port.read(num_samples)
-        if input_signal is None:
-            self.out_port.write(0.0)
-            return
+        input_signal = read_samples(self.in_port, num_samples)
+        if self.component is None:
+            self.component = self.create_engine_component()
 
-        # Process
-        gain_db = self.gain_knob.get_value()
-        self.component.gain_db = gain_db
-        output_signal = self.component(input_signal)
+        self.component.gain_db = float_parameter(
+            parameters, "gain_db", self.gain_knob.get_value
+        )
+        self.out_port.write(self.component(input_signal))
 
-        # Write to output port
-        self.out_port.write(output_signal)

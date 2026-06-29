@@ -1,197 +1,61 @@
-"""Shared utilities for visualization modules.
+"""Shared utilities for passive visualization modules.
 
-This module provides common functionality for waveform and spectrum visualizers,
-including hybrid active/passive mode sample acquisition.
+Visualizer widgets never render upstream modules themselves. Audio output and
+the monitor timer both render through ``AudioEngine``; visualizers only read
+recent tap history from connected ports. This keeps scopes/meters from changing
+oscillator, envelope, or effect state while still allowing silent patches such
+as ``Oscillator -> Waveform`` to animate without an Output module.
 """
 
 import logging
 
 import numpy as np
 
-from src.gui.widgets.module_widget import ModuleWidget
-
 logger = logging.getLogger(__name__)
 
 
-def check_output_module_exists(visualizer_module) -> bool:
-    """Check if an output module exists in the scene.
+def get_visualizer_samples(
+    input_port, num_samples: int | None = None
+) -> np.ndarray | None:
+    """Read cached port tap history.
 
-    This is used to determine whether visualizer should be in passive mode
-    (output exists, just read cached values) or active mode (no output,
-    actively generate samples).
-
-    Args:
-        visualizer_module: The visualizer module instance (needs .scene() method)
-
-    Returns:
-        True if output module exists, False otherwise
-    """
-    if not hasattr(visualizer_module, "scene"):
-        return False
-
-    scene = visualizer_module.scene()
-    if not scene:
-        return False
-
-    # Check all items in scene for output module
-    for item in scene.items():
-        if isinstance(item, ModuleWidget) and hasattr(item, "audio_output"):
-            return True
-
-    return False
-
-
-def get_samples_passive_mode(input_port) -> np.ndarray | None:
-    """Get samples in PASSIVE mode - read cached port value.
-
-    In passive mode, the audio thread has already written samples to port.value.
-    We simply read and copy those samples. This is safe because we're only
-    READING, not calling process() or generating new samples.
-
-    This avoids race conditions with the audio thread.
+    The audio callback or monitor timer has already rendered the graph and
+    written samples to the connected output port. Visualizers copy that history
+    without calling ``process()`` or advancing upstream DSP state.
 
     Args:
         input_port: The input port to read from
+        num_samples: Optional number of recent samples to return
 
     Returns:
         Audio samples as numpy array, or None if unavailable
     """
+    if not input_port.is_connected:
+        return None
+
     try:
         for connected_port in input_port.connected_to:
-            if connected_port.value is not None:
-                if (
-                    isinstance(connected_port.value, np.ndarray)
-                    and connected_port.value.size > 0
-                ):
-                    # Make a copy to avoid any threading issues
-                    samples = connected_port.value.copy()
+            samples = connected_port.peek_recent(num_samples)
+            if samples is not None:
+                if isinstance(samples, np.ndarray) and samples.size > 0:
                     logger.debug(
                         f"PASSIVE: Got {len(samples)} samples from port "
-                        f"{connected_port.port_name}, "
-                        f"value_id={id(connected_port.value)}"
-                    )
-                    return samples
-                elif isinstance(connected_port.value, (int, float)):
-                    # Scalar value - convert to small array for visualization
-                    samples = np.array([connected_port.value], dtype=np.float32)
-                    logger.debug(
-                        f"PASSIVE: Got scalar {connected_port.value} "
-                        f"from port {connected_port.port_name}"
-                    )
-                    return samples
-        logger.debug("PASSIVE: No valid samples found in connected ports")
-    except Exception as e:
-        logger.debug(f"Error reading cached samples in passive mode: {e}")
-
-    return None
-
-
-def get_samples_active_mode(input_port, num_samples: int = 1024) -> np.ndarray | None:
-    """Get samples in ACTIVE mode - actively generate samples.
-
-    In active mode (no output module exists), we directly call process() on
-    upstream modules to generate samples. This is used for standalone
-    visualization without audio output.
-
-    Args:
-        input_port: The input port to read from
-        num_samples: Number of samples to request
-
-    Returns:
-        Audio samples as numpy array, or None if unavailable
-    """
-    try:
-        samples = None
-
-        # Directly trigger upstream module generation
-        # (can't use port.read() because visualizers are marked non-processing)
-        for connected_port in input_port.connected_to:
-            if connected_port.parent_module:
-                logger.debug(
-                    f"ACTIVE: Triggering process({num_samples}) on "
-                    f"{connected_port.parent_module.__class__.__name__}"
-                )
-                # Call process() directly on upstream module
-                if hasattr(connected_port.parent_module, "process"):
-                    connected_port.parent_module.process(num_samples)
-
-                # Now read the generated value from the port
-                if connected_port.value is not None and (
-                    isinstance(connected_port.value, np.ndarray)
-                    and connected_port.value.size > 0
-                ):
-                    samples = connected_port.value
-                    logger.debug(
-                        f"ACTIVE: Got {len(samples)} samples from "
                         f"{connected_port.port_name}"
                     )
-                    break
-
-        # Fallback: try port.read() if direct call didn't work
-        if samples is None:
-            logger.debug(f"ACTIVE: Fallback to port.read({num_samples})")
-            samples = input_port.read(num_samples)
-            if not isinstance(samples, np.ndarray) or samples.size == 0:
-                samples = None
-            else:
-                logger.debug(
-                    f"ACTIVE: Fallback got "
-                    f"{len(samples) if samples is not None else 0} samples"
-                )
-
-        return samples
-
+                    return samples
+                elif isinstance(samples, (int, float)):
+                    # Scalar value - convert to small array for visualization
+                    scalar_samples = np.array([samples], dtype=np.float32)
+                    logger.debug(
+                        f"PASSIVE: Got scalar {samples} "
+                        f"from port {connected_port.port_name}"
+                    )
+                    return scalar_samples
+        logger.debug("No valid tap samples found in connected ports")
     except Exception as e:
-        logger.warning(f"Error pulling samples in active mode: {e}", exc_info=True)
-        return None
+        logger.debug(f"Error reading cached visualizer samples: {e}")
 
-
-def get_samples_hybrid(
-    visualizer_module, input_port, num_samples: int = 1024
-) -> np.ndarray | None:
-    """Get samples using hybrid active/passive mode.
-
-    This is the main entry point for visualizers. It automatically detects
-    whether to use passive or active mode based on whether an output module
-    exists in the scene.
-
-    **Passive Mode (output exists):**
-    - Just reads port.value that was already written by audio thread
-    - No race conditions, zero audio interference
-    - Safe concurrent access
-
-    **Active Mode (standalone):**
-    - Directly calls process() on upstream modules
-    - Enables visualization without output module
-    - Used for monitoring generators directly
-
-    Args:
-        visualizer_module: The visualizer module (needs .scene() method)
-        input_port: The input port to read from
-        num_samples: Number of samples to request (used in active mode)
-
-    Returns:
-        Audio samples as numpy array, or None if unavailable
-    """
-    # Check if input is connected
-    if not hasattr(input_port, "is_connected") or not input_port.is_connected:
-        return None
-
-    # Determine mode based on output module presence
-    output_exists = check_output_module_exists(visualizer_module)
-
-    logger.debug(
-        f"get_samples_hybrid: output_exists={output_exists}, num_samples={num_samples}"
-    )
-
-    if output_exists:
-        # PASSIVE MODE: Read cached value (no generation)
-        logger.debug("Using PASSIVE mode")
-        return get_samples_passive_mode(input_port)
-    else:
-        # ACTIVE MODE: Generate samples (standalone)
-        logger.debug("Using ACTIVE mode")
-        return get_samples_active_mode(input_port, num_samples)
+    return None
 
 
 def validate_samples(samples) -> bool:

@@ -1,12 +1,13 @@
-import logging
+﻿import logging
 
-import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
 from src.engine import Chain, Volume, WaveAdder
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import read_samples, silence
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -21,6 +22,11 @@ class MixerModule(ModuleWidget):
 
     Uses WaveAdder to mix multiple inputs together (averages them).
     """
+
+    runtime_kind = "mixer"
+    runtime_input_names = ("In 1", "In 2", "In 3", "In 4")
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("gain1", "gain2", "gain3", "gain4")
 
     metadata = ModuleMetadata(
         title="Mixer",
@@ -117,7 +123,7 @@ class MixerModule(ModuleWidget):
         # Update the Volume component amplitude (click-free)
         self._volume_components[channel_index].amplitude = new_gain
 
-        logger.debug(f"🎚️ Mixer: Ch {channel_index + 1} gain set to {new_gain:.3f}")
+        logger.debug(f"ðŸŽšï¸ Mixer: Ch {channel_index + 1} gain set to {new_gain:.3f}")
 
     def create_engine_component(
         self,
@@ -148,43 +154,26 @@ class MixerModule(ModuleWidget):
 
         return WaveAdder(*processed_inputs, mix_mode="sum")
 
-    def process(self, num_samples: int = 1):
-        """Mix input signals and write to output port.
-
-        Reads from all connected input ports, applies channel Volume components,
-        mixes them together, and writes the result to the output port.
-
-        Called automatically via ensure_samples_ready() when downstream modules request
-        samples in the pull-based architecture.
-
-        Args:
-            num_samples: Number of samples to process
-        """
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Mix connected input channels for the current engine cycle."""
+        del parameters
+        mixed_signal = None
         input_ports = [self.in1_port, self.in2_port, self.in3_port, self.in4_port]
 
-        mixed_signal = None
-
         for channel_idx, port in enumerate(input_ports):
-            if port.is_connected:
-                # Read signal from port (triggers upstream generation)
-                signal = port.read(num_samples)
+            if not port.is_connected:
+                continue
+            signal = read_samples(port, num_samples)
+            gained_signal = self._volume_components[channel_idx](signal)
+            mixed_signal = (
+                gained_signal
+                if mixed_signal is None
+                else mixed_signal + gained_signal
+            )
 
-                if signal is not None:
-                    # Apply channel gain using Volume component (Volume is callable)
-                    gained_signal = self._volume_components[channel_idx](signal)
+        self.out_port.write(
+            mixed_signal if mixed_signal is not None else silence(num_samples)
+        )
 
-                    # Mix signals (sum)
-                    if mixed_signal is None:
-                        mixed_signal = gained_signal
-                    else:
-                        # Ensure proper addition (handle both arrays and scalars)
-                        mixed_signal = np.add(mixed_signal, gained_signal)
-
-        # Write mixed signal to output
-        if mixed_signal is not None:
-            if isinstance(mixed_signal, tuple):
-                mixed_signal = np.asarray(mixed_signal, dtype=np.float32)
-            self.out_port.write(mixed_signal)
-        else:
-            # No inputs connected, write silence
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))

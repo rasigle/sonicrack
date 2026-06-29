@@ -10,8 +10,8 @@ from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _benchmark_output import print_benchmark_table
 
-from scripts.benchmarks._benchmark_output import print_benchmark_table
 from src.engine import (
     Chain,
     Delay,

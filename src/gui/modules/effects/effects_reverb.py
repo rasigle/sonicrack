@@ -1,6 +1,5 @@
 import logging
 
-import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
@@ -8,6 +7,8 @@ from src.engine.effects import Reverb
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,11 @@ logger = logging.getLogger(__name__)
 @register_module()
 class ReverbModule(ModulatedModuleBase):
     """Reverb module"""
+
+    runtime_kind = "reverb"
+    runtime_input_names = ("In",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("room_size", "damping", "mix")
 
     metadata = ModuleMetadata(
         title="Reverb",
@@ -86,29 +92,6 @@ class ReverbModule(ModulatedModuleBase):
         """Reverb requires the In port to be connected."""
         return ["In"]
 
-    def process(self, num_samples: int = 1):
-        """Process audio through the reverb effect.
-
-        Args:
-            num_samples: Number of samples to process
-        """
-        if not self.in_port.is_connected:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        samples = self.in_port.read(num_samples)
-        if samples is None:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        if self.component is None:
-            self.component = self.create_engine_component()
-
-        self.component.room_size = self.room_size_knob.get_value()
-        self.component.damping = self.damping_knob.get_value()
-        self.component.mix = self.mix_knob.get_value()
-        self.out_port.write(self.component(samples))
-
     def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
         """Reverb expects bipolar CV range [-1, 1].
 
@@ -127,3 +110,24 @@ class ReverbModule(ModulatedModuleBase):
         damping = self.damping_knob.get_value()
         mix = self.mix_knob.get_value()
         return Reverb(room_size=room_size, damping=damping, mix=mix)
+
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Apply reverb during an engine-owned render cycle."""
+        if not self.in_port.is_connected:
+            self.out_port.write(silence(num_samples))
+            return
+
+        if self.component is None:
+            self.component = self.create_unmodulated_component()
+
+        self.component.room_size = float_parameter(
+            parameters, "room_size", self.room_size_knob.get_value
+        )
+        self.component.damping = float_parameter(
+            parameters, "damping", self.damping_knob.get_value
+        )
+        self.component.mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
+
+        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

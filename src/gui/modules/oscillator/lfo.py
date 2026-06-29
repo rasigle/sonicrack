@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
@@ -14,6 +14,7 @@ from src.engine.oscillator import (
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
 from src.gui.ui_constants import (
     DEFAULT_PW_PERCENTAGE_VALUE,
     MAX_PW_PERCENTAGE_VALUE,
@@ -38,6 +39,10 @@ class LFOModule(ModuleWidget):
 
     Similar to Oscillator but optimized for modulation (0.01 Hz - 20 Hz).
     """
+
+    runtime_kind = "multi_oscillator"
+    runtime_output_names = ("Sine", "Triangle", "Sawtooth", "Square")
+    runtime_parameter_names = ("frequency", "pulsewidth")
 
     metadata = ModuleMetadata(
         title="LFO",
@@ -186,6 +191,15 @@ class LFOModule(ModuleWidget):
         """Handle pulse width changes - only update square oscillator."""
         self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
 
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Render each LFO output for the current engine cycle."""
+        del parameters
+        for port, osc in zip(self.ports, self.oscs, strict=False):
+            if osc is not None:
+                port.write(osc.get_samples(num_samples))
+
     @staticmethod
     def get_cv_output_range() -> tuple[float, float]:
         """LFO outputs bipolar signal [-1, 1] for modulation.
@@ -195,20 +209,3 @@ class LFOModule(ModuleWidget):
         """
         return -1.0, 1.0
 
-    def process(self, num_samples: int = 1):
-        """Generate LFO signals and write to output ports.
-
-        Generates low-frequency modulation signals from each oscillator type
-        and writes them to the corresponding output ports if connected.
-
-        Args:
-            num_samples: Number of samples to generate (default: 1 for per-sample
-                processing)
-        """
-        # Generate samples for each connected output
-        for port, osc in zip(self.ports, self.oscs, strict=False):
-            if port.is_connected and osc is not None:
-                # Generate samples from oscillator
-                samples = osc.get_samples(num_samples)
-                # Write to port for downstream modules
-                port.write(samples)

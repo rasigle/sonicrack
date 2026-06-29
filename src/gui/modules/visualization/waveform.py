@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.modules.visualization.visualizer_utils import get_visualizer_samples
 from src.gui.widgets.knob_widget import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -40,7 +41,16 @@ class WaveformModule(ModuleWidget):
     - Adjust "Time" knob to change the number of samples displayed
     - Click "Freeze" button to capture current waveform
     - Great for oscilloscope-style monitoring and debugging
+
+    Runtime behavior:
+    - Passive sink in the render graph; it does not process upstream modules.
+    - When audio output is playing, it displays samples tapped from the shared
+      render path.
+    - Without active audio output, AudioEngine's monitor timer renders only the
+      connected visualizer sink ports so sources still animate silently.
     """
+
+    runtime_kind = "passive_sink"
 
     metadata = ModuleMetadata(
         title="Waveform",
@@ -48,7 +58,7 @@ class WaveformModule(ModuleWidget):
         description="Professional oscilloscope-style waveform display",
     )
 
-    # Mark as non-processing to exclude from audio chain pulling
+    # Passive sink: receives rendered buffers without running as a processor.
     is_processing_module = False
 
     def __init__(self):
@@ -262,7 +272,7 @@ class WaveformModule(ModuleWidget):
         if samples is None or samples.size == 0:
             self.min_label.setText("Min: 0.000")
             self.max_label.setText("Max: 0.000")
-            self.peak_label.setText("Peak: -∞ dB")
+            self.peak_label.setText("Peak: -inf dB")
             self.samples_label.setText("Samples: 0")
             return
 
@@ -284,7 +294,7 @@ class WaveformModule(ModuleWidget):
             self.samples_label.setText(f"Samples: {len(samples)}")
         else:
             self.samples_label.setText(
-                f"Samples: {samples.shape[0]} × {samples.shape[1]}"
+                f"Samples: {samples.shape[0]} x {samples.shape[1]}"
             )
 
     def get_required_inputs(self) -> list[str]:
@@ -296,14 +306,7 @@ class WaveformModule(ModuleWidget):
         return []  # Optional inputs - show "No Signal" if not connected
 
     def _update_display(self):
-        """Update the waveform display at 20 Hz (independent of audio rate).
-
-        HYBRID MODE:
-        - PASSIVE when output module is playing: reads buffered samples (no
-            interference)
-        - ACTIVE when standalone: actively pulls samples (enables visualization
-            without output)
-        """
+        """Update the waveform display from rendered port tap history."""
         try:
             # If frozen, keep showing frozen samples but still update display
             if self._is_frozen:
@@ -325,55 +328,16 @@ class WaveformModule(ModuleWidget):
             # Get current timerange
             num_samples = int(self.timerange_knob.get_value())
 
-            # ALWAYS use active mode - directly generate samples for real-time
-            # visualization
-            # This ensures we get fresh samples on each timer tick
-            samples_l = None
-            samples_r = None
-
-            if l_connected:
-                # Directly trigger sample generation from connected module
-                for connected_port in self.in_port_l.connected_to:
-                    if connected_port.parent_module and hasattr(
-                        connected_port.parent_module, "process"
-                    ):
-                        try:
-                            # Generate fresh samples
-                            connected_port.parent_module.process(num_samples)
-                            if (
-                                connected_port.value is not None
-                                and isinstance(connected_port.value, np.ndarray)
-                                and connected_port.value.size > 0
-                            ):
-                                samples_l = connected_port.value.copy()
-                                logger.debug(
-                                    f"Waveform: Got L samples, shape={samples_l.shape}"
-                                )
-                                break
-                        except Exception as e:
-                            logger.debug(f"Error generating L samples: {e}")
-
-            if r_connected:
-                # Directly trigger sample generation from connected module
-                for connected_port in self.in_port_r.connected_to:
-                    if connected_port.parent_module and hasattr(
-                        connected_port.parent_module, "process"
-                    ):
-                        try:
-                            # Generate fresh samples
-                            connected_port.parent_module.process(num_samples)
-                            if (
-                                connected_port.value is not None
-                                and isinstance(connected_port.value, np.ndarray)
-                                and connected_port.value.size > 0
-                            ):
-                                samples_r = connected_port.value.copy()
-                                logger.debug(
-                                    f"Waveform: Got R samples, shape={samples_r.shape}"
-                                )
-                                break
-                        except Exception as e:
-                            logger.debug(f"Error generating R samples: {e}")
+            samples_l = (
+                get_visualizer_samples(self.in_port_l, num_samples)
+                if l_connected
+                else None
+            )
+            samples_r = (
+                get_visualizer_samples(self.in_port_r, num_samples)
+                if r_connected
+                else None
+            )
 
             # Update display with samples
             if samples_l is not None or samples_r is not None:
@@ -385,22 +349,6 @@ class WaveformModule(ModuleWidget):
 
         except Exception as e:
             logger.error(f"Error in _update_display: {e}", exc_info=True)
-
-    def process(self, num_samples: int = 1):
-        """Process method for audio path.
-
-        For visualizers: This is a NO-OP. Visualizers observe samples via
-        observe_samples() which is called explicitly by modules that want to share
-        their output.
-
-        Visualizers are NOT part of the audio processing chain to avoid any
-        interference.
-
-        Args:
-            num_samples: Number of samples (ignored)
-        """
-        pass  # Visualizers don't process - they only observe
-
 
 class WaveformDisplay(QWidget):
     """Professional widget for displaying audio waveforms in real-time.

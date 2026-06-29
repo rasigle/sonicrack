@@ -1,4 +1,4 @@
-"""Modulated Oscillator module with frequency modulation input.
+﻿"""Modulated Oscillator module with frequency modulation input.
 
 This module provides an oscillator that can have its frequency controlled
 by an external CV source (like MIDI Input). Perfect for MIDI-controlled synthesis!
@@ -6,6 +6,7 @@ by an external CV source (like MIDI Input). Perfect for MIDI-controlled synthesi
 
 from typing import Any
 
+import numpy as np
 from PyQt6 import QtWidgets
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QLabel
@@ -20,6 +21,8 @@ from src.engine import (
 from src.engine.oscillator_modulated import ModulatedOscillator
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import as_samples, read_samples, silence
 from src.gui.widgets import HSlider, Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -37,6 +40,11 @@ class ModulatedOscillatorModule(ModuleWidget):
     Outputs:
         - Out: Audio output
     """
+
+    runtime_kind = "vco"
+    runtime_input_names = ("Freq", "Gain")
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("waveform", "mode", "frequency", "gain_db", "phase")
 
     metadata = ModuleMetadata(
         title="VCO",
@@ -261,8 +269,8 @@ class ModulatedOscillatorModule(ModuleWidget):
         self._base_frequency = new_freq
         logger.debug(f"VCO: Frequency changed to {new_freq} Hz")
 
-        # Hotswap: update frequency directly on the component if possible
-        if hasattr(self.component, "frequency"):
+        # Hotswap the active oscillator without rebuilding the widget.
+        if self.component is not None:
             self.component.frequency = new_freq
 
         self.parameter_changed.emit("frequency", new_freq)
@@ -277,8 +285,8 @@ class ModulatedOscillatorModule(ModuleWidget):
         self._gain_db = gain_value
         logger.debug(f"VCO: Gain changed to {gain_value} dB")
 
-        # Hotswap: update gain_db directly on the component if possible
-        if hasattr(self.component, "gain_db"):
+        # Hotswap the active oscillator without rebuilding the widget.
+        if self.component is not None:
             self.component.gain_db = gain_value
 
         self.parameter_changed.emit("gain_db", gain_value)
@@ -287,98 +295,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         """Freq and Gain inputs are optional - VCO works as normal oscillator without
         them."""
         return []  # No required inputs - Freq and Gain are optional
-
-    def process(self, num_samples: int = 1):
-        """Process audio through the VCO with optional frequency and gain modulation.
-
-        The VCO generates audio samples based on its current state and any
-        connected modulation sources.
-
-        Args:
-            num_samples: Number of samples to generate
-        """
-        import logging
-
-        import numpy as np
-
-        logger = logging.getLogger(__name__)
-
-        # Check if output is needed
-        if not self.out_port.is_connected:
-            return
-
-        # Check for modulation inputs
-        has_freq_mod = self.freq_input.is_connected
-        has_gain_mod = self.gain_mod_input.is_connected
-
-        # Read modulation signals if connected
-        freq_signal = None
-        gain_signal = None
-
-        if has_freq_mod:
-            freq_signal = self.freq_input.read(num_samples)
-            logger.debug(
-                f"VCO: Read freq modulation, "
-                f"shape={np.shape(freq_signal) if freq_signal is not None else None}"
-            )
-
-        if has_gain_mod:
-            gain_signal = self.gain_mod_input.read(num_samples)
-            logger.debug(
-                f"VCO: Read gain modulation, "
-                f"shape={np.shape(gain_signal) if gain_signal is not None else None}"
-            )
-
-        # Generate samples based on modulation state
-        if has_freq_mod or has_gain_mod:
-            # Create ModulatedOscillator for this processing cycle
-            modulators = []
-            amp_mod = None
-            freq_mod = None
-
-            # Helper class to wrap signals for ModulatedOscillator
-            class SignalGenerator:
-                def __init__(self, signal):
-                    self.signal = signal
-                    self.idx = 0
-
-                def get_samples(self, n: int):
-                    if isinstance(self.signal, (int, float)):
-                        return np.full(n, self.signal)
-                    result = self.signal[self.idx : self.idx + n]
-                    self.idx += n
-                    return result
-
-            if has_gain_mod and gain_signal is not None:
-                gain_gen = SignalGenerator(gain_signal)
-                modulators.append(gain_gen)
-
-                def amplitude_modulator(base_amp, cv_amp):
-                    return base_amp * cv_amp
-
-                amp_mod = amplitude_modulator
-
-            if has_freq_mod and freq_signal is not None:
-                freq_gen = SignalGenerator(freq_signal)
-                modulators.append(freq_gen)
-
-                def frequency_modulator(base_freq, cv_freq):
-                    return cv_freq
-
-                freq_mod = frequency_modulator  # Use CV frequency directly
-
-            # Create modulated oscillator
-            modulated_osc = ModulatedOscillator(
-                self.component, *modulators, amp_mod=amp_mod, freq_mod=freq_mod
-            )
-
-            samples = modulated_osc.get_samples(num_samples)
-        else:
-            # No modulation - use base oscillator
-            samples = self.component.get_samples(num_samples)
-
-        # Write to output port
-        self.out_port.write(samples)
 
     def get_modulation_inputs(self) -> list[str]:
         """VCO accepts modulation on Gain port."""
@@ -555,3 +471,57 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         # No modulation - return plain oscillator
         return osc
+
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Render VCO output for the current engine cycle."""
+        del parameters
+        if self.component is None:
+            self.component = self.create_engine_component()
+
+        modulators = []
+        amp_mod = None
+        freq_mod = None
+
+        if self.gain_mod_input.is_connected:
+            gain_signal = read_samples(self.gain_mod_input, num_samples)
+            modulators.append(_SignalGenerator(gain_signal))
+
+            def amplitude_modulator(base_amp, cv_amp):
+                return base_amp * cv_amp
+
+            amp_mod = amplitude_modulator
+
+        if self.freq_input.is_connected:
+            freq_signal = read_samples(self.freq_input, num_samples)
+            modulators.append(_SignalGenerator(freq_signal))
+
+            def frequency_modulator(base_freq, cv_freq):
+                del base_freq
+                return cv_freq
+
+            freq_mod = frequency_modulator
+
+        component = self.component
+        if modulators:
+            component = ModulatedOscillator(
+                self.component, *modulators, amp_mod=amp_mod, freq_mod=freq_mod
+            )
+
+        self.out_port.write(component.get_samples(num_samples))
+
+
+class _SignalGenerator:
+    def __init__(self, signal: object):
+        signal_array = np.asarray(signal, dtype=np.float32)
+        signal_len = int(signal_array.size) if signal_array.ndim > 0 else 1
+        self.signal = as_samples(signal_array, signal_len)
+        self.idx = 0
+
+    def get_samples(self, n: int):
+        if self.idx >= len(self.signal):
+            return silence(n)
+        result = self.signal[self.idx : self.idx + n]
+        self.idx += n
+        return as_samples(result, n)

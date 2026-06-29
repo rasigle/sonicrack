@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from src.gui.core.port import Port
 from src.gui.modules.output.output import OutputModule
 from src.utils.audio_utils import combine_lr_to_stereo, mono_to_stereo
 
@@ -179,6 +180,41 @@ class TestOutputModuleRouting:
 
         assert samples.shape == (8, 2)
         assert np.allclose(samples, np.zeros((8, 2), dtype=np.float32))
+
+    def test_output_callback_uses_audio_engine_render_ports(self, output_module):
+        """Output audio callback should delegate render ownership to AudioEngine."""
+
+        class FakeEngine:
+            def __init__(self):
+                self.calls = []
+
+            def render_ports(self, ports, num_samples):
+                self.calls.append((ports, num_samples))
+                return [np.array([0.1, 0.2, 0.3], dtype=np.float32)]
+
+        engine = FakeEngine()
+        output_module.audio_engine = engine
+        source_port = Port("output", "Out")
+        output_module.inp_port_l.connect(source_port)
+
+        samples = output_module._generate_samples(3)
+
+        assert len(engine.calls) == 1
+        assert engine.calls[0][1] == 3
+        assert samples.shape == (3, 2)
+        assert np.allclose(samples[:, 0], [0.1, 0.2, 0.3])
+        assert np.allclose(samples[:, 1], [0.1, 0.2, 0.3])
+
+    def test_output_callback_requires_audio_engine(self, output_module):
+        """Output callback must not fall back to direct port reads."""
+        source_port = Port("output", "Out")
+        source_port.write(np.array([0.1, 0.2, 0.3], dtype=np.float32))
+        output_module.inp_port_l.connect(source_port)
+
+        samples = output_module._generate_samples(3)
+
+        assert samples.shape == (3, 2)
+        assert np.allclose(samples, np.zeros((3, 2), dtype=np.float32))
 
     def test_mono_to_stereo_integration(self):
         """Test mono input is properly converted to stereo."""

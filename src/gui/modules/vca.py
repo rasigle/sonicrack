@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from typing import Any
 
 from PyQt6.QtGui import QColor
@@ -8,6 +8,8 @@ from src.engine import Volume
 from src.engine.modifier import ModulatedVolume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -34,6 +36,11 @@ class VCAModule(ModuleWidget):
     Parameters:
         - Amplitude: Manual amplitude control (0.0 to 1.0)
     """
+
+    runtime_kind = "vca"
+    runtime_input_names = ("In", "CV")
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("amplitude",)
 
     metadata = ModuleMetadata(
         title="VCA",
@@ -195,38 +202,19 @@ class VCAModule(ModuleWidget):
         )
         return volume_component
 
-    def process(self, num_samples: int = 1):
-        """Process VCA: apply amplitude control to input signal.
-
-        Reads from the audio input port, applies amplitude modulation (either from
-        the CV port or the amplitude knob), and writes the result to the output port.
-
-        Args:
-            num_samples: Number of samples to process (default: 1 for per-sample
-                processing)
-
-        Note:
-            In the current architecture, this method is not actively called during
-            playback. The audio engine directly calls get_samples() on the compiled
-            AudioComponents. This method exists to satisfy the AudioModule interface
-            and for potential future use in a more modular processing pipeline.
-        """
-        # Read input signal
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Apply manual or CV-controlled amplitude for one render cycle."""
         if not self.in_port.is_connected:
+            self.out_port.write(silence(num_samples))
             return
 
-        input_signal = self.in_port.read()
+        input_signal = read_samples(self.in_port, num_samples)
+        amplitude = (
+            read_samples(self.cv_port, num_samples)
+            if self.cv_port.is_connected
+            else float_parameter(parameters, "amplitude", self.amp_knob.get_value)
+        )
+        self.out_port.write(input_signal * amplitude)
 
-        # Determine amplitude (from CV or knob)
-        if self.cv_port.is_connected:
-            # Use CV to control amplitude
-            amplitude = self.cv_port.read()
-        else:
-            # Use knob value
-            amplitude = self.amp_knob.get_value()
-
-        # Apply amplitude modulation
-        output_signal = input_signal * amplitude
-
-        # Write to output port
-        self.out_port.write(output_signal)

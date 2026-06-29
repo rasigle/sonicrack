@@ -1,6 +1,5 @@
 import logging
 
-import numpy as np
 from PyQt6 import QtWidgets
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
@@ -9,6 +8,13 @@ from src.engine.effects import Distortion
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import (
+    float_parameter,
+    read_samples,
+    silence,
+    str_parameter,
+)
 from src.gui.widgets import Knob
 
 logger = logging.getLogger(__name__)
@@ -20,6 +26,11 @@ DEFAULT_DISTORTION_TYPE = "Distortion"
 @register_module()
 class DistortionModule(ModulatedModuleBase):
     """Distortion module"""
+
+    runtime_kind = "distortion"
+    runtime_input_names = ("In",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("drive", "mix", "distortion_type")
 
     metadata = ModuleMetadata(
         title="Distortion",
@@ -83,29 +94,6 @@ class DistortionModule(ModulatedModuleBase):
         """Distortion requires the In port to be connected."""
         return ["In"]
 
-    def process(self, num_samples: int = 1):
-        """Process audio through the distortion effect.
-
-        Args:
-            num_samples: Number of samples to process
-        """
-        if not self.in_port.is_connected:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        samples = self.in_port.read(num_samples)
-        if samples is None:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        if self.component is None:
-            self.component = self.create_engine_component()
-
-        self.component.drive = self.drive_knob.get_value()
-        self.component.mix = self.mix_knob.get_value()
-        self.component.distortion_type = self.distortion_combo.currentText()
-        self.out_port.write(self.component(samples))
-
     def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
         """Distortion expects bipolar CV range [-1, 1].
 
@@ -128,3 +116,24 @@ class DistortionModule(ModulatedModuleBase):
         drive = self.drive_knob.get_value()
         mix = self.mix_knob.get_value()
         return Distortion(drive=drive, mix=mix)
+
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Apply distortion during an engine-owned render cycle."""
+        if not self.in_port.is_connected:
+            self.out_port.write(silence(num_samples))
+            return
+
+        if self.component is None:
+            self.component = self.create_unmodulated_component()
+
+        self.component.drive = float_parameter(
+            parameters, "drive", self.drive_knob.get_value
+        )
+        self.component.mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
+        self.component.distortion_type = str_parameter(
+            parameters, "distortion_type", self.distortion_combo.currentText
+        )
+
+        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

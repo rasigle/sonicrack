@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
@@ -14,6 +14,7 @@ from src.engine.oscillator import (
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
 from src.gui.ui_constants import (
     DEFAULT_PW_PERCENTAGE_VALUE,
     MAX_PW_PERCENTAGE_VALUE,
@@ -34,6 +35,10 @@ OSCILLATOR_MAX_FREQUENCY = 6000
 @register_module()
 class OscillatorModule(ModuleWidget):
     """Oscillator module with frequency and gain controls."""
+
+    runtime_kind = "multi_oscillator"
+    runtime_output_names = ("Sine", "Triangle", "Sawtooth", "Square")
+    runtime_parameter_names = ("frequency", "pulsewidth")
 
     metadata = ModuleMetadata(
         title="Oscillator",
@@ -144,17 +149,6 @@ class OscillatorModule(ModuleWidget):
         # Register with audio_config to receive sample rate change notifications
         audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
 
-    def process(self, num_samples: int | None = None):
-        if num_samples is None:
-            num_samples = audio_config.buffer_size
-
-        # Generate samples for all ports that are connected
-        # This ensures visualization modules can pull samples even without audio output
-        for port, osc in zip(self.ports, self.oscs, strict=False):
-            if port.is_connected and osc is not None:
-                samples = osc.get_samples(num_samples)
-                port.write(samples)
-
     def _on_global_sample_rate_changed(self, new_sample_rate: int):
         """Handle global sample rate changes from audio_config.
 
@@ -184,6 +178,15 @@ class OscillatorModule(ModuleWidget):
         outputs.
         """
         return None
+
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Render each oscillator output for the current engine cycle."""
+        del parameters
+        for port, osc in zip(self.ports, self.oscs, strict=False):
+            if osc is not None:
+                port.write(osc.get_samples(num_samples))
 
     def get_output_component(self, port_name: str):
         """Return the engine component backing a specific waveform output."""

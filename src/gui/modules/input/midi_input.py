@@ -1,4 +1,4 @@
-"""MIDI Input module for the modular synthesizer GUI.
+﻿"""MIDI Input module for the modular synthesizer GUI.
 
 This module provides real-time MIDI input from connected controllers and keyboards.
 It converts MIDI messages to control voltages (CV) that can control oscillators
@@ -23,9 +23,9 @@ Usage:
     4. Play notes on your MIDI controller
 
 Example Patch:
-    MIDI Input (Freq) → Oscillator (Freq)
-    MIDI Input (Gate) → ADSR Envelope → Volume (Mod)
-    MIDI Input (Vel)  → [Future: velocity-sensitive parameter]
+    MIDI Input (Freq) â†’ Oscillator (Freq)
+    MIDI Input (Gate) â†’ ADSR Envelope â†’ Volume (Mod)
+    MIDI Input (Vel)  â†’ [Future: velocity-sensitive parameter]
 """
 
 import logging
@@ -44,6 +44,7 @@ from PyQt6.QtWidgets import (
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.modules.input.midi_worker_thread import MIDIWorkerThread
+from src.gui.runtime import RuntimeParameters
 from src.gui.widgets.module_widget import ModuleWidget
 from src.midi_io import (
     CVFrequencyOutput,
@@ -68,6 +69,9 @@ class MIDIInputModule(ModuleWidget):
     The module runs a background thread to receive MIDI messages and updates
     the CV converter in real-time.
     """
+
+    runtime_kind = "midi"
+    runtime_output_names = ("Freq", "Gate", "Vel")
 
     metadata = ModuleMetadata(
         title="MIDI Input",
@@ -314,30 +318,6 @@ class MIDIInputModule(ModuleWidget):
         """
         self.status_label.setText(status)
 
-    def process(self, num_samples: int = 1):
-        """Process MIDI input and write CV outputs to ports.
-
-        The MIDI module generates control voltages based on the current
-        MIDI state (active notes, velocity, etc.).
-
-        Args:
-            num_samples: Number of samples to generate
-        """
-        # Generate frequency CV
-        if self.freq_port.is_connected:
-            freq_samples = self.freq_output.get_samples(num_samples)
-            self.freq_port.write(freq_samples)
-
-        # Generate gate CV
-        if self.gate_port.is_connected:
-            gate_samples = self.gate_output.get_samples(num_samples)
-            self.gate_port.write(gate_samples)
-
-        # Generate velocity CV
-        if self.vel_port.is_connected:
-            vel_samples = self.vel_output.get_samples(num_samples)
-            self.vel_port.write(vel_samples)
-
     def create_engine_component(
         self,
         input_components: list[Any] | None = None,
@@ -368,6 +348,15 @@ class MIDIInputModule(ModuleWidget):
             "Vel": self.vel_output,
         }
         return outputs.get(port_name, self.freq_output)
+
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Render MIDI CV outputs for the current engine cycle."""
+        del parameters
+        self.freq_port.write(self.freq_output.get_samples(num_samples))
+        self.gate_port.write(self.gate_output.get_samples(num_samples))
+        self.vel_port.write(self.vel_output.get_samples(num_samples))
 
     def __del__(self):
         """Destructor - ensure MIDI input is stopped."""

@@ -1016,6 +1016,20 @@ class TestPortNumpySupport:
         assert isinstance(port.value, np.ndarray)
         np.testing.assert_array_equal(port.value, array)
 
+    def test_peek_recent_reads_tap_history_without_connections(self):
+        """Test passive tap snapshots do not require graph traversal."""
+        port = Port("output", "audio_out")
+        port.write(np.array([1.0, 2.0, 3.0], dtype=np.float32))
+        port.write(np.array([4.0, 5.0], dtype=np.float32))
+
+        recent = port.peek_recent(4)
+
+        assert isinstance(recent, np.ndarray)
+        np.testing.assert_array_equal(
+            recent,
+            np.array([2.0, 3.0, 4.0, 5.0], dtype=np.float32),
+        )
+
     def test_read_numpy_array(self):
         """Test reading a numpy array from connected port."""
         input_port = Port("input", "audio_in")

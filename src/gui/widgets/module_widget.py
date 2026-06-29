@@ -7,7 +7,6 @@ import logging
 from abc import ABCMeta
 from typing import Any
 
-import numpy as np
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import (
@@ -18,7 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.gui.core.module import AudioModule, ModuleCategory
+from src.gui.core.module import AudioModule
 from src.gui.dialogs.module_info_dialog import ModuleInfoDialog
 from src.gui.widgets.port_widget import PortWidget
 
@@ -70,6 +69,15 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
     # Signals
     parameter_changed = pyqtSignal(str, object)  # (param_name, value)
+    # Runtime classification used by AudioEngine/render specs. Subclasses with
+    # DSP behavior should override this with a registered kind from gui.runtime.
+    runtime_kind = "unknown"
+    runtime_input_names: tuple[str, ...] = ()
+    runtime_output_names: tuple[str, ...] = ()
+    runtime_parameter_names: tuple[str, ...] = ()
+    # Visual-only sink modules set this to False so they can receive rendered
+    # buffers without being treated as processors inside the graph.
+    is_processing_module = True
 
     def __init__(
         self,
@@ -92,11 +100,6 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
         self.custom_name = ""
         self.is_active = True
-
-        # Caching for pull-based architecture (Phase 3)
-        self._cache_valid = False
-        self._cached_samples = None
-        self._cache_num_samples = 0
 
         # Ports
         self.input_ports: list[PortWidget] = []
@@ -331,68 +334,13 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 main_window._restart_output_playback()
             break
 
-    # === Pull-Based Audio Processing (Caching) ===
-
-    def ensure_samples_ready(self, num_samples: int):
-        """Ensure audio samples are generated for this processing cycle.
-
-        This method implements the pull-based architecture with caching:
-        1. Check if samples are already cached for this cycle
-        2. If not, call process() to generate samples
-        3. Cache the result to prevent redundant processing
-
-        This is called by Port.read() when downstream modules request samples.
-
-        Args:
-            num_samples: Number of samples to generate
-        """
-        # Check if cache is valid and has the right number of samples
-        if self._cache_valid and self._cache_num_samples == num_samples:
-            return  # Already generated for this cycle
-
-        if not self.is_active:
-            self._process_inactive(num_samples)
-            self._cache_valid = True
-            self._cache_num_samples = num_samples
-            return
-
-        # Generate samples by calling process()
-        self.process(num_samples)
-
-        # Mark cache as valid
-        self._cache_valid = True
-        self._cache_num_samples = num_samples
-
     def invalidate_cache(self):
-        """Invalidate the sample cache at the start of each audio cycle.
-
-        This should be called by the audio engine at the start of each
-        processing cycle to ensure all modules regenerate their samples.
-        """
-        self._cache_valid = False
-        self._cache_num_samples = 0
-        self._cached_samples = None
+        """Hook for modules that own per-cycle runtime state."""
 
     def _clear_output_ports(self) -> None:
         """Clear visible output values when a module is bypassed."""
         for port in self.output_ports:
             port.write(0.0)
-
-    def _process_inactive(self, num_samples: int) -> None:
-        """Apply bypass semantics for pull-based module processing."""
-        if self.metadata.category == ModuleCategory.MODIFIER:
-            required_inputs = self.get_required_inputs()
-            if required_inputs:
-                input_port = self._find_port_by_name(required_inputs[0])
-                if input_port is not None:
-                    value = input_port.port.read(num_samples)
-                    for output_port in self.output_ports:
-                        output_port.write(value)
-                    return
-
-        silence = np.zeros(num_samples, dtype=np.float32)
-        for output_port in self.output_ports:
-            output_port.write(silence)
 
     # === Naming ===
 
@@ -728,3 +676,19 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         modulation_components: dict[str, Any] | None = None,
     ) -> Any:
         raise NotImplementedError
+
+    def get_runtime_spec(self):
+        """Return this module's runtime declaration for the graph renderer."""
+        from src.gui.runtime import RuntimeModuleSpec
+
+        return RuntimeModuleSpec(
+            kind=self.runtime_kind,
+            processor=self.process_runtime,
+            input_names=self.runtime_input_names,
+            output_names=self.runtime_output_names,
+            parameter_names=self.runtime_parameter_names,
+        )
+
+    def process_runtime(self, num_samples: int, parameters) -> None:
+        """Default runtime no-op for passive sinks and unknown modules."""
+        del num_samples, parameters

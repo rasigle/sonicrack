@@ -1,4 +1,4 @@
-"""Base class for modulated components (Volume, Panner, etc.)
+﻿"""Base class for modulated components (Volume, Panner, etc.)
 
 This provides common functionality for modules that have:
 - A main parameter knob
@@ -183,5 +183,3 @@ class ModulatedModuleBase(ModuleWidget):
             f"{type(self).__name__} must implement create_unmodulated_component()"
         )
 
-    def process(self, num_samples: int = 1):
-        raise NotImplementedError(f"{type(self).__name__} must implement process()")

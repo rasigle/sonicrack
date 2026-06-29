@@ -1,9 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
 
-import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
@@ -12,6 +11,8 @@ from src.engine import ModulatedVolume, Volume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 
 if TYPE_CHECKING:
@@ -23,6 +24,11 @@ logger = logging.getLogger(__name__)
 @register_module()
 class VolumeModule(ModulatedModuleBase):
     """Volume/Gain module with modulation support."""
+
+    runtime_kind = "volume_mod"
+    runtime_input_names = ("In", "Mod")
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("gain_db",)
 
     metadata = ModuleMetadata(
         title="Volume (Mod)",
@@ -76,97 +82,6 @@ class VolumeModule(ModulatedModuleBase):
         """Volume requires the In port to be connected."""
         return ["In"]
 
-    def process(self, num_samples: int = 1):
-        """Process audio through the volume control.
-
-        Uses either Volume or ModulatedVolume component to process the audio.
-        Automatically recreates component when modulation connection state changes.
-
-        Args:
-            num_samples: Number of samples to process
-        """
-        # Check if input is connected
-        if not self.in_port.is_connected:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        # Read input signal - MUST pass num_samples to trigger upstream generation
-        input_signal = self.in_port.read(num_samples)
-        if input_signal is None:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        # Check if modulation connection state changed
-        is_modulated = self.mod_port.is_connected
-
-        if is_modulated != self._was_modulated:
-            # Modulation state changed - recreate component
-            logger.info(f"VolumeModule: Modulation state changed to {is_modulated}")
-
-            if is_modulated:
-                # Modulation just connected - get component from connected port
-                connected_ports = list(self.mod_port.connected_to)
-                if connected_ports:
-                    connected_port = connected_ports[0]
-
-                    # Direct access to the engine component via port.component
-                    modulator_component = connected_port.component
-
-                    if modulator_component:
-                        logger.info(
-                            f"VolumeModule: Creating ModulatedVolume with "
-                            f"{type(modulator_component).__name__}"
-                        )
-                        self.component = self.create_modulated_component(
-                            modulator_component
-                        )
-                    else:
-                        logger.warning(
-                            "VolumeModule: Connected port has no component - "
-                            "using unmodulated"
-                        )
-                        self.component = self.create_unmodulated_component()
-                else:
-                    logger.warning(
-                        "VolumeModule: Mod port connected but no ports found"
-                    )
-                    self.component = self.create_unmodulated_component()
-
-                # Disable knob
-                self.gain_knob.setEnabled(False)
-                self.gain_knob.setStyleSheet("opacity: 0.5;")
-                self.gain_knob.setToolTip("Gain controlled by Mod input")
-            else:
-                # Modulation disconnected - create simple Volume
-                self.component = self.create_unmodulated_component()
-
-                # Enable knob
-                self.gain_knob.setEnabled(True)
-                self.gain_knob.setStyleSheet("")
-                self.gain_knob.setToolTip("Manual gain control")
-
-            self._was_modulated = is_modulated
-
-        # Safety check: component must exist
-        if self.component is None:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        # Update component parameters if not modulated
-        if not isinstance(self.component, ModulatedVolume):
-            # Simple Volume - update gain_db parameter
-            gain_db = self.gain_knob.get_value()
-            self.component.gain_db = gain_db
-
-        # Process through the component (Volume or ModulatedVolume)
-
-        # Both Volume and ModulatedVolume use __call__ for processing
-        # ModulatedVolume automatically handles vectorized processing
-        output_signal = self.component(input_signal)
-
-        # Write to output port
-        self.out_port.write(output_signal)
-
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
         """Create ModulatedVolume with modulation. This is used when modulation is
@@ -194,3 +109,33 @@ class VolumeModule(ModulatedModuleBase):
         gain_db = self.gain_knob.get_value()
         logger.debug(f"VolumeModule: Creating simple Volume with gain_db={gain_db}")
         return Volume(gain_db=gain_db)
+
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Apply static or modulated gain for one render cycle."""
+        if not self.in_port.is_connected:
+            self.out_port.write(silence(num_samples))
+            return
+
+        input_signal = read_samples(self.in_port, num_samples)
+
+        if self.mod_port.is_connected:
+            gain = read_samples(self.mod_port, num_samples)
+            gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)
+            base_gain = 10.0 ** (gain_db / 20.0)
+            self.out_port.write(input_signal * base_gain * gain)
+            return
+
+        if self.component is None or isinstance(self.component, ModulatedVolume):
+            self.component = Volume(
+                gain_db=float_parameter(
+                    parameters, "gain_db", self.gain_knob.get_value
+                )
+            )
+        else:
+            self.component.gain_db = float_parameter(
+                parameters, "gain_db", self.gain_knob.get_value
+            )
+
+        self.out_port.write(self.component(input_signal))

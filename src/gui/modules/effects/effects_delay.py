@@ -1,6 +1,5 @@
 import logging
 
-import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
@@ -8,6 +7,8 @@ from src.engine.effects import Delay
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,11 @@ logger = logging.getLogger(__name__)
 @register_module()
 class DelayModule(ModulatedModuleBase):
     """Delay module"""
+
+    runtime_kind = "delay"
+    runtime_input_names = ("In",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("delay_time", "feedback", "mix")
 
     metadata = ModuleMetadata(
         title="Delay",
@@ -86,26 +92,6 @@ class DelayModule(ModulatedModuleBase):
         """Delay requires the In port to be connected."""
         return ["In"]
 
-    def process(self, num_samples: int = 1):
-        """Process audio through the delay effect.
-
-        Args:
-            num_samples: Number of samples to process
-        """
-        if not self.in_port.is_connected:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        samples = self.in_port.read(num_samples)
-        if samples is None:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        if self.component is None:
-            self.component = self.create_engine_component()
-
-        self.out_port.write(self.component(samples))
-
     def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
         """Delay expects bipolar CV range [-1, 1].
 
@@ -124,3 +110,24 @@ class DelayModule(ModulatedModuleBase):
         feedback = self.feedback_knob.get_value()
         mix = self.mix_knob.get_value()
         return Delay(delay_time=delay_time, feedback=feedback, mix=mix)
+
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Apply delay during an engine-owned render cycle."""
+        if not self.in_port.is_connected:
+            self.out_port.write(silence(num_samples))
+            return
+
+        if self.component is None:
+            self.component = self.create_unmodulated_component()
+
+        self.component.delay_time = float_parameter(
+            parameters, "delay_time", self.delay_time.get_value
+        )
+        self.component.feedback = float_parameter(
+            parameters, "feedback", self.feedback_knob.get_value
+        )
+        self.component.mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
+
+        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

@@ -1,13 +1,14 @@
-import logging
+﻿import logging
 from typing import Any
 
-import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from src.engine import Clipper
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -17,6 +18,11 @@ logger = logging.getLogger(__name__)
 @register_module()
 class ClipperModule(ModuleWidget):
     """Clipper module for distortion/limiting."""
+
+    runtime_kind = "clipper"
+    runtime_input_names = ("In",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("threshold",)
 
     metadata = ModuleMetadata(
         title="Clipper",
@@ -81,31 +87,20 @@ class ClipperModule(ModuleWidget):
         threshold = self.threshold_knob.get_value()
         return Clipper((-threshold, threshold))
 
-    def process(self, num_samples: int = 1):
-        """Apply clipping/limiting to input signal.
-
-        Reads from the input port, applies clipping based on threshold, and writes to
-        the output port.
-
-        Args:
-            num_samples: Number of samples to process
-
-        Note:
-            This method is called in the pull-based architecture to generate output
-            samples.
-        """
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Clip the connected input for one render cycle."""
         if not self.in_port.is_connected:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+            self.out_port.write(silence(num_samples))
             return
 
-        # Read input signal - MUST pass num_samples to trigger upstream generation
-        input_signal = self.in_port.read(num_samples)
-        if input_signal is None:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
+        samples = read_samples(self.in_port, num_samples)
+        threshold = float_parameter(
+            parameters, "threshold", self.threshold_knob.get_value
+        )
+        if self.component is not None:
+            self.component.wave_range = (-threshold, threshold)
 
-        # Apply clipping through the component
-        output_signal = self.component(input_signal)
+        self.out_port.write(samples.clip(-threshold, threshold))
 
-        # Write to output port
-        self.out_port.write(output_signal)

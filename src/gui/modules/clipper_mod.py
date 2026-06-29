@@ -1,8 +1,7 @@
-"""Modulated Clipper module - clipper with CV threshold control."""
+﻿"""Modulated Clipper module - clipper with CV threshold control."""
 
 import logging
 
-import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
@@ -10,6 +9,8 @@ from src.engine import Clipper, ModulatedClipper
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,11 @@ logger = logging.getLogger(__name__)
 @register_module()
 class ClipperModulatedModule(ModulatedModuleBase):
     """Clipper module with modulation support for dynamic threshold control."""
+
+    runtime_kind = "clipper"
+    runtime_input_names = ("In",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("threshold",)
 
     metadata = ModuleMetadata(
         title="Clipper (Mod)",
@@ -58,6 +64,8 @@ class ClipperModulatedModule(ModulatedModuleBase):
         # Register parameters for automatic get/set
         self.register_parameter("threshold", self.threshold_knob)
 
+        self.component: Clipper | None = None
+
         # Set control_knob for base class functionality
         self.control_knob = self.threshold_knob
 
@@ -65,30 +73,6 @@ class ClipperModulatedModule(ModulatedModuleBase):
     def get_required_inputs(self) -> list[str]:
         """Clipper requires the In port to be connected."""
         return ["In"]
-
-    def process(self, num_samples: int = 1):
-        """Process audio through the clipper.
-
-        This is called by the process-based architecture to generate samples.
-        Currently not used as we rely on create_engine_component for the
-        compiled audio chain.
-
-        Args:
-            num_samples: Number of samples to process
-        """
-        if not self.in_port.is_connected:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        samples = self.in_port.read(num_samples)
-        if samples is None:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        # Apply clipping (simplified version for process-based flow)
-        threshold = self.threshold_knob.get_value()
-        clipped = samples.clip(-threshold, threshold)
-        self.out_port.write(clipped)
 
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
@@ -102,3 +86,21 @@ class ClipperModulatedModule(ModulatedModuleBase):
         """Create simple Clipper without modulation."""
         threshold = self.threshold_knob.get_value()
         return Clipper((-threshold, threshold))
+
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Clip the connected input for one render cycle."""
+        if not self.in_port.is_connected:
+            self.out_port.write(silence(num_samples))
+            return
+
+        samples = read_samples(self.in_port, num_samples)
+        threshold = float_parameter(
+            parameters, "threshold", self.threshold_knob.get_value
+        )
+        if self.component is None:
+            self.component = self.create_unmodulated_component()
+        self.component.wave_range = (-threshold, threshold)
+
+        self.out_port.write(samples.clip(-threshold, threshold))

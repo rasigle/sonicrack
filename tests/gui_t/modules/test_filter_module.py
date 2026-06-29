@@ -7,6 +7,7 @@ import numpy as np
 from src.engine.filter import ButterworthFilter
 from src.gui.core.port import Port
 from src.gui.modules.filter import FilterModule
+from src.gui.runtime import process_runtime_module
 
 
 def test_filter_module_create_engine_component_returns_modifier(app):
@@ -21,8 +22,8 @@ def test_filter_module_create_engine_component_returns_modifier(app):
     assert isinstance(component, ButterworthFilter)
 
 
-def test_filter_module_process_filters_signal(app):
-    """Process should apply real filtering instead of passing input through."""
+def test_filter_module_runtime_filters_signal(app):
+    """Runtime processing should apply real filtering."""
     module = FilterModule()
     source = Port("output", "source")
     module.in_port.connect(source)
@@ -42,7 +43,7 @@ def test_filter_module_process_filters_signal(app):
     module.type_combo.setCurrentText("Low-pass")
     module.component = module.create_engine_component()
 
-    module.process(num_samples)
+    process_runtime_module(module, num_samples)
     output_signal = module.out_port.value
 
     assert isinstance(output_signal, np.ndarray)
@@ -50,11 +51,11 @@ def test_filter_module_process_filters_signal(app):
     assert not np.allclose(output_signal, input_signal)
 
 
-def test_filter_module_process_outputs_silence_without_input(app):
-    """Process should write silence when there is no connected input."""
+def test_filter_module_runtime_outputs_silence_without_input(app):
+    """Runtime processing should write silence when there is no connected input."""
     module = FilterModule()
 
-    module.process(16)
+    process_runtime_module(module, 16)
 
     assert isinstance(module.out_port.value, np.ndarray)
     assert np.allclose(module.out_port.value, np.zeros(16, dtype=np.float32))

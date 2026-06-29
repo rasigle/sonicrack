@@ -4,9 +4,7 @@ All notable changes to AudioPlayground will be documented in this file.
 
 
 ## Planned
-- Audio paths in GUI: compiled engine graphs and pull-based module processing. Which to continue with
-- Rework visualizers as modules
-- Visualization system as visualization modules
+
 - Rethink mono stereo channels
 - Display ADSR shape in module
 - Add Lowpass Filter with resonance module
@@ -14,13 +12,26 @@ All notable changes to AudioPlayground will be documented in this file.
 - Better Architecture with UI/Logic Separation
 - Fullscreen support
 - Undo / Redo system
-- Make communication between UI and engine fully preset based
 - Review the engine preset system (fluent API)
 - Make the ui look cooler and integrate a rack design
 
 
 ### Added
 
+- Engine-owned GUI render graph for live playback, monitor visualizers, and
+  future sink modules such as wave writers.
+- Passive visualizer audio taps: waveform and spectrum modules now read rendered
+  tap history instead of driving upstream DSP.
+- Standalone visualizer monitoring path: an oscillator connected only to a
+  visualizer is rendered by the audio engine monitor timer without requiring an
+  Output module.
+- Runtime module specs with explicit `runtime_kind`, declared input/output
+  ports, and parameter snapshots for compiled graph nodes.
+- Module-owned runtime processors: GUI modules now declare their own runtime
+  specs and DSP adapters, while `AudioEngine` keeps graph traversal and render
+  ownership.
+- Architecture documentation in affected runtime modules describing render
+  ownership, passive sinks, and the shared graph path.
 - Rack-style module headers with category labels, accent rails, and a shared
   power/bypass control.
 - Improved knob spacing, module sizing, and control contrast for denser rack

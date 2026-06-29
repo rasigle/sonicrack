@@ -1,5 +1,5 @@
-import logging
-from typing import Any, cast
+﻿import logging
+from typing import Any
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 from src.engine.modulator import ADSREnvelope, GateTriggeredADSR
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -19,6 +20,16 @@ class ADSRModule(ModuleWidget):
     - External gate signal (e.g., from MIDI Input)
     - Manual trigger button
     """
+
+    runtime_kind = "adsr"
+    runtime_input_names = ("Gate",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = (
+        "attack_duration",
+        "decay_duration",
+        "sustain_level",
+        "release_duration",
+    )
 
     metadata = ModuleMetadata(
         title="ADSR Envelope",
@@ -132,7 +143,7 @@ class ADSRModule(ModuleWidget):
         self.register_parameter("release_duration", self.release_knob)
 
         # Track ADSR component for manual triggering
-        self._adsr_component = None
+        self._adsr_component: ADSREnvelope | GateTriggeredADSR | None = None
 
         self.component = self.create_engine_component()
 
@@ -141,20 +152,15 @@ class ADSRModule(ModuleWidget):
         if self._adsr_component is None:
             return
 
-        try:
-            adsr = getattr(self._adsr_component, "adsr", self._adsr_component)
-            adsr = cast(ADSREnvelope, adsr)
+        component = self._adsr_component
+        adsr = component.adsr if isinstance(component, GateTriggeredADSR) else component
 
-            if note_on:
-                adsr.trigger_note_on()
-                logging.debug("ADSR manually triggered (note on)")
-            else:
-                adsr.trigger_note_off()
-                logging.debug("ADSR manually released (note off)")
-
-        except AttributeError as e:
-            action = "trigger" if note_on else "release"
-            logging.warning(f"Failed to {action} ADSR: {e}")
+        if note_on:
+            adsr.trigger_note_on()
+            logging.debug("ADSR manually triggered (note on)")
+        else:
+            adsr.trigger_note_off()
+            logging.debug("ADSR manually released (note off)")
 
     def _on_trigger_pressed(self) -> None:
         """Handle trigger button press - start attack phase."""
@@ -205,23 +211,12 @@ class ADSRModule(ModuleWidget):
 
         return self._adsr_component
 
-    def process(self, num_samples: int = 1):
-        """Generate ADSR envelope output.
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Render the ADSR envelope for the current engine cycle."""
+        del parameters
+        if self._adsr_component is None:
+            self._adsr_component = self.create_engine_component()
+        self.out_port.write(self._adsr_component.get_samples(num_samples))
 
-        Generates envelope values based on current ADSR state and writes to the output
-        port.
-        Can be triggered by gate input or manual trigger button.
-
-        Args:
-            num_samples: Number of samples to generate (default: 1 for per-sample
-                processing)
-
-        Note:
-            In the current architecture, this method is not actively called during
-            playback. The audio engine directly calls get_samples() on the compiled
-            AudioComponents. This method exists to satisfy the AudioModule interface.
-        """
-        if self.out_port.is_connected and hasattr(self, "_adsr_component"):
-            # Generate envelope samples
-            samples = self._adsr_component.get_samples(num_samples)
-            self.out_port.write(samples)

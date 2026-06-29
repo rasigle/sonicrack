@@ -257,10 +257,3 @@ class AudioModule(ABC):
         self.outputs[name] = port
         return port
 
-    @abstractmethod
-    def process(self, num_samples: int = 1):
-        """Process method placeholder.
-
-        This method can be overridden by subclasses to implement
-        any necessary processing logic specific to the module.
-        """

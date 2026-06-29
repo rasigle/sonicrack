@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
@@ -10,6 +10,8 @@ from PyQt6.QtGui import QColor
 from src.engine import Panner
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -22,6 +24,11 @@ logger = logging.getLogger(__name__)
 @register_module()
 class SimplePannerModule(ModuleWidget):
     """Simple panner module without modulation input."""
+
+    runtime_kind = "panner"
+    runtime_input_names = ("In",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("position",)
 
     metadata = ModuleMetadata(
         title="Panner",
@@ -84,37 +91,27 @@ class SimplePannerModule(ModuleWidget):
         """Create the panner component."""
         return Panner(0.0)
 
-    def process(self, num_samples: int = 1):
-        """Apply stereo panning to input signal.
-
-        Reads from the input port, applies panning control, and writes to the output
-        port.
-
-        Args:
-            num_samples: Number of samples to process (default: 1 for per-sample
-                processing)
-        """
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Pan the connected input for one render cycle."""
         if not self.in_port.is_connected:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+            self.out_port.write(silence(num_samples))
             return
 
-        # Read input signal - MUST pass num_samples to trigger upstream generation
-        input_signal = self.in_port.read(num_samples)
-        if input_signal is None:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+        samples = read_samples(self.in_port, num_samples)
+        position = float_parameter(parameters, "position", self.pan_knob.get_value)
+
+        if samples.ndim == 1:
+            left_gain = np.sqrt(0.5 * (1.0 - position))
+            right_gain = np.sqrt(0.5 * (1.0 + position))
+            self.out_port.write(
+                np.column_stack((samples * left_gain, samples * right_gain))
+            )
             return
 
-        # Apply panning - use vectorized method for proper stereo output
-        # Panner returns tuple (left, right), need to convert to (N, 2) stereo format
-        if isinstance(input_signal, np.ndarray) and len(input_signal) > 1:
-            # Use vectorized panning for arrays
-            left, right = self.component.pan_vectorized(input_signal)
-            # Convert to stereo format (N, 2)
-            output_signal = np.column_stack((left, right))
-        else:
-            # Single sample or scalar - use __call__
-            left, right = self.component(input_signal)
-            output_signal = np.array([[left, right]], dtype=np.float32)
+        panned = samples.copy()
+        panned[:, 0] *= np.sqrt(0.5 * (1.0 - position))
+        panned[:, 1] *= np.sqrt(0.5 * (1.0 + position))
+        self.out_port.write(panned)
 
-        # Write to output port
-        self.out_port.write(output_signal)

@@ -13,8 +13,8 @@ import time
 import tracemalloc
 
 import numpy as np
+from _benchmark_output import print_benchmark_table
 
-from scripts.benchmarks._benchmark_output import print_benchmark_table
 from src.audio_io import AudioOutput
 
 

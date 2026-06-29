@@ -67,7 +67,7 @@ class AudioComponentRegistry:
         # Validate module class
         if not inspect.isclass(component_class):
             raise TypeError(
-                f"component_class must be a class, got {type(component_class)}"
+                f"component_class must be a class, got {type(component_class).__name__}"
             )
 
         if not issubclass(component_class, AudioComponent):
@@ -304,7 +304,7 @@ def register_component(override: bool = False) -> Callable:
         ...         description="Sine wave oscillator"
         ...     )
         ...     def __init__(self, frequency: float = 440.0):
-        ...         pass
+        ...         super().__init__()
     """
 
     def decorator(cls: type[AudioComponent]) -> type[AudioComponent]:

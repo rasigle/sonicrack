@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
@@ -7,6 +8,8 @@ from src.engine import ModulatedPanner, Panner
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 
 logger = logging.getLogger(__name__)
@@ -15,6 +18,11 @@ logger = logging.getLogger(__name__)
 @register_module()
 class PannerModule(ModulatedModuleBase):
     """Panner module for stereo positioning with modulation support."""
+
+    runtime_kind = "panner"
+    runtime_input_names = ("In",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("position",)
 
     metadata = ModuleMetadata(
         title="Panner (Mod)",
@@ -60,34 +68,6 @@ class PannerModule(ModulatedModuleBase):
         """Panner requires the In port to be connected."""
         return ["In"]
 
-    def process(self, num_samples: int = 1):
-        """Process audio through the panner.
-
-        Args:
-            num_samples: Number of samples to process
-        """
-        if self.in_port.is_connected:
-            samples = self.in_port.read()
-            if samples is not None:
-                # Apply panning (simplified for process-based flow)
-                import numpy as np
-
-                position = self.pan_knob.get_value()
-
-                # Convert to stereo if mono
-                if samples.ndim == 1:
-                    samples = np.column_stack([samples, samples])
-
-                # Apply pan law
-                left_gain = np.sqrt(0.5 * (1.0 - position))
-                right_gain = np.sqrt(0.5 * (1.0 + position))
-
-                panned = samples.copy()
-                panned[:, 0] *= left_gain
-                panned[:, 1] *= right_gain
-
-                self.out_port.write(panned)
-
     def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
         """Panner expects bipolar CV range [-1, 1] for pan position.
 
@@ -105,3 +85,27 @@ class PannerModule(ModulatedModuleBase):
         """Create simple Panner without modulation."""
         position = self.pan_knob.get_value()
         return Panner(position)
+
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Pan the connected input for one render cycle."""
+        if not self.in_port.is_connected:
+            self.out_port.write(silence(num_samples))
+            return
+
+        samples = read_samples(self.in_port, num_samples)
+        position = float_parameter(parameters, "position", self.pan_knob.get_value)
+
+        if samples.ndim == 1:
+            left_gain = np.sqrt(0.5 * (1.0 - position))
+            right_gain = np.sqrt(0.5 * (1.0 + position))
+            self.out_port.write(
+                np.column_stack((samples * left_gain, samples * right_gain))
+            )
+            return
+
+        panned = samples.copy()
+        panned[:, 0] *= np.sqrt(0.5 * (1.0 - position))
+        panned[:, 1] *= np.sqrt(0.5 * (1.0 + position))
+        self.out_port.write(panned)

@@ -1,10 +1,9 @@
-"""Filter module for the modular synthesizer GUI."""
+﻿"""Filter module for the modular synthesizer GUI."""
 
 from __future__ import annotations
 
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
-import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
@@ -18,6 +17,8 @@ from src.engine.filter import ButterworthFilter
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
+from src.gui.runtime import RuntimeParameters
+from src.gui.runtime_helpers import read_samples, silence, write_output
 from src.gui.widgets import HSlider, Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -25,6 +26,11 @@ from src.gui.widgets.module_widget import ModuleWidget
 @register_module()
 class FilterModule(ModuleWidget):
     """Butterworth filter module with frequency, order, and type controls."""
+
+    runtime_kind = "component_modifier"
+    runtime_input_names = ("In",)
+    runtime_output_names = ("Out",)
+    runtime_parameter_names = ("cutoff", "high_cutoff", "order", "filter_type")
 
     metadata = ModuleMetadata(
         title="Filter",
@@ -262,40 +268,21 @@ class FilterModule(ModuleWidget):
             sample_rate=audio_config.sample_rate,
         )
 
-    def process(self, num_samples: int = 1):
-        """Apply filter to input signal.
-
-        Reads from the input port, applies the configured filter, and writes to the
-        output port.
-
-        Args:
-            num_samples: Number of samples to process (default: 1 for per-sample
-                processing)
-
-        Note:
-            In the current architecture, this method is not actively called during
-            playback. The audio engine directly calls get_samples() on the compiled
-            AudioComponents. This method exists to satisfy the AudioModule interface.
-        """
+    def process_runtime(
+        self, num_samples: int, parameters: RuntimeParameters
+    ) -> None:
+        """Filter the connected input for one render cycle."""
+        del parameters
         if not self.in_port.is_connected:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
+            write_output(self.out_port, silence(num_samples), num_samples)
             return
 
-        # Read input signal
-        input_signal = self.in_port.read(num_samples)
-        if input_signal is None:
-            self.out_port.write(np.zeros(num_samples, dtype=np.float32))
-            return
-
-        # Recreate lazily if needed, otherwise use the live modifier component.
         if self.component is None:
             self.component = self.create_engine_component()
 
-        output_signal = self.component(input_signal)
-        if isinstance(output_signal, tuple):
-            tuple_signal = cast(tuple[float, ...], output_signal)
-            self.out_port.write(np.asarray(tuple_signal, dtype=np.float32))
-            return
+        write_output(
+            self.out_port,
+            self.component(read_samples(self.in_port, num_samples)),
+            num_samples,
+        )
 
-        # Write to output port
-        self.out_port.write(output_signal)

@@ -12,7 +12,7 @@ from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.module_registry import register_module
 from src.gui.modules.visualization.visualizer_utils import (
-    get_samples_hybrid,
+    get_visualizer_samples,
     validate_samples,
 )
 from src.gui.widgets.module_widget import ModuleWidget
@@ -32,7 +32,16 @@ class SpectrumModule(ModuleWidget):
     - Connect audio signal to the "In" port
     - The display shows the frequency spectrum of the input signal
     - Great for analyzing frequency content and monitoring mix
+
+    Runtime behavior:
+    - Passive sink in the render graph; it does not process upstream modules.
+    - When audio output is playing, it displays samples tapped from the shared
+      render path.
+    - Without active audio output, AudioEngine's monitor timer renders only the
+      connected visualizer sink ports so sources still animate silently.
     """
+
+    runtime_kind = "passive_sink"
 
     metadata = ModuleMetadata(
         title="Spectrum",
@@ -40,7 +49,7 @@ class SpectrumModule(ModuleWidget):
         description="Real-time frequency spectrum display (FFT analyzer)",
     )
 
-    # Mark as non-processing to exclude from audio chain pulling
+    # Passive sink: receives rendered buffers without running as a processor.
     is_processing_module = False
 
     def __init__(self):
@@ -194,14 +203,7 @@ class SpectrumModule(ModuleWidget):
         return []  # Optional input - show "No Signal" if not connected
 
     def _update_display(self):
-        """Update the spectrum display at 30 FPS (independent of audio rate).
-
-        HYBRID MODE:
-        - PASSIVE when output module is playing: reads buffered samples
-            (no interference)
-        - ACTIVE when standalone: actively pulls samples (enables visualization without
-            output)
-        """
+        """Update the spectrum display from rendered port tap history."""
         # Check if input is connected
         if not self.in_port.is_connected:
             # No input - clear display
@@ -210,9 +212,8 @@ class SpectrumModule(ModuleWidget):
             self.level_label.setText("Level: -- dB")
             return
 
-        # Use shared utility to get samples (handles active/passive mode automatically)
         # FFT needs at least 1024 samples for good frequency resolution
-        samples = get_samples_hybrid(self, self.in_port, num_samples=1024)
+        samples = get_visualizer_samples(self.in_port, num_samples=1024)
 
         # Validate and display samples
         if not validate_samples(samples):
@@ -223,22 +224,6 @@ class SpectrumModule(ModuleWidget):
 
         # Update display with samples
         self._update_samples(samples)
-
-    def process(self, num_samples: int | None = None):
-        """Process method for audio path.
-
-        For visualizers: This is a NO-OP. Visualizers observe samples via
-        observe_samples() which is called explicitly by modules that want to share
-        their output.
-
-        Visualizers are NOT part of the audio processing chain to avoid any
-        interference.
-
-        Args:
-            num_samples: Number of samples (ignored)
-        """
-        pass  # Visualizers don't process - they only observe
-
 
 class SpectrumAnalyzer(QWidget):
     """Widget for displaying audio spectrum in real-time.

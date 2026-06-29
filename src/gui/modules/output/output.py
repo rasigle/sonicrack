@@ -26,7 +26,15 @@ logger = logging.getLogger(__name__)
 
 @register_module()
 class OutputModule(ModuleWidget):
-    """Audio output module with configurable sample rate and buffer size."""
+    """Audio output sink with configurable sample rate and buffer size.
+
+    Output is a passive runtime sink. Its audio callback requests rendered input
+    buffers from ``AudioEngine.render_ports()`` and never pulls upstream modules
+    directly through ``Port.read()``. That keeps playback, visualizers, and
+    future writer sinks on one shared render path.
+    """
+
+    runtime_kind = "passive_sink"
 
     metadata = ModuleMetadata(
         title="Output",
@@ -195,7 +203,7 @@ class OutputModule(ModuleWidget):
         super().closeEvent(event)
 
     def _generate_samples(self, num_samples: int) -> np.ndarray:
-        """Generate stereo audio samples by pulling from input ports.
+        """Generate stereo audio samples through the engine-owned graph.
 
         Routing behavior:
         - Only L connected: L signal duplicated to both stereo channels
@@ -216,17 +224,11 @@ class OutputModule(ModuleWidget):
         if not self.is_active:
             return silence()
 
-        def read_port(port):
-            samples = port.read(num_samples)
+        def normalize_samples(samples):
             if samples is None:
                 return None
-
             samples = np.asarray(samples)
             return None if samples.size == 0 else samples
-
-        # Invalidate all module caches at the start of each audio cycle
-        if hasattr(self, "audio_engine") and self.audio_engine:
-            self.audio_engine.invalidate_all_caches()
 
         l_connected = self.inp_port_l.is_connected
         r_connected = self.inp_port_r.is_connected
@@ -234,9 +236,26 @@ class OutputModule(ModuleWidget):
         if not l_connected and not r_connected:
             return silence()
 
-        # Read from connected ports (with num_samples to trigger upstream generation)
-        left_samples = read_port(self.inp_port_l) if l_connected else None
-        right_samples = read_port(self.inp_port_r) if r_connected else None
+        ports_to_render = []
+        if l_connected:
+            ports_to_render.append(self.inp_port_l)
+        if r_connected:
+            ports_to_render.append(self.inp_port_r)
+
+        if self.audio_engine is None:
+            logger.error("Output module has no AudioEngine; returning silence")
+            return silence()
+
+        rendered = self.audio_engine.render_ports(ports_to_render, num_samples)
+
+        rendered_index = 0
+        left_samples = None
+        right_samples = None
+        if l_connected:
+            left_samples = normalize_samples(rendered[rendered_index])
+            rendered_index += 1
+        if r_connected:
+            right_samples = normalize_samples(rendered[rendered_index])
 
         if left_samples is None and right_samples is None:
             return silence()
@@ -265,11 +284,3 @@ class OutputModule(ModuleWidget):
 
         return stereo_samples.astype(np.float32)
 
-    def process(self, num_samples: int = 1):
-        """Process method for compatibility with QTimer-based architecture.
-
-        NOTE: This method is no longer used when using callback-based pulling.
-        The audio callback directly calls _generate_samples() instead.
-        Kept for backward compatibility during transition.
-        """
-        # No-op - audio callback drives everything now

@@ -110,19 +110,15 @@ class PortWidget(QGraphicsItem):
     # Logic Methods - Delegate to Model
     # ========================================================================
 
-    def connect(self, other: PortWidget) -> None:
+    def connect(self, other: PortWidget | Port) -> None:
         """Connect this port to another port.
 
         Args:
-            other: The port widget to connect to
+            other: The port widget or raw port to connect to
         """
         if isinstance(other, PortWidget):
             self.port.connect(other.port)
-        elif hasattr(other, "model"):
-            # Handle wrapped PortModel
-            self.port.connect(other.port)
         elif isinstance(other, Port):
-            # Assume it's a PortModel directly
             self.port.connect(other)
 
     def disconnect(self) -> None:
@@ -200,8 +196,7 @@ class PortWidget(QGraphicsItem):
             10,
         )
         text_color = QColor(232, 236, 240)
-        parent_active = getattr(self.parent_module, "is_active", True)
-        if not parent_active:
+        if not self.parent_module.is_active:
             text_color = QColor(150, 154, 158)
         painter.setPen(text_color)
         painter.drawText(

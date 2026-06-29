@@ -107,5 +107,5 @@ class NoiseModule(ModuleWidget):
         del parameters
         if self.component is None:
             self.component = self.create_engine_component()
-        self.out_port.write(self.component.get_samples(num_samples))
 
+        self.out_port.write(self.component.get_samples(num_samples))

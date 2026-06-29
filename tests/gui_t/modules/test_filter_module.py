@@ -6,7 +6,7 @@ import numpy as np
 
 from src.engine.filter import ButterworthFilter
 from src.gui.core.port import Port
-from src.gui.modules.filter import FilterModule
+from gui.modules.modifier.filter import FilterModule
 from src.gui.runtime import process_runtime_module
 
 

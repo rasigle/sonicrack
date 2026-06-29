@@ -52,6 +52,7 @@ from src.engine.audio_component import (
 from src.engine.audio_component_registry import register_component
 from src.engine.modifier import Modifier
 from src.engine.validation import validate_sample_rate
+from src.utils.math import db_to_linear
 
 
 @register_component()
@@ -304,6 +305,360 @@ class ButterworthFilter(Modifier):
     def filter_type(self) -> str:
         """Get filter type."""
         return self._filter_type
+
+
+@register_component()
+class BiquadResonantFilter(Modifier):
+    """Stateful RBJ biquad filter with resonance, drive, and modulation support.
+
+    This is intended as a synth-character filter. ``ButterworthFilter`` remains
+    the neutral utility filter; this component provides a resonant cutoff peak
+    and optional saturation for more musical sweeps.
+    """
+
+    FilterType = Literal["low", "high", "band", "notch"]
+
+    descriptor = ComponentDescriptor(
+        name="BiquadResonantFilter",
+        category=ComponentCategory.MODIFIER,
+        parameters=make_parameter_descriptors(
+            "cutoff",
+            "resonance",
+            "filter_type",
+            "drive_db",
+            "output_gain_db",
+            "sample_rate",
+            cutoff=ParameterDescriptor(
+                name="cutoff",
+                default=1000.0,
+                minimum=20.0,
+                unit="Hz",
+                description="Cutoff or center frequency.",
+            ),
+            resonance=ParameterDescriptor(
+                name="resonance",
+                default=0.707,
+                minimum=0.1,
+                maximum=30.0,
+                description="Filter Q/resonance.",
+            ),
+            filter_type=ParameterDescriptor(
+                name="filter_type",
+                default="low",
+                choices=("low", "high", "band", "notch"),
+                description="Resonant biquad filter type.",
+            ),
+            drive_db=ParameterDescriptor(
+                name="drive_db",
+                default=0.0,
+                unit="dB",
+                description="Pre-filter saturation drive.",
+            ),
+            output_gain_db=ParameterDescriptor(
+                name="output_gain_db",
+                default=0.0,
+                unit="dB",
+                description="Post-filter output gain.",
+            ),
+        ),
+        description="Resonant RBJ biquad synth filter with drive",
+        tags=["filter", "biquad", "resonant", "synth", "drive"],
+    )
+
+    def __init__(
+        self,
+        cutoff: float = 1000.0,
+        resonance: float = 0.707,
+        filter_type: FilterType = "low",
+        drive_db: float = 0.0,
+        output_gain_db: float = 0.0,
+        sample_rate: int = DEFAULT_SAMPLE_RATE,
+    ) -> None:
+        """Initialize resonant biquad filter."""
+        super().__init__()
+        self.sample_rate = validate_sample_rate(sample_rate)
+        self._cutoff = float(cutoff)
+        self._resonance = float(resonance)
+        self._filter_type: BiquadResonantFilter.FilterType = filter_type
+        self._drive_db = float(drive_db)
+        self._output_gain_db = float(output_gain_db)
+        self._filter_state: np.ndarray | None = None
+
+        if filter_type not in ("low", "high", "band", "notch"):
+            raise ValueError(
+                "filter_type must be 'low', 'high', 'band', or 'notch', "
+                f"got '{filter_type}'"
+            )
+
+        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+
+    @property
+    def cutoff(self) -> float:
+        return self._cutoff
+
+    @cutoff.setter
+    def cutoff(self, value: float) -> None:
+        self._cutoff = float(value)
+        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+
+    @property
+    def resonance(self) -> float:
+        return self._resonance
+
+    @resonance.setter
+    def resonance(self, value: float) -> None:
+        self._resonance = float(value)
+        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+
+    @property
+    def filter_type(self) -> str:
+        return self._filter_type
+
+    @filter_type.setter
+    def filter_type(self, value: FilterType) -> None:
+        if value not in ("low", "high", "band", "notch"):
+            raise ValueError(
+                "filter_type must be 'low', 'high', 'band', or 'notch', "
+                f"got '{value}'"
+            )
+        self._filter_type = value
+        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+        self.reset_state()
+
+    @property
+    def drive_db(self) -> float:
+        return self._drive_db
+
+    @drive_db.setter
+    def drive_db(self, value: float) -> None:
+        self._drive_db = float(value)
+
+    @property
+    def output_gain_db(self) -> float:
+        return self._output_gain_db
+
+    @output_gain_db.setter
+    def output_gain_db(self, value: float) -> None:
+        self._output_gain_db = float(value)
+
+    def reset_state(self) -> None:
+        """Reset filter delay memory."""
+        self._filter_state = None
+
+    def __iter__(self):
+        self.reset_state()
+        return self
+
+    def __next__(self):
+        raise NotImplementedError(
+            "BiquadResonantFilter requires an input signal. Call it with samples."
+        )
+
+    def __call__(
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
+        """Apply the filter to scalar, stereo tuple, or array input."""
+        if isinstance(val, np.ndarray):
+            return self.scale_vectorized(val)
+        if isinstance(val, tuple):
+            result = self.scale_vectorized(np.asarray([val], dtype=np.float32))[0]
+            return tuple(float(sample) for sample in result)
+        return float(self.scale_vectorized(np.asarray([val], dtype=np.float32))[0])
+
+    def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
+        """Apply the current static filter coefficients to a sample buffer."""
+        if samples.size == 0:
+            return samples
+
+        shaped = self._apply_drive(np.asarray(samples, dtype=np.float32))
+        zi = self._filter_state_for(shaped)
+        filtered, self._filter_state = lfilter(
+            self._b,
+            self._a,
+            shaped,
+            axis=0,
+            zi=zi,
+        )
+        return self._apply_output_gain(filtered).astype(np.float32)
+
+    def process_modulated(
+        self,
+        samples: np.ndarray,
+        cutoff_values: np.ndarray | None = None,
+        resonance_values: np.ndarray | None = None,
+        drive_db_values: np.ndarray | None = None,
+        output_gain_db_values: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """Process a buffer with optional per-sample cutoff modulation."""
+        samples = np.asarray(samples, dtype=np.float32)
+        if samples.size == 0:
+            return samples
+        if (
+            cutoff_values is None
+            and resonance_values is None
+            and drive_db_values is None
+            and output_gain_db_values is None
+        ):
+            return self.scale_vectorized(samples)
+
+        shaped = self._apply_drive(samples, drive_db_values)
+        cutoff_array = self._fit_cutoff_values(cutoff_values, len(shaped))
+        resonance_array = self._fit_resonance_values(resonance_values, len(shaped))
+        result = self._process_modulated_samples(shaped, cutoff_array, resonance_array)
+        return self._apply_output_gain(result, output_gain_db_values).astype(np.float32)
+
+    def configure(
+        self,
+        *,
+        cutoff: float,
+        resonance: float,
+        filter_type: FilterType,
+        drive_db: float,
+        output_gain_db: float,
+    ) -> None:
+        """Update runtime parameters while preserving delay state when possible."""
+        reset_state = filter_type != self._filter_type
+        self._cutoff = float(cutoff)
+        self._resonance = float(resonance)
+        self._filter_type = filter_type
+        self._drive_db = float(drive_db)
+        self._output_gain_db = float(output_gain_db)
+        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+        if reset_state:
+            self.reset_state()
+
+    def _process_modulated_samples(
+        self,
+        samples: np.ndarray,
+        cutoff_values: np.ndarray,
+        resonance_values: np.ndarray,
+    ) -> np.ndarray:
+        trailing_shape = samples.shape[1:]
+        state_shape = (2,) + trailing_shape
+        if self._filter_state is None or self._filter_state.shape != state_shape:
+            self._filter_state = np.zeros(state_shape, dtype=np.float64)
+
+        z1 = self._filter_state[0]
+        z2 = self._filter_state[1]
+        output = np.empty_like(samples, dtype=np.float32)
+        for index, sample in enumerate(samples):
+            b, a = self._design_filter(
+                float(cutoff_values[index]), float(resonance_values[index])
+            )
+            y = b[0] * sample + z1
+            z1 = b[1] * sample - a[1] * y + z2
+            z2 = b[2] * sample - a[2] * y
+            output[index] = y
+
+        self._filter_state = np.stack((z1, z2)).astype(np.float64, copy=False)
+        return output
+
+    def _filter_state_for(self, samples: np.ndarray) -> np.ndarray:
+        expected_shape = (2,) + samples.shape[1:]
+        if self._filter_state is None or self._filter_state.shape != expected_shape:
+            self._filter_state = np.zeros(expected_shape, dtype=np.float64)
+        return self._filter_state
+
+    def _fit_parameter_values(
+        self,
+        values: np.ndarray | None,
+        num_samples: int,
+        fallback: float,
+        *,
+        minimum: float,
+        maximum: float,
+    ) -> np.ndarray:
+        if values is None:
+            return np.full(num_samples, fallback, dtype=np.float32)
+
+        parameter_values = np.asarray(values, dtype=np.float32).reshape(-1)
+        if len(parameter_values) == num_samples:
+            return np.clip(parameter_values, minimum, maximum)
+        if len(parameter_values) < num_samples:
+            padded = np.empty(num_samples, dtype=np.float32)
+            padded[: len(parameter_values)] = parameter_values
+            padded[len(parameter_values) :] = (
+                parameter_values[-1] if len(parameter_values) else fallback
+            )
+            return np.clip(padded, minimum, maximum)
+        return np.clip(parameter_values[:num_samples], minimum, maximum)
+
+    def _fit_cutoff_values(
+        self, cutoff_values: np.ndarray | None, num_samples: int
+    ) -> np.ndarray:
+        return self._fit_parameter_values(
+            cutoff_values,
+            num_samples,
+            self._cutoff,
+            minimum=1.0,
+            maximum=self.sample_rate * 0.475,
+        )
+
+    def _fit_resonance_values(
+        self, resonance_values: np.ndarray | None, num_samples: int
+    ) -> np.ndarray:
+        return self._fit_parameter_values(
+            resonance_values,
+            num_samples,
+            self._resonance,
+            minimum=0.1,
+            maximum=30.0,
+        )
+
+    def _design_filter(
+        self, cutoff: float, resonance: float
+    ) -> tuple[np.ndarray, np.ndarray]:
+        nyq = self.sample_rate * 0.5
+        safe_cutoff = float(np.clip(cutoff, 1.0, nyq * 0.95))
+        q = float(np.clip(resonance, 0.1, 30.0))
+        omega = 2.0 * np.pi * safe_cutoff / self.sample_rate
+        sin_omega = np.sin(omega)
+        cos_omega = np.cos(omega)
+        alpha = sin_omega / (2.0 * q)
+
+        if self._filter_type == "low":
+            b0 = (1.0 - cos_omega) * 0.5
+            b1 = 1.0 - cos_omega
+            b2 = (1.0 - cos_omega) * 0.5
+        elif self._filter_type == "high":
+            b0 = (1.0 + cos_omega) * 0.5
+            b1 = -(1.0 + cos_omega)
+            b2 = (1.0 + cos_omega) * 0.5
+        elif self._filter_type == "band":
+            b0 = alpha
+            b1 = 0.0
+            b2 = -alpha
+        else:
+            b0 = 1.0
+            b1 = -2.0 * cos_omega
+            b2 = 1.0
+
+        a0 = 1.0 + alpha
+        a1 = -2.0 * cos_omega
+        a2 = 1.0 - alpha
+        b = np.asarray([b0 / a0, b1 / a0, b2 / a0], dtype=np.float64)
+        a = np.asarray([1.0, a1 / a0, a2 / a0], dtype=np.float64)
+        return b, a
+
+    def _apply_drive(
+        self, samples: np.ndarray, drive_db_values: np.ndarray | None = None
+    ) -> np.ndarray:
+        if drive_db_values is None:
+            drive = db_to_linear(self._drive_db)
+        else:
+            drive = np.asarray(db_to_linear(drive_db_values), dtype=np.float32)
+
+        if np.all(drive <= 1.0001):
+            return samples
+        driven = np.tanh(samples * drive) / np.tanh(drive)
+        return np.where(drive <= 1.0001, samples, driven).astype(np.float32)
+
+    def _apply_output_gain(
+        self, samples: np.ndarray, output_gain_db_values: np.ndarray | None = None
+    ) -> np.ndarray:
+        if output_gain_db_values is None:
+            return samples * db_to_linear(self._output_gain_db)
+        return samples * db_to_linear(output_gain_db_values)
 
 
 # Utility functions for standalone use

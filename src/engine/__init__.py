@@ -111,7 +111,12 @@ from src.engine.effects import (
     Distortion,
     Reverb,
 )
-from src.engine.filter import ButterworthFilter, apply_filter, butter
+from src.engine.filter import (
+    BiquadResonantFilter,
+    ButterworthFilter,
+    apply_filter,
+    butter,
+)
 from src.engine.modifier import (
     Clipper,
     Frequency,
@@ -189,6 +194,7 @@ __all__ = [
     "butter",
     "apply_filter",
     "ButterworthFilter",
+    "BiquadResonantFilter",
     "white_noise",
     "pink_noise",
     "brownian_noise",

@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.oscillator_square import SquareOscillator
 from src.gui.core.port import Port
 from src.gui.modules.mixer import MixerModule
@@ -104,6 +105,79 @@ def test_adsr_runtime_applies_envelope_parameters(qapp: Any):
     assert module._adsr_component.decay_duration == pytest.approx(0.3)
     assert module._adsr_component.sustain_level == pytest.approx(0.4)
     assert module._adsr_component.release_duration == pytest.approx(0.5)
+
+
+def test_adsr_runtime_outputs_zero_until_triggered(qapp: Any):
+    del qapp
+    module = ADSRModule()
+
+    module.process_runtime(8, {})
+
+    np.testing.assert_allclose(module.out_port.value, np.zeros(8), atol=1e-7)
+
+
+def test_adsr_runtime_renders_expected_gate_attack_decay_sustain(qapp: Any):
+    del qapp
+    module = ADSRModule()
+    gate_source = _connect_constant_input(module.gate_input, 1.0)
+    gate_source.write(np.ones(12, dtype=np.float32))
+
+    module.process_runtime(
+        12,
+        {
+            "attack_duration": 4 / DEFAULT_SAMPLE_RATE,
+            "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
+            "sustain_level": 0.5,
+            "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+        },
+    )
+
+    expected = np.array(
+        [0.0, 0.25, 0.5, 0.75, 1.0, 0.875, 0.75, 0.625, 0.5, 0.5, 0.5, 0.5],
+        dtype=np.float32,
+    )
+    np.testing.assert_allclose(module.out_port.value, expected, atol=1e-7)
+
+
+def test_adsr_runtime_renders_expected_gate_release(qapp: Any):
+    del qapp
+    module = ADSRModule()
+    gate_source = _connect_constant_input(module.gate_input, 1.0)
+    parameters = {
+        "attack_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "sustain_level": 0.5,
+        "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+    }
+
+    gate_source.write(np.ones(12, dtype=np.float32))
+    module.process_runtime(12, parameters)
+    gate_source.write(np.zeros(6, dtype=np.float32))
+    module.process_runtime(6, parameters)
+
+    expected = np.array([0.5, 0.375, 0.25, 0.125, 0.0, 0.0], dtype=np.float32)
+    np.testing.assert_allclose(module.out_port.value, expected, atol=1e-7)
+
+
+def test_adsr_manual_gate_holds_long_attack(qapp: Any):
+    del qapp
+    module = ADSRModule()
+    parameters = {
+        "attack_duration": 8 / DEFAULT_SAMPLE_RATE,
+        "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "sustain_level": 0.5,
+        "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+    }
+
+    module.trigger_button.setChecked(True)
+    module.process_runtime(4, parameters)
+    first_chunk = np.asarray(module.out_port.value)
+    module.process_runtime(4, parameters)
+    second_chunk = np.asarray(module.out_port.value)
+
+    assert module.trigger_button.text() == "Gate On"
+    assert second_chunk[-1] > first_chunk[-1]
+    assert second_chunk[-1] == pytest.approx(0.875)
 
 
 def test_vco_runtime_applies_oscillator_parameters(qapp: Any):

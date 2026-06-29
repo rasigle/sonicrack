@@ -15,5 +15,5 @@ class RealtimeAudioCallback(Protocol):
     contended locks, and avoidable allocations.
     """
 
-    def __call__(self, frames: int) -> np.ndarray | None:
-        """Return mono or stereo audio for exactly `frames` requested frames."""
+    def __call__(self, num_frames: int) -> np.ndarray | None:
+        """Return mono or stereo audio for exactly `num_frames` requested frames."""

@@ -21,7 +21,7 @@ from src.engine import (
     Volume,
     WaveAdder,
 )
-from src.engine.filter import ButterworthFilter
+from src.engine.filter import BiquadResonantFilter, ButterworthFilter
 from src.engine.presets import PresetBuilder
 
 CHUNKS = [64, 128, 320, 511, 1024, 2049]
@@ -107,6 +107,38 @@ def test_butterworth_filter_preserves_multichannel_state_across_buffers():
 
     continuous_filter = ButterworthFilter(cutoff=1800, order=4, sample_rate=48000)
     chunked_filter = ButterworthFilter(cutoff=1800, order=4, sample_rate=48000)
+
+    continuous = continuous_filter.scale_vectorized(signal)
+
+    offset = 0
+    chunks = []
+    for chunk_size in CHUNKS:
+        chunk = signal[offset : offset + chunk_size]
+        chunks.append(chunked_filter.scale_vectorized(chunk))
+        offset += chunk_size
+    chunked = np.concatenate(chunks)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+def test_biquad_resonant_filter_preserves_state_across_buffers():
+    rng = np.random.default_rng(2468)
+    signal = rng.normal(0.0, 0.25, TOTAL_SAMPLES).astype(np.float32)
+
+    continuous_filter = BiquadResonantFilter(
+        cutoff=1200,
+        resonance=3.0,
+        filter_type="low",
+        output_gain_db=-6.0,
+        sample_rate=44100,
+    )
+    chunked_filter = BiquadResonantFilter(
+        cutoff=1200,
+        resonance=3.0,
+        filter_type="low",
+        output_gain_db=-6.0,
+        sample_rate=44100,
+    )
 
     continuous = continuous_filter.scale_vectorized(signal)
 

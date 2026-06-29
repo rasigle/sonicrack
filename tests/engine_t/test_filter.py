@@ -5,7 +5,12 @@ import unittest
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.filter import ButterworthFilter, apply_filter, butter
+from src.engine.filter import (
+    BiquadResonantFilter,
+    ButterworthFilter,
+    apply_filter,
+    butter,
+)
 
 
 class TestButterworthFilterBasics(unittest.TestCase):
@@ -379,6 +384,104 @@ class TestButterworthFilterEdgeCases(unittest.TestCase):
 
         # DC component should be removed
         self.assertLess(np.mean(filtered), 0.5)
+
+
+class TestBiquadResonantFilter(unittest.TestCase):
+    """Test synth-style resonant biquad filter behavior."""
+
+    def test_initialization(self):
+        filt = BiquadResonantFilter(
+            cutoff=1200,
+            resonance=2.0,
+            filter_type="band",
+            drive_db=6.0,
+            output_gain_db=-3.0,
+            sample_rate=48000,
+        )
+
+        self.assertEqual(filt.cutoff, 1200)
+        self.assertEqual(filt.resonance, 2.0)
+        self.assertEqual(filt.filter_type, "band")
+        self.assertEqual(filt.drive_db, 6.0)
+        self.assertEqual(filt.output_gain_db, -3.0)
+        self.assertEqual(filt.sample_rate, 48000)
+
+    def test_low_pass_attenuates_high_frequencies(self):
+        sample_rate = 10000
+        t = np.linspace(0, 1.0, sample_rate, endpoint=False)
+        low_freq = 100
+        high_freq = 3000
+        signal_in = np.sin(2 * np.pi * low_freq * t) + np.sin(
+            2 * np.pi * high_freq * t
+        )
+
+        filt = BiquadResonantFilter(
+            cutoff=500,
+            resonance=0.707,
+            filter_type="low",
+            sample_rate=sample_rate,
+        )
+        filtered = filt.scale_vectorized(signal_in.astype(np.float32))
+        fft_out = np.abs(np.fft.rfft(filtered))
+        freqs = np.fft.rfftfreq(len(signal_in), 1 / sample_rate)
+
+        low_idx = np.argmin(np.abs(freqs - low_freq))
+        high_idx = np.argmin(np.abs(freqs - high_freq))
+
+        self.assertLess(fft_out[high_idx] / fft_out[low_idx], 0.25)
+
+    def test_resonance_boosts_cutoff_region(self):
+        sample_rate = 12000
+        t = np.linspace(0, 1.0, sample_rate, endpoint=False)
+        cutoff_freq = 1000
+        signal_in = np.sin(2 * np.pi * cutoff_freq * t).astype(np.float32)
+
+        neutral = BiquadResonantFilter(
+            cutoff=cutoff_freq,
+            resonance=0.707,
+            filter_type="low",
+            sample_rate=sample_rate,
+        )
+        resonant = BiquadResonantFilter(
+            cutoff=cutoff_freq,
+            resonance=8.0,
+            filter_type="low",
+            sample_rate=sample_rate,
+        )
+
+        neutral_out = neutral.scale_vectorized(signal_in)
+        resonant_out = resonant.scale_vectorized(signal_in)
+
+        self.assertGreater(
+            np.sqrt(np.mean(resonant_out**2)),
+            np.sqrt(np.mean(neutral_out**2)),
+        )
+
+    def test_drive_limits_output(self):
+        samples = np.linspace(-4.0, 4.0, 512, dtype=np.float32)
+        filt = BiquadResonantFilter(
+            cutoff=5000,
+            resonance=0.707,
+            drive_db=24.0,
+            sample_rate=44100,
+        )
+
+        filtered = filt.scale_vectorized(samples)
+
+        self.assertLessEqual(np.max(np.abs(filtered)), 1.5)
+
+    def test_modulated_cutoff_changes_output(self):
+        sample_rate = 10000
+        t = np.linspace(0, 1.0, sample_rate, endpoint=False)
+        signal_in = np.sin(2 * np.pi * 1000 * t).astype(np.float32)
+        static = BiquadResonantFilter(cutoff=300, sample_rate=sample_rate)
+        modulated = BiquadResonantFilter(cutoff=300, sample_rate=sample_rate)
+        cutoff_values = np.linspace(300, 3000, len(signal_in), dtype=np.float32)
+
+        static_out = static.process_modulated(signal_in)
+        modulated_out = modulated.process_modulated(signal_in, cutoff_values)
+
+        self.assertGreater(np.mean(np.abs(modulated_out)), np.mean(np.abs(static_out)))
 
 
 if __name__ == "__main__":

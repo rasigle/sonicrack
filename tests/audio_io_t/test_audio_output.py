@@ -67,8 +67,8 @@ class TestAudioOutputCallbacks(unittest.TestCase):
         """Test setting audio callback."""
         audio = AudioOutput()
 
-        def new_callback(n):
-            return np.ones((n, 2))
+        def new_callback(num_frames: int):
+            return np.ones((num_frames, 2))
 
         audio.set_audio_callback(new_callback)
         self.assertIs(audio.audio_callback, new_callback)
@@ -77,9 +77,9 @@ class TestAudioOutputCallbacks(unittest.TestCase):
         """Test that callback is executed correctly."""
         call_count = [0]
 
-        def test_callback(num_samples):
+        def test_callback(num_frames: int):
             call_count[0] += 1
-            return np.random.randn(num_samples, 2)
+            return np.asarray(np.random.randn(num_frames, 2))
 
         audio = AudioOutput(audio_callback=test_callback)
 

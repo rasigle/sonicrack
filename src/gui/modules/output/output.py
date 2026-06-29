@@ -202,7 +202,7 @@ class OutputModule(ModuleWidget):
             logger.debug(f"Error stopping audio on close: {e}")
         super().closeEvent(event)
 
-    def _generate_samples(self, num_samples: int) -> np.ndarray:
+    def _generate_samples(self, num_frames: int) -> np.ndarray:
         """Generate stereo audio samples through the engine-owned graph.
 
         Routing behavior:
@@ -212,14 +212,14 @@ class OutputModule(ModuleWidget):
         - Neither connected: Return silence
 
         Args:
-            num_samples: Number of samples requested by audio callback
+            num_frames: Number of samples requested by audio callback
 
         Returns:
             Stereo audio samples as (N, 2) numpy array
         """
 
         def silence() -> np.ndarray:
-            return np.zeros((num_samples, 2), dtype=np.float32)
+            return np.zeros((num_frames, 2), dtype=np.float32)
 
         if not self.is_active:
             return silence()
@@ -246,7 +246,7 @@ class OutputModule(ModuleWidget):
             logger.error("Output module has no AudioEngine; returning silence")
             return silence()
 
-        rendered = self.audio_engine.render_ports(ports_to_render, num_samples)
+        rendered = self.audio_engine.render_ports(ports_to_render, num_frames)
 
         rendered_index = 0
         left_samples = None
@@ -276,9 +276,9 @@ class OutputModule(ModuleWidget):
             stereo_samples = stereo_samples * (10.0 ** (self.gain_db / 20.0))
 
         # Ensure correct length
-        if stereo_samples.shape[0] != num_samples:
+        if stereo_samples.shape[0] != num_frames:
             result = silence()
-            length = min(stereo_samples.shape[0], num_samples)
+            length = min(stereo_samples.shape[0], num_frames)
             result[:length] = stereo_samples[:length]
             return result
 

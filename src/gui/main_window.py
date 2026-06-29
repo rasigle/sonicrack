@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from PyQt6 import QtGui, QtWidgets
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -385,18 +385,18 @@ class ModularSynthWindow(QMainWindow):
                 output_module = module
                 break
 
-        if not output_module:
+        if output_module is None:
             logger.debug("No Output module found")
             return
 
-        logger.info(f"Found Output module: {output_module}")
+        logger.info(f"Found Output module: {output_module.metadata.title}")
 
         # Simply start playback - the Output module's process chain will handle
         # everything
         try:
             output_module.start_playback()
             statusbar.showMessage("Playback started (process-based)")
-            logger.info("✓ Process-based playback started")
+            logger.info("Process-based playback started")
 
         except Exception as e:
             logger.error(f"Failed to start playback: {e}", exc_info=True)
@@ -432,8 +432,6 @@ class ModularSynthWindow(QMainWindow):
             output_module.stop_playback()
 
         # Small delay to ensure clean stop
-        from PyQt6.QtCore import QTimer
-
         QTimer.singleShot(100, lambda: self._delayed_start_playback(output_module))
 
     def _delayed_start_playback(self, output_module: OutputModule):

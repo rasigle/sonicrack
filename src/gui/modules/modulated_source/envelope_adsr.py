@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 
@@ -94,8 +95,8 @@ class ADSRModule(ModuleWidget):
 
         # Manual trigger button
         trigger_layout = QHBoxLayout()
-        self.trigger_button = QPushButton("Trigger")
-        self.trigger_button.setCheckable(False)  # Not a toggle, just a momentary push
+        self.trigger_button = QPushButton("Gate")
+        self.trigger_button.setCheckable(True)
         self.trigger_button.setMinimumHeight(35)
         self.trigger_button.setStyleSheet("""
             QPushButton {
@@ -113,16 +114,17 @@ class ADSRModule(ModuleWidget):
             QPushButton:hover {
                 background-color: #5cbf60;
             }
+            QPushButton:checked {
+                background-color: #2f8f46;
+                border: 2px solid #8ee0a0;
+            }
         """)
         self.trigger_button.setToolTip(
-            "Manual Trigger\n"
-            "Press: Start attack phase\n"
-            "Hold: Sustain phase\n"
-            "Release: Trigger release phase"
+            "Manual Gate\n"
+            "On: Start attack and hold sustain\n"
+            "Off: Trigger release phase"
         )
-        # Connect press and release events
-        self.trigger_button.pressed.connect(self._on_trigger_pressed)
-        self.trigger_button.released.connect(self._on_trigger_released)
+        self.trigger_button.toggled.connect(self._on_trigger_toggled)
         trigger_layout.addWidget(self.trigger_button)
         layout.addLayout(trigger_layout)
 
@@ -137,6 +139,7 @@ class ADSRModule(ModuleWidget):
 
         # Track ADSR component for manual triggering
         self._adsr_component: ADSREnvelope | GateTriggeredADSR | None = None
+        self._previous_gate = 0.0
 
         self.component = self.create_engine_component()
 
@@ -155,13 +158,10 @@ class ADSRModule(ModuleWidget):
             adsr.trigger_note_off()
             logging.debug("ADSR manually released (note off)")
 
-    def _on_trigger_pressed(self) -> None:
-        """Handle trigger button press - start attack phase."""
-        self._trigger_adsr(note_on=True)
-
-    def _on_trigger_released(self) -> None:
-        """Handle trigger button release - start release phase."""
-        self._trigger_adsr(note_on=False)
+    def _on_trigger_toggled(self, checked: bool) -> None:
+        """Handle manual gate toggles."""
+        self.trigger_button.setText("Gate On" if checked else "Gate")
+        self._trigger_adsr(note_on=checked)
 
     def get_required_inputs(self) -> list[str]:
         """Gate input is optional - ADSR works without gate triggering."""
@@ -204,21 +204,83 @@ class ADSRModule(ModuleWidget):
 
         return self._adsr_component
 
-    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        """Render the ADSR envelope for the current engine cycle."""
+    def _current_adsr(self) -> ADSREnvelope:
+        """Return the active ADSR envelope, unwrapping legacy gate wrappers."""
         if self._adsr_component is None:
             self._adsr_component = self.create_engine_component()
 
-        self._adsr_component.attack_duration = float_parameter(
+        component = self._adsr_component
+        if isinstance(component, GateTriggeredADSR):
+            return component.adsr
+        return component
+
+    def _apply_runtime_parameters(
+        self, adsr: ADSREnvelope, parameters: RuntimeParameters
+    ) -> None:
+        adsr.attack_duration = float_parameter(
             parameters, "attack_duration", self.attack_knob.get_value
         )
-        self._adsr_component.decay_duration = float_parameter(
+        adsr.decay_duration = float_parameter(
             parameters, "decay_duration", self.decay_knob.get_value
         )
-        self._adsr_component.sustain_level = float_parameter(
+        adsr.sustain_level = float_parameter(
             parameters, "sustain_level", self.sustain_knob.get_value
         )
-        self._adsr_component.release_duration = float_parameter(
+        adsr.release_duration = float_parameter(
             parameters, "release_duration", self.release_knob.get_value
         )
-        self.out_port.write(self._adsr_component.get_samples(num_samples))
+
+    def _render_gate_triggered_adsr(
+        self, adsr: ADSREnvelope, gate_signal: np.ndarray, num_samples: int
+    ) -> np.ndarray:
+        """Render ADSR output while applying gate transitions inside the buffer."""
+        output = np.zeros(num_samples, dtype=np.float32)
+        start = 0
+        previous_gate = self._previous_gate
+
+        for index, value in enumerate(gate_signal):
+            current_gate = float(value)
+            note_on = previous_gate < 0.3 and current_gate > 0.7
+            note_off = previous_gate > 0.7 and current_gate < 0.3
+            if not note_on and not note_off:
+                previous_gate = current_gate
+                continue
+
+            if index > start:
+                output[start:index] = adsr.get_samples(index - start)
+
+            if note_on:
+                adsr.trigger_note_on()
+            else:
+                adsr.trigger_note_off()
+
+            start = index
+            previous_gate = current_gate
+
+        if start < num_samples:
+            output[start:] = adsr.get_samples(num_samples - start)
+
+        self._previous_gate = previous_gate
+        return output
+
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
+        """Render the ADSR envelope for the current engine cycle."""
+        adsr = self._current_adsr()
+        self._apply_runtime_parameters(adsr, parameters)
+
+        if self.gate_input.is_connected:
+            gate_signal = np.asarray(
+                self.gate_input.read(num_samples), dtype=np.float32
+            ).reshape(-1)
+            if len(gate_signal) < num_samples:
+                gate_signal = np.pad(gate_signal, (0, num_samples - len(gate_signal)))
+            elif len(gate_signal) > num_samples:
+                gate_signal = gate_signal[:num_samples]
+            samples = self._render_gate_triggered_adsr(
+                adsr, gate_signal, num_samples
+            )
+        else:
+            self._previous_gate = 0.0
+            samples = adsr.get_samples(num_samples)
+
+        self.out_port.write(samples)

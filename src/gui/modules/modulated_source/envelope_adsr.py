@@ -1,9 +1,9 @@
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout, QPushButton
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from src.engine.modulator import ADSREnvelope, GateTriggeredADSR
 from src.gui.core.module import ModuleCategory, ModuleMetadata
@@ -21,6 +21,12 @@ class ADSRModule(ModuleWidget):
     Can be triggered by:
     - External gate signal (e.g., from MIDI Input)
     - Manual trigger button
+
+    Retrigger mode defines note-on behavior while the envelope is still active:
+    - Punch: short click-safe reset to zero, then attack from zero. This gives
+      rhythmic gate patterns a stronger percussive chop.
+    - Legato: attack starts from the current envelope level. This is smoother and
+      avoids amplitude dips when gates overlap.
     """
 
     runtime_kind = "adsr"
@@ -93,6 +99,22 @@ class ADSRModule(ModuleWidget):
 
         layout.addLayout(knobs_layout2)
 
+        retrigger_layout = QVBoxLayout()
+        retrigger_label = QLabel("Retrigger")
+        self.retrigger_combo = QComboBox()
+        self.retrigger_combo.addItems(["Punch", "Legato"])
+        self.retrigger_combo.setToolTip(
+            "Punch: briefly ramps to zero, then attacks for a stronger rhythmic "
+            "chop without clicks.\n"
+            "Legato: attacks from the current envelope level for smoother overlap."
+        )
+        self.retrigger_combo.currentTextChanged.connect(
+            lambda value: self.parameter_changed.emit("retrigger_mode", value)
+        )
+        retrigger_layout.addWidget(retrigger_label)
+        retrigger_layout.addWidget(self.retrigger_combo)
+        layout.addLayout(retrigger_layout)
+
         # Manual trigger button
         trigger_layout = QHBoxLayout()
         self.trigger_button = QPushButton("Gate")
@@ -136,6 +158,12 @@ class ADSRModule(ModuleWidget):
         self.register_parameter("decay_duration", self.decay_knob)
         self.register_parameter("sustain_level", self.sustain_knob)
         self.register_parameter("release_duration", self.release_knob)
+        self.register_parameter(
+            "retrigger_mode",
+            self.retrigger_combo,
+            getter="currentText",
+            setter="setCurrentText",
+        )
 
         # Track ADSR component for manual triggering
         self._adsr_component: ADSREnvelope | GateTriggeredADSR | None = None
@@ -192,6 +220,9 @@ class ADSRModule(ModuleWidget):
             decay_duration=self.decay_knob.get_value(),
             sustain_level=self.sustain_knob.get_value(),
             release_duration=self.release_knob.get_value(),
+            retrigger_mode=self._normalize_retrigger_mode(
+                self.retrigger_combo.currentText()
+            ),
         )
 
         # If gate input is connected, wrap with gate-triggered version
@@ -229,6 +260,14 @@ class ADSRModule(ModuleWidget):
         adsr.release_duration = float_parameter(
             parameters, "release_duration", self.release_knob.get_value
         )
+        mode_value = parameters.get(
+            "retrigger_mode", self.retrigger_combo.currentText()
+        )
+        adsr.retrigger_mode = self._normalize_retrigger_mode(str(mode_value))
+
+    @staticmethod
+    def _normalize_retrigger_mode(value: str) -> Literal["legato", "punch"]:
+        return "legato" if value.lower() == "legato" else "punch"
 
     def _render_gate_triggered_adsr(
         self, adsr: ADSREnvelope, gate_signal: np.ndarray, num_samples: int

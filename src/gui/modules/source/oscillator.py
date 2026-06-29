@@ -16,6 +16,7 @@ from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter
 from src.gui.module_registry import register_module
+from src.gui.modules.source._oscillator_runtime import render_with_frequency_ramp
 from src.gui.ui_constants import (
     DEFAULT_PW_PERCENTAGE_VALUE,
     MAX_PW_PERCENTAGE_VALUE,
@@ -110,6 +111,7 @@ class OscillatorModule(ModuleWidget):
             self._sawtooth_oscillator,
             self._square_oscillator,
         ]
+        self._last_runtime_frequency = freq
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -185,15 +187,19 @@ class OscillatorModule(ModuleWidget):
             parameters, "pulsewidth", self.pulsewidth_knob.get_value
         )
 
-        self._sine_oscillator.frequency = frequency
-        self._triangle_oscillator.frequency = frequency
-        self._sawtooth_oscillator.frequency = frequency
-        self._square_oscillator.frequency = frequency
         self._square_oscillator.pulsewidth = pulsewidth
 
         for port, osc in zip(self.ports, self.oscs, strict=False):
             if osc is not None:
-                port.write(osc.get_samples(num_samples))
+                port.write(
+                    render_with_frequency_ramp(
+                        osc,
+                        self._last_runtime_frequency,
+                        frequency,
+                        num_samples,
+                    )
+                )
+        self._last_runtime_frequency = frequency
 
     def get_output_component(self, port_name: str):
         """Return the engine component backing a specific waveform output."""
@@ -211,14 +217,9 @@ class OscillatorModule(ModuleWidget):
 
     # AudioModuleInterface implementation
     def _on_frequency_changed(self):
-        """Handle frequency changes - update all connected oscillators."""
+        """Handle frequency control changes."""
         new_freq = self.freq_knob.get_value()
-
-        # Hotswap: update frequency directly on all oscillators
-        self._sine_oscillator.frequency = new_freq
-        self._triangle_oscillator.frequency = new_freq
-        self._sawtooth_oscillator.frequency = new_freq
-        self._square_oscillator.frequency = new_freq
+        self.parameter_changed.emit("frequency", new_freq)
 
     def _on_pulsewidth_changed(self):
         """Handle pulse width changes - only update square oscillator if connected."""

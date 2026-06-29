@@ -251,6 +251,53 @@ def test_adsr_release_preserves_state_across_buffers():
     np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
 
 
+def test_adsr_retrigger_during_release_starts_from_current_level():
+    adsr = ADSREnvelope(
+        attack_duration=0.01,
+        decay_duration=0.01,
+        sustain_level=0.5,
+        release_duration=0.2,
+        sample_rate=1000,
+    )
+
+    adsr.trigger_note_on()
+    adsr.get_samples(40, mode="vectorized")
+    adsr.trigger_note_off()
+    release_samples = adsr.get_samples(30, mode="vectorized")
+    current_release_level = release_samples[-1]
+
+    adsr.trigger_note_on()
+    retriggered_attack = adsr.get_samples(8, mode="vectorized")
+
+    assert retriggered_attack[0] == pytest.approx(current_release_level)
+    assert retriggered_attack[0] > 0.0
+    assert np.all(np.diff(retriggered_attack) >= 0.0)
+
+
+def test_adsr_punch_retrigger_smoothly_resets_before_attack():
+    adsr = ADSREnvelope(
+        attack_duration=0.01,
+        decay_duration=0.01,
+        sustain_level=0.5,
+        release_duration=0.2,
+        sample_rate=1000,
+        retrigger_mode="punch",
+    )
+
+    adsr.trigger_note_on()
+    adsr.get_samples(40, mode="vectorized")
+    adsr.trigger_note_off()
+    release_samples = adsr.get_samples(30, mode="vectorized")
+
+    adsr.trigger_note_on()
+    retriggered = adsr.get_samples(8, mode="vectorized")
+
+    assert retriggered[0] == pytest.approx(release_samples[-1])
+    assert retriggered[1] < retriggered[0]
+    assert retriggered[2] == pytest.approx(0.0)
+    assert retriggered[-1] > retriggered[2]
+
+
 def test_modulated_oscillator_adsr_release_preserves_state_across_buffers():
     def make_voice() -> ModulatedOscillator:
         envelope = _make_release_ready_adsr()

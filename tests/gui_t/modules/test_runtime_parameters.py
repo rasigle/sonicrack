@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.modulator import ADSREnvelope
 from src.engine.oscillator_square import SquareOscillator
 from src.gui.core.port import Port
 from src.gui.modules.mixer import MixerModule
@@ -49,6 +50,34 @@ def test_lfo_runtime_applies_frequency_and_pulsewidth(qapp: Any):
     assert module._sawtooth_oscillator.frequency == pytest.approx(4.0)
     assert module._square_oscillator.frequency == pytest.approx(4.0)
     assert module._square_oscillator.pulsewidth == pytest.approx(0.75)
+
+
+def test_oscillator_frequency_changes_are_ramped_across_buffer(qapp: Any):
+    del qapp
+    module = OscillatorModule()
+
+    module.process_runtime(128, {"frequency": 120.0, "pulsewidth": 0.5})
+    first = np.asarray(module.triangle_port.value)
+    module.process_runtime(128, {"frequency": 2000.0, "pulsewidth": 0.5})
+    second = np.asarray(module.triangle_port.value)
+
+    boundary_jump = abs(float(second[0] - first[-1]))
+    assert boundary_jump < 0.08
+    assert module._triangle_oscillator.frequency == pytest.approx(2000.0)
+
+
+def test_lfo_frequency_changes_are_ramped_across_buffer(qapp: Any):
+    del qapp
+    module = LFOModule()
+
+    module.process_runtime(128, {"frequency": 1.0, "pulsewidth": 0.5})
+    first = np.asarray(module.sine_port.value)
+    module.process_runtime(128, {"frequency": 12.0, "pulsewidth": 0.5})
+    second = np.asarray(module.sine_port.value)
+
+    boundary_jump = abs(float(second[0] - first[-1]))
+    assert boundary_jump < 0.01
+    assert module._sine_oscillator.frequency == pytest.approx(12.0)
 
 
 def test_mixer_runtime_applies_channel_gains(qapp: Any):
@@ -97,14 +126,17 @@ def test_adsr_runtime_applies_envelope_parameters(qapp: Any):
             "decay_duration": 0.3,
             "sustain_level": 0.4,
             "release_duration": 0.5,
+            "retrigger_mode": "Legato",
         },
     )
 
     assert module._adsr_component is not None
+    assert isinstance(module._adsr_component, ADSREnvelope)
     assert module._adsr_component.attack_duration == pytest.approx(0.2)
     assert module._adsr_component.decay_duration == pytest.approx(0.3)
     assert module._adsr_component.sustain_level == pytest.approx(0.4)
     assert module._adsr_component.release_duration == pytest.approx(0.5)
+    assert module._adsr_component.retrigger_mode == "legato"
 
 
 def test_adsr_runtime_outputs_zero_until_triggered(qapp: Any):

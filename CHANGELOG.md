@@ -41,6 +41,9 @@ All notable changes to AudioPlayground will be documented in this file.
 - Runtime graph bypass behavior for inactive modules: sources mute, modifiers
   pass their input through.
 - Added module subpackages and recursive search in module registry.
+- Added ADSR retrigger modes: `Punch` performs a short click-safe reset before
+  attack for percussive repeated gates, while `Legato` retriggers from the
+  current envelope level for smoother overlaps.
 - BLEP anti-aliasing for oscillators
 - Polish API and documentation and code (comprehensive update complete)
 - Documentation hub with clear navigation (docs/README.md)

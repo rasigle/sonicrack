@@ -44,7 +44,7 @@ Note:
 import itertools
 import logging
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
@@ -93,6 +93,16 @@ class ADSREnvelope(Modulator):
 
     Has `.trigger_release()` implemented to trigger the release stage of the envelope.
     similarly has `.ended`, a flag to indicate the end of the release stage.
+
+    Retrigger behavior controls what happens when a new note-on/gate rising edge
+    arrives while the envelope is already active:
+
+    - ``"legato"`` starts the next attack from the current envelope level. This is
+      the smoothest mode and avoids amplitude dips when gates overlap or retrigger
+      before release has finished.
+    - ``"punch"`` first performs a short click-safe reset ramp to zero, then starts
+      attack from zero. This restores a percussive VCA chop for rhythmic gates
+      without the one-sample discontinuity that causes clicks.
     """
 
     descriptor = ComponentDescriptor(
@@ -146,6 +156,7 @@ class ADSREnvelope(Modulator):
         sustain_level: float = 0.7,
         release_duration: float = 0.3,
         sample_rate: float = DEFAULT_SAMPLE_RATE,
+        retrigger_mode: Literal["legato", "punch"] = "legato",
     ):
         """Initialize a new ADSR envelope instance.
 
@@ -156,6 +167,8 @@ class ADSREnvelope(Modulator):
                 be in the range [0,1]
             release_duration : time taken to reach 0 from current value in s.
             sample_rate : the sample rate at which the notes are to be consumed.
+            retrigger_mode : "legato" keeps retriggers smooth from the current
+                envelope level; "punch" uses a short click-safe reset before attack.
         """
         # Store as private attributes - access through properties
         self._attack_duration = attack_duration
@@ -163,10 +176,14 @@ class ADSREnvelope(Modulator):
         self.sustain_level = sustain_level
         self._release_duration = release_duration
         self._sample_rate = validate_sample_rate(sample_rate)
+        self.retrigger_mode = retrigger_mode
         super().__init__(sample_rate=sample_rate)
 
         self.ended = True  # Start in ended state
         self.val: float = 0.0  # Initialize current value
+        self._attack_start_value = 0.0
+        self._release_start_value = 0.0
+        self._retrigger_reset_start_value = 0.0
 
         # Pre-compute phase durations in samples (performance optimization)
         # These will be set by _update_phase_samples()
@@ -177,11 +194,11 @@ class ADSREnvelope(Modulator):
 
         # Vectorization state tracking
         # Start in idle/ended state, not attack! (prevents spurious triggers)
-        self._phase = (
-            "idle"  # Current phase: 'idle', 'attack', 'decay', 'sustain', 'release'
-        )
+        # Current phase: idle, retrigger_reset, attack, decay, sustain, release.
+        self._phase = "idle"
         self._phase_position = 0  # Position within current phase (in samples)
         self._stepper: Iterator[float] | None = None
+        self._retrigger_reset_samples = max(1, int(0.002 * self._sample_rate))
 
     @property
     def attack_duration(self) -> float:
@@ -226,13 +243,18 @@ class ADSREnvelope(Modulator):
         """Set sample rate and update all pre-computed samples."""
         self._sample_rate = validate_sample_rate(value)
         self._update_phase_samples()
+        self._retrigger_reset_samples = max(1, int(0.002 * self._sample_rate))
 
     def _get_ads_stepper(self):
         steppers = []
         if self.attack_duration > 0:
+            attack_step = (1.0 - self._attack_start_value) / (
+                self.attack_duration * self._sample_rate
+            )
             steppers.append(
                 itertools.count(
-                    start=0, step=1 / (self.attack_duration * self._sample_rate)
+                    start=self._attack_start_value,
+                    step=attack_step,
                 )
             )
 
@@ -263,8 +285,11 @@ class ADSREnvelope(Modulator):
         val = 1
         stepper = None
         if self.release_duration > 0:
-            release_step = -self.val / (self.release_duration * self._sample_rate)
-            stepper = itertools.count(self.val, step=release_step)
+            self._release_start_value = self.val
+            release_step = -self._release_start_value / (
+                self.release_duration * self._sample_rate
+            )
+            stepper = itertools.count(self._release_start_value, step=release_step)
         else:
             val = -1
         while True:
@@ -282,6 +307,9 @@ class ADSREnvelope(Modulator):
         # This prevents spurious triggers when creating iterator
         if self._phase != "idle":
             self.val = 0.0
+            self._attack_start_value = 0.0
+            self._release_start_value = 0.0
+            self._retrigger_reset_start_value = 0.0
             self.ended = False
             self._stepper = self._get_ads_stepper()
             self._phase = "attack"
@@ -314,20 +342,34 @@ class ADSREnvelope(Modulator):
 
     def trigger_release(self):
         """Trigger the release phase of the envelope."""
+        self._release_start_value = self.val
         self._stepper = self._get_r_stepper()
         self._phase = "release"
         self._phase_position = 0
 
     def trigger_note_on(self):
-        """Trigger note on - resets envelope to attack phase.
+        """Trigger note on and start attack from the current envelope level.
 
-        This is an alias for resetting the envelope, compatible with MIDI note on.
-        Transitions from idle state to attack phase.
+        Re-triggering while the envelope is already active must not force the output
+        to zero. The VCA would otherwise jump in one sample and create an audible
+        click on rhythmic gate signals.
         """
+        if self.ended or self._phase == "idle":
+            self._attack_start_value = 0.0
+        elif self.retrigger_mode == "punch":
+            self._retrigger_reset_start_value = self.val
+            self.ended = False
+            self._phase = "retrigger_reset"
+            self._phase_position = 0
+            self._stepper = None
+            return
+        else:
+            self._attack_start_value = self.val
         self.ended = False
         self._phase = "attack"
         self._phase_position = 0
-        self.val = 0
+        self.val = self._attack_start_value
+        self._stepper = self._get_ads_stepper()
 
     def trigger_note_off(self):
         """Trigger note off - starts release phase.
@@ -439,7 +481,7 @@ class ADSREnvelope(Modulator):
 
         n = validate_sample_count(n)
         # Initialize stepper if needed
-        if self._stepper is None:
+        if self._stepper is None and self._phase not in ("idle", "retrigger_reset"):
             iter(self)
 
         samples = np.zeros(n, dtype=np.float32)
@@ -459,16 +501,64 @@ class ADSREnvelope(Modulator):
                 self.val = 0.0
                 break  # Stay in idle, don't advance
 
+            if self._phase == "retrigger_reset":
+                samples_in_phase = (
+                    self._retrigger_reset_samples - self._phase_position
+                )
+                chunk_size = min(remaining, samples_in_phase)
+
+                if chunk_size > 0:
+                    start_progress = (
+                        self._phase_position / self._retrigger_reset_samples
+                    )
+                    end_progress = (
+                        self._phase_position + chunk_size
+                    ) / self._retrigger_reset_samples
+                    start_val = self._retrigger_reset_start_value * (
+                        1.0 - start_progress
+                    )
+                    end_val = self._retrigger_reset_start_value * (
+                        1.0 - end_progress
+                    )
+                    samples[idx : idx + chunk_size] = np.linspace(
+                        start_val,
+                        end_val,
+                        chunk_size,
+                        endpoint=False,
+                        dtype=np.float32,
+                    )
+
+                    self._phase_position += chunk_size
+                    self.val = samples[idx + chunk_size - 1]
+                    idx += chunk_size
+                    remaining -= chunk_size
+
+                if self._phase_position >= self._retrigger_reset_samples:
+                    self._attack_start_value = 0.0
+                    self.val = 0.0
+                    self._phase = "attack"
+                    self._phase_position = 0
+                    self._stepper = self._get_ads_stepper()
+
             if self._phase == "attack":
-                # Attack phase: 0 -> 1
+                # Attack phase: current level -> 1
                 if attack_samples > 0:
                     samples_in_phase = attack_samples - self._phase_position
                     chunk_size = min(remaining, samples_in_phase)
 
                     if chunk_size > 0:
                         # Generate attack curve
-                        start_val = self._phase_position / attack_samples
-                        end_val = (self._phase_position + chunk_size) / attack_samples
+                        start_progress = self._phase_position / attack_samples
+                        end_progress = (
+                            self._phase_position + chunk_size
+                        ) / attack_samples
+                        attack_range = 1.0 - self._attack_start_value
+                        start_val = self._attack_start_value + (
+                            start_progress * attack_range
+                        )
+                        end_val = self._attack_start_value + (
+                            end_progress * attack_range
+                        )
                         samples[idx : idx + chunk_size] = np.linspace(
                             start_val,
                             end_val,
@@ -487,11 +577,13 @@ class ADSREnvelope(Modulator):
                         self._phase = "decay"
                         self._phase_position = 0
                         self.val = 1.0
+                        self._attack_start_value = 0.0
                 else:
                     # Zero attack time, skip to decay
                     self._phase = "decay"
                     self._phase_position = 0
                     self.val = 1.0
+                    self._attack_start_value = 0.0
 
             elif self._phase == "decay":
                 # Decay phase: 1 -> sustain_level
@@ -548,10 +640,10 @@ class ADSREnvelope(Modulator):
                     if chunk_size > 0:
                         # Generate release curve from current val to 0
                         # Note: val is set when trigger_release() is called
-                        start_val = self.val * (
+                        start_val = self._release_start_value * (
                             1.0 - self._phase_position / release_samples
                         )
-                        end_val = self.val * (
+                        end_val = self._release_start_value * (
                             1.0 - (self._phase_position + chunk_size) / release_samples
                         )
                         samples[idx : idx + chunk_size] = np.linspace(
@@ -563,6 +655,7 @@ class ADSREnvelope(Modulator):
                         )
 
                         self._phase_position += chunk_size
+                        self.val = samples[idx + chunk_size - 1]
                         idx += chunk_size
                         remaining -= chunk_size
 

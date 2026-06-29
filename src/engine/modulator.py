@@ -44,6 +44,7 @@ Note:
 import itertools
 import logging
 from collections.abc import Iterator
+from enum import StrEnum
 from typing import Any, Literal
 
 import numpy as np
@@ -60,6 +61,17 @@ from src.engine.audio_component_registry import ComponentCategory, register_comp
 from src.engine.validation import validate_sample_count, validate_sample_rate
 
 logger = logging.getLogger(__name__)
+
+
+class ADSRPhase(StrEnum):
+    """Internal ADSR envelope phase states."""
+
+    IDLE = "idle"
+    RETRIGGER_RESET = "retrigger_reset"
+    ATTACK = "attack"
+    DECAY = "decay"
+    SUSTAIN = "sustain"
+    RELEASE = "release"
 
 
 class Modulator(Generator):
@@ -194,8 +206,7 @@ class ADSREnvelope(Modulator):
 
         # Vectorization state tracking
         # Start in idle/ended state, not attack! (prevents spurious triggers)
-        # Current phase: idle, retrigger_reset, attack, decay, sustain, release.
-        self._phase = "idle"
+        self._phase = ADSRPhase.IDLE
         self._phase_position = 0  # Position within current phase (in samples)
         self._stepper: Iterator[float] | None = None
         self._retrigger_reset_samples = max(1, int(0.002 * self._sample_rate))
@@ -305,20 +316,20 @@ class ADSREnvelope(Modulator):
     def __iter__(self):
         # Only initialize stepper if not in idle state
         # This prevents spurious triggers when creating iterator
-        if self._phase != "idle":
+        if self._phase != ADSRPhase.IDLE:
             self.val = 0.0
             self._attack_start_value = 0.0
             self._release_start_value = 0.0
             self._retrigger_reset_start_value = 0.0
             self.ended = False
             self._stepper = self._get_ads_stepper()
-            self._phase = "attack"
+            self._phase = ADSRPhase.ATTACK
         self._phase_position = 0
         return self
 
     def __next__(self):
         # Handle idle state
-        if self._phase == "idle":
+        if self._phase == ADSRPhase.IDLE:
             self.val = 0.0
             return 0.0
 
@@ -331,11 +342,17 @@ class ADSREnvelope(Modulator):
         self._phase_position += 1
 
         # Update phase tracking using pre-computed values (optimized)
-        if self._phase == "attack" and self._phase_position >= self._attack_samples:
-            self._phase = "decay"
+        if (
+            self._phase == ADSRPhase.ATTACK
+            and self._phase_position >= self._attack_samples
+        ):
+            self._phase = ADSRPhase.DECAY
             self._phase_position = 0
-        elif self._phase == "decay" and self._phase_position >= self._decay_samples:
-            self._phase = "sustain"
+        elif (
+            self._phase == ADSRPhase.DECAY
+            and self._phase_position >= self._decay_samples
+        ):
+            self._phase = ADSRPhase.SUSTAIN
             self._phase_position = 0
 
         return self.val
@@ -344,7 +361,7 @@ class ADSREnvelope(Modulator):
         """Trigger the release phase of the envelope."""
         self._release_start_value = self.val
         self._stepper = self._get_r_stepper()
-        self._phase = "release"
+        self._phase = ADSRPhase.RELEASE
         self._phase_position = 0
 
     def trigger_note_on(self):
@@ -354,19 +371,21 @@ class ADSREnvelope(Modulator):
         to zero. The VCA would otherwise jump in one sample and create an audible
         click on rhythmic gate signals.
         """
-        if self.ended or self._phase == "idle":
+        if self.ended or self._phase == ADSRPhase.IDLE:
             self._attack_start_value = 0.0
+
         elif self.retrigger_mode == "punch":
             self._retrigger_reset_start_value = self.val
             self.ended = False
-            self._phase = "retrigger_reset"
+            self._phase = ADSRPhase.RETRIGGER_RESET
             self._phase_position = 0
             self._stepper = None
             return
         else:
             self._attack_start_value = self.val
+
         self.ended = False
-        self._phase = "attack"
+        self._phase = ADSRPhase.ATTACK
         self._phase_position = 0
         self.val = self._attack_start_value
         self._stepper = self._get_ads_stepper()
@@ -481,7 +500,10 @@ class ADSREnvelope(Modulator):
 
         n = validate_sample_count(n)
         # Initialize stepper if needed
-        if self._stepper is None and self._phase not in ("idle", "retrigger_reset"):
+        if self._stepper is None and self._phase not in (
+            ADSRPhase.IDLE,
+            ADSRPhase.RETRIGGER_RESET,
+        ):
             iter(self)
 
         samples = np.zeros(n, dtype=np.float32)
@@ -495,13 +517,13 @@ class ADSREnvelope(Modulator):
 
         # Process samples through current and subsequent phases
         while remaining > 0 and not self.ended:
-            if self._phase == "idle":
+            if self._phase == ADSRPhase.IDLE:
                 # Idle phase: output zeros until triggered
                 samples[idx : idx + remaining] = 0.0
                 self.val = 0.0
                 break  # Stay in idle, don't advance
 
-            if self._phase == "retrigger_reset":
+            if self._phase == ADSRPhase.RETRIGGER_RESET:
                 samples_in_phase = (
                     self._retrigger_reset_samples - self._phase_position
                 )
@@ -536,11 +558,11 @@ class ADSREnvelope(Modulator):
                 if self._phase_position >= self._retrigger_reset_samples:
                     self._attack_start_value = 0.0
                     self.val = 0.0
-                    self._phase = "attack"
+                    self._phase = ADSRPhase.ATTACK
                     self._phase_position = 0
                     self._stepper = self._get_ads_stepper()
 
-            if self._phase == "attack":
+            if self._phase == ADSRPhase.ATTACK:
                 # Attack phase: current level -> 1
                 if attack_samples > 0:
                     samples_in_phase = attack_samples - self._phase_position
@@ -574,18 +596,18 @@ class ADSREnvelope(Modulator):
 
                     # Check if attack phase completed
                     if self._phase_position >= attack_samples:
-                        self._phase = "decay"
+                        self._phase = ADSRPhase.DECAY
                         self._phase_position = 0
                         self.val = 1.0
                         self._attack_start_value = 0.0
                 else:
                     # Zero attack time, skip to decay
-                    self._phase = "decay"
+                    self._phase = ADSRPhase.DECAY
                     self._phase_position = 0
                     self.val = 1.0
                     self._attack_start_value = 0.0
 
-            elif self._phase == "decay":
+            elif self._phase == ADSRPhase.DECAY:
                 # Decay phase: 1 -> sustain_level
                 if decay_samples > 0:
                     samples_in_phase = decay_samples - self._phase_position
@@ -614,16 +636,16 @@ class ADSREnvelope(Modulator):
 
                     # Check if decay phase completed
                     if self._phase_position >= decay_samples:
-                        self._phase = "sustain"
+                        self._phase = ADSRPhase.SUSTAIN
                         self._phase_position = 0
                         self.val = self.sustain_level
                 else:
                     # Zero decay time, skip to sustain
-                    self._phase = "sustain"
+                    self._phase = ADSRPhase.SUSTAIN
                     self._phase_position = 0
                     self.val = self.sustain_level
 
-            elif self._phase == "sustain":
+            elif self._phase == ADSRPhase.SUSTAIN:
                 # Sustain phase: hold at sustain_level
                 samples[idx : idx + remaining] = self.sustain_level
                 self.val = self.sustain_level
@@ -631,7 +653,7 @@ class ADSREnvelope(Modulator):
                 idx += remaining
                 remaining = 0
 
-            elif self._phase == "release":
+            elif self._phase == ADSRPhase.RELEASE:
                 # Release phase: current value -> 0
                 if release_samples > 0:
                     samples_in_phase = release_samples - self._phase_position
@@ -773,6 +795,7 @@ class GateTriggeredADSR(Modulator):
         if hasattr(gate_source, "cv_converter"):
             # For CVGateOutput
             initial_gate = gate_source.cv_converter.gate
+
         elif hasattr(gate_source, "gate"):
             # For other gate sources with gate property
             initial_gate = gate_source.gate

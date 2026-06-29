@@ -22,10 +22,8 @@ from src.engine.oscillator_modulated import ModulatedOscillator
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import (
-    as_samples,
     float_parameter,
     read_samples,
-    silence,
     str_parameter,
 )
 from src.gui.module_registry import register_module
@@ -495,36 +493,29 @@ class ModulatedOscillatorModule(ModuleWidget):
             self.component.gain_db = gain_db
             self.component.phase = phase
 
-        modulators = []
-        amp_mod = None
-        freq_mod = None
-
+        freq_signal = None
+        gain_signal = None
         if self.gain_mod_input.is_connected:
             gain_signal = read_samples(self.gain_mod_input, num_samples)
-            modulators.append(_SignalGenerator(gain_signal))
-
-            def amplitude_modulator(base_amp, cv_amp):
-                return base_amp * cv_amp
-
-            amp_mod = amplitude_modulator
 
         if self.freq_input.is_connected:
             freq_signal = read_samples(self.freq_input, num_samples)
-            modulators.append(_SignalGenerator(freq_signal))
+            samples = self._render_frequency_signal(freq_signal)
+        else:
+            samples = self.component.get_samples(num_samples)
 
-            def frequency_modulator(base_freq, cv_freq):
-                del base_freq
-                return cv_freq
+        if gain_signal is not None:
+            samples = samples * gain_signal
 
-            freq_mod = frequency_modulator
+        self.out_port.write(samples)
 
-        component = self.component
-        if modulators:
-            component = ModulatedOscillator(
-                self.component, *modulators, amp_mod=amp_mod, freq_mod=freq_mod
-            )
-
-        self.out_port.write(component.get_samples(num_samples))
+    def _render_frequency_signal(self, frequency_signal: np.ndarray) -> np.ndarray:
+        """Render a frequency-CV buffer without resetting oscillator phase."""
+        samples = np.empty(len(frequency_signal), dtype=np.float32)
+        for index, frequency in enumerate(frequency_signal):
+            self.component.frequency = float(frequency)
+            samples[index] = next(self.component)
+        return samples
 
     @staticmethod
     def _create_runtime_base_oscillator(
@@ -553,17 +544,3 @@ class ModulatedOscillatorModule(ModuleWidget):
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")
 
-
-class _SignalGenerator:
-    def __init__(self, signal: object):
-        signal_array = np.asarray(signal, dtype=np.float32)
-        signal_len = int(signal_array.size) if signal_array.ndim > 0 else 1
-        self.signal = as_samples(signal_array, signal_len)
-        self.idx = 0
-
-    def get_samples(self, n: int):
-        if self.idx >= len(self.signal):
-            return silence(n)
-        result = self.signal[self.idx : self.idx + n]
-        self.idx += n
-        return as_samples(result, n)

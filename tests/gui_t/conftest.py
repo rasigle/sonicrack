@@ -1,5 +1,6 @@
 """Shared pytest fixtures for GUI tests."""
 
+import contextlib
 import os
 
 import pytest
@@ -34,7 +35,8 @@ def cleanup_qt_widgets(qapp):
     yield
 
     for widget in list(qapp.topLevelWidgets()):
-        widget.close()
-        widget.deleteLater()
+        with contextlib.suppress(RuntimeError):
+            widget.close()
+            widget.deleteLater()
 
     qapp.processEvents()

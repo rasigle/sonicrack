@@ -44,6 +44,9 @@ All notable changes to AudioPlayground will be documented in this file.
 - Added ADSR retrigger modes: `Punch` performs a short click-safe reset before
   attack for percussive repeated gates, while `Legato` retriggers from the
   current envelope level for smoother overlaps.
+- Added user documentation for the on-screen MIDI Keyboard module, including
+  `Freq`, `Gate`, and `Vel` patching patterns for VCO, ADSR, VCA, visualizers,
+  and parallel outputs.
 - BLEP anti-aliasing for oscillators
 - Polish API and documentation and code (comprehensive update complete)
 - Documentation hub with clear navigation (docs/README.md)

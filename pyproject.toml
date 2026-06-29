@@ -87,6 +87,9 @@ path = "src/_version.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff]
 line-length = 88
 indent-width = 4

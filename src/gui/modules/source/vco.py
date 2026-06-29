@@ -1,4 +1,4 @@
-﻿"""Modulated Oscillator module with frequency modulation input.
+"""Modulated Oscillator module with frequency modulation input.
 
 This module provides an oscillator that can have its frequency controlled
 by an external CV source (like MIDI Input). Perfect for MIDI-controlled synthesis!
@@ -20,9 +20,15 @@ from src.engine import (
 )
 from src.engine.oscillator_modulated import ModulatedOscillator
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import as_samples, read_samples, silence
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import (
+    as_samples,
+    float_parameter,
+    read_samples,
+    silence,
+    str_parameter,
+)
+from src.gui.module_registry import register_module
 from src.gui.widgets import HSlider, Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -42,9 +48,6 @@ class ModulatedOscillatorModule(ModuleWidget):
     """
 
     runtime_kind = "vco"
-    runtime_input_names = ("Freq", "Gain")
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("waveform", "mode", "frequency", "gain_db", "phase")
 
     metadata = ModuleMetadata(
         title="VCO",
@@ -143,6 +146,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.register_parameter("phase", self.phase_slider)
 
         self.component = self.create_engine_component()
+        self._runtime_oscillator_shape: tuple[str, str] | None = None
 
     @staticmethod
     def _get_available_modes_for_waveform(waveform: str) -> list[str]:
@@ -472,13 +476,24 @@ class ModulatedOscillatorModule(ModuleWidget):
         # No modulation - return plain oscillator
         return osc
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render VCO output for the current engine cycle."""
-        del parameters
-        if self.component is None:
-            self.component = self.create_engine_component()
+        wave_type = str_parameter(parameters, "waveform", self.wave_combo.currentText)
+        mode = str_parameter(parameters, "mode", self.mode_combo.currentText)
+        frequency = float_parameter(parameters, "frequency", self.freq_knob.get_value)
+        gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)
+        phase = float_parameter(parameters, "phase", self.phase_slider.get_value)
+
+        oscillator_shape = (wave_type, mode)
+        if self.component is None or oscillator_shape != self._runtime_oscillator_shape:
+            self.component = self._create_runtime_base_oscillator(
+                wave_type, mode, frequency, gain_db, phase
+            )
+            self._runtime_oscillator_shape = oscillator_shape
+        else:
+            self.component.frequency = frequency
+            self.component.gain_db = gain_db
+            self.component.phase = phase
 
         modulators = []
         amp_mod = None
@@ -510,6 +525,33 @@ class ModulatedOscillatorModule(ModuleWidget):
             )
 
         self.out_port.write(component.get_samples(num_samples))
+
+    @staticmethod
+    def _create_runtime_base_oscillator(
+        wave_type: str,
+        mode: str,
+        frequency: float,
+        gain_db: float,
+        phase: float,
+    ):
+        """Create the VCO base oscillator from a runtime parameter snapshot."""
+        if wave_type == "Sine":
+            return SineOscillator(
+                frequency, gain_db=gain_db, phase=phase, mode=mode
+            )
+        if wave_type == "Square":
+            return SquareOscillator(
+                frequency, gain_db=gain_db, phase=phase, mode=mode
+            )
+        if wave_type == "Sawtooth":
+            return SawtoothOscillator(
+                frequency, gain_db=gain_db, phase=phase, mode=mode
+            )
+        if wave_type == "Triangle":
+            return TriangleOscillator(
+                frequency, gain_db=gain_db, phase=phase, mode=mode
+            )
+        raise ValueError(f"Unknown waveform type: {wave_type}")
 
 
 class _SignalGenerator:

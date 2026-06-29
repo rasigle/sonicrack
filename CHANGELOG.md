@@ -38,7 +38,7 @@ All notable changes to AudioPlayground will be documented in this file.
   layouts.
 - Improved input/output port label placement and contrast.
 - Module active state persistence in patch parameters.
-- Patch compiler bypass behavior for inactive modules: sources mute, modifiers
+- Runtime graph bypass behavior for inactive modules: sources mute, modifiers
   pass their input through.
 - Added module subpackages and recursive search in module registry.
 - BLEP anti-aliasing for oscillators
@@ -51,9 +51,9 @@ All notable changes to AudioPlayground will be documented in this file.
 - Complete documentation index
 - Learning paths for users, developers, musicians
 - API reference structure
-- VCA module implementation and patch compiler fix
+- VCA module implementation and runtime graph fix
 - Voltage controlled amplifier module (VCA)
-- Clarified module interface (create_engine_component vs get_output_component)
+- Clarified module interface around `RuntimeModuleSpec` and `process_runtime()`
 - Fixed mixer: independent oscillator outputs per port
 - Added mix_mode parameter to WaveAdder (sum/average modes)
 - Volume knobs for mixer with hot-swapping (click-free)

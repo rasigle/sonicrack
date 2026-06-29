@@ -7,9 +7,9 @@ import numpy as np
 from src.engine.audio_component import AudioComponent
 from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.runtime import RuntimeParameters, get_runtime_spec
+from src.gui.core.runtime_helpers import read_samples
 from src.gui.modules.visualization.waveform import WaveformModule
-from src.gui.runtime import RuntimeParameters, get_runtime_spec
-from src.gui.runtime_helpers import read_samples
 from src.gui.widgets.module_widget import ModuleWidget
 
 
@@ -27,10 +27,17 @@ class _DoubleComponent:
         return samples * 2
 
 
+class _ValueControl:
+    def __init__(self, value: float):
+        self.value = value
+
+    def get_value(self) -> float:
+        return self.value
+
+
 class _SourceWidget(ModuleWidget):
     metadata = ModuleMetadata("Test Source", ModuleCategory.SOURCE)
     runtime_kind = "single_source"
-    runtime_output_names = ("Out",)
 
     def __init__(self):
         super().__init__()
@@ -78,12 +85,10 @@ class _VisualizerWidget(ModuleWidget):
         del input_components, modulation_components
         return None
 
+
 class _ModifierWidget(ModuleWidget):
     metadata = ModuleMetadata("Test Modifier", ModuleCategory.MODIFIER)
     runtime_kind = "component_modifier"
-    runtime_input_names = ("In",)
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("gain_db",)
 
     def __init__(self):
         super().__init__()
@@ -92,6 +97,7 @@ class _ModifierWidget(ModuleWidget):
         self.controls_widget = self._create_controls_container()
         self._create_portwidgets()
         self.component = None
+        self.register_parameter("gain_db", _ValueControl(-3.0))
 
     def get_required_inputs(self) -> list[str]:
         return ["In"]

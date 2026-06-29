@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any, cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from src.gui.core.port import Port
 
 RuntimeParameters = Mapping[str, object]
 
@@ -17,19 +20,23 @@ def silence(num_samples: int) -> np.ndarray:
 def as_samples(value: object, num_samples: int) -> np.ndarray:
     if value is None:
         return silence(num_samples)
+
     samples = np.asarray(value, dtype=np.float32)
     if samples.ndim == 0:
         return np.full(num_samples, float(samples), dtype=np.float32)
+
     if len(samples) == num_samples:
         return samples
+
     if len(samples) < num_samples:
         padded = silence(num_samples)
         padded[: len(samples)] = samples
         return padded
+
     return samples[:num_samples].copy()
 
 
-def read_samples(port: Any, num_samples: int) -> np.ndarray:
+def read_samples(port: Port, num_samples: int) -> np.ndarray:
     return as_samples(port.read(num_samples), num_samples)
 
 
@@ -60,7 +67,9 @@ def str_parameter(
     return str(parameter(parameters, name, fallback_getter))
 
 
-def write_output(output_port: Any, value: object, num_samples: int) -> None:
+def write_output(
+    output_port: Port, value: float | np.ndarray, num_samples: int
+) -> None:
     if value is None:
         output_port.write(silence(num_samples))
     elif isinstance(value, tuple):

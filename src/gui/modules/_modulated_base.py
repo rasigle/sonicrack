@@ -1,4 +1,4 @@
-﻿"""Base class for modulated components (Volume, Panner, etc.)
+"""Base class for modulated components (Volume, Panner, etc.)
 
 This provides common functionality for modules that have:
 - A main parameter knob
@@ -182,4 +182,3 @@ class ModulatedModuleBase(ModuleWidget):
         raise NotImplementedError(
             f"{type(self).__name__} must implement create_unmodulated_component()"
         )
-

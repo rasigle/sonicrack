@@ -22,7 +22,7 @@ Press Ctrl+C to exit.
 import sys
 import time
 
-from engine.io.midi import (
+from midi_io import (
     AftertouchMessage,
     ControlChangeMessage,
     MIDIInput,
@@ -34,7 +34,6 @@ from engine.io.midi import (
     midi_to_frequency,
     midi_to_note_name,
 )
-from engine.io.midi.input import MIDO_AVAILABLE
 
 
 # ANSI color codes for terminal output
@@ -154,13 +153,6 @@ def format_message(msg: MIDIMessage) -> str:
 def main():
     """Main function."""
     print(f"\n{Colors.BOLD}{Colors.HEADER}=== MIDI Input Demo ==={Colors.ENDC}\n")
-
-    # Check if mido is available
-    if not MIDO_AVAILABLE:
-        print(f"{Colors.RED}Error: mido library not installed{Colors.ENDC}")
-        print("\nOr with uv:")
-        print("  uv pip install mido python-rtmidi")
-        sys.exit(1)
 
     # List available devices
     try:

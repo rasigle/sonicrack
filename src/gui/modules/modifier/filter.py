@@ -1,4 +1,4 @@
-﻿"""Filter module for the modular synthesizer GUI."""
+"""Filter module for the modular synthesizer GUI."""
 
 from __future__ import annotations
 
@@ -16,9 +16,15 @@ from PyQt6.QtWidgets import (
 from src.engine.filter import ButterworthFilter
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import read_samples, silence, write_output
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import (
+    float_parameter,
+    read_samples,
+    silence,
+    str_parameter,
+    write_output,
+)
+from src.gui.module_registry import register_module
 from src.gui.widgets import HSlider, Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -28,9 +34,6 @@ class FilterModule(ModuleWidget):
     """Butterworth filter module with frequency, order, and type controls."""
 
     runtime_kind = "component_modifier"
-    runtime_input_names = ("In",)
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("cutoff", "high_cutoff", "order", "filter_type")
 
     metadata = ModuleMetadata(
         title="Filter",
@@ -142,6 +145,10 @@ class FilterModule(ModuleWidget):
         )
 
         self.component = self.create_engine_component()
+        self._runtime_filter_params: (
+            tuple[float | tuple[float, float], int, Literal["low", "high", "band"]]
+            | None
+        ) = None
         self._sample_rate_listener = self._on_global_sample_rate_changed
         audio_config.add_sample_rate_listener(self._sample_rate_listener)
         self.destroyed.connect(self._cleanup_audio_config_listeners)
@@ -212,12 +219,20 @@ class FilterModule(ModuleWidget):
 
     def _get_filter_type(self) -> Literal["low", "high", "band"]:
         """Map UI filter type text to engine filter type."""
+        return self._normalize_filter_type(self.type_combo.currentText())
+
+    @staticmethod
+    def _normalize_filter_type(text: str) -> Literal["low", "high", "band"]:
+        """Map UI or engine filter type text to the engine filter type."""
         type_map: dict[str, Literal["low", "high", "band"]] = {
             "Low-pass": "low",
             "High-pass": "high",
             "Band-pass": "band",
+            "low": "low",
+            "high": "high",
+            "band": "band",
         }
-        return type_map.get(self.type_combo.currentText(), "low")
+        return type_map.get(text, "low")
 
     def _get_cutoff_param(self) -> float | tuple[float, float]:
         """Get the current cutoff parameter in engine format."""
@@ -225,6 +240,15 @@ class FilterModule(ModuleWidget):
         high_cutoff = self.high_cutoff_knob.get_value()
         filter_type = self._get_filter_type()
 
+        return self._build_cutoff_param(cutoff, high_cutoff, filter_type)
+
+    def _build_cutoff_param(
+        self,
+        cutoff: float,
+        high_cutoff: float,
+        filter_type: Literal["low", "high", "band"],
+    ) -> float | tuple[float, float]:
+        """Build a valid engine cutoff parameter for the selected filter type."""
         if filter_type == "band":
             low = min(cutoff, high_cutoff)
             high = max(cutoff, high_cutoff)
@@ -268,21 +292,39 @@ class FilterModule(ModuleWidget):
             sample_rate=audio_config.sample_rate,
         )
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Filter the connected input for one render cycle."""
-        del parameters
         if not self.in_port.is_connected:
             write_output(self.out_port, silence(num_samples), num_samples)
             return
 
-        if self.component is None:
-            self.component = self.create_engine_component()
+        filter_type = self._normalize_filter_type(
+            str_parameter(parameters, "filter_type", self.type_combo.currentText)
+        )
+        cutoff = self._build_cutoff_param(
+            float_parameter(parameters, "cutoff", self.cutoff_knob.get_value),
+            float_parameter(
+                parameters, "high_cutoff", self.high_cutoff_knob.get_value
+            ),
+            filter_type,
+        )
+        filter_params = (
+            cutoff,
+            int(float_parameter(parameters, "order", self.order_slider.get_value)),
+            filter_type,
+        )
+
+        if self.component is None or filter_params != self._runtime_filter_params:
+            self.component = ButterworthFilter(
+                cutoff=filter_params[0],
+                order=filter_params[1],
+                filter_type=filter_params[2],
+                sample_rate=audio_config.sample_rate,
+            )
+            self._runtime_filter_params = filter_params
 
         write_output(
             self.out_port,
             self.component(read_samples(self.in_port, num_samples)),
             num_samples,
         )
-

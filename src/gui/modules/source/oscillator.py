@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
@@ -13,8 +13,9 @@ from src.engine.oscillator import (
 )
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter
+from src.gui.module_registry import register_module
 from src.gui.ui_constants import (
     DEFAULT_PW_PERCENTAGE_VALUE,
     MAX_PW_PERCENTAGE_VALUE,
@@ -37,8 +38,6 @@ class OscillatorModule(ModuleWidget):
     """Oscillator module with frequency and gain controls."""
 
     runtime_kind = "multi_oscillator"
-    runtime_output_names = ("Sine", "Triangle", "Sawtooth", "Square")
-    runtime_parameter_names = ("frequency", "pulsewidth")
 
     metadata = ModuleMetadata(
         title="Oscillator",
@@ -179,11 +178,19 @@ class OscillatorModule(ModuleWidget):
         """
         return None
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render each oscillator output for the current engine cycle."""
-        del parameters
+        frequency = float_parameter(parameters, "frequency", self.freq_knob.get_value)
+        pulsewidth = float_parameter(
+            parameters, "pulsewidth", self.pulsewidth_knob.get_value
+        )
+
+        self._sine_oscillator.frequency = frequency
+        self._triangle_oscillator.frequency = frequency
+        self._sawtooth_oscillator.frequency = frequency
+        self._square_oscillator.frequency = frequency
+        self._square_oscillator.pulsewidth = pulsewidth
+
         for port, osc in zip(self.ports, self.oscs, strict=False):
             if osc is not None:
                 port.write(osc.get_samples(num_samples))

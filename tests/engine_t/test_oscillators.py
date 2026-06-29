@@ -89,7 +89,7 @@ class TestOscillatorModeSelection(unittest.TestCase):
         ):
             with (
                 self.subTest(oscillator=oscillator_cls.__name__),
-                self.assertRaises(ValueError)
+                self.assertRaises(ValueError),
             ):
                 oscillator_cls(frequency=440, mode="invalid")
 

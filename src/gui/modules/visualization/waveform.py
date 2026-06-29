@@ -18,7 +18,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
+from src.gui.module_registry import register_module
 from src.gui.modules.visualization.visualizer_utils import get_visualizer_samples
 from src.gui.widgets.knob_widget import Knob
 from src.gui.widgets.module_widget import ModuleWidget
@@ -349,6 +349,7 @@ class WaveformModule(ModuleWidget):
 
         except Exception as e:
             logger.error(f"Error in _update_display: {e}", exc_info=True)
+
 
 class WaveformDisplay(QWidget):
     """Professional widget for displaying audio waveforms in real-time.

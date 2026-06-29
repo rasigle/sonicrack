@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 from typing import Any
 
 from PyQt6.QtCore import Qt
@@ -7,9 +7,9 @@ from PyQt6.QtGui import QColor
 from src.constants import DEFAULT_GAIN_DB
 from src.engine import Volume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -21,9 +21,6 @@ class SimpleVolumeModule(ModuleWidget):
     """Simple volume/gain module without modulation input."""
 
     runtime_kind = "volume"
-    runtime_input_names = ("In",)
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("gain_db",)
 
     metadata = ModuleMetadata(
         title="Volume",
@@ -76,7 +73,7 @@ class SimpleVolumeModule(ModuleWidget):
         # Update the Volume component amplitude (click-free)
         self.component.amplitude = new_gain
 
-        logger.debug(f"ðŸŽšï¸ Volume: gain set to {new_gain:.3f}")
+        logger.debug(f"Volume: gain set to {new_gain:.3f}")
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -92,9 +89,7 @@ class SimpleVolumeModule(ModuleWidget):
         gain_db = self.gain_knob.get_value()
         return Volume(gain_db=gain_db)
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply gain to the connected input for one render cycle."""
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))
@@ -108,4 +103,3 @@ class SimpleVolumeModule(ModuleWidget):
             parameters, "gain_db", self.gain_knob.get_value
         )
         self.out_port.write(self.component(input_signal))
-

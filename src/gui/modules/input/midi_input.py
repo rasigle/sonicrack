@@ -1,4 +1,4 @@
-﻿"""MIDI Input module for the modular synthesizer GUI.
+"""MIDI Input module for the modular synthesizer GUI.
 
 This module provides real-time MIDI input from connected controllers and keyboards.
 It converts MIDI messages to control voltages (CV) that can control oscillators
@@ -42,9 +42,9 @@ from PyQt6.QtWidgets import (
 )
 
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.module_registry import register_module
 from src.gui.modules.input.midi_worker_thread import MIDIWorkerThread
-from src.gui.runtime import RuntimeParameters
 from src.gui.widgets.module_widget import ModuleWidget
 from src.midi_io import (
     CVFrequencyOutput,
@@ -71,7 +71,6 @@ class MIDIInputModule(ModuleWidget):
     """
 
     runtime_kind = "midi"
-    runtime_output_names = ("Freq", "Gate", "Vel")
 
     metadata = ModuleMetadata(
         title="MIDI Input",
@@ -349,9 +348,7 @@ class MIDIInputModule(ModuleWidget):
         }
         return outputs.get(port_name, self.freq_output)
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render MIDI CV outputs for the current engine cycle."""
         del parameters
         self.freq_port.write(self.freq_output.get_samples(num_samples))

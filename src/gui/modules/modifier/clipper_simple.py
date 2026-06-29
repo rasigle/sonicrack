@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 from typing import Any
 
 from PyQt6.QtCore import Qt
@@ -6,9 +6,9 @@ from PyQt6.QtGui import QColor
 
 from src.engine import Clipper
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -20,9 +20,6 @@ class ClipperModule(ModuleWidget):
     """Clipper module for distortion/limiting."""
 
     runtime_kind = "clipper"
-    runtime_input_names = ("In",)
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("threshold",)
 
     metadata = ModuleMetadata(
         title="Clipper",
@@ -87,9 +84,7 @@ class ClipperModule(ModuleWidget):
         threshold = self.threshold_knob.get_value()
         return Clipper((-threshold, threshold))
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Clip the connected input for one render cycle."""
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))
@@ -103,4 +98,3 @@ class ClipperModule(ModuleWidget):
             self.component.wave_range = (-threshold, threshold)
 
         self.out_port.write(samples.clip(-threshold, threshold))
-

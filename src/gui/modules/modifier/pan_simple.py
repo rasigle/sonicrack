@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
@@ -9,9 +9,9 @@ from PyQt6.QtGui import QColor
 
 from src.engine import Panner
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -26,9 +26,6 @@ class SimplePannerModule(ModuleWidget):
     """Simple panner module without modulation input."""
 
     runtime_kind = "panner"
-    runtime_input_names = ("In",)
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("position",)
 
     metadata = ModuleMetadata(
         title="Panner",
@@ -91,9 +88,7 @@ class SimplePannerModule(ModuleWidget):
         """Create the panner component."""
         return Panner(0.0)
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Pan the connected input for one render cycle."""
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))
@@ -114,4 +109,3 @@ class SimplePannerModule(ModuleWidget):
         panned[:, 0] *= np.sqrt(0.5 * (1.0 - position))
         panned[:, 1] *= np.sqrt(0.5 * (1.0 + position))
         self.out_port.write(panned)
-

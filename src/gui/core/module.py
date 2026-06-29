@@ -1,14 +1,11 @@
-"""Generic interface for audio modules in the patch system.
-
-This interface allows the patch compiler to work with any module type
-without needing specific knowledge about each module's implementation.
-"""
+"""Core audio-module contracts used by GUI graph compilation and runtime."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from src.engine.audio_component import AudioComponent
 from src.gui.core.port import Port
@@ -88,6 +85,8 @@ class AudioModule(ABC):
     """
 
     metadata: ModuleMetadata
+    input_ports: list[Any]
+    output_ports: list[Any]
 
     def __init__(self):
         self.custom_name: str = ""
@@ -222,8 +221,11 @@ class AudioModule(ABC):
         return self.custom_name
 
     def _find_port_by_name(self, port_name: str):
-        """Helper to find a port by name."""
-        for port in getattr(self, "input_ports", []):
+        """Find a UI port widget by name, checking inputs then outputs."""
+        for port in self.input_ports:
+            if port.port_name == port_name:
+                return port
+        for port in self.output_ports:
             if port.port_name == port_name:
                 return port
         return None
@@ -256,4 +258,3 @@ class AudioModule(ABC):
         port = Port("output", name, parent_module=self, component=component)
         self.outputs[name] = port
         return port
-

@@ -1,8 +1,11 @@
 """Preset browser dialog for managing presets."""
 
+from __future__ import annotations
+
 import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, cast
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -28,6 +31,21 @@ from src.gui.core.preset_manager import PresetManager
 logger = logging.getLogger(__name__)
 
 
+class PresetMetadata(TypedDict, total=False):
+    """Metadata shape returned by ``PresetManager.list_presets()``."""
+
+    name: str
+    author: str
+    category: str
+    tags: list[str]
+    description: str
+    created: str
+    filepath: str
+
+
+DEFAULT_PRESET_CATEGORIES = ("User", "Bass", "Lead", "Pad", "FX", "Drums", "Other")
+
+
 class LibraryPresetBrowserDialog(QDialog):
     """Dialog for browsing and managing library presets.
 
@@ -41,7 +59,7 @@ class LibraryPresetBrowserDialog(QDialog):
 
     preset_selected = pyqtSignal(dict)  # Emits preset data when loaded
 
-    def __init__(self, preset_manager: PresetManager, parent=None):
+    def __init__(self, preset_manager: PresetManager, parent: QWidget | None = None):
         """Initialize the preset browser dialog.
 
         Args:
@@ -51,7 +69,7 @@ class LibraryPresetBrowserDialog(QDialog):
         super().__init__(parent)
 
         self.preset_manager = preset_manager
-        self.current_presets: list[dict[str, Any]] = []
+        self.current_presets: list[PresetMetadata] = []
 
         self.setWindowTitle("Preset Browser")
         self.setMinimumSize(700, 500)
@@ -59,7 +77,7 @@ class LibraryPresetBrowserDialog(QDialog):
         self._setup_ui()
         self._load_presets()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Setup the user interface."""
         layout = QVBoxLayout(self)
 
@@ -172,84 +190,110 @@ class LibraryPresetBrowserDialog(QDialog):
 
         layout.addLayout(button_layout)
 
-    def _load_presets(self):
+    def _load_presets(self) -> None:
         """Load and display available presets."""
-        # Get current category filter
-        category = self.category_combo.currentData()
+        category = self._selected_category()
 
-        # Load presets
-        self.current_presets = self.preset_manager.list_presets(category)
+        self.current_presets = [
+            cast(PresetMetadata, preset)
+            for preset in self.preset_manager.list_presets(category)
+        ]
 
-        # Update category combo if needed
         if self.category_combo.count() == 1:  # Only "All Categories"
-            categories = self.preset_manager.get_categories()
-            for cat in categories:
-                self.category_combo.addItem(cat, cat)
+            self._populate_categories()
 
-        # Clear and populate list
         self.preset_list.clear()
 
         for preset in self.current_presets:
-            name = preset.get("name", "Unnamed")
-            category = preset.get("category", "User")
-            item = QListWidgetItem(f"{name} ({category})")
+            item = QListWidgetItem(self._preset_list_label(preset))
             item.setData(Qt.ItemDataRole.UserRole, preset)
             self.preset_list.addItem(item)
 
-        # Update UI
         if not self.current_presets:
             self._clear_details()
+            self._set_selection_actions_enabled(False)
 
-    def _on_category_changed(self):
+    def _populate_categories(self) -> None:
+        for category in self.preset_manager.get_categories():
+            self.category_combo.addItem(category, category)
+
+    def _selected_category(self) -> str | None:
+        return cast(str | None, self.category_combo.currentData())
+
+    @staticmethod
+    def _preset_list_label(preset: PresetMetadata) -> str:
+        name = preset.get("name") or "Unnamed"
+        category = preset.get("category") or "User"
+        return f"{name} ({category})"
+
+    def _on_category_changed(self) -> None:
         """Handle category filter change."""
         self._load_presets()
 
-    def _on_preset_selected(self, current: QListWidgetItem, previous: QListWidgetItem):
+    def _on_preset_selected(
+        self,
+        current: QListWidgetItem | None,
+        previous: QListWidgetItem | None,
+    ) -> None:
         """Handle preset selection.
 
         Args:
             current: Currently selected item
             previous: Previously selected item
         """
-        _ = previous
+        del previous
         if current:
-            preset = current.data(Qt.ItemDataRole.UserRole)
+            preset = self._preset_from_item(current)
             self._show_details(preset)
-            self.load_btn.setEnabled(True)
-            self.delete_btn.setEnabled(True)
-            self.export_btn.setEnabled(True)
+            self._set_selection_actions_enabled(True)
         else:
             self._clear_details()
-            self.load_btn.setEnabled(False)
-            self.delete_btn.setEnabled(False)
-            self.export_btn.setEnabled(False)
+            self._set_selection_actions_enabled(False)
 
-    def _show_details(self, preset: dict[str, Any]):
+    def _selected_preset(self) -> PresetMetadata | None:
+        current_item = self.preset_list.currentItem()
+        if current_item is None:
+            return None
+        return self._preset_from_item(current_item)
+
+    @staticmethod
+    def _preset_from_item(item: QListWidgetItem) -> PresetMetadata:
+        return cast(PresetMetadata, item.data(Qt.ItemDataRole.UserRole))
+
+    def _set_selection_actions_enabled(self, enabled: bool) -> None:
+        self.load_btn.setEnabled(enabled)
+        self.delete_btn.setEnabled(enabled)
+        self.export_btn.setEnabled(enabled)
+
+    def _show_details(self, preset: PresetMetadata) -> None:
         """Show preset details.
 
         Args:
             preset: Preset metadata dictionary
         """
-        self.name_label.setText(f"<b>Name:</b> {preset.get('name', '-')}")
-        self.author_label.setText(f"<b>Author:</b> {preset.get('author', '-')}")
-        self.category_label.setText(f"<b>Category:</b> {preset.get('category', '-')}")
+        self.name_label.setText(f"<b>Name:</b> {preset.get('name') or '-'}")
+        self.author_label.setText(f"<b>Author:</b> {preset.get('author') or '-'}")
+        self.category_label.setText(f"<b>Category:</b> {preset.get('category') or '-'}")
 
         tags = preset.get("tags", [])
         tags_str = ", ".join(tags) if tags else "-"
         self.tags_label.setText(f"<b>Tags:</b> {tags_str}")
 
-        self.description_text.setText(preset.get("description", ""))
+        self.description_text.setText(preset.get("description") or "")
+        self.created_label.setText(
+            f"<b>Created:</b> {self._format_created(preset.get('created'))}"
+        )
 
-        created = preset.get("created", "-")
-        if created != "-":
-            # Format date nicely
-            from datetime import datetime
+    @staticmethod
+    def _format_created(created: str | None) -> str:
+        if not created:
+            return "-"
+        try:
+            return datetime.fromisoformat(created).strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            return created
 
-            dt = datetime.fromisoformat(created)
-            created = dt.strftime("%Y-%m-%d %H:%M")
-        self.created_label.setText(f"<b>Created:</b> {created}")
-
-    def _clear_details(self):
+    def _clear_details(self) -> None:
         """Clear preset details display."""
         self.name_label.setText("<b>Name:</b> -")
         self.author_label.setText("<b>Author:</b> -")
@@ -258,16 +302,19 @@ class LibraryPresetBrowserDialog(QDialog):
         self.description_text.clear()
         self.created_label.setText("<b>Created:</b> -")
 
-    def _on_load_clicked(self):
+    def _on_load_clicked(self) -> None:
         """Handle load button click."""
-        current_item = self.preset_list.currentItem()
-        if not current_item:
+        preset_meta = self._selected_preset()
+        if preset_meta is None:
             return
 
-        preset_meta = current_item.data(Qt.ItemDataRole.UserRole)
-        filepath = Path(preset_meta["filepath"])
+        filepath = self._preset_file(preset_meta)
+        if filepath is None:
+            QMessageBox.critical(
+                self, "Load Error", "Preset metadata has no file path."
+            )
+            return
 
-        # Load full preset data
         preset_data = self.preset_manager.load_preset(filepath)
 
         if preset_data:
@@ -276,13 +323,17 @@ class LibraryPresetBrowserDialog(QDialog):
         else:
             QMessageBox.critical(self, "Load Error", "Failed to load preset file.")
 
-    def _on_delete_clicked(self):
+    @staticmethod
+    def _preset_file(preset: PresetMetadata) -> Path | None:
+        filepath = preset.get("filepath")
+        return Path(filepath) if filepath else None
+
+    def _on_delete_clicked(self) -> None:
         """Handle delete button click."""
-        current_item = self.preset_list.currentItem()
-        if not current_item:
+        preset_meta = self._selected_preset()
+        if preset_meta is None:
             return
 
-        preset_meta = current_item.data(Qt.ItemDataRole.UserRole)
         name = preset_meta.get("name", "Unnamed")
 
         reply = QMessageBox.question(
@@ -293,14 +344,17 @@ class LibraryPresetBrowserDialog(QDialog):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            filepath = Path(preset_meta["filepath"])
+            filepath = self._preset_file(preset_meta)
+            if filepath is None:
+                QMessageBox.critical(self, "Error", "Preset metadata has no file path.")
+                return
             if self.preset_manager.delete_preset(filepath):
                 self._load_presets()
                 QMessageBox.information(self, "Success", "Preset deleted.")
             else:
                 QMessageBox.critical(self, "Error", "Failed to delete preset.")
 
-    def _on_import_clicked(self):
+    def _on_import_clicked(self) -> None:
         """Handle import button click."""
         filepath, _ = QFileDialog.getOpenFileName(
             self, "Import Preset", "", "JSON Files (*.json);;All Files (*)"
@@ -314,13 +368,12 @@ class LibraryPresetBrowserDialog(QDialog):
             else:
                 QMessageBox.critical(self, "Error", "Failed to import preset.")
 
-    def _on_export_clicked(self):
+    def _on_export_clicked(self) -> None:
         """Handle export button click."""
-        current_item = self.preset_list.currentItem()
-        if not current_item:
+        preset_meta = self._selected_preset()
+        if preset_meta is None:
             return
 
-        preset_meta = current_item.data(Qt.ItemDataRole.UserRole)
         name = preset_meta.get("name", "preset")
 
         filepath, _ = QFileDialog.getSaveFileName(
@@ -328,7 +381,10 @@ class LibraryPresetBrowserDialog(QDialog):
         )
 
         if filepath:
-            source = Path(preset_meta["filepath"])
+            source = self._preset_file(preset_meta)
+            if source is None:
+                QMessageBox.critical(self, "Error", "Preset metadata has no file path.")
+                return
             if self.preset_manager.export_preset(source, Path(filepath)):
                 QMessageBox.information(self, "Success", "Preset exported.")
             else:
@@ -338,7 +394,7 @@ class LibraryPresetBrowserDialog(QDialog):
 class SaveLibraryPresetDialog(QDialog):
     """Dialog for saving a preset with metadata."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None = None):
         """Initialize the save preset dialog.
 
         Args:
@@ -351,7 +407,7 @@ class SaveLibraryPresetDialog(QDialog):
 
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Setup the user interface."""
         layout = QVBoxLayout(self)
 
@@ -371,9 +427,7 @@ class SaveLibraryPresetDialog(QDialog):
         layout.addWidget(QLabel("Category:"))
         self.category_combo = QComboBox()
         self.category_combo.setEditable(True)
-        self.category_combo.addItems(
-            ["User", "Bass", "Lead", "Pad", "FX", "Drums", "Other"]
-        )
+        self.category_combo.addItems(DEFAULT_PRESET_CATEGORIES)
         layout.addWidget(self.category_combo)
 
         # Tags
@@ -404,7 +458,7 @@ class SaveLibraryPresetDialog(QDialog):
 
         layout.addLayout(button_layout)
 
-    def _on_save_clicked(self):
+    def _on_save_clicked(self) -> None:
         """Handle save button click."""
         if not self.name_edit.text().strip():
             QMessageBox.warning(self, "Missing Name", "Please enter a preset name.")

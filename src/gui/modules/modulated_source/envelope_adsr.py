@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 from typing import Any
 
 from PyQt6.QtGui import QColor
@@ -6,8 +6,9 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 
 from src.engine.modulator import ADSREnvelope, GateTriggeredADSR
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -22,14 +23,6 @@ class ADSRModule(ModuleWidget):
     """
 
     runtime_kind = "adsr"
-    runtime_input_names = ("Gate",)
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = (
-        "attack_duration",
-        "decay_duration",
-        "sustain_level",
-        "release_duration",
-    )
 
     metadata = ModuleMetadata(
         title="ADSR Envelope",
@@ -211,12 +204,21 @@ class ADSRModule(ModuleWidget):
 
         return self._adsr_component
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render the ADSR envelope for the current engine cycle."""
-        del parameters
         if self._adsr_component is None:
             self._adsr_component = self.create_engine_component()
-        self.out_port.write(self._adsr_component.get_samples(num_samples))
 
+        self._adsr_component.attack_duration = float_parameter(
+            parameters, "attack_duration", self.attack_knob.get_value
+        )
+        self._adsr_component.decay_duration = float_parameter(
+            parameters, "decay_duration", self.decay_knob.get_value
+        )
+        self._adsr_component.sustain_level = float_parameter(
+            parameters, "sustain_level", self.sustain_knob.get_value
+        )
+        self._adsr_component.release_duration = float_parameter(
+            parameters, "release_duration", self.release_knob.get_value
+        )
+        self.out_port.write(self._adsr_component.get_samples(num_samples))

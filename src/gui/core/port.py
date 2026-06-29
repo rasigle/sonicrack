@@ -1,12 +1,8 @@
-"""Port data model (pure Python logic, no Qt dependencies).
+"""Core signal-port data model with no Qt dependencies.
 
-This module provides the core data model for signal ports without any UI concerns.
-The UI layer is in src.gui.widgets.port_widget.PortWidget.
-
-Architecture:
-- PortModel (this file): Data and connection logic
-- PortWidget (port_widget.py): Qt graphics and interaction
-- Port (port.py): Legacy wrapper for backward compatibility
+The UI layer wraps this class in ``src.gui.widgets.port_widget.PortWidget``.
+Ports store current values, connection state, and passive tap history used by
+visualization modules.
 """
 
 from __future__ import annotations
@@ -278,8 +274,7 @@ class Port:
                 f"Port write value must be float or np.ndarray, "
                 f"got {type(value).__name__}"
             )
-        # Note: Visualizers poll port.value directly - no notifications needed!
-        # This ensures ZERO interference with audio thread
+        # Visualizers read passive tap history; ports do not notify or pull DSP.
 
     def peek_recent(self, num_samples: int | None = None) -> float | np.ndarray:
         """Peek at recent samples without triggering upstream generation.

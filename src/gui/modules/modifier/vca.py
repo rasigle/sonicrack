@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 from typing import Any
 
 from PyQt6.QtGui import QColor
@@ -7,9 +7,9 @@ from PyQt6.QtWidgets import QHBoxLayout
 from src.engine import Volume
 from src.engine.modifier import ModulatedVolume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -38,9 +38,6 @@ class VCAModule(ModuleWidget):
     """
 
     runtime_kind = "vca"
-    runtime_input_names = ("In", "CV")
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("amplitude",)
 
     metadata = ModuleMetadata(
         title="VCA",
@@ -202,9 +199,7 @@ class VCAModule(ModuleWidget):
         )
         return volume_component
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply manual or CV-controlled amplitude for one render cycle."""
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))
@@ -217,4 +212,3 @@ class VCAModule(ModuleWidget):
             else float_parameter(parameters, "amplitude", self.amp_knob.get_value)
         )
         self.out_port.write(input_signal * amplitude)
-

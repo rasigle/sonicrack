@@ -27,7 +27,11 @@ from src.constants import DEFAULT_SAMPLE_RATE
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.port import Port
-from src.gui.runtime import RuntimeModuleSpec, get_runtime_spec, process_runtime_module
+from src.gui.core.runtime import (
+    RuntimeModuleSpec,
+    get_runtime_spec,
+    process_runtime_module,
+)
 from src.gui.widgets.port_widget import PortWidget
 
 logger = logging.getLogger(__name__)
@@ -116,9 +120,11 @@ class RenderContext:
             return self._copy_value(self._port_cache[port])
 
         if port.port_type == "output" and not port.connected_to:
-            value = self._fit_array_length(port.value) if isinstance(
-                port.value, np.ndarray
-            ) else port.value
+            value = (
+                self._fit_array_length(port.value)
+                if isinstance(port.value, np.ndarray)
+                else port.value
+            )
             self._port_cache[port] = value
             return self._copy_value(value)
 
@@ -134,9 +140,7 @@ class RenderContext:
 
     def render_node(self, node: GraphNode) -> None:
         """Render one compiled graph node."""
-        self.render_module(
-            node.module, node.spec, node.input_ports, node.parameters
-        )
+        self.render_module(node.module, node.spec, node.input_ports, node.parameters)
 
     def render_module(
         self,
@@ -171,9 +175,7 @@ class RenderContext:
     ) -> None:
         """Cache all connected input-port values for a module before processing."""
         ports = (
-            input_ports
-            if input_ports is not None
-            else iter_module_input_ports(module)
+            input_ports if input_ports is not None else iter_module_input_ports(module)
         )
         for port in ports:
             if port not in self._port_cache:
@@ -204,8 +206,10 @@ class RenderContext:
             else:
                 result = result_array + value
 
-        return result if result is not None else np.zeros(
-            self.num_samples, dtype=np.float32
+        return (
+            result
+            if result is not None
+            else np.zeros(self.num_samples, dtype=np.float32)
         )
 
     def _fit_array_length(self, value: np.ndarray) -> np.ndarray:
@@ -269,9 +273,7 @@ def resolve_runtime_output_ports(
             if isinstance((port := module.outputs.get(output_name)), Port)
         )
 
-    return tuple(
-        port for port in module.outputs.values() if isinstance(port, Port)
-    )
+    return tuple(port for port in module.outputs.values() if isinstance(port, Port))
 
 
 def iter_upstream_modules(
@@ -301,9 +303,7 @@ def resolve_runtime_parameters(
 
     parameters = module.get_parameters()
     return {
-        name: parameters[name]
-        for name in spec.parameter_names
-        if name in parameters
+        name: parameters[name] for name in spec.parameter_names if name in parameters
     }
 
 
@@ -403,10 +403,7 @@ class AudioEngine(QtCore.QObject):
                 for connected_port in port.connected_to:
                     visit(cast(RenderModule | None, connected_port.parent_module))
 
-        nodes = tuple(
-            self._compile_graph_node(module)
-            for module in ordered_modules
-        )
+        nodes = tuple(self._compile_graph_node(module) for module in ordered_modules)
         return RenderPlan(sink_ports=tuple(ports), nodes=nodes)
 
     def _compile_graph_node(self, module: RenderModule) -> GraphNode:

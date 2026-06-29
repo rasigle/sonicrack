@@ -1,4 +1,4 @@
-﻿"""Noise generator module with multiple noise types."""
+"""Noise generator module with multiple noise types."""
 
 from typing import Any
 
@@ -9,8 +9,9 @@ from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel
 from src.constants import DEFAULT_GAIN_DB
 from src.engine.noise import NoiseGenerator
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter, str_parameter
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -30,8 +31,6 @@ class NoiseModule(ModuleWidget):
     """
 
     runtime_kind = "single_source"
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("noise_type", "gain_db")
 
     metadata = ModuleMetadata(
         title="Noise",
@@ -100,12 +99,16 @@ class NoiseModule(ModuleWidget):
         gain_db = self.gain_knob.get_value()
         return NoiseGenerator(noise_type=noise_type, gain_db=gain_db)
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render noise output for the current engine cycle."""
-        del parameters
         if self.component is None:
             self.component = self.create_engine_component()
+
+        self.component.noise_type = str_parameter(
+            parameters, "noise_type", self.type_combo.currentText
+        )
+        self.component.gain_db = float_parameter(
+            parameters, "gain_db", self.gain_knob.get_value
+        )
 
         self.out_port.write(self.component.get_samples(num_samples))

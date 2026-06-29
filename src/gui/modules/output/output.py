@@ -12,7 +12,7 @@ from PyQt6.QtGui import QColor
 from src.audio_io import AudioOutput
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 from src.utils.audio_utils import combine_lr_to_stereo, mono_to_stereo
@@ -283,4 +283,3 @@ class OutputModule(ModuleWidget):
             return result
 
         return stereo_samples.astype(np.float32)
-

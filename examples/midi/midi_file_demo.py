@@ -14,7 +14,7 @@ If no file is provided, shows instructions on finding MIDI files.
 import sys
 from pathlib import Path
 
-from engine.io.midi import (
+from midi_io import (
     ControlChangeMessage,
     MIDIFile,
     NoteOffMessage,

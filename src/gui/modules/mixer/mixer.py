@@ -1,13 +1,13 @@
-﻿import logging
+import logging
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
 from src.engine import Chain, Volume, WaveAdder
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import read_samples, silence
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -24,9 +24,6 @@ class MixerModule(ModuleWidget):
     """
 
     runtime_kind = "mixer"
-    runtime_input_names = ("In 1", "In 2", "In 3", "In 4")
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("gain1", "gain2", "gain3", "gain4")
 
     metadata = ModuleMetadata(
         title="Mixer",
@@ -123,7 +120,7 @@ class MixerModule(ModuleWidget):
         # Update the Volume component amplitude (click-free)
         self._volume_components[channel_index].amplitude = new_gain
 
-        logger.debug(f"ðŸŽšï¸ Mixer: Ch {channel_index + 1} gain set to {new_gain:.3f}")
+        logger.debug(f"Mixer: Ch {channel_index + 1} gain set to {new_gain:.3f}")
 
     def create_engine_component(
         self,
@@ -154,26 +151,27 @@ class MixerModule(ModuleWidget):
 
         return WaveAdder(*processed_inputs, mix_mode="sum")
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Mix connected input channels for the current engine cycle."""
-        del parameters
         mixed_signal = None
         input_ports = [self.in1_port, self.in2_port, self.in3_port, self.in4_port]
 
         for channel_idx, port in enumerate(input_ports):
             if not port.is_connected:
                 continue
+
+            gain = float_parameter(
+                parameters,
+                f"gain{channel_idx + 1}",
+                self.gain_knobs[channel_idx].get_value,
+            )
+            self._volume_components[channel_idx].amplitude = gain
             signal = read_samples(port, num_samples)
             gained_signal = self._volume_components[channel_idx](signal)
             mixed_signal = (
-                gained_signal
-                if mixed_signal is None
-                else mixed_signal + gained_signal
+                gained_signal if mixed_signal is None else mixed_signal + gained_signal
             )
 
         self.out_port.write(
             mixed_signal if mixed_signal is not None else silence(num_samples)
         )
-

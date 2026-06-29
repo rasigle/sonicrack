@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
+from src.gui.module_registry import register_module
 from src.gui.modules.visualization.visualizer_utils import (
     get_visualizer_samples,
     validate_samples,
@@ -223,7 +223,9 @@ class SpectrumModule(ModuleWidget):
             return
 
         # Update display with samples
-        self._update_samples(samples)
+        if samples:
+            self._update_samples(samples)
+
 
 class SpectrumAnalyzer(QWidget):
     """Widget for displaying audio spectrum in real-time.

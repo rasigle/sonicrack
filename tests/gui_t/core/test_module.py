@@ -7,8 +7,8 @@ import pytest
 from src.engine.oscillator import SineOscillator
 from src.gui.core.module import ModuleCategory
 from src.gui.modules.mixer import MixerModule
+from src.gui.modules.modifier.volume_mod import VolumeModule
 from src.gui.modules.source.oscillator import OscillatorModule
-from gui.modules.modifier.volume_mod import VolumeModule
 
 
 def test_oscillator_interface():

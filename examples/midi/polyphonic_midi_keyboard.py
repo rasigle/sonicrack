@@ -26,14 +26,6 @@ except ImportError:
     sys.exit(1)
 
 
-from engine.io.midi import (
-    MIDIInput,
-    NoteOffMessage,
-    NoteOnMessage,
-    PolyphonicSynth,
-    midi_to_note_name,
-)
-
 from engine import (
     ADSREnvelope,
     Chain,
@@ -41,6 +33,13 @@ from engine import (
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
+)
+from midi_io import (
+    MIDIInput,
+    NoteOffMessage,
+    NoteOnMessage,
+    PolyphonicSynth,
+    midi_to_note_name,
 )
 from src.constants import DEFAULT_SAMPLE_RATE
 

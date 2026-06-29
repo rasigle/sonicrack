@@ -11,12 +11,13 @@ import numpy as np
 
 from constants import DEFAULT_SAMPLE_RATE
 from engine import (
+    ComponentCategory,
     ComponentDescriptor,
     Modifier,
     Oscillator,
+    PresetBuilder,
     audio_registry,
 )
-from engine.presets import ComponentCategory, PresetBuilder
 
 
 def example_1_basic_usage():

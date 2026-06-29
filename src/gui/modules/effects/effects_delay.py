@@ -5,10 +5,10 @@ from PyQt6.QtWidgets import QHBoxLayout
 
 from src.engine.effects import Delay
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 
 logger = logging.getLogger(__name__)
@@ -19,10 +19,6 @@ class DelayModule(ModulatedModuleBase):
     """Delay module"""
 
     runtime_kind = "delay"
-    runtime_input_names = ("In",)
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("delay_time", "feedback", "mix")
-
     metadata = ModuleMetadata(
         title="Delay",
         category=ModuleCategory.MODIFIER,
@@ -81,8 +77,9 @@ class DelayModule(ModulatedModuleBase):
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
         # Register parameters for automatic get/set
-        self.register_parameter("drive", self.delay_time)
-        self.register_parameter("mix", self.delay_time)
+        self.register_parameter("delay_time", self.delay_time)
+        self.register_parameter("feedback", self.feedback_knob)
+        self.register_parameter("mix", self.mix_knob)
 
         # Set control_knob for base class functionality
         self.control_knob = self.delay_time
@@ -111,9 +108,7 @@ class DelayModule(ModulatedModuleBase):
         mix = self.mix_knob.get_value()
         return Delay(delay_time=delay_time, feedback=feedback, mix=mix)
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply delay during an engine-owned render cycle."""
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))

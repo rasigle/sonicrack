@@ -1,4 +1,4 @@
-﻿"""Modulated Clipper module - clipper with CV threshold control."""
+"""Modulated Clipper module - clipper with CV threshold control."""
 
 import logging
 
@@ -7,10 +7,10 @@ from PyQt6.QtGui import QColor
 
 from src.engine import Clipper, ModulatedClipper
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 
 logger = logging.getLogger(__name__)
@@ -21,9 +21,6 @@ class ClipperModulatedModule(ModulatedModuleBase):
     """Clipper module with modulation support for dynamic threshold control."""
 
     runtime_kind = "clipper"
-    runtime_input_names = ("In",)
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("threshold",)
 
     metadata = ModuleMetadata(
         title="Clipper (Mod)",
@@ -87,9 +84,7 @@ class ClipperModulatedModule(ModulatedModuleBase):
         threshold = self.threshold_knob.get_value()
         return Clipper((-threshold, threshold))
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Clip the connected input for one render cycle."""
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))

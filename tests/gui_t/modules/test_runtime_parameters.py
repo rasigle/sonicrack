@@ -1,0 +1,127 @@
+"""Runtime parameter snapshot coverage for GUI modules."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import numpy as np
+import pytest
+
+from src.engine.oscillator_square import SquareOscillator
+from src.gui.core.port import Port
+from src.gui.modules.mixer import MixerModule
+from src.gui.modules.modifier.filter import FilterModule
+from src.gui.modules.modulated_source.envelope_adsr import ADSRModule
+from src.gui.modules.source.lfo import LFOModule
+from src.gui.modules.source.oscillator import OscillatorModule
+from src.gui.modules.source.vco import ModulatedOscillatorModule
+
+
+def _connect_constant_input(input_port: Port, value: float = 1.0) -> Port:
+    output_port = Port("output", "Test Out")
+    output_port.write(np.full(8, value, dtype=np.float32))
+    output_port.connect(input_port)
+    return output_port
+
+
+def test_oscillator_runtime_applies_frequency_and_pulsewidth(qapp: Any):
+    del qapp
+    module = OscillatorModule()
+
+    module.process_runtime(8, {"frequency": 880.0, "pulsewidth": 0.25})
+
+    assert module._sine_oscillator.frequency == pytest.approx(880.0)
+    assert module._triangle_oscillator.frequency == pytest.approx(880.0)
+    assert module._sawtooth_oscillator.frequency == pytest.approx(880.0)
+    assert module._square_oscillator.frequency == pytest.approx(880.0)
+    assert module._square_oscillator.pulsewidth == pytest.approx(0.25)
+
+
+def test_lfo_runtime_applies_frequency_and_pulsewidth(qapp: Any):
+    del qapp
+    module = LFOModule()
+
+    module.process_runtime(8, {"frequency": 4.0, "pulsewidth": 0.75})
+
+    assert module._sine_oscillator.frequency == pytest.approx(4.0)
+    assert module._triangle_oscillator.frequency == pytest.approx(4.0)
+    assert module._sawtooth_oscillator.frequency == pytest.approx(4.0)
+    assert module._square_oscillator.frequency == pytest.approx(4.0)
+    assert module._square_oscillator.pulsewidth == pytest.approx(0.75)
+
+
+def test_mixer_runtime_applies_channel_gains(qapp: Any):
+    del qapp
+    module = MixerModule()
+    _connect_constant_input(module.in1_port, 1.0)
+    _connect_constant_input(module.in2_port, 1.0)
+
+    module.process_runtime(
+        8,
+        {"gain1": 0.25, "gain2": 0.5, "gain3": 0.75, "gain4": 1.0},
+    )
+
+    assert module._volume_components[0].amplitude == pytest.approx(0.25)
+    assert module._volume_components[1].amplitude == pytest.approx(0.5)
+
+
+def test_filter_runtime_applies_filter_parameters(qapp: Any):
+    del qapp
+    module = FilterModule()
+    _connect_constant_input(module.in_port, 1.0)
+
+    module.process_runtime(
+        8,
+        {
+            "cutoff": 300.0,
+            "high_cutoff": 1200.0,
+            "order": 2,
+            "filter_type": "Band-pass",
+        },
+    )
+
+    assert module.component.cutoff == pytest.approx((300.0, 1200.0))
+    assert module.component.order == 2
+    assert module.component.filter_type == "band"
+
+
+def test_adsr_runtime_applies_envelope_parameters(qapp: Any):
+    del qapp
+    module = ADSRModule()
+
+    module.process_runtime(
+        8,
+        {
+            "attack_duration": 0.2,
+            "decay_duration": 0.3,
+            "sustain_level": 0.4,
+            "release_duration": 0.5,
+        },
+    )
+
+    assert module._adsr_component is not None
+    assert module._adsr_component.attack_duration == pytest.approx(0.2)
+    assert module._adsr_component.decay_duration == pytest.approx(0.3)
+    assert module._adsr_component.sustain_level == pytest.approx(0.4)
+    assert module._adsr_component.release_duration == pytest.approx(0.5)
+
+
+def test_vco_runtime_applies_oscillator_parameters(qapp: Any):
+    del qapp
+    module = ModulatedOscillatorModule()
+
+    module.process_runtime(
+        8,
+        {
+            "waveform": "Square",
+            "mode": "ideal",
+            "frequency": 330.0,
+            "gain_db": -6.0,
+            "phase": 45.0,
+        },
+    )
+
+    assert isinstance(module.component, SquareOscillator)
+    assert module.component.frequency == pytest.approx(330.0)
+    assert module.component.gain_db == pytest.approx(-6.0)
+    assert module.component.phase == pytest.approx(np.deg2rad(45.0))

@@ -70,11 +70,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
     # Signals
     parameter_changed = pyqtSignal(str, object)  # (param_name, value)
     # Runtime classification used by AudioEngine/render specs. Subclasses with
-    # DSP behavior should override this with a registered kind from gui.runtime.
+    # DSP behavior should override this with a registered kind from core.runtime.
     runtime_kind = "unknown"
-    runtime_input_names: tuple[str, ...] = ()
-    runtime_output_names: tuple[str, ...] = ()
-    runtime_parameter_names: tuple[str, ...] = ()
     # Visual-only sink modules set this to False so they can receive rendered
     # buffers without being treated as processors inside the graph.
     is_processing_module = True
@@ -135,8 +132,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             ```
         """
         widget = QWidget()
-        widget.setStyleSheet(
-            """
+        widget.setStyleSheet("""
             QWidget {
                 background: transparent;
                 color: #edf1f5;
@@ -171,8 +167,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 margin: -5px 0;
                 border-radius: 7px;
             }
-            """
-        )
+            """)
         return widget
 
     def _add_controls_to_module(self, controls_widget: QWidget) -> QGraphicsProxyWidget:
@@ -679,14 +674,14 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
     def get_runtime_spec(self):
         """Return this module's runtime declaration for the graph renderer."""
-        from src.gui.runtime import RuntimeModuleSpec
+        from src.gui.core.runtime import RuntimeModuleSpec
 
         return RuntimeModuleSpec(
             kind=self.runtime_kind,
             processor=self.process_runtime,
-            input_names=self.runtime_input_names,
-            output_names=self.runtime_output_names,
-            parameter_names=self.runtime_parameter_names,
+            input_names=tuple(self.inputs),
+            output_names=tuple(self.outputs),
+            parameter_names=tuple(self._parameters),
         )
 
     def process_runtime(self, num_samples: int, parameters) -> None:

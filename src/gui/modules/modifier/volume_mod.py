@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
@@ -9,10 +9,10 @@ from PyQt6.QtGui import QColor
 from src.constants import DEFAULT_GAIN_DB
 from src.engine import ModulatedVolume, Volume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.module_registry import register_module
 from src.gui.modules._modulated_base import ModulatedModuleBase
-from src.gui.runtime import RuntimeParameters
-from src.gui.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.widgets import Knob
 
 if TYPE_CHECKING:
@@ -26,9 +26,6 @@ class VolumeModule(ModulatedModuleBase):
     """Volume/Gain module with modulation support."""
 
     runtime_kind = "volume_mod"
-    runtime_input_names = ("In", "Mod")
-    runtime_output_names = ("Out",)
-    runtime_parameter_names = ("gain_db",)
 
     metadata = ModuleMetadata(
         title="Volume (Mod)",
@@ -110,9 +107,7 @@ class VolumeModule(ModulatedModuleBase):
         logger.debug(f"VolumeModule: Creating simple Volume with gain_db={gain_db}")
         return Volume(gain_db=gain_db)
 
-    def process_runtime(
-        self, num_samples: int, parameters: RuntimeParameters
-    ) -> None:
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply static or modulated gain for one render cycle."""
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))
@@ -129,9 +124,7 @@ class VolumeModule(ModulatedModuleBase):
 
         if self.component is None or isinstance(self.component, ModulatedVolume):
             self.component = Volume(
-                gain_db=float_parameter(
-                    parameters, "gain_db", self.gain_knob.get_value
-                )
+                gain_db=float_parameter(parameters, "gain_db", self.gain_knob.get_value)
             )
         else:
             self.component.gain_db = float_parameter(

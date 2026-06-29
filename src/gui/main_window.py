@@ -27,18 +27,18 @@ from src import __version__
 from src.constants import PRESET_FILE_EXTENSION
 from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory
-from src.gui.core.module_registry import initialize_module_registry
 from src.gui.core.preset_manager import PresetManager
 from src.gui.dialogs.about_dialog import show_about
 from src.gui.dialogs.preset_library_dialog import (
     LibraryPresetBrowserDialog,
     SaveLibraryPresetDialog,
 )
+from src.gui.module_registry import initialize_module_registry
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.ui_constants import APP_ICON_PATH, APP_TITLE
 
 if TYPE_CHECKING:
-    from src.gui.core.module_registry import ModuleRegistry
+    from src.gui.module_registry import ModuleRegistry
     from src.gui.modules.output.output import OutputModule
     from src.gui.widgets.port_widget import PortWidget
 

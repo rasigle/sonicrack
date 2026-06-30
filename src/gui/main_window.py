@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSplitter,
     QStatusBar,
-    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -73,6 +72,11 @@ class ModularSynthWindow(QMainWindow):
         # UI elements
         self.patch_canvas: PatchCanvas | None = None
         self.statusbar: QStatusBar | None = None
+        self.main_splitter: QSplitter | None = None
+        self.module_library_panel: QWidget | None = None
+        self.module_library_scroll_layout: QVBoxLayout | None = None
+        self.module_library_group_checkbox: QtWidgets.QCheckBox | None = None
+        self.module_library_toggle_action: QtGui.QAction | None = None
 
         # UI setup
         logger.debug("Initializing UI components")
@@ -99,9 +103,11 @@ class ModularSynthWindow(QMainWindow):
 
         # Main splitter (horizontal)
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter = main_splitter
 
         # Left panel - Module Library
         module_library = self._create_module_library_panel()
+        self.module_library_panel = module_library
         main_splitter.addWidget(module_library)
 
         # Center - Patch Canvas
@@ -116,7 +122,7 @@ class ModularSynthWindow(QMainWindow):
         main_splitter.addWidget(canvas_widget)
 
         # Set splitter sizes
-        main_splitter.setSizes([200, 800, 400])
+        main_splitter.setSizes([220, 1180])
 
         layout.addWidget(main_splitter)
 
@@ -138,9 +144,24 @@ class ModularSynthWindow(QMainWindow):
         layout = QVBoxLayout(panel)
 
         # Title
+        header_layout = QtWidgets.QHBoxLayout()
         title = QLabel("Module Library")
         title.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
-        layout.addWidget(title)
+        header_layout.addWidget(title)
+
+        hide_button = QtWidgets.QToolButton()
+        hide_button.setText("Hide")
+        hide_button.setToolTip("Hide module library")
+        hide_button.clicked.connect(lambda: self._set_module_library_visible(False))
+        header_layout.addWidget(hide_button)
+        layout.addLayout(header_layout)
+
+        group_checkbox = QtWidgets.QCheckBox("Group by category")
+        group_checkbox.setToolTip("Group module buttons by their registered category")
+        group_checkbox.setChecked(True)
+        group_checkbox.toggled.connect(self._populate_module_library)
+        self.module_library_group_checkbox = group_checkbox
+        layout.addWidget(group_checkbox)
 
         # Module buttons
         scroll = QScrollArea()
@@ -150,20 +171,82 @@ class ModularSynthWindow(QMainWindow):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
 
-        # Add module buttons
-        for module_name in self.registry.list_modules():
-            btn = QtWidgets.QPushButton(f"+ {module_name}")
-            btn.setMinimumHeight(35)
-            btn.clicked.connect(
-                lambda checked, name=module_name: self._add_module(name)
-            )
-            scroll_layout.addWidget(btn)
-
         scroll_layout.addStretch()
+        self.module_library_scroll_layout = scroll_layout
+        self._populate_module_library()
         scroll.setWidget(scroll_content)
         layout.addWidget(scroll)
 
         return panel
+
+    def _populate_module_library(self):
+        """Populate module library buttons in the selected grouping mode."""
+        scroll_layout = self.module_library_scroll_layout
+        if scroll_layout is None:
+            return
+
+        while scroll_layout.count():
+            item = scroll_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        if self._is_module_library_grouped():
+            for category in self._sorted_module_categories():
+                category_label = QLabel(str(category))
+                category_label.setStyleSheet(
+                    "font-weight: bold; padding: 8px 4px 2px 4px;"
+                )
+                scroll_layout.addWidget(category_label)
+                for module_name in self._sorted_module_names(category=category):
+                    scroll_layout.addWidget(self._create_module_library_button(module_name))
+        else:
+            for module_name in self._sorted_module_names():
+                scroll_layout.addWidget(self._create_module_library_button(module_name))
+
+        scroll_layout.addStretch()
+
+    def _is_module_library_grouped(self) -> bool:
+        """Return whether the module library should group modules by category."""
+        return bool(
+            self.module_library_group_checkbox
+            and self.module_library_group_checkbox.isChecked()
+        )
+
+    def _sorted_module_names(self, category: str | None = None) -> list[str]:
+        """Return module names alphabetically, optionally filtered by category."""
+        if category is None:
+            module_names = self.registry.list_modules()
+        else:
+            module_names = list(self.registry.get_by_category(category).keys())
+        return sorted(module_names, key=str.casefold)
+
+    def _sorted_module_categories(self) -> list[str]:
+        """Return non-empty module categories alphabetically."""
+        return sorted(
+            (
+                category
+                for category in self.registry.get_categories()
+                if self.registry.get_by_category(category)
+            ),
+            key=str.casefold,
+        )
+
+    def _create_module_library_button(self, module_name: str) -> QtWidgets.QPushButton:
+        """Create a button that adds a module to the canvas."""
+        btn = QtWidgets.QPushButton(f"+ {module_name}")
+        btn.setMinimumHeight(35)
+        btn.clicked.connect(lambda checked, name=module_name: self._add_module(name))
+        return btn
+
+    def _set_module_library_visible(self, visible: bool):
+        """Show or hide the module library panel."""
+        if self.module_library_panel is not None:
+            self.module_library_panel.setVisible(visible)
+
+        if self.module_library_toggle_action is not None:
+            with contextlib.suppress(RuntimeError):
+                self.module_library_toggle_action.setChecked(visible)
 
     def _setup_menu(self):
         """Set up the menu bar."""
@@ -218,6 +301,17 @@ class ModularSynthWindow(QMainWindow):
         clear_action.triggered.connect(self._clear_canvas)
         edit_menu.addAction(clear_action)
 
+        # View menu
+        view_menu = menubar.addMenu("&View")
+        self.module_library_toggle_action = QtGui.QAction("Show Module Library", self)
+        self.module_library_toggle_action.setCheckable(True)
+        self.module_library_toggle_action.setChecked(True)
+        self.module_library_toggle_action.setShortcut("Ctrl+L")
+        self.module_library_toggle_action.toggled.connect(
+            self._set_module_library_visible
+        )
+        view_menu.addAction(self.module_library_toggle_action)
+
         # Settings action
         settings_action = QtGui.QAction("&Settings", self)
         settings_action.setShortcut("Ctrl+,")
@@ -232,13 +326,7 @@ class ModularSynthWindow(QMainWindow):
 
     def _setup_toolbar(self):
         """Setup the toolbar."""
-        toolbar = QToolBar("Main Toolbar")
-        toolbar.setMovable(False)
-        self.addToolBar(toolbar)
-
-        # Quick access buttons
-        toolbar.addAction("New", self._new_patch)
-        toolbar.addAction("Clear", self._clear_canvas)
+        return
 
     def _setup_statusbar(self):
         """Setup the status bar."""

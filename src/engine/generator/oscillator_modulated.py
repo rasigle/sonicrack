@@ -519,7 +519,10 @@ class ModulatedOscillator(Generator):
             phase_offsets = phase_offsets_deg / 360.0
 
         cycles = carrier_cycles + phase_offsets
-        waveform = 2 * (cycles - np.floor(0.5 + cycles))
+        if osc.mode == "vcv":
+            waveform = osc._generate_vcv_from_cycles(cycles)
+        else:
+            waveform = 2 * (cycles - np.floor(0.5 + cycles))
         if osc.mode == "analog":
             sample_indices = getattr(osc, "_i", 0.0) + np.arange(
                 len(freqs), dtype=np.float64

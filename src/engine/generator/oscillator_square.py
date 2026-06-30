@@ -15,6 +15,11 @@ from src.engine.audio_component import (
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.generator.oscillator_base import Oscillator
+from src.engine.generator.oscillator_minblep import (
+    VCV_MINBLEP_OVERSAMPLE,
+    VCV_MINBLEP_ZERO_CROSSINGS,
+    minimum_phase_minblep_table,
+)
 from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.utils import filter_provided_args, track_provided_args
@@ -23,8 +28,6 @@ SquareWaveMode = Literal[
     "ideal", "ideal_smooth", "bandlimited", "vcv", "soft", "comparator"
 ]
 TWO_PI = 2 * np.pi
-VCV_MINBLEP_ZERO_CROSSINGS = 16
-VCV_MINBLEP_OVERSAMPLE = 16
 logger = logging.getLogger(__name__)
 
 
@@ -311,41 +314,10 @@ class BandlimitedSquareStrategy(SquareWaveStrategy):
         return self._scale_from_normalized(normalized, low_value, high_value)
 
 
-def _blackman_harris(position: np.ndarray) -> np.ndarray:
-    return (
-        0.35875
-        - 0.48829 * np.cos(TWO_PI * position)
-        + 0.14128 * np.cos(2 * TWO_PI * position)
-        - 0.01168 * np.cos(3 * TWO_PI * position)
-    )
-
-
-def _minimum_phase_minblep_table(
-    zero_crossings: int = VCV_MINBLEP_ZERO_CROSSINGS,
-    oversample: int = VCV_MINBLEP_OVERSAMPLE,
-) -> np.ndarray:
-    n = 2 * zero_crossings * oversample
-    positions = np.arange(n, dtype=np.float64) / oversample - zero_crossings
-    impulse = np.sinc(positions)
-    impulse *= _blackman_harris(np.arange(n, dtype=np.float64) / (n - 1))
-
-    spectrum = np.fft.fft(impulse)
-    log_magnitude = np.log(np.maximum(np.abs(spectrum), np.exp(-10.0)))
-    cepstrum = np.fft.ifft(log_magnitude)
-    cepstrum[1 : n // 2] *= 2.0
-    cepstrum[n // 2 :] = 0.0
-    minimum_phase = np.fft.ifft(np.exp(np.fft.fft(cepstrum))).real
-
-    step = np.cumsum(minimum_phase) / oversample
-    step = np.concatenate(([0.0], step[:-1]))
-    step /= step[-1] + minimum_phase[-1] / oversample
-    return np.asarray(step - 1.0, dtype=np.float32)
-
-
 class VCVRackSquareStrategy(SquareWaveStrategy):
     """VCV Rack Fundamental-style minBLEP square wave with DC blocking."""
 
-    _minblep_table = _minimum_phase_minblep_table()
+    _minblep_table = minimum_phase_minblep_table()
 
     def __init__(
         self,
@@ -461,17 +433,24 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
         else:
             current_phase_unwrapped = current_phase
 
+        phase_delta = current_phase_unwrapped - start_phase
         wrap_subsample = self._crossing_subsample(
             1.0, start_phase, current_phase_unwrapped
         )
         if wrap_subsample is not None:
-            self._insert_discontinuity(wrap_subsample, 2.0)
+            self._insert_discontinuity(
+                wrap_subsample,
+                2.0 if phase_delta > 0.0 else -2.0,
+            )
 
         pulse_subsample = self._crossing_subsample(
             pulsewidth, start_phase, current_phase_unwrapped
         )
         if pulse_subsample is not None:
-            self._insert_discontinuity(pulse_subsample, -2.0)
+            self._insert_discontinuity(
+                pulse_subsample,
+                -2.0 if phase_delta > 0.0 else 2.0,
+            )
 
         normalized = self._square_state(current_phase, pulsewidth)
         self._last_square_state = normalized

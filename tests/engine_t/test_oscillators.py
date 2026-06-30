@@ -464,6 +464,47 @@ class TestSawtoothOscillator(TestOscillatorBase):
         self.assertTrue(np.any(diff > 0))  # Increasing segments
         self.assertTrue(np.any(diff < -1))  # Reset jumps
 
+    def test_vcv_mode_is_available(self) -> None:
+        """Test sawtooth exposes the VCV-style mode."""
+        self.assertIn("vcv", SawtoothOscillator.get_available_modes())
+        osc = SawtoothOscillator(frequency=440, mode="vcv")
+        self.assertEqual(osc.mode, "vcv")
+
+    def test_vcv_vectorized_matches_iterator(self) -> None:
+        """Test stateful VCV sawtooth matches iterator and vectorized output."""
+        iterator_osc = SawtoothOscillator(
+            frequency=440,
+            sample_rate=44100,
+            mode="vcv",
+            gain_db=0,
+            dc_block=False,
+        )
+        vectorized_osc = SawtoothOscillator(
+            frequency=440,
+            sample_rate=44100,
+            mode="vcv",
+            gain_db=0,
+            dc_block=False,
+        )
+
+        iterator_samples = np.array([next(iterator_osc) for _ in range(2048)])
+        vectorized_samples = vectorized_osc.get_samples_vectorized(2048)
+
+        np.testing.assert_allclose(iterator_samples, vectorized_samples)
+
+    def test_vcv_has_minblep_ringing(self) -> None:
+        """Test VCV sawtooth smooths reset edges with minBLEP ringing."""
+        osc = SawtoothOscillator(
+            frequency=440,
+            sample_rate=44100,
+            mode="vcv",
+            gain_db=0,
+            dc_block=False,
+        )
+        samples = osc.get_samples_vectorized(2048)
+
+        self.assertLess(np.min(samples), -1.05)
+
 
 class TestTriangleOscillator(TestOscillatorBase):
     """Test suite for TriangleOscillator."""

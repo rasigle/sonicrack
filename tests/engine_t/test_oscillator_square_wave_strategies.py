@@ -410,6 +410,28 @@ class TestVCVRackSquareStrategy:
         assert np.max(samples) > 1.05
         assert np.min(samples) < -1.05
 
+    def test_vcv_reverse_phase_edges_are_symmetric(self):
+        """Reverse phase traversal should sign the minBLEP edges symmetrically."""
+        osc = SquareOscillator(
+            frequency=-10,
+            sample_rate=1000,
+            phase=90,
+            mode="vcv",
+            gain_db=0,
+            dc_block=False,
+        )
+        samples = osc.get_samples_vectorized(250)
+        edge_indices = np.flatnonzero(
+            np.signbit(samples[:-1]) != np.signbit(samples[1:])
+        )
+
+        falling_edge = edge_indices[2]
+        rising_edge = edge_indices[3]
+        falling_window = samples[falling_edge - 4 : falling_edge + 24]
+        rising_window = samples[rising_edge - 4 : rising_edge + 24]
+
+        np.testing.assert_allclose(falling_window, -rising_window, atol=1e-6)
+
     def test_vcv_clamps_pulse_width_like_vcv_rack(self):
         """VCV mode should internally clamp pulse width to 1%-99%."""
         for pulsewidth, expected in (

@@ -14,6 +14,7 @@ from engine.generator.oscillator_modulated import (
     ModulatedFrequency,
     ModulatedOscillator,
 )
+from engine.generator.oscillator_ramp import SawtoothOscillator
 from engine.generator.oscillator_square import SquareOscillator
 from src.engine.audio_component import (
     ComponentCategory,
@@ -209,4 +210,11 @@ def test_remaining_registry_descriptors_expose_ui_preset_limits():
         "vcv",
         "soft",
         "comparator",
+    )
+
+    assert SawtoothOscillator.descriptor.parameters is not None
+    assert SawtoothOscillator.descriptor.parameters["mode"].choices == (
+        "pure",
+        "analog",
+        "vcv",
     )

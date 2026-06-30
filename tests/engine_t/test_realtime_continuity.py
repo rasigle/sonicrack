@@ -488,7 +488,7 @@ def test_sine_oscillator_preserves_state_across_buffers(mode: str):
     np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
 
 
-@pytest.mark.parametrize("mode", ["pure", "analog"])
+@pytest.mark.parametrize("mode", ["pure", "analog", "vcv"])
 def test_sawtooth_oscillator_preserves_state_across_buffers(mode: str):
     def make_sawtooth() -> SawtoothOscillator:
         return SawtoothOscillator(

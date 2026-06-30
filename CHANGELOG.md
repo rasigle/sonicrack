@@ -159,6 +159,11 @@ First release of AudioPlayground!
   `96000` Hz.
 - Added shared engine validation helpers for sample-rate and render-length
   contracts.
+- Added shared minBLEP oscillator helpers for band-limited edge correction.
+- Added VCV-style sawtooth oscillator mode with iterator and vectorized rendering
+  support.
+- Added optional non-linear knob curves, used by audio-rate oscillator frequency
+  controls for finer low-frequency resolution.
 
 ### Changed
 - Moved audio-device playback and MIDI functionality out of the engine package so
@@ -173,6 +178,12 @@ First release of AudioPlayground!
   sample rate.
 - Narrowed non-callback exception handling in scoped engine/audio_io/midi_io code
   to explicit IO/runtime/parse exception types.
+- Changed VCV-style square oscillator edge handling so up- and down-phase
+  traversal are symmetric.
+- Changed oscillator and VCO frequency knobs to span roughly `11 Hz` to `6000 Hz`
+  with a pitch-oriented response curve.
+- Smoothed GUI oscillator and VCO frequency changes with per-sample pitch-space
+  slewing for more natural sweeps.
 
 ### Fixed
 - Fixed state carry across buffer boundaries for `ButterworthFilter`.
@@ -186,10 +197,15 @@ First release of AudioPlayground!
   silently returning or mixing silence.
 - Kept broad exception handling only at explicit callback isolation boundaries:
   sounddevice callback diagnostics and MIDI user callback dispatch.
+- Fixed VCO and oscillator frequency-slew state so partial glides continue across
+  audio buffers instead of snapping oscillator internals to the target frequency.
+- Fixed split-buffer oscillator frequency sweeps to match continuous rendering.
 
 ### Tests
 - Added regression tests for runtime contracts, cross-rate continuity, callback
   buffer reuse/allocation behavior, and MIDI synth render-error propagation.
+- Added regression tests for VCV square symmetry, VCV sawtooth rendering,
+  non-linear knob mapping, and GUI oscillator/VCO frequency-slew continuity.
 - Current scoped verification: engine + audio IO + MIDI IO tests pass with
   `782 passed, 2 skipped, 8 subtests passed`.
 

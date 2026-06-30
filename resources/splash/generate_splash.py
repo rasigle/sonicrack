@@ -197,7 +197,7 @@ def create_splash_screen(width=800, height=600):
     )
 
     # Version info
-    version = "v1.0.0"
+    version = "2026.1.0"
     version_bbox = draw.textbbox((0, 0), version, font=version_font)
     version_width = version_bbox[2] - version_bbox[0]
     version_x = (width - version_width) // 2

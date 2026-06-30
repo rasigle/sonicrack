@@ -52,6 +52,7 @@ def validate_numeric_range(
     result = float(value)
     if not math.isfinite(result):
         raise ValueError(f"{name} must be finite, got {value!r}")
+
     if not minimum <= result <= maximum:
         raise ValueError(
             f"{name} must be between {minimum} and {maximum}, got {value!r}"

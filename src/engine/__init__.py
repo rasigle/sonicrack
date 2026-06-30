@@ -117,6 +117,7 @@ from src.engine.filter import (
     apply_filter,
     butter,
 )
+from src.engine.filter_303 import AcidResonantFilter
 from src.engine.modifier import (
     Clipper,
     Frequency,
@@ -206,6 +207,7 @@ __all__ = [
     "apply_filter",
     "ButterworthFilter",
     "BiquadResonantFilter",
+    "AcidResonantFilter",
     "white_noise",
     "pink_noise",
     "brownian_noise",

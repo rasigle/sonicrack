@@ -12,6 +12,7 @@ from src.engine.modulator import ADSREnvelope, DecayEnvelope
 from src.engine.oscillator_square import SquareOscillator
 from src.gui.core.port import Port
 from src.gui.modules.mixer import MixerModule
+from src.gui.modules.modifier.acid_filter import AcidFilterModule
 from src.gui.modules.modifier.filter import FilterModule
 from src.gui.modules.modulated_source.envelope_adsr import ADSRModule
 from src.gui.modules.modulated_source.envelope_decay import DecayEnvelopeModule
@@ -114,6 +115,33 @@ def test_filter_runtime_applies_filter_parameters(qapp: Any):
     assert module.component.cutoff == pytest.approx((300.0, 1200.0))
     assert module.component.order == 2
     assert module.component.filter_type == "band"
+
+
+def test_acid_filter_runtime_applies_parameters(qapp: Any):
+    del qapp
+    module = AcidFilterModule()
+    _connect_constant_input(module.in_port, 0.2)
+
+    module.process_runtime(
+        16,
+        {
+            "cutoff": 600.0,
+            "resonance": 6.0,
+            "env_amount": 2.0,
+            "accent_amount": 1.5,
+            "drive_db": 9.0,
+            "output_gain_db": -3.0,
+        },
+    )
+
+    assert module.component.cutoff == pytest.approx(600.0)
+    assert module.component.resonance == pytest.approx(6.0)
+    assert module.component.env_amount == pytest.approx(2.0)
+    assert module.component.accent_amount == pytest.approx(1.5)
+    assert module.component.drive_db == pytest.approx(9.0)
+    assert module.component.output_gain_db == pytest.approx(-3.0)
+    assert np.asarray(module.out_port.value).shape == (16,)
+    assert np.all(np.isfinite(module.out_port.value))
 
 
 def test_adsr_runtime_applies_envelope_parameters(qapp: Any):

@@ -30,6 +30,7 @@ def test_sequencing_modules_are_discoverable(qapp: Any):
     assert "Step Sequencer" in registered
     assert "Slide" in registered
     assert "Accent" in registered
+    assert "Acid Filter" in registered
 
 
 def test_clock_module_writes_pulses(qapp: Any):

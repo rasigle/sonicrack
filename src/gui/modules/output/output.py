@@ -121,15 +121,16 @@ class OutputModule(ModuleWidget):
             self.stop_playback()
 
     def start_playback(self):
-        """Start audio playback using process-based architecture.
+        """Start audio playback through the engine-owned render graph.
 
         Also stops playback if there are no connections.
         """
-        # Debug: Check connection status
         logger.info("OutputModule.start_playback() called")
-        logger.info(f"  input_port.is_connected = {self.inp_port_l.is_connected}")
-        logger.info(f"  input_port.connected_to = {self.inp_port_l.connected_to}")
-        logger.info(f"  Number of connections: {len(self.inp_port_l.connected_to)}")
+        logger.info(
+            "  input connections: left=%s right=%s",
+            self.inp_port_l.is_connected,
+            self.inp_port_r.is_connected,
+        )
 
         if not self.is_active:
             logger.info("Output module is inactive; playback will not start")
@@ -142,7 +143,7 @@ class OutputModule(ModuleWidget):
             return
 
         # Check if we have any connections
-        if not self.inp_port_l.is_connected:
+        if not self.inp_port_l.is_connected and not self.inp_port_r.is_connected:
             logger.warning("Output module has no connections")
 
             # Stop playback if it's running
@@ -158,7 +159,7 @@ class OutputModule(ModuleWidget):
 
         # We have connections - start playback if not already playing
         if not self.audio_output.is_playing:
-            logger.info("Starting playback using PROCESS-BASED architecture")
+            logger.info("Starting playback using engine-owned render graph")
             self.audio_output.start_playback()
             self.status_label.setText("Playing")
             self.status_label.setStyleSheet(

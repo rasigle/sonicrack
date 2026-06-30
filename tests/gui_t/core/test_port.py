@@ -1088,6 +1088,23 @@ class TestPortNumpySupport:
 
         np.testing.assert_array_equal(result, expected)
 
+    def test_mix_scalar_then_array(self):
+        """Test scalar/array mixing when the scalar connection is read first."""
+        input_port = Port("input", "mixer_in")
+        output_scalar = Port("output", "out_scalar")
+        output_array = Port("output", "out_array")
+
+        input_port.connect(output_scalar)
+        input_port.connect(output_array)
+
+        output_scalar.write(0.5)
+        output_array.write(np.array([1.0, 2.0, 3.0]))
+
+        result = input_port.read()
+        expected = np.array([1.5, 2.5, 3.5])
+
+        np.testing.assert_array_equal(result, expected)
+
     def test_mix_multiple_scalars_and_arrays(self):
         """Test mixing multiple scalars and arrays together."""
         input_port = Port("input", "mixer_in")

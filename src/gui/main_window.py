@@ -949,12 +949,19 @@ class ModularSynthWindow(QMainWindow):
             module_instance = module_class()
 
             # Set parameters
-            for param_name, param_value in parameters.items():
-                if hasattr(module_instance, "set_parameter"):
-                    try:
-                        module_instance.set_parameter(param_name, param_value)
-                    except Exception as e:
-                        logger.warning(f"Failed to set parameter {param_name}: {e}")
+            try:
+                module_instance.set_parameters(parameters)
+            except Exception as e:
+                logger.warning(
+                    "Failed to set parameters for %s: %s",
+                    module_type,
+                    e,
+                    exc_info=True,
+                )
+
+            custom_name = module_data.get("custom_name")
+            if isinstance(custom_name, str) and custom_name:
+                module_instance.set_custom_name(custom_name)
 
             # Add to canvas
             patch_canvas.add_module(module_instance)

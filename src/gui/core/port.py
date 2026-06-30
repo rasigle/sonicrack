@@ -202,50 +202,34 @@ class Port:
             if len(array_shapes) > 1:
                 raise ValueError("Cannot mix arrays with different shapes")
 
-        # If num_samples was requested, ensure all arrays match that size
-        result = None
+        if num_samples is None:
+            first_array = next(v for v in values if isinstance(v, np.ndarray))
+            result = np.zeros_like(first_array)
+            for value in values:
+                result = result + value
+            return result
+
+        # If num_samples was requested, ensure all arrays match that size while
+        # preserving any channel dimensions after the sample axis.
+        first_array = next(v for v in values if isinstance(v, np.ndarray))
+        if len(first_array) < num_samples:
+            target_shape = (num_samples, *first_array.shape[1:])
+        else:
+            target_shape = first_array[:num_samples].shape
+
+        result = np.zeros(target_shape, dtype=np.float32)
         for value in values:
-            if result is None:
-                # Initialize with first value
-                if isinstance(value, np.ndarray):
-                    # If num_samples specified and array size doesn't match, adjust it
-                    if num_samples is not None and len(value) != num_samples:
-                        if len(value) < num_samples:
-                            # Pad with zeros
-                            padded = np.zeros(num_samples, dtype=value.dtype)
-                            padded[: len(value)] = value
-                            result = padded
-                        else:
-                            # Truncate to requested size
-                            result = value[:num_samples].copy()
-                    else:
-                        result = value.copy()
+            if isinstance(value, np.ndarray):
+                if len(value) < num_samples:
+                    padded = np.zeros(target_shape, dtype=value.dtype)
+                    padded[: len(value)] = value
+                    result = result + padded
                 else:
-                    result = np.array(value)
+                    result = result + value[:num_samples]
             else:
-                # Add subsequent values
-                if isinstance(value, np.ndarray):
-                    assert result is not None
-                    result_array = np.asarray(result)
+                result = result + value
 
-                    # Adjust array size to match result if needed
-                    if result_array.shape != value.shape:
-                        result_length = len(result_array)
-                        if len(value) < result_length:
-                            # Pad with zeros
-                            padded = np.zeros(result_length, dtype=value.dtype)
-                            padded[: len(value)] = value
-                            result = result_array + padded
-                        else:
-                            # Truncate to match result size
-                            result = result_array + value[:result_length]
-                    else:
-                        result = result_array + value
-                else:
-                    # Scalar - broadcast across array
-                    result = result + value
-
-        return result if result is not None else 0.0
+        return result
 
     def write(self, value: float | np.ndarray) -> None:
         """Write a value to this port.

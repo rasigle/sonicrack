@@ -160,15 +160,21 @@ class RenderContext:
 
         try:
             if not module.is_processing_module:
+                self._rendered_modules.add(module)
                 return
 
             self.cache_module_inputs(module, input_ports)
 
             process_runtime_module(module, self.num_samples, spec, parameters)
-        except (RuntimeError, AttributeError):
-            return
-        finally:
-            self._rendered_modules.add(module)
+        except (RuntimeError, AttributeError) as exc:
+            logger.exception(
+                "Runtime render failed for %s: %s",
+                type(module).__name__,
+                exc,
+            )
+            raise
+
+        self._rendered_modules.add(module)
 
     def cache_module_inputs(
         self, module: RenderModule, input_ports: tuple[Port, ...] | None = None

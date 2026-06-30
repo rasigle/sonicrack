@@ -216,6 +216,24 @@ class TestOutputModuleRouting:
         assert samples.shape == (3, 2)
         assert np.allclose(samples, np.zeros((3, 2), dtype=np.float32))
 
+    def test_right_only_connection_starts_playback(self, output_module):
+        """A signal patched only to Right is still a valid output input."""
+        started = False
+
+        def start_playback():
+            nonlocal started
+            started = True
+            output_module.audio_output.is_playing = True
+
+        output_module.audio_output.start_playback = start_playback
+        output_module.inp_port_r.connect(Port("output", "Right Source"))
+
+        output_module.start_playback()
+
+        assert started
+        assert output_module.audio_output.is_playing
+        assert output_module.status_label.text() == "Playing"
+
     def test_mono_to_stereo_integration(self):
         """Test mono input is properly converted to stereo."""
         mono_input = np.array([0.1, 0.2, 0.3, 0.4])

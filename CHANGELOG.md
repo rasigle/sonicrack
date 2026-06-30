@@ -3,7 +3,27 @@
 All notable changes to AudioPlayground will be documented in this file.
 
 
-## Planned
+## Repository Review Fixes - 2026-06-30
+
+### Fixed
+
+- Restored saved module parameters during patch loading by using the module
+  `set_parameters()` API.
+- Allowed Output playback to start from a right-only patch connection.
+- Made GUI render graph runtime failures visible by logging and propagating
+  `RuntimeError` and `AttributeError` from module processing.
+- Fixed legacy `Port.read()` scalar/array mixing when a scalar connection is read
+  before an array connection.
+
+### Maintainability
+
+- Made `src.gui` package imports lazy so narrow submodule imports do not
+  immediately import the PyQt6 main window.
+- Cleaned up this changelog so backlog items are separated from completed
+  unreleased changes.
+
+
+## Backlog
 
 - Rethink mono stereo channels
 - Display ADSR shape in module
@@ -14,7 +34,11 @@ All notable changes to AudioPlayground will be documented in this file.
 - Undo / Redo system
 - Review the engine preset system (fluent API)
 - Make the ui look cooler and integrate a rack design
+- Do not pan the canvas when scroll with the mouse-wheel over a locked knob
+- Make module widgets debuggable without ui components
 
+
+## Unreleased GUI / Runtime Work
 
 ### Added
 
@@ -78,16 +102,9 @@ All notable changes to AudioPlayground will be documented in this file.
 - Panner and Volume module not working
 - Store name of current patch, to allow direct Save or Save As
 
-
-## Not implemented:
-- Do not pan the canvas when scroll with the mouse-wheel over a locked knob
-- Make module widgets debuggable without ui components
-
-
-
 ## [1.0.0] - 2025-11-04
 
-### 🎉 Initial Release
+### Initial Release
 
 First release of AudioPlayground!
 

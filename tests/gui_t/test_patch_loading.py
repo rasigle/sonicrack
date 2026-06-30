@@ -44,6 +44,36 @@ def test_apply_preset_recreates_saved_cables(monkeypatch):
     assert connections[0][1].port_name == "Left/Mono"
 
 
+def test_apply_preset_restores_module_parameters(monkeypatch):
+    """Loading a patch should restore registered module parameters."""
+    window = ModularSynthWindow()
+    monkeypatch.setattr(window, "_start_output_playback", lambda: None)
+
+    patch_data = {
+        "metadata": {"name": "Parameterized Patch"},
+        "modules": [
+            {
+                "id": 0,
+                "type": "Oscillator",
+                "custom_name": "Bass Source",
+                "position": {"x": 0, "y": 0},
+                "parameters": {
+                    "frequency": 220.0,
+                    "pulsewidth": 0.25,
+                },
+            },
+        ],
+        "connections": [],
+    }
+
+    window._apply_preset(patch_data)
+
+    module = window._require_patch_canvas().get_modules()[0]
+    assert module.get_custom_name() == "Bass Source"
+    assert module.get_parameters()["frequency"] == 220.0
+    assert module.get_parameters()["pulsewidth"] == 0.25
+
+
 def test_add_output_keeps_audio_output_backend():
     """Adding Output must not replace its playback backend with AudioEngine."""
     window = ModularSynthWindow()

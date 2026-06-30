@@ -9,6 +9,13 @@ synthesis engine, featuring:
 - MIDI support (future)
 """
 
-from src.gui.main_window import ModularSynthWindow
-
 __all__ = ["ModularSynthWindow"]
+
+
+def __getattr__(name: str):
+    """Lazily import GUI window classes so submodule imports stay lightweight."""
+    if name == "ModularSynthWindow":
+        from src.gui.main_window import ModularSynthWindow
+
+        return ModularSynthWindow
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

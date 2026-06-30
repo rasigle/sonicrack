@@ -11,6 +11,7 @@ from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.modulator import ADSREnvelope, DecayEnvelope
 from src.engine.oscillator_square import SquareOscillator
 from src.gui.core.port import Port
+from src.gui.modules.effects.effects_distortion import DistortionModule
 from src.gui.modules.mixer import MixerModule
 from src.gui.modules.modifier.acid_filter import AcidFilterModule
 from src.gui.modules.modifier.filter import FilterModule
@@ -303,6 +304,29 @@ def test_decay_envelope_runtime_applies_accent_amount(qapp: Any):
     )
 
     np.testing.assert_allclose(module.out_port.value, [1.0, 0.75, 0.5], atol=1e-7)
+
+
+def test_distortion_runtime_applies_drive_and_mix_cv(qapp: Any):
+    del qapp
+    module = DistortionModule()
+    input_source = _connect_constant_input(module.in_port, 0.5)
+    input_source.write(np.full(3, 0.5, dtype=np.float32))
+    drive_source = _connect_constant_input(module.drive_cv_port, 0.0)
+    drive_source.write(np.array([0.0, 1.0, 1.0], dtype=np.float32))
+    mix_source = _connect_constant_input(module.mix_cv_port, 0.0)
+    mix_source.write(np.array([-1.0, 0.0, 0.0], dtype=np.float32))
+
+    module.process_runtime(
+        3,
+        {"drive": 0.0, "mix": 1.0, "distortion_type": "soft"},
+    )
+
+    output = np.asarray(module.out_port.value)
+    assert output[0] == pytest.approx(0.25)
+    assert output[1] > output[0]
+    assert output[2] == pytest.approx(output[1])
+    assert module.component.drive == pytest.approx(0.0)
+    assert module.component.mix == pytest.approx(1.0)
 
 
 def test_vco_runtime_applies_oscillator_parameters(qapp: Any):

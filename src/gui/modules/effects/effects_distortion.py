@@ -45,8 +45,8 @@ class DistortionModule(ModulatedModuleBase):
         # Add ports
         self.in_port = self.add_input("In")
         self.out_port = self.add_output("Out")
-        self.mod_port = self.add_input("CV_Drive")
-        self.mod_port = self.add_input("CV_Mix")
+        self.drive_cv_port = self.add_input("CV_Drive")
+        self.mix_cv_port = self.add_input("CV_Mix")
         self.component = None
 
         # Use helper methods for UI construction
@@ -96,12 +96,17 @@ class DistortionModule(ModulatedModuleBase):
         """Distortion requires the In port to be connected."""
         return ["In"]
 
-    def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
-        """Distortion expects bipolar CV range [-1, 1].
+    def get_modulation_inputs(self) -> list[str]:
+        """Distortion accepts CV modulation for drive and mix."""
+        return ["CV_Drive", "CV_Mix"]
+
+    def get_cv_range(self, port_name: str = "CV_Drive") -> tuple[float, float]:
+        """Distortion CV inputs expect bipolar offsets [-1, 1].
 
         Returns:
             (-1.0, 1.0) - bipolar range
         """
+        _ = port_name
         return -1.0, 1.0
 
     def _on_type_changed(self, distortion_type: str):
@@ -112,6 +117,8 @@ class DistortionModule(ModulatedModuleBase):
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
         """Create modulated distortion (not implemented yet)."""
+        _ = mod_comp
+        return self.create_unmodulated_component()
 
     def create_unmodulated_component(self):
         """Create simple Distortion without modulation."""
@@ -136,4 +143,60 @@ class DistortionModule(ModulatedModuleBase):
             parameters, "distortion_type", self.distortion_combo.currentText
         )
 
-        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))
+        input_signal = read_samples(self.in_port, num_samples)
+        drive_cv = (
+            read_samples(self.drive_cv_port, num_samples)
+            if self.drive_cv_port.is_connected
+            else None
+        )
+        mix_cv = (
+            read_samples(self.mix_cv_port, num_samples)
+            if self.mix_cv_port.is_connected
+            else None
+        )
+        if drive_cv is None and mix_cv is None:
+            self.out_port.write(self.component(input_signal))
+            return
+
+        self.out_port.write(
+            self._process_modulated_distortion(
+                input_signal,
+                base_drive=self.component.drive,
+                base_mix=self.component.mix,
+                drive_cv=drive_cv,
+                mix_cv=mix_cv,
+            )
+        )
+
+    def _process_modulated_distortion(
+        self,
+        input_signal,
+        *,
+        base_drive: float,
+        base_mix: float,
+        drive_cv,
+        mix_cv,
+    ):
+        """Process audio while applying per-sample drive/mix CV offsets."""
+        import numpy as np
+
+        output = np.empty(len(input_signal), dtype=np.float32)
+        drive_values = (
+            np.clip(base_drive + drive_cv, 0.0, 10.0)
+            if drive_cv is not None
+            else np.full(len(input_signal), base_drive, dtype=np.float32)
+        )
+        mix_values = (
+            np.clip(base_mix + mix_cv, 0.0, 1.0)
+            if mix_cv is not None
+            else np.full(len(input_signal), base_mix, dtype=np.float32)
+        )
+
+        for index, sample in enumerate(input_signal):
+            self.component.drive = float(drive_values[index])
+            self.component.mix = float(mix_values[index])
+            output[index] = self.component(float(sample))
+
+        self.component.drive = base_drive
+        self.component.mix = base_mix
+        return output

@@ -5,10 +5,14 @@ from typing import cast
 
 import numpy as np
 
+from engine.generator.oscillator import (
+    SawtoothOscillator,
+    SineOscillator,
+    SquareOscillator,
+)
+from engine.generator.oscillator_base import Oscillator
+from engine.generator.oscillator_modulated import ModulatedOscillator
 from src.engine.modulator import ADSREnvelope
-from src.engine.oscillator import SawtoothOscillator, SineOscillator, SquareOscillator
-from src.engine.oscillator_base import Oscillator
-from src.engine.oscillator_modulated import ModulatedOscillator
 
 
 class TestModulatedOscillatorInitialization(unittest.TestCase):

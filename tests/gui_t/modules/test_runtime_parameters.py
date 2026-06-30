@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.generator.oscillator_square import SquareOscillator
 from src.engine.modulator import ADSREnvelope, DecayEnvelope
-from src.engine.oscillator_square import SquareOscillator
 from src.gui.core.port import Port
 from src.gui.modules.effects.effects_distortion import DistortionModule
 from src.gui.modules.mixer import MixerModule
@@ -238,9 +238,57 @@ def test_adsr_manual_gate_holds_long_attack(qapp: Any):
     module.process_runtime(4, parameters)
     second_chunk = np.asarray(module.out_port.value)
 
-    assert module.trigger_button.text() == "Gate On"
+    assert module.trigger_button.text() == "trig on"
     assert second_chunk[-1] > first_chunk[-1]
     assert second_chunk[-1] == pytest.approx(0.875)
+
+
+def test_adsr_manual_on_off_trigger_releases_on_button_release(qapp: Any):
+    del qapp
+    module = ADSRModule()
+    module.trigger_mode_combo.setCurrentText("On/Off")
+    parameters = {
+        "attack_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "sustain_level": 0.5,
+        "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+    }
+
+    module._on_trigger_pressed()
+    module.process_runtime(8, parameters)
+    held_chunk = np.asarray(module.out_port.value)
+    module._on_trigger_released()
+    module.process_runtime(5, parameters)
+    released_chunk = np.asarray(module.out_port.value)
+
+    assert module.trigger_button.text() == "trig"
+    assert not module.trigger_button.isCheckable()
+    assert held_chunk[-1] == pytest.approx(0.625)
+    np.testing.assert_allclose(
+        released_chunk, [0.5, 0.375, 0.25, 0.125, 0.0], atol=1e-7
+    )
+
+
+def test_adsr_switching_from_latched_to_on_off_releases_gate(qapp: Any):
+    del qapp
+    module = ADSRModule()
+    parameters = {
+        "attack_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "sustain_level": 0.5,
+        "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+    }
+
+    module.trigger_button.setChecked(True)
+    module.process_runtime(8, parameters)
+    module.trigger_mode_combo.setCurrentText("On/Off")
+    module.process_runtime(5, parameters)
+
+    assert module.trigger_button.text() == "trig"
+    assert module.get_parameters()["trigger_mode"] == "On/Off"
+    np.testing.assert_allclose(
+        module.out_port.value, [0.5, 0.375, 0.25, 0.125, 0.0], atol=1e-7
+    )
 
 
 def test_decay_envelope_runtime_applies_parameters(qapp: Any):
@@ -261,6 +309,7 @@ def test_decay_envelope_runtime_applies_parameters(qapp: Any):
     assert module.component.attack_duration == pytest.approx(0.05)
     assert module.component.decay_duration == pytest.approx(0.2)
     assert module.component.amount == pytest.approx(0.6)
+    assert module.trigger_button.text() == "trig"
 
 
 def test_decay_envelope_runtime_renders_gate_pluck(qapp: Any):

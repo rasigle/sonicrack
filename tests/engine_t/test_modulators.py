@@ -175,6 +175,7 @@ class TestGetADSR(unittest.TestCase):
         up_phase = adsr_vals[down_len:]
         self.assertLess(up_phase[-1], 0.1)
 
+
 class TestDecayEnvelope(unittest.TestCase):
     """Test suite for triggered decay envelopes."""
 

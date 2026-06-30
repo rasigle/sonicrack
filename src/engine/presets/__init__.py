@@ -9,7 +9,7 @@ Components:
     PresetLibrary: Manage collections of saved builder
 
 Example:
-    >>> from engine import PresetBuilder, PresetLibrary
+    >>> from src.engine import PresetBuilder, PresetLibrary
     >>>
     >>> # Create preset with fluent API
     >>> preset = (PresetBuilder()

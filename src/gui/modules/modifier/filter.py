@@ -303,9 +303,7 @@ class FilterModule(ModuleWidget):
         )
         cutoff = self._build_cutoff_param(
             float_parameter(parameters, "cutoff", self.cutoff_knob.get_value),
-            float_parameter(
-                parameters, "high_cutoff", self.high_cutoff_knob.get_value
-            ),
+            float_parameter(parameters, "high_cutoff", self.high_cutoff_knob.get_value),
             filter_type,
         )
         filter_params = (

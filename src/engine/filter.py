@@ -418,8 +418,7 @@ class BiquadResonantFilter(Modifier):
     def filter_type(self, value: FilterType) -> None:
         if value not in ("low", "high", "band", "notch"):
             raise ValueError(
-                "filter_type must be 'low', 'high', 'band', or 'notch', "
-                f"got '{value}'"
+                f"filter_type must be 'low', 'high', 'band', or 'notch', got '{value}'"
             )
         self._filter_type = value
         self._b, self._a = self._design_filter(self._cutoff, self._resonance)

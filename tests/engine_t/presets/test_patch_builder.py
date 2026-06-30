@@ -11,8 +11,8 @@ import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB
 from src.engine.composer import Chain
+from src.engine.generator.oscillator_sine import SineOscillator
 from src.engine.modifier import Panner, Volume
-from src.engine.oscillator_sine import SineOscillator
 from src.engine.presets.preset_builder import PresetBuilder
 
 

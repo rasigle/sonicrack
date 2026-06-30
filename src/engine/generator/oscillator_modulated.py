@@ -71,7 +71,7 @@ from src.engine.audio_component import (
     ParameterDescriptor,
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.oscillator import (
+from src.engine.generator.oscillator import (
     Oscillator,
     SawtoothOscillator,
     SineOscillator,
@@ -816,7 +816,7 @@ class ModulatedFrequency(ModulatedOscillator):
             TypeError: If modulator doesn't support iteration.
 
         Example:
-            >>> from engine import SineOscillator
+            >>> from src.engine import SineOscillator
             >>> carrier = SineOscillator(frequency=440, amplitude=0.5)
             >>> lfo = SineOscillator(frequency=5.0, amplitude=50.0)
             >>> fm_osc = ModulatedFrequency(carrier, lfo)

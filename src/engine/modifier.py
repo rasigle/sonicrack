@@ -44,7 +44,7 @@ from src.engine.audio_component import (
     ParameterDescriptor,
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.oscillator import _derive_amplitude_from_init
+from src.engine.generator.oscillator import _derive_amplitude_from_init
 from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.validation import validate_numeric_range, validate_sample_rate
 from src.utils.math import db_to_linear, linear_to_db
@@ -323,7 +323,7 @@ class ModulatedPanner(Panner):
 
     **Note:** If your CV source outputs a different range (e.g., envelope [0, 1]),
     use CVScaler to convert it:
-        >>> from engine import unipolar_to_bipolar, ADSREnvelope
+        >>> from src.engine import unipolar_to_bipolar, ADSREnvelope
         >>> env = ADSREnvelope(attack=0.1, decay=0.2, sustain=0.7, release=0.3)
         >>> scaled_env = unipolar_to_bipolar(env)  # Convert [0,1] to [-1,1]
         >>> panner = ModulatedPanner(scaled_env)
@@ -756,7 +756,7 @@ class ModulatedVolume(Volume):
             Examples: LFO for tremolo, ADSR for envelope shaping.
 
     Example:
-        >>> from engine import SineOscillator, ADSREnvelope
+        >>> from src.engine import SineOscillator, ADSREnvelope
         >>> # Tremolo effect with LFO
         >>> lfo = SineOscillator(frequency=5, amplitude=0.5, gain_db=None)
         >>> tremolo = ModulatedVolume(lfo)
@@ -1162,7 +1162,7 @@ class ModulatedClipper(Modifier):
 
     **Note:** If your CV source outputs a different range (e.g., oscillator [-1, 1]),
     use CVScaler to convert it:
-        >>> from engine import bipolar_to_unipolar, SineOscillator
+        >>> from src.engine import bipolar_to_unipolar, SineOscillator
         >>> lfo = SineOscillator(2)  # Output: [-1, 1]
         >>> scaled_lfo = bipolar_to_unipolar(lfo)  # Output: [0, 1]
         >>> clipper = ModulatedClipper(scaled_lfo)

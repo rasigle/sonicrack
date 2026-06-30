@@ -5,6 +5,10 @@ from typing import cast
 
 import numpy as np
 
+from engine.generator.oscillator_modulated import ModulatedFrequency
+from engine.generator.oscillator_ramp import TriangleOscillator
+from engine.generator.oscillator_sine import SineOscillator
+from engine.generator.oscillator_square import SquareOscillator
 from src.constants import DEFAULT_GAIN_DB
 from src.engine.composer import Chain
 from src.engine.modifier import (
@@ -16,10 +20,6 @@ from src.engine.modifier import (
     Volume,
 )
 from src.engine.modulator import ADSREnvelope
-from src.engine.oscillator_modulated import ModulatedFrequency
-from src.engine.oscillator_ramp import TriangleOscillator
-from src.engine.oscillator_sine import SineOscillator
-from src.engine.oscillator_square import SquareOscillator
 
 
 class TestPanner(unittest.TestCase):

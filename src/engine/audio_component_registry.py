@@ -134,7 +134,7 @@ class AudioComponentRegistry:
             ValueError: If component not registered and strict=True
 
         Example:
-            >>> from engine import audio_registry
+            >>> from src.engine import audio_registry
             >>>
             >>> # Safe lookup (returns None if not found)
             >>> sine_component = audio_registry.get("Sine")

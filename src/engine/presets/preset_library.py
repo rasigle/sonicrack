@@ -28,7 +28,7 @@ class PresetLibrary:
         preset_dir: Directory containing preset files
 
     Example:
-        >>> from engine import PresetLibrary, PresetBuilder
+        >>> from src.engine import PresetLibrary, PresetBuilder
         >>>
         >>> #
         >>> library = PresetLibrary("builder/")
@@ -123,7 +123,7 @@ class PresetLibrary:
                      Note: preset description is automatically included
 
         Example:
-            >>> from engine import PresetBuilder, PresetLibrary
+            >>> from src.engine import PresetBuilder, PresetLibrary
             >>>library = PresetLibrary("builder/")
             >>> builder = (PresetBuilder("Warm Lead")
             ...     .set_description("Smooth lead sound")

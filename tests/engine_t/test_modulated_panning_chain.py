@@ -4,10 +4,10 @@ import unittest
 
 import numpy as np
 
+from engine.generator.oscillator import SineOscillator
 from src.engine.composer import Chain
 from src.engine.modifier import ModulatedPanner
 from src.engine.modulator import ADSREnvelope
-from src.engine.oscillator import SineOscillator
 
 
 class TestModulatedPanningInChain(unittest.TestCase):

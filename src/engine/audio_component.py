@@ -203,7 +203,7 @@ class AudioComponent(ABC):
         """Creates an audio component instance from given configuration dictionary.
 
         Example:
-            >>> from engine import SineOscillator
+            >>> from src.engine import SineOscillator
             >>> conf = {"frequency": 440, "amplitude": 0.5}
             >>> sine = SineOscillator.from_config(conf)
 

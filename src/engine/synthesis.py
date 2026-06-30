@@ -9,9 +9,9 @@ from __future__ import annotations
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.oscillator_ramp import SawtoothOscillator, TriangleOscillator
-from src.engine.oscillator_sine import SineOscillator
-from src.engine.oscillator_square import SquareOscillator
+from src.engine.generator.oscillator_ramp import SawtoothOscillator, TriangleOscillator
+from src.engine.generator.oscillator_sine import SineOscillator
+from src.engine.generator.oscillator_square import SquareOscillator
 
 
 def synth(

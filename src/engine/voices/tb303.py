@@ -6,8 +6,8 @@ import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.filter_303 import AcidResonantFilter
+from src.engine.generator.oscillator import SawtoothOscillator, SquareOscillator
 from src.engine.modulator import DecayEnvelope
-from src.engine.oscillator import SawtoothOscillator, SquareOscillator
 from src.engine.sequencing import AccentProcessor, SlideProcessor
 from src.engine.validation import validate_sample_count, validate_sample_rate
 

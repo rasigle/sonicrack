@@ -6,7 +6,7 @@ and notifies all registered listeners.
 
 import pytest
 
-from src.engine.oscillator import SineOscillator
+from src.engine.generator.oscillator import SineOscillator
 from src.gui.audio_config import AudioConfig, audio_config
 
 

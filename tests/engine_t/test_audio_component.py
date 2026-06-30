@@ -10,6 +10,11 @@ Tests cover:
 
 import unittest
 
+from engine.generator.oscillator_modulated import (
+    ModulatedFrequency,
+    ModulatedOscillator,
+)
+from engine.generator.oscillator_square import SquareOscillator
 from src.engine.audio_component import (
     ComponentCategory,
     ComponentDescriptor,
@@ -25,8 +30,6 @@ from src.engine.modifier import (
     Panner,
     Volume,
 )
-from src.engine.oscillator_modulated import ModulatedFrequency, ModulatedOscillator
-from src.engine.oscillator_square import SquareOscillator
 
 
 class TestComponentDescriptor(unittest.TestCase):

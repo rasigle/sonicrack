@@ -168,9 +168,10 @@ def test_resonant_filter_module_smooths_large_parameter_changes(app):
     num_samples = 512
     t = np.arange(num_samples) / sample_rate
     first_input = np.sin(2 * np.pi * 220 * t).astype(np.float32) * 0.25
-    second_input = np.sin(
-        2 * np.pi * 220 * (t + num_samples / sample_rate)
-    ).astype(np.float32) * 0.25
+    second_input = (
+        np.sin(2 * np.pi * 220 * (t + num_samples / sample_rate)).astype(np.float32)
+        * 0.25
+    )
 
     source.write(first_input)
     module.process_runtime(

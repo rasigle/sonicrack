@@ -11,7 +11,7 @@ from src.engine.audio_component import (
     make_parameter_descriptors,
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.oscillator_base import Oscillator
+from src.engine.generator.oscillator_base import Oscillator
 from src.engine.validation import validate_sample_count
 from src.utils.utils import filter_provided_args, track_provided_args
 

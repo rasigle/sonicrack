@@ -118,10 +118,26 @@ class ADSRModule(ModuleWidget):
         retrigger_layout.addWidget(self.retrigger_combo)
         layout.addLayout(retrigger_layout)
 
+        trigger_mode_layout = QVBoxLayout()
+        trigger_mode_label = QLabel("Trig Mode")
+        self.trigger_mode_combo = QComboBox()
+        self.trigger_mode_combo.addItems(["Latched", "On/Off"])
+        self.trigger_mode_combo.setToolTip(
+            "Latched: click trig once to hold the envelope gate on, click again "
+            "to release.\n"
+            "On/Off: hold trig down to gate on, release it to gate off."
+        )
+        self.trigger_mode_combo.currentTextChanged.connect(
+            self._on_trigger_mode_changed
+        )
+        trigger_mode_layout.addWidget(trigger_mode_label)
+        trigger_mode_layout.addWidget(self.trigger_mode_combo)
+        layout.addLayout(trigger_mode_layout)
+
         # Manual trigger button
         trigger_layout = QHBoxLayout()
         trigger_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.trigger_button = QPushButton("Gate")
+        self.trigger_button = QPushButton("trig")
         self.trigger_button.setCheckable(True)
         self.trigger_button.setMinimumHeight(35)
         self.trigger_button.setStyleSheet("""
@@ -146,11 +162,13 @@ class ADSRModule(ModuleWidget):
             }
         """)
         self.trigger_button.setToolTip(
-            "Manual Gate\n"
-            "On: Start attack and hold sustain\n"
-            "Off: Trigger release phase"
+            "Manual trig\n"
+            "Latched: click to toggle note on/off\n"
+            "On/Off: press to start attack, release for release phase"
         )
         self.trigger_button.toggled.connect(self._on_trigger_toggled)
+        self.trigger_button.pressed.connect(self._on_trigger_pressed)
+        self.trigger_button.released.connect(self._on_trigger_released)
         trigger_layout.addWidget(self.trigger_button)
         layout.addLayout(trigger_layout)
 
@@ -165,6 +183,12 @@ class ADSRModule(ModuleWidget):
         self.register_parameter(
             "retrigger_mode",
             self.retrigger_combo,
+            getter="currentText",
+            setter="setCurrentText",
+        )
+        self.register_parameter(
+            "trigger_mode",
+            self.trigger_mode_combo,
             getter="currentText",
             setter="setCurrentText",
         )
@@ -191,9 +215,49 @@ class ADSRModule(ModuleWidget):
             logging.debug("ADSR manually released (note off)")
 
     def _on_trigger_toggled(self, checked: bool) -> None:
-        """Handle manual gate toggles."""
-        self.trigger_button.setText("Gate On" if checked else "Gate")
+        """Handle latched manual trig toggles."""
+        if self._trigger_mode() != "latched":
+            return
+
+        self.trigger_button.setText("trig on" if checked else "trig")
         self._trigger_adsr(note_on=checked)
+
+    def _on_trigger_pressed(self) -> None:
+        """Start the manual gate in On/Off mode."""
+        if self._trigger_mode() != "on/off":
+            return
+
+        self.trigger_button.setText("trig on")
+        self._trigger_adsr(note_on=True)
+
+    def _on_trigger_released(self) -> None:
+        """Release the manual gate in On/Off mode."""
+        if self._trigger_mode() != "on/off":
+            return
+
+        self.trigger_button.setText("trig")
+        self._trigger_adsr(note_on=False)
+
+    def _on_trigger_mode_changed(self, value: str) -> None:
+        """Apply manual trig button behavior for the selected mode."""
+        mode = self._normalize_trigger_mode(value)
+        if mode == "latched":
+            self.trigger_button.setCheckable(True)
+        else:
+            if self.trigger_button.isChecked():
+                self.trigger_button.setChecked(False)
+                self._trigger_adsr(note_on=False)
+            self.trigger_button.setCheckable(False)
+            self.trigger_button.setText("trig")
+
+        self.parameter_changed.emit("trigger_mode", value)
+
+    def _trigger_mode(self) -> Literal["latched", "on/off"]:
+        return self._normalize_trigger_mode(self.trigger_mode_combo.currentText())
+
+    @staticmethod
+    def _normalize_trigger_mode(value: str) -> Literal["latched", "on/off"]:
+        return "on/off" if value.lower() == "on/off" else "latched"
 
     def get_required_inputs(self) -> list[str]:
         """Gate input is optional - ADSR works without gate triggering."""
@@ -319,9 +383,7 @@ class ADSRModule(ModuleWidget):
                 gate_signal = np.pad(gate_signal, (0, num_samples - len(gate_signal)))
             elif len(gate_signal) > num_samples:
                 gate_signal = gate_signal[:num_samples]
-            samples = self._render_gate_triggered_adsr(
-                adsr, gate_signal, num_samples
-            )
+            samples = self._render_gate_triggered_adsr(adsr, gate_signal, num_samples)
         else:
             self._previous_gate = 0.0
             samples = adsr.get_samples(num_samples)

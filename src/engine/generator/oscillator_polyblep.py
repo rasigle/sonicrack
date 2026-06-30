@@ -31,7 +31,7 @@ from src.engine.audio_component_registry import (
     ComponentCategory,
     register_component,
 )
-from src.engine.oscillator import _derive_amplitude_from_init
+from src.engine.generator.oscillator import _derive_amplitude_from_init
 from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.validation import validate_sample_count, validate_sample_rate
 from src.utils.utils import track_provided_args

@@ -47,8 +47,8 @@ from src.engine.audio_component import (
     ParameterDescriptor,
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.oscillator import Oscillator
-from src.engine.oscillator_modulated import ModulatedOscillator
+from src.engine.generator.oscillator import Oscillator
+from src.engine.generator.oscillator_modulated import ModulatedOscillator
 from src.engine.validation import validate_sample_count
 
 logger = logging.getLogger(__name__)
@@ -182,7 +182,7 @@ class Chain(Composer):
             ValueError: If oscillator is None.
 
         Example:
-            >>> from engine import SineOscillator, Chain, Volume, Distortion, Panner
+            >>> from src.engine import SineOscillator, Chain, Volume, Distortion, Panner
             >>> # Mix Modifiers seamlessly - all derive from Modifier!
             >>> chain = Chain(
             ...     SineOscillator(440),

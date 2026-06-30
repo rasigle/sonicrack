@@ -77,7 +77,7 @@ class DecayEnvelopeModule(ModuleWidget):
         amount_row.addWidget(self.accent_amount_knob)
         layout.addLayout(amount_row)
 
-        self.trigger_button = QPushButton("Trig")
+        self.trigger_button = QPushButton("trig")
         self.trigger_button.clicked.connect(self._trigger)
         layout.addWidget(self.trigger_button)
 
@@ -120,9 +120,7 @@ class DecayEnvelopeModule(ModuleWidget):
             accent_amount = float_parameter(
                 parameters, "accent_amount", self.accent_amount_knob.get_value
             )
-            samples = np.clip(
-                samples * (1.0 + accent_signal * accent_amount), 0.0, 1.0
-            )
+            samples = np.clip(samples * (1.0 + accent_signal * accent_amount), 0.0, 1.0)
 
         self.out_port.write(samples)
 

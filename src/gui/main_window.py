@@ -199,7 +199,9 @@ class ModularSynthWindow(QMainWindow):
                 )
                 scroll_layout.addWidget(category_label)
                 for module_name in self._sorted_module_names(category=category):
-                    scroll_layout.addWidget(self._create_module_library_button(module_name))
+                    scroll_layout.addWidget(
+                        self._create_module_library_button(module_name)
+                    )
         else:
             for module_name in self._sorted_module_names():
                 scroll_layout.addWidget(self._create_module_library_button(module_name))

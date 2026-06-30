@@ -7,7 +7,7 @@ performance, and proper factory behavior.
 import numpy as np
 import pytest
 
-from src.engine.oscillator import (
+from engine.generator.oscillator import (
     BandlimitedSquareStrategy,
     ComparatorSquareStrategy,
     IdealSquareStrategy,

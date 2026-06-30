@@ -278,8 +278,8 @@ class TestButterworthFilterIntegration(unittest.TestCase):
 
     def test_filter_in_chain(self):
         """Test filter can be used in a processing chain."""
+        from engine.generator.oscillator import SineOscillator
         from src.engine.composer import Chain
-        from src.engine.oscillator import SineOscillator
 
         # Create chain: Oscillator -> Filter
         osc = SineOscillator(frequency=1000, amplitude=1.0, sample_rate=10000)
@@ -298,7 +298,7 @@ class TestButterworthFilterIntegration(unittest.TestCase):
 
     def test_filter_with_noise(self):
         """Test filter can process noise."""
-        from src.engine.noise import NoiseGenerator
+        from engine.generator.noise import NoiseGenerator
 
         noise = NoiseGenerator(noise_type="White", amplitude=1.0, sample_rate=10000)
         filt = ButterworthFilter(cutoff=1000, sample_rate=10000)
@@ -411,9 +411,7 @@ class TestBiquadResonantFilter(unittest.TestCase):
         t = np.linspace(0, 1.0, sample_rate, endpoint=False)
         low_freq = 100
         high_freq = 3000
-        signal_in = np.sin(2 * np.pi * low_freq * t) + np.sin(
-            2 * np.pi * high_freq * t
-        )
+        signal_in = np.sin(2 * np.pi * low_freq * t) + np.sin(2 * np.pi * high_freq * t)
 
         filt = BiquadResonantFilter(
             cutoff=500,

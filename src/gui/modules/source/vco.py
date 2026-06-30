@@ -19,7 +19,7 @@ from src.engine import (
     SquareOscillator,
     TriangleOscillator,
 )
-from src.engine.oscillator_modulated import ModulatedOscillator
+from src.engine.generator.oscillator_modulated import ModulatedOscillator
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import (
@@ -570,9 +570,7 @@ class ModulatedOscillatorModule(ModuleWidget):
     ):
         """Create the VCO base oscillator from a runtime parameter snapshot."""
         if wave_type == "Sine":
-            return SineOscillator(
-                frequency, gain_db=gain_db, phase=phase, mode=mode
-            )
+            return SineOscillator(frequency, gain_db=gain_db, phase=phase, mode=mode)
         if wave_type == "Square":
             return SquareOscillator(
                 frequency,
@@ -590,4 +588,3 @@ class ModulatedOscillatorModule(ModuleWidget):
                 frequency, gain_db=gain_db, phase=phase, mode=mode
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")
-

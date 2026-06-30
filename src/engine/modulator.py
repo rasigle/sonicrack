@@ -524,9 +524,7 @@ class ADSREnvelope(Modulator):
                 break  # Stay in idle, don't advance
 
             if self._phase == ADSRPhase.RETRIGGER_RESET:
-                samples_in_phase = (
-                    self._retrigger_reset_samples - self._phase_position
-                )
+                samples_in_phase = self._retrigger_reset_samples - self._phase_position
                 chunk_size = min(remaining, samples_in_phase)
 
                 if chunk_size > 0:
@@ -539,9 +537,7 @@ class ADSREnvelope(Modulator):
                     start_val = self._retrigger_reset_start_value * (
                         1.0 - start_progress
                     )
-                    end_val = self._retrigger_reset_start_value * (
-                        1.0 - end_progress
-                    )
+                    end_val = self._retrigger_reset_start_value * (1.0 - end_progress)
                     samples[idx : idx + chunk_size] = np.linspace(
                         start_val,
                         end_val,

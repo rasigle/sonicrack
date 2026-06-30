@@ -118,6 +118,28 @@ from src.engine.filter import (
     butter,
 )
 from src.engine.filter_303 import AcidResonantFilter
+from src.engine.generator.noise import (
+    NoiseGenerator,
+    blue_noise,
+    brownian_noise,
+    grey_noise,
+    perlin_noise,
+    pink_noise,
+    sample_hold_noise,
+    velvet_noise,
+    white_noise,
+)
+from src.engine.generator.oscillator import (
+    Oscillator,
+    SawtoothOscillator,
+    SineOscillator,
+    SquareOscillator,
+    TriangleOscillator,
+)
+from src.engine.generator.oscillator_modulated import (
+    ModulatedFrequency,
+    ModulatedOscillator,
+)
 from src.engine.modifier import (
     Clipper,
     Frequency,
@@ -134,25 +156,6 @@ from src.engine.modulator import (
     Modulator,
     getadsr,
 )
-from src.engine.noise import (
-    NoiseGenerator,
-    blue_noise,
-    brownian_noise,
-    grey_noise,
-    perlin_noise,
-    pink_noise,
-    sample_hold_noise,
-    velvet_noise,
-    white_noise,
-)
-from src.engine.oscillator import (
-    Oscillator,
-    SawtoothOscillator,
-    SineOscillator,
-    SquareOscillator,
-    TriangleOscillator,
-)
-from src.engine.oscillator_modulated import ModulatedFrequency, ModulatedOscillator
 from src.engine.presets.preset_builder import PresetBuilder
 from src.engine.presets.preset_library import PresetLibrary
 from src.engine.sequencing import (

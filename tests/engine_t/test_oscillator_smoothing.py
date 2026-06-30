@@ -5,7 +5,7 @@ Test that all oscillator types have amplitude smoothing.
 import numpy as np
 import pytest
 
-from src.engine.oscillator import (
+from engine.generator.oscillator import (
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,

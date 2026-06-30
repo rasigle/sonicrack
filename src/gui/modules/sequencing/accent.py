@@ -44,9 +44,7 @@ class AccentModule(ModuleWidget):
         top_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.amount_knob = Knob("Amount", 0.0, 1.0, 1.0)
         self.amount_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "amount", self.amount_knob.get_value()
-            )
+            lambda: self.parameter_changed.emit("amount", self.amount_knob.get_value())
         )
         top_row.addWidget(self.amount_knob)
 

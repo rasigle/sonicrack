@@ -4,8 +4,7 @@ import unittest
 
 import numpy as np
 
-from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.noise import (
+from engine.generator.noise import (
     blue_noise,
     brownian_noise,
     grey_noise,
@@ -15,6 +14,7 @@ from src.engine.noise import (
     velvet_noise,
     white_noise,
 )
+from src.constants import DEFAULT_SAMPLE_RATE
 
 
 class TestWhiteNoise(unittest.TestCase):
@@ -429,7 +429,7 @@ class TestNoiseGenerator(unittest.TestCase):
 
     def test_initialization_with_amplitude(self):
         """Test NoiseGenerator initializes with amplitude parameter."""
-        from src.engine.noise import NoiseGenerator
+        from engine.generator.noise import NoiseGenerator
 
         gen = NoiseGenerator(noise_type="White", amplitude=0.5)
         self.assertEqual(gen.noise_type, "White")
@@ -437,7 +437,7 @@ class TestNoiseGenerator(unittest.TestCase):
 
     def test_initialization_with_gain_db(self):
         """Test NoiseGenerator initializes with gain_db parameter."""
-        from src.engine.noise import NoiseGenerator
+        from engine.generator.noise import NoiseGenerator
         from src.utils.math import db_to_linear
 
         gen = NoiseGenerator(noise_type="Pink", gain_db=-6)
@@ -447,7 +447,7 @@ class TestNoiseGenerator(unittest.TestCase):
 
     def test_gain_db_overrides_amplitude(self):
         """Test that gain_db takes precedence over amplitude."""
-        from src.engine.noise import NoiseGenerator
+        from engine.generator.noise import NoiseGenerator
         from src.utils.math import db_to_linear
 
         # When both are specified, gain_db should win
@@ -457,7 +457,7 @@ class TestNoiseGenerator(unittest.TestCase):
 
     def test_default_amplitude(self):
         """Test default amplitude is 0.5."""
-        from src.engine.noise import NoiseGenerator
+        from engine.generator.noise import NoiseGenerator
 
         gen = NoiseGenerator(noise_type="White")
         self.assertEqual(gen.gain_db, -20)
@@ -465,7 +465,7 @@ class TestNoiseGenerator(unittest.TestCase):
 
     def test_iterator_protocol(self):
         """Test NoiseGenerator supports iterator protocol."""
-        from src.engine.noise import NoiseGenerator
+        from engine.generator.noise import NoiseGenerator
 
         gen = NoiseGenerator(noise_type="White", amplitude=1.0)
         gen_iter = iter(gen)
@@ -476,7 +476,7 @@ class TestNoiseGenerator(unittest.TestCase):
 
     def test_get_samples(self):
         """Test NoiseGenerator.get_samples() method."""
-        from src.engine.noise import NoiseGenerator
+        from engine.generator.noise import NoiseGenerator
 
         gen = NoiseGenerator(noise_type="White", amplitude=1.0, sample_rate=1000)
         samples = gen.get_samples(100)
@@ -486,7 +486,7 @@ class TestNoiseGenerator(unittest.TestCase):
 
     def test_gain_db_affects_output_level(self):
         """Test that gain_db affects the output amplitude."""
-        from src.engine.noise import NoiseGenerator
+        from engine.generator.noise import NoiseGenerator
 
         gen1 = NoiseGenerator(noise_type="White", gain_db=-20, sample_rate=1000)
         gen2 = NoiseGenerator(noise_type="White", gain_db=0, sample_rate=1000)

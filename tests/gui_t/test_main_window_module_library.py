@@ -48,6 +48,41 @@ def test_module_library_can_hide_and_show():
     assert window.module_library_toggle_action.isChecked()
 
 
+def test_full_screen_action_toggles_window_state(qapp):
+    """The View menu action enters and exits full-screen mode."""
+    window = ModularSynthWindow()
+    assert window.full_screen_action is not None
+
+    window.full_screen_action.trigger()
+    qapp.processEvents()
+
+    assert window.isFullScreen()
+    assert window.full_screen_action.isChecked()
+
+    window.full_screen_action.trigger()
+    qapp.processEvents()
+
+    assert not window.isFullScreen()
+    assert not window.full_screen_action.isChecked()
+
+
+def test_escape_exits_full_screen(qapp):
+    """Escape leaves full-screen mode without closing the window."""
+    window = ModularSynthWindow()
+    assert window.full_screen_action is not None
+
+    window._set_full_screen(True)
+    qapp.processEvents()
+
+    assert window.isFullScreen()
+
+    window._exit_full_screen()
+    qapp.processEvents()
+
+    assert not window.isFullScreen()
+    assert not window.full_screen_action.isChecked()
+
+
 def test_module_library_sorts_full_list_alphabetically():
     """Ungrouped module buttons are sorted alphabetically."""
     window = ModularSynthWindow()

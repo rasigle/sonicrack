@@ -77,6 +77,8 @@ class ModularSynthWindow(QMainWindow):
         self.module_library_scroll_layout: QVBoxLayout | None = None
         self.module_library_group_checkbox: QtWidgets.QCheckBox | None = None
         self.module_library_toggle_action: QtGui.QAction | None = None
+        self.full_screen_action: QtGui.QAction | None = None
+        self._window_state_before_full_screen: Qt.WindowState | None = None
 
         # UI setup
         logger.debug("Initializing UI components")
@@ -250,6 +252,38 @@ class ModularSynthWindow(QMainWindow):
             with contextlib.suppress(RuntimeError):
                 self.module_library_toggle_action.setChecked(visible)
 
+    def _set_full_screen(self, enabled: bool):
+        """Enter or leave full-screen mode."""
+        if enabled == self.isFullScreen():
+            if self.full_screen_action is not None:
+                with contextlib.suppress(RuntimeError):
+                    self.full_screen_action.setChecked(enabled)
+            return
+
+        if enabled:
+            self._window_state_before_full_screen = (
+                self.windowState() & ~Qt.WindowState.WindowFullScreen
+            )
+            self.showFullScreen()
+        else:
+            previous_state = self._window_state_before_full_screen
+            self._window_state_before_full_screen = None
+            self.showNormal()
+            if (
+                previous_state is not None
+                and previous_state & Qt.WindowState.WindowMaximized
+            ):
+                self.showMaximized()
+
+        if self.full_screen_action is not None:
+            with contextlib.suppress(RuntimeError):
+                self.full_screen_action.setChecked(enabled)
+
+    def _exit_full_screen(self):
+        """Exit full-screen mode when active."""
+        if self.isFullScreen():
+            self._set_full_screen(False)
+
     def _setup_menu(self):
         """Set up the menu bar."""
         menubar = self.menuBar()
@@ -313,6 +347,17 @@ class ModularSynthWindow(QMainWindow):
             self._set_module_library_visible
         )
         view_menu.addAction(self.module_library_toggle_action)
+
+        full_screen_action = QtGui.QAction("&Full Screen", self)
+        full_screen_action.setCheckable(True)
+        full_screen_action.setShortcut("F11")
+        full_screen_action.toggled.connect(self._set_full_screen)
+        self.full_screen_action = full_screen_action
+        view_menu.addAction(full_screen_action)
+
+        exit_full_screen_shortcut = QtGui.QShortcut(QtGui.QKeySequence("Esc"), self)
+        exit_full_screen_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        exit_full_screen_shortcut.activated.connect(self._exit_full_screen)
 
         # Settings action
         settings_action = QtGui.QAction("&Settings", self)

@@ -129,6 +129,7 @@ from src.engine.modifier import (
 )
 from src.engine.modulator import (
     ADSREnvelope,
+    DecayEnvelope,
     Modulator,
     getadsr,
 )
@@ -153,6 +154,15 @@ from src.engine.oscillator import (
 from src.engine.oscillator_modulated import ModulatedFrequency, ModulatedOscillator
 from src.engine.presets.preset_builder import PresetBuilder
 from src.engine.presets.preset_library import PresetLibrary
+from src.engine.sequencing import (
+    AccentFrame,
+    AccentProcessor,
+    SequencerFrame,
+    SlideProcessor,
+    StepClock,
+    StepEvent,
+    StepSequencer,
+)
 from src.engine.synthesis import synth
 
 __all__ = [
@@ -173,6 +183,7 @@ __all__ = [
     "synth",
     "Modulator",
     "ADSREnvelope",
+    "DecayEnvelope",
     "getadsr",
     "ModulatedOscillator",
     "Composer",
@@ -209,4 +220,11 @@ __all__ = [
     "Reverb",
     "PresetBuilder",
     "PresetLibrary",
+    "AccentFrame",
+    "AccentProcessor",
+    "SequencerFrame",
+    "SlideProcessor",
+    "StepClock",
+    "StepEvent",
+    "StepSequencer",
 ]

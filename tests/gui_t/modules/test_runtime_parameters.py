@@ -8,12 +8,13 @@ import numpy as np
 import pytest
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.modulator import ADSREnvelope
+from src.engine.modulator import ADSREnvelope, DecayEnvelope
 from src.engine.oscillator_square import SquareOscillator
 from src.gui.core.port import Port
 from src.gui.modules.mixer import MixerModule
 from src.gui.modules.modifier.filter import FilterModule
 from src.gui.modules.modulated_source.envelope_adsr import ADSRModule
+from src.gui.modules.modulated_source.envelope_decay import DecayEnvelopeModule
 from src.gui.modules.source.lfo import LFOModule
 from src.gui.modules.source.oscillator import OscillatorModule
 from src.gui.modules.source.vco import ModulatedOscillatorModule
@@ -212,6 +213,70 @@ def test_adsr_manual_gate_holds_long_attack(qapp: Any):
     assert second_chunk[-1] == pytest.approx(0.875)
 
 
+def test_decay_envelope_runtime_applies_parameters(qapp: Any):
+    del qapp
+    module = DecayEnvelopeModule()
+
+    module.process_runtime(
+        8,
+        {
+            "attack_duration": 0.05,
+            "decay_duration": 0.2,
+            "amount": 0.6,
+            "accent_amount": 0.4,
+        },
+    )
+
+    assert isinstance(module.component, DecayEnvelope)
+    assert module.component.attack_duration == pytest.approx(0.05)
+    assert module.component.decay_duration == pytest.approx(0.2)
+    assert module.component.amount == pytest.approx(0.6)
+
+
+def test_decay_envelope_runtime_renders_gate_pluck(qapp: Any):
+    del qapp
+    module = DecayEnvelopeModule()
+    gate_source = _connect_constant_input(module.gate_input, 1.0)
+    gate_source.write(np.ones(6, dtype=np.float32))
+
+    module.process_runtime(
+        6,
+        {
+            "attack_duration": 0.0,
+            "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
+            "amount": 1.0,
+            "accent_amount": 0.0,
+        },
+    )
+
+    np.testing.assert_allclose(
+        module.out_port.value,
+        [1.0, 0.75, 0.5, 0.25, 0.0, 0.0],
+        atol=1e-7,
+    )
+
+
+def test_decay_envelope_runtime_applies_accent_amount(qapp: Any):
+    del qapp
+    module = DecayEnvelopeModule()
+    gate_source = _connect_constant_input(module.gate_input, 1.0)
+    gate_source.write(np.ones(3, dtype=np.float32))
+    accent_source = _connect_constant_input(module.accent_input, 1.0)
+    accent_source.write(np.ones(3, dtype=np.float32))
+
+    module.process_runtime(
+        3,
+        {
+            "attack_duration": 0.0,
+            "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
+            "amount": 0.5,
+            "accent_amount": 1.0,
+        },
+    )
+
+    np.testing.assert_allclose(module.out_port.value, [1.0, 0.75, 0.5], atol=1e-7)
+
+
 def test_vco_runtime_applies_oscillator_parameters(qapp: Any):
     del qapp
     module = ModulatedOscillatorModule()
@@ -224,6 +289,7 @@ def test_vco_runtime_applies_oscillator_parameters(qapp: Any):
             "frequency": 330.0,
             "gain_db": -6.0,
             "phase": 45.0,
+            "pulsewidth": 0.25,
         },
     )
 
@@ -231,3 +297,4 @@ def test_vco_runtime_applies_oscillator_parameters(qapp: Any):
     assert module.component.frequency == pytest.approx(330.0)
     assert module.component.gain_db == pytest.approx(-6.0)
     assert module.component.phase == pytest.approx(np.deg2rad(45.0))
+    assert module.component.pulsewidth == pytest.approx(0.25)

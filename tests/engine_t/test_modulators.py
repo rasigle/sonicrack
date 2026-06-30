@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from src.engine.modulator import ADSREnvelope, getadsr
+from src.engine.modulator import ADSREnvelope, DecayEnvelope, getadsr
 
 
 class TestADSREnvelope(unittest.TestCase):
@@ -174,6 +174,54 @@ class TestGetADSR(unittest.TestCase):
         # Up phase (release) should end near 0
         up_phase = adsr_vals[down_len:]
         self.assertLess(up_phase[-1], 0.1)
+
+class TestDecayEnvelope(unittest.TestCase):
+    """Test suite for triggered decay envelopes."""
+
+    def test_instant_attack_decay_shape(self) -> None:
+        env = DecayEnvelope(
+            attack_duration=0.0,
+            decay_duration=4 / 44100,
+            amount=1.0,
+            sample_rate=44100,
+        )
+
+        env.trigger_note_on()
+        samples = env.get_samples(6)
+
+        np.testing.assert_allclose(
+            samples,
+            [1.0, 0.75, 0.5, 0.25, 0.0, 0.0],
+            atol=1e-7,
+        )
+
+    def test_attack_phase_ramps_to_amount(self) -> None:
+        env = DecayEnvelope(
+            attack_duration=4 / 44100,
+            decay_duration=4 / 44100,
+            amount=0.8,
+            sample_rate=44100,
+        )
+
+        env.trigger_note_on()
+        samples = env.get_samples(5)
+
+        np.testing.assert_allclose(
+            samples,
+            [0.0, 0.2, 0.4, 0.6, 0.8],
+            atol=1e-7,
+        )
+
+    def test_retrigger_restarts_shape(self) -> None:
+        env = DecayEnvelope(decay_duration=4 / 44100, amount=1.0, sample_rate=44100)
+
+        env.trigger_note_on()
+        first = env.get_samples(2)
+        env.trigger_note_on()
+        second = env.get_samples(2)
+
+        np.testing.assert_allclose(first, [1.0, 0.75], atol=1e-7)
+        np.testing.assert_allclose(second, [1.0, 0.75], atol=1e-7)
 
 
 if __name__ == "__main__":

@@ -29,6 +29,7 @@ from src.gui.core.runtime_helpers import (
 )
 from src.gui.module_registry import register_module
 from src.gui.ui_constants import (
+    AUDIO_FREQUENCY_KNOB_CURVE,
     DEFAULT_PW_PERCENTAGE_VALUE,
     MAX_PW_PERCENTAGE_VALUE,
     MIN_PW_PERCENTAGE_VALUE,
@@ -115,7 +116,13 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Frequency control (base frequency when no modulation)
         knobs_layout = QHBoxLayout()
         knobs_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.freq_knob = Knob("Base Hz", 20, 2000, self._base_frequency)
+        self.freq_knob = Knob(
+            "Base Hz",
+            11,
+            6000,
+            self._base_frequency,
+            curve_points=AUDIO_FREQUENCY_KNOB_CURVE,
+        )
         self.freq_knob.setToolTip(
             "Base frequency (Hz)\nActive when Freq input is disconnected"
         )

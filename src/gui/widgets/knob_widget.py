@@ -1,7 +1,7 @@
 """Rotary knob widget for parameter control."""
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import QPointF, QRectF, Qt
@@ -24,6 +24,7 @@ class Knob(QWidget):
         max_value: float = 1.0,
         default_value: float | None = None,
         logarithmic: bool = False,
+        curve_points: Sequence[tuple[float, float]] | None = None,
         callback: Callable[[float], None] | None = None,
         parent: QWidget | None = None,
     ):
@@ -35,6 +36,7 @@ class Knob(QWidget):
             max_value: Maximum value
             default_value: Default value (defaults to min_value)
             logarithmic: If True, use logarithmic scaling (useful for frequency)
+            curve_points: Optional normalized/value anchors for custom scaling.
             callback: Optional callback function called with the new value when changed
             parent: Parent widget
         """
@@ -44,6 +46,7 @@ class Knob(QWidget):
         self.min_value = min_value
         self.max_value = max_value
         self.logarithmic = logarithmic
+        self.curve_points = self._validate_curve_points(curve_points)
         self.callback = callback
         self.default_value = default_value if default_value is not None else min_value
         self._value = self.default_value
@@ -63,6 +66,77 @@ class Knob(QWidget):
         self.min_angle = 225  # Bottom-right (starting point)
         self.max_angle = -45  # Bottom-left (ending point)
         # This creates a 270-degree arc with the gap at the bottom
+
+    @staticmethod
+    def _validate_curve_points(
+        curve_points: Sequence[tuple[float, float]] | None,
+    ) -> tuple[tuple[float, float], ...] | None:
+        if curve_points is None:
+            return None
+        points = tuple(
+            (float(position), float(value)) for position, value in curve_points
+        )
+        if len(points) < 2:
+            raise ValueError("curve_points must contain at least two anchors")
+        if points[0][0] != 0.0 or points[-1][0] != 1.0:
+            raise ValueError("curve_points must start at 0.0 and end at 1.0")
+        previous_position = -math.inf
+        previous_value = -math.inf
+        for position, value in points:
+            if not 0.0 <= position <= 1.0:
+                raise ValueError("curve point positions must be between 0.0 and 1.0")
+            if position <= previous_position:
+                raise ValueError("curve point positions must be strictly increasing")
+            if value <= previous_value:
+                raise ValueError("curve point values must be strictly increasing")
+            previous_position = position
+            previous_value = value
+        return points
+
+    @staticmethod
+    def _interpolate(start: float, end: float, fraction: float) -> float:
+        return start + fraction * (end - start)
+
+    @classmethod
+    def _interpolate_value(cls, start: float, end: float, fraction: float) -> float:
+        if start > 0.0 and end > 0.0:
+            log_start = math.log(start)
+            log_end = math.log(end)
+            return math.exp(cls._interpolate(log_start, log_end, fraction))
+        return cls._interpolate(start, end, fraction)
+
+    def _curve_normalized_to_value(self, norm_value: float) -> float:
+        assert self.curve_points is not None
+        norm_value = max(0.0, min(1.0, norm_value))
+        points = self.curve_points
+        for index in range(len(points) - 1):
+            start_pos, start_value = points[index]
+            end_pos, end_value = points[index + 1]
+            if norm_value <= end_pos:
+                fraction = (norm_value - start_pos) / (end_pos - start_pos)
+                return self._interpolate_value(start_value, end_value, fraction)
+        return points[-1][1]
+
+    def _curve_value_to_normalized(self, value: float) -> float:
+        assert self.curve_points is not None
+        points = self.curve_points
+        if value <= points[0][1]:
+            return points[0][0]
+        if value >= points[-1][1]:
+            return points[-1][0]
+
+        for index in range(len(points) - 1):
+            start_pos, start_value = points[index]
+            end_pos, end_value = points[index + 1]
+            if value <= end_value:
+                if start_value > 0.0 and end_value > 0.0 and value > 0.0:
+                    start = math.log(start_value)
+                    end = math.log(end_value)
+                    fraction = (math.log(value) - start) / (end - start)
+                else:
+                    fraction = (value - start_value) / (end_value - start_value)
+                return self._interpolate(start_pos, end_pos, fraction)
+        return points[-1][0]
 
     def get_value(self) -> float:
         """Get the current value."""
@@ -91,6 +165,9 @@ class Knob(QWidget):
         if self.max_value == self.min_value:
             return 0.0
 
+        if self.curve_points is not None:
+            return self._curve_value_to_normalized(value)
+
         if self.logarithmic:
             # Ensure we don't take log of zero or negative numbers
             if self.min_value <= 0:
@@ -117,6 +194,9 @@ class Knob(QWidget):
         Returns:
             Actual value
         """
+        if self.curve_points is not None:
+            return self._curve_normalized_to_value(norm_value)
+
         if self.logarithmic:
             # Ensure we don't take log of zero or negative numbers
             if self.min_value <= 0:
@@ -275,8 +355,8 @@ class Knob(QWidget):
             # Use the larger delta for more responsive control
             delta = delta_y if abs(delta_y) > abs(delta_x) else delta_x
 
-            if self.logarithmic:
-                # For logarithmic scale, adjust in normalized space for consistent feel
+            if self.logarithmic or self.curve_points is not None:
+                # Non-linear scales adjust in normalized space for consistent feel.
                 norm_value = self.get_normalized_value()
                 norm_delta = delta / 200.0  # Normalized delta
                 new_norm_value = max(0.0, min(1.0, norm_value + norm_delta))
@@ -313,8 +393,8 @@ class Knob(QWidget):
         """Handle mouse wheel for fine adjustment."""
         delta = event.angleDelta().y()
 
-        if self.logarithmic:
-            # For logarithmic scale, adjust in normalized space
+        if self.logarithmic or self.curve_points is not None:
+            # Non-linear scales adjust in normalized space.
             norm_value = self.get_normalized_value()
             norm_delta = delta / 2000.0  # Finer adjustment
             new_norm_value = max(0.0, min(1.0, norm_value + norm_delta))

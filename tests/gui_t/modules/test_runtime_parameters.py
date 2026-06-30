@@ -21,6 +21,7 @@ from src.gui.modules.source.lfo import LFOModule
 from src.gui.modules.source.oscillator import OscillatorModule
 from src.gui.modules.source.vco import ModulatedOscillatorModule
 from src.gui.modules.voice.tb303_voice import TB303VoiceModule
+from src.gui.ui_constants import AUDIO_FREQUENCY_KNOB_CURVE
 
 
 def _connect_constant_input(input_port: Port, value: float = 1.0) -> Port:
@@ -41,6 +42,18 @@ def test_oscillator_runtime_applies_frequency_and_pulsewidth(qapp: Any):
     assert module._sawtooth_oscillator.frequency == pytest.approx(880.0)
     assert module._square_oscillator.frequency == pytest.approx(880.0)
     assert module._square_oscillator.pulsewidth == pytest.approx(0.25)
+
+
+def test_audio_rate_frequency_knobs_use_custom_curve(qapp: Any):
+    oscillator = OscillatorModule()
+    vco = ModulatedOscillatorModule()
+
+    assert oscillator.freq_knob.curve_points == tuple(AUDIO_FREQUENCY_KNOB_CURVE)
+    assert oscillator.freq_knob.min_value == pytest.approx(11.0)
+    assert oscillator.freq_knob.max_value == pytest.approx(6000.0)
+    assert vco.freq_knob.curve_points == tuple(AUDIO_FREQUENCY_KNOB_CURVE)
+    assert vco.freq_knob.min_value == pytest.approx(11.0)
+    assert vco.freq_knob.max_value == pytest.approx(6000.0)
 
 
 def test_lfo_runtime_applies_frequency_and_pulsewidth(qapp: Any):

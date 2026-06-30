@@ -18,6 +18,7 @@ from src.gui.core.runtime_helpers import float_parameter
 from src.gui.module_registry import register_module
 from src.gui.modules.source._oscillator_runtime import render_with_frequency_ramp
 from src.gui.ui_constants import (
+    AUDIO_FREQUENCY_KNOB_CURVE,
     DEFAULT_PW_PERCENTAGE_VALUE,
     MAX_PW_PERCENTAGE_VALUE,
     MIN_PW_PERCENTAGE_VALUE,
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 
 OSCILLATOR_DEFAULT_GAIN_DB = 0.0
 OSCILLATOR_DEFAULT_FREQUENCY = 120
-OSCILLATOR_MIN_FREQUENCY = 20
+OSCILLATOR_MIN_FREQUENCY = 11
 OSCILLATOR_MAX_FREQUENCY = 6000
 
 
@@ -124,6 +125,7 @@ class OscillatorModule(ModuleWidget):
             OSCILLATOR_MIN_FREQUENCY,
             OSCILLATOR_MAX_FREQUENCY,
             OSCILLATOR_DEFAULT_FREQUENCY,
+            curve_points=AUDIO_FREQUENCY_KNOB_CURVE,
         )
         self.freq_knob.value_changed.connect(self._on_frequency_changed)
         knobs_layout.addWidget(self.freq_knob)

@@ -8,6 +8,14 @@ from PyQt6.QtTest import QTest
 
 from src.gui.widgets.knob_widget import Knob
 
+AUDIO_FREQUENCY_CURVE = (
+    (0.0, 11.0),
+    (0.2, 40.0),
+    (0.5, 282.0),
+    (0.8, 1715.0),
+    (1.0, 6000.0),
+)
+
 
 def test_knob_callback_on_set_value():
     """Test that callback is called when set_value is used."""
@@ -225,6 +233,50 @@ def test_knob_default_value_none():
     # Should default to min_value
     assert knob.default_value == 10.0
     assert knob.get_value() == 10.0
+
+
+def test_knob_custom_curve_maps_frequency_anchors():
+    """Test custom knob curves map normalized clock positions to values."""
+    knob = Knob(
+        label="Freq",
+        min_value=11.0,
+        max_value=6000.0,
+        default_value=282.0,
+        curve_points=AUDIO_FREQUENCY_CURVE,
+    )
+
+    expected_values = {
+        0.0: 11.0,
+        0.2: 40.0,
+        0.5: 282.0,
+        0.8: 1715.0,
+        1.0: 6000.0,
+    }
+    for normalized, expected in expected_values.items():
+        knob.set_normalized_value(normalized)
+        assert knob.get_value() == pytest.approx(expected)
+
+
+def test_knob_custom_curve_maps_frequency_values_to_positions():
+    """Test custom knob curves map values back to normalized positions."""
+    knob = Knob(
+        label="Freq",
+        min_value=11.0,
+        max_value=6000.0,
+        default_value=282.0,
+        curve_points=AUDIO_FREQUENCY_CURVE,
+    )
+
+    expected_positions = {
+        11.0: 0.0,
+        40.0: 0.2,
+        282.0: 0.5,
+        1715.0: 0.8,
+        6000.0: 1.0,
+    }
+    for value, expected in expected_positions.items():
+        knob.set_value(value)
+        assert knob.get_normalized_value() == pytest.approx(expected)
 
 
 def test_knob_double_click_with_min_default():

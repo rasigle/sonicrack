@@ -8,6 +8,8 @@ import numpy as np
 import pytest
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.generator.oscillator_ramp import SawtoothOscillator
+from src.engine.generator.oscillator_sine import SineOscillator
 from src.engine.generator.oscillator_square import SquareOscillator
 from src.engine.modulator import ADSREnvelope, DecayEnvelope
 from src.gui.core.port import Port
@@ -17,6 +19,10 @@ from src.gui.modules.modifier.acid_filter import AcidFilterModule
 from src.gui.modules.modifier.filter import FilterModule
 from src.gui.modules.modulated_source.envelope_adsr import ADSRModule
 from src.gui.modules.modulated_source.envelope_decay import DecayEnvelopeModule
+from src.gui.modules.source._oscillator_runtime import (
+    _frequency_slew_values,
+    render_with_frequency_ramp,
+)
 from src.gui.modules.source.lfo import LFOModule
 from src.gui.modules.source.oscillator import OscillatorModule
 from src.gui.modules.source.vco import ModulatedOscillatorModule
@@ -37,10 +43,10 @@ def test_oscillator_runtime_applies_frequency_and_pulsewidth(qapp: Any):
 
     module.process_runtime(8, {"frequency": 880.0, "pulsewidth": 0.25})
 
-    assert module._sine_oscillator.frequency == pytest.approx(880.0)
-    assert module._triangle_oscillator.frequency == pytest.approx(880.0)
-    assert module._sawtooth_oscillator.frequency == pytest.approx(880.0)
-    assert module._square_oscillator.frequency == pytest.approx(880.0)
+    assert 120.0 < module._sine_oscillator.frequency < 880.0
+    assert 120.0 < module._triangle_oscillator.frequency < 880.0
+    assert 120.0 < module._sawtooth_oscillator.frequency < 880.0
+    assert 120.0 < module._square_oscillator.frequency < 880.0
     assert module._square_oscillator.pulsewidth == pytest.approx(0.25)
 
 
@@ -62,10 +68,10 @@ def test_lfo_runtime_applies_frequency_and_pulsewidth(qapp: Any):
 
     module.process_runtime(8, {"frequency": 4.0, "pulsewidth": 0.75})
 
-    assert module._sine_oscillator.frequency == pytest.approx(4.0)
-    assert module._triangle_oscillator.frequency == pytest.approx(4.0)
-    assert module._sawtooth_oscillator.frequency == pytest.approx(4.0)
-    assert module._square_oscillator.frequency == pytest.approx(4.0)
+    assert 1.0 < module._sine_oscillator.frequency < 4.0
+    assert 1.0 < module._triangle_oscillator.frequency < 4.0
+    assert 1.0 < module._sawtooth_oscillator.frequency < 4.0
+    assert 1.0 < module._square_oscillator.frequency < 4.0
     assert module._square_oscillator.pulsewidth == pytest.approx(0.75)
 
 
@@ -80,7 +86,8 @@ def test_oscillator_frequency_changes_are_ramped_across_buffer(qapp: Any):
 
     boundary_jump = abs(float(second[0] - first[-1]))
     assert boundary_jump < 0.08
-    assert module._triangle_oscillator.frequency == pytest.approx(2000.0)
+    assert module._triangle_oscillator.frequency < 2000.0
+    assert module._triangle_oscillator.frequency > 120.0
 
 
 def test_lfo_frequency_changes_are_ramped_across_buffer(qapp: Any):
@@ -94,7 +101,82 @@ def test_lfo_frequency_changes_are_ramped_across_buffer(qapp: Any):
 
     boundary_jump = abs(float(second[0] - first[-1]))
     assert boundary_jump < 0.01
-    assert module._sine_oscillator.frequency == pytest.approx(12.0)
+    assert module._sine_oscillator.frequency < 12.0
+    assert module._sine_oscillator.frequency > 1.0
+
+
+def test_frequency_slew_continues_across_buffers():
+    frequencies = _frequency_slew_values(
+        previous_frequency=120.0,
+        target_frequency=2000.0,
+        num_samples=128,
+        sample_rate=44100.0,
+        slew_time_ms=35.0,
+    )
+
+    assert np.all(np.diff(frequencies) > 0.0)
+    assert frequencies[-1] < 2000.0
+    assert frequencies[0] / 120.0 == pytest.approx(
+        frequencies[1] / frequencies[0],
+        rel=1e-3,
+    )
+
+
+def test_render_frequency_ramp_keeps_oscillator_at_smoothed_state():
+    oscillator = SineOscillator(frequency=120.0, sample_rate=44100, gain_db=0)
+
+    _, rendered_frequency = render_with_frequency_ramp(
+        oscillator,
+        previous_frequency=120.0,
+        target_frequency=2000.0,
+        num_samples=128,
+    )
+
+    assert rendered_frequency < 2000.0
+    assert rendered_frequency > 120.0
+    assert oscillator.frequency == pytest.approx(rendered_frequency)
+
+
+def test_frequency_slew_is_continuous_when_split_across_buffers():
+    continuous_osc = SawtoothOscillator(
+        frequency=120.0,
+        sample_rate=44100,
+        gain_db=0,
+        mode="analog",
+    )
+    split_osc = SawtoothOscillator(
+        frequency=120.0,
+        sample_rate=44100,
+        gain_db=0,
+        mode="analog",
+    )
+
+    continuous, _ = render_with_frequency_ramp(
+        continuous_osc,
+        previous_frequency=120.0,
+        target_frequency=2000.0,
+        num_samples=256,
+    )
+
+    first, rendered_frequency = render_with_frequency_ramp(
+        split_osc,
+        previous_frequency=120.0,
+        target_frequency=2000.0,
+        num_samples=128,
+    )
+    second, _ = render_with_frequency_ramp(
+        split_osc,
+        previous_frequency=rendered_frequency,
+        target_frequency=2000.0,
+        num_samples=128,
+    )
+
+    np.testing.assert_allclose(
+        np.concatenate((first, second)),
+        continuous,
+        rtol=1e-6,
+        atol=1e-6,
+    )
 
 
 def test_mixer_runtime_applies_channel_gains(qapp: Any):

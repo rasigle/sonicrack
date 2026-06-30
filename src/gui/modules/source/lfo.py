@@ -196,17 +196,17 @@ class LFOModule(ModuleWidget):
 
         self._square_oscillator.pulsewidth = pulsewidth
 
+        rendered_frequency = self._last_runtime_frequency
         for port, osc in zip(self.ports, self.oscs, strict=False):
             if osc is not None:
-                port.write(
-                    render_with_frequency_ramp(
-                        osc,
-                        self._last_runtime_frequency,
-                        frequency,
-                        num_samples,
-                    )
+                samples, rendered_frequency = render_with_frequency_ramp(
+                    osc,
+                    self._last_runtime_frequency,
+                    frequency,
+                    num_samples,
                 )
-        self._last_runtime_frequency = frequency
+                port.write(samples)
+        self._last_runtime_frequency = rendered_frequency
 
     @staticmethod
     def get_cv_output_range() -> tuple[float, float]:

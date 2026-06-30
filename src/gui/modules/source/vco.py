@@ -28,6 +28,7 @@ from src.gui.core.runtime_helpers import (
     str_parameter,
 )
 from src.gui.module_registry import register_module
+from src.gui.modules.source._oscillator_runtime import render_with_frequency_ramp
 from src.gui.ui_constants import (
     AUDIO_FREQUENCY_KNOB_CURVE,
     DEFAULT_PW_PERCENTAGE_VALUE,
@@ -173,6 +174,7 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         self.component = self.create_engine_component()
         self._runtime_oscillator_shape: tuple[str, str] | None = None
+        self._last_runtime_frequency = self._base_frequency
 
     @staticmethod
     def _get_available_modes_for_waveform(waveform: str) -> list[str]:
@@ -535,8 +537,8 @@ class ModulatedOscillatorModule(ModuleWidget):
                 wave_type, mode, frequency, gain_db, phase, pulsewidth
             )
             self._runtime_oscillator_shape = oscillator_shape
+            self._last_runtime_frequency = frequency
         else:
-            self.component.frequency = frequency
             self.component.gain_db = gain_db
             self.component.phase = phase
             if isinstance(self.component, SquareOscillator):
@@ -550,8 +552,15 @@ class ModulatedOscillatorModule(ModuleWidget):
         if self.freq_input.is_connected:
             freq_signal = read_samples(self.freq_input, num_samples)
             samples = self._render_frequency_signal(freq_signal)
+            self._last_runtime_frequency = float(freq_signal[-1])
         else:
-            samples = self.component.get_samples(num_samples)
+            samples, rendered_frequency = render_with_frequency_ramp(
+                self.component,
+                self._last_runtime_frequency,
+                frequency,
+                num_samples,
+            )
+            self._last_runtime_frequency = rendered_frequency
 
         if gain_signal is not None:
             samples = samples * gain_signal

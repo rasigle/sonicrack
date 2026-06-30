@@ -5,7 +5,6 @@ different modulated components.
 """
 
 import logging
-from typing import Any
 
 import numpy as np
 
@@ -35,7 +34,7 @@ class CVScaler:
 
     def __init__(
         self,
-        source: Any,
+        source: AudioComponent,
         input_range: tuple[float, float] = (-1.0, 1.0),
         output_range: tuple[float, float] = (0.0, 1.0),
         clamp: bool = True,
@@ -113,6 +112,7 @@ class CVScaler:
             Array of scaled samples
         """
         n = validate_sample_count(n)
+
         # Try to get samples from source efficiently
         vectorized_method = getattr(type(self._source), "get_samples_vectorized", None)
         has_vectorized_override = (
@@ -150,7 +150,7 @@ class CVScaler:
 # Convenience functions for common CV scaling scenarios
 
 
-def bipolar_to_unipolar(source: Any, clamp: bool = True) -> CVScaler:
+def bipolar_to_unipolar(source: AudioComponent, clamp: bool = True) -> CVScaler:
     """Scale bipolar [-1, 1] to unipolar [0, 1].
 
     Common use case: LFO modulating volume or clipper threshold.
@@ -173,7 +173,7 @@ def bipolar_to_unipolar(source: Any, clamp: bool = True) -> CVScaler:
     )
 
 
-def unipolar_to_bipolar(source: Any, clamp: bool = True) -> CVScaler:
+def unipolar_to_bipolar(source: AudioComponent, clamp: bool = True) -> CVScaler:
     """Scale unipolar [0, 1] to bipolar [-1, 1].
 
     Common use case: Envelope modulating pan position.
@@ -197,7 +197,7 @@ def unipolar_to_bipolar(source: Any, clamp: bool = True) -> CVScaler:
 
 
 def scale_cv(
-    source: Any,
+    source: AudioComponent,
     from_range: tuple[float, float],
     to_range: tuple[float, float],
     clamp: bool = True,

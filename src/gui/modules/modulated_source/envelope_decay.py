@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 
@@ -28,7 +29,7 @@ class DecayEnvelopeModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=220, height=235, color=QColor(140, 175, 75))
+        super().__init__(width=220, height=265, color=QColor(140, 175, 75))
 
         self.gate_input = self.add_input("Gate")
         self.accent_input = self.add_input("Accent")
@@ -38,9 +39,10 @@ class DecayEnvelopeModule(ModuleWidget):
         self._previous_gate = 0.0
 
         self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._create_standard_layout(spacing=6)
 
         timing_row = QHBoxLayout()
+        timing_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.attack_knob = Knob("Attack", 0.0, 0.2, 0.0)
         self.attack_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -59,6 +61,7 @@ class DecayEnvelopeModule(ModuleWidget):
         layout.addLayout(timing_row)
 
         amount_row = QHBoxLayout()
+        amount_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.amount_knob = Knob("Amount", 0.0, 1.0, 1.0)
         self.amount_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("amount", self.amount_knob.get_value())

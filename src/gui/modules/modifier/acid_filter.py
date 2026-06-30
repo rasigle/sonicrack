@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
@@ -28,7 +29,7 @@ class AcidFilterModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=260, height=315, color=QColor(85, 165, 120))
+        super().__init__(width=260, height=325, color=QColor(85, 165, 120))
 
         self.in_port = self.add_input("In")
         self.cutoff_cv_port = self.add_input("Cutoff CV")
@@ -39,9 +40,10 @@ class AcidFilterModule(ModuleWidget):
         self.component = AcidResonantFilter(sample_rate=audio_config.sample_rate)
 
         self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._create_standard_layout(spacing=6)
 
         tone_row = QHBoxLayout()
+        tone_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cutoff_knob = Knob("Cutoff", 20.0, 12000.0, 700.0, logarithmic=True)
         self.cutoff_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("cutoff", self.cutoff_knob.get_value())
@@ -58,6 +60,7 @@ class AcidFilterModule(ModuleWidget):
         layout.addLayout(tone_row)
 
         mod_row = QHBoxLayout()
+        mod_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.env_amount_knob = Knob("Env", 0.0, 6.0, 2.5)
         self.env_amount_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -76,6 +79,7 @@ class AcidFilterModule(ModuleWidget):
         layout.addLayout(mod_row)
 
         gain_row = QHBoxLayout()
+        gain_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drive_knob = Knob("Drive", 0.0, 24.0, 6.0)
         self.drive_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("drive_db", self.drive_knob.get_value())

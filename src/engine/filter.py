@@ -372,7 +372,7 @@ class BiquadResonantFilter(Modifier):
         filter_type: FilterType = "low",
         drive_db: float = 0.0,
         output_gain_db: float = 0.0,
-        sample_rate: int = DEFAULT_SAMPLE_RATE,
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
     ) -> None:
         """Initialize resonant biquad filter."""
         super().__init__()

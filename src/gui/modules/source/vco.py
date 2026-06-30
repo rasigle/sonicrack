@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 from PyQt6 import QtWidgets
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QLabel
 
@@ -63,8 +64,8 @@ class ModulatedOscillatorModule(ModuleWidget):
     def __init__(self):
         """Initialize modulated oscillator module."""
         super().__init__(
-            width=240,
-            height=325,
+            width=280,
+            height=275,
             color=QColor(100, 140, 220),
         )
 
@@ -88,10 +89,11 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._create_standard_layout(spacing=6)
 
         # Waveform selector
         wave_layout = QHBoxLayout()
+        wave_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         wave_layout.addWidget(QLabel("Wave:"))
         self.wave_combo = QtWidgets.QComboBox()
         self.wave_combo.addItems(["Sine", "Square", "Sawtooth", "Triangle"])
@@ -102,6 +104,7 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         # Mode selector
         mode_layout = QHBoxLayout()
+        mode_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         mode_layout.addWidget(QLabel("Mode:"))
         self.mode_combo = QtWidgets.QComboBox()
         self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
@@ -111,6 +114,7 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         # Frequency control (base frequency when no modulation)
         knobs_layout = QHBoxLayout()
+        knobs_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.freq_knob = Knob("Base Hz", 20, 2000, self._base_frequency)
         self.freq_knob.setToolTip(
             "Base frequency (Hz)\nActive when Freq input is disconnected"
@@ -126,15 +130,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.gain_knob.value_changed.connect(self._on_gain_changed)
         knobs_layout.addWidget(self.gain_knob)
 
-        layout.addLayout(knobs_layout)
-
-        # Phase control
-        self.phase_slider = HSlider("Phase", 0, 360, 0)
-        self.phase_slider.value_changed.connect(
-            lambda v: self.parameter_changed.emit("phase", v)
-        )
-        layout.addWidget(self.phase_slider)
-
         self.pulsewidth_knob = Knob(
             "PW",
             MIN_PW_PERCENTAGE_VALUE / 100,
@@ -143,7 +138,16 @@ class ModulatedOscillatorModule(ModuleWidget):
         )
         self.pulsewidth_knob.setToolTip("Square pulse width")
         self.pulsewidth_knob.value_changed.connect(self._on_pulsewidth_changed)
-        layout.addWidget(self.pulsewidth_knob)
+        knobs_layout.addWidget(self.pulsewidth_knob)
+
+        layout.addLayout(knobs_layout)
+
+        # Phase control
+        self.phase_slider = HSlider("Phase", 0, 360, 0)
+        self.phase_slider.value_changed.connect(
+            lambda v: self.parameter_changed.emit("phase", v)
+        )
+        layout.addWidget(self.phase_slider)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)

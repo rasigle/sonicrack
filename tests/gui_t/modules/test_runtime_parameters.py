@@ -20,6 +20,7 @@ from src.gui.modules.modulated_source.envelope_decay import DecayEnvelopeModule
 from src.gui.modules.source.lfo import LFOModule
 from src.gui.modules.source.oscillator import OscillatorModule
 from src.gui.modules.source.vco import ModulatedOscillatorModule
+from src.gui.modules.voice.tb303_voice import TB303VoiceModule
 
 
 def _connect_constant_input(input_port: Port, value: float = 1.0) -> Port:
@@ -327,6 +328,50 @@ def test_distortion_runtime_applies_drive_and_mix_cv(qapp: Any):
     assert output[2] == pytest.approx(output[1])
     assert module.component.drive == pytest.approx(0.0)
     assert module.component.mix == pytest.approx(1.0)
+
+
+def test_tb303_voice_runtime_outputs_silence_without_required_inputs(qapp: Any):
+    del qapp
+    module = TB303VoiceModule()
+
+    module.process_runtime(8, {})
+
+    np.testing.assert_allclose(module.out_port.value, np.zeros(8), atol=1e-7)
+
+
+def test_tb303_voice_runtime_applies_parameters_and_renders(qapp: Any):
+    del qapp
+    module = TB303VoiceModule()
+    freq_source = _connect_constant_input(module.freq_input, 110.0)
+    freq_source.write(np.full(32, 110.0, dtype=np.float32))
+    gate_source = _connect_constant_input(module.gate_input, 1.0)
+    gate_source.write(np.ones(32, dtype=np.float32))
+
+    module.process_runtime(
+        32,
+        {
+            "waveform": "Square",
+            "tuning": 1.0,
+            "pulsewidth": 0.35,
+            "cutoff": 600.0,
+            "resonance": 7.0,
+            "env_amount": 2.0,
+            "decay": 0.12,
+            "accent": 0.5,
+            "slide_time": 0.05,
+            "drive_db": 8.0,
+            "volume": 0.7,
+        },
+    )
+
+    assert module.component.waveform == "Square"
+    assert module.component.pulsewidth == pytest.approx(0.35)
+    assert module.component.cutoff == pytest.approx(600.0)
+    assert module.component.decay == pytest.approx(0.12)
+    output = np.asarray(module.out_port.value)
+    assert output.shape == (32,)
+    assert np.all(np.isfinite(output))
+    assert np.max(np.abs(output)) > 0.0
 
 
 def test_vco_runtime_applies_oscillator_parameters(qapp: Any):

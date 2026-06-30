@@ -187,6 +187,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             self.proxy = self._add_controls_to_module(self.controls_widget)
             ```
         """
+        controls_widget.setFixedWidth(self.module_width)
         proxy = QGraphicsProxyWidget(self)
         proxy.setWidget(controls_widget)
         proxy.setPos(0, self._title_bar_height())
@@ -213,6 +214,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         layout = QVBoxLayout()
         layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(spacing)
+        layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         return layout
 
     def _create_portwidgets(self):

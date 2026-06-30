@@ -2,6 +2,7 @@ import logging
 from typing import Any, Literal
 
 import numpy as np
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
@@ -41,7 +42,7 @@ class ADSRModule(ModuleWidget):
         """Initialize ADSR module."""
         super().__init__(
             width=220,
-            height=275,
+            height=325,
             color=QColor(120, 180, 80),
         )
 
@@ -53,10 +54,11 @@ class ADSRModule(ModuleWidget):
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._create_standard_layout(spacing=6)
 
         # ADSR controls
         knobs_layout = QHBoxLayout()
+        knobs_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.attack_knob = Knob("Attack", 0.005, 5.0, 0.01)  # Min 5ms, default 10ms
         self.attack_knob.setToolTip(
@@ -80,6 +82,7 @@ class ADSRModule(ModuleWidget):
         layout.addLayout(knobs_layout)
 
         knobs_layout2 = QHBoxLayout()
+        knobs_layout2.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.sustain_knob = Knob("Sustain", 0.0, 1.0, 0.7)
         self.sustain_knob.value_changed.connect(
@@ -117,6 +120,7 @@ class ADSRModule(ModuleWidget):
 
         # Manual trigger button
         trigger_layout = QHBoxLayout()
+        trigger_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.trigger_button = QPushButton("Gate")
         self.trigger_button.setCheckable(True)
         self.trigger_button.setMinimumHeight(35)

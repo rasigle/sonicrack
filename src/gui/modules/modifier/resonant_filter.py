@@ -38,8 +38,8 @@ class ResonantFilterModule(ModuleWidget):
 
     def __init__(self) -> None:
         super().__init__(
-            width=260,
-            height=380,
+            width=300,
+            height=330,
             color=QColor(80, 170, 150),
         )
 
@@ -48,9 +48,10 @@ class ResonantFilterModule(ModuleWidget):
         self.out_port = self.add_output("Out")
 
         self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._create_standard_layout(spacing=6)
 
         type_layout = QHBoxLayout()
+        type_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         type_layout.addWidget(QLabel("Type:"))
         self.type_combo = QComboBox()
         self.type_combo.addItems(["Low-pass", "High-pass", "Band-pass", "Notch"])
@@ -58,6 +59,7 @@ class ResonantFilterModule(ModuleWidget):
         layout.addLayout(type_layout)
 
         cutoff_row = QHBoxLayout()
+        cutoff_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         cutoff_layout = QVBoxLayout()
         cutoff_label = QLabel("Cutoff")
         cutoff_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -84,6 +86,7 @@ class ResonantFilterModule(ModuleWidget):
         layout.addLayout(cutoff_row)
 
         character_row = QHBoxLayout()
+        character_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         cv_layout = QVBoxLayout()
         cv_label = QLabel("CV Depth")
         cv_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -106,9 +109,6 @@ class ResonantFilterModule(ModuleWidget):
         drive_layout.addWidget(drive_label)
         drive_layout.addWidget(self.drive_knob)
         drive_layout.addWidget(self.drive_value_label)
-        character_row.addLayout(drive_layout)
-        layout.addLayout(character_row)
-
         output_layout = QVBoxLayout()
         output_label = QLabel("Output")
         output_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -119,7 +119,9 @@ class ResonantFilterModule(ModuleWidget):
         output_layout.addWidget(output_label)
         output_layout.addWidget(self.output_gain_knob)
         output_layout.addWidget(self.output_gain_value_label)
-        layout.addLayout(output_layout)
+        character_row.addLayout(drive_layout)
+        character_row.addLayout(output_layout)
+        layout.addLayout(character_row)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)

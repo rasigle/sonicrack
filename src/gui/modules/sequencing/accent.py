@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
@@ -28,7 +29,7 @@ class AccentModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=240, height=245, color=QColor(175, 120, 55))
+        super().__init__(width=288, height=245, color=QColor(175, 120, 55))
 
         self.accent_input = self.add_input("Accent")
         self.amp_port = self.add_output("Amp CV")
@@ -40,6 +41,7 @@ class AccentModule(ModuleWidget):
         layout = self._create_standard_layout()
 
         top_row = QHBoxLayout()
+        top_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.amount_knob = Knob("Amount", 0.0, 1.0, 1.0)
         self.amount_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -56,6 +58,7 @@ class AccentModule(ModuleWidget):
         layout.addLayout(top_row)
 
         depth_row = QHBoxLayout()
+        depth_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.amp_depth_knob = Knob("Amp", 0.0, 1.0, 0.35)
         self.amp_depth_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(

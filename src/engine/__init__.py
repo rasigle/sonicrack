@@ -165,6 +165,7 @@ from src.engine.sequencing import (
     StepSequencer,
 )
 from src.engine.synthesis import synth
+from src.engine.voices import TB303Voice
 
 __all__ = [
     "AudioComponent",
@@ -229,4 +230,5 @@ __all__ = [
     "StepClock",
     "StepEvent",
     "StepSequencer",
+    "TB303Voice",
 ]

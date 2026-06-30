@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel
 
@@ -28,7 +29,7 @@ class ClockModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=190, height=205, color=QColor(150, 125, 70))
+        super().__init__(width=220, height=205, color=QColor(150, 125, 70))
 
         self.clock_port = self.add_output("Clock")
         self.component = StepClock(sample_rate=audio_config.sample_rate)
@@ -36,13 +37,24 @@ class ClockModule(ModuleWidget):
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
+        timing_row = QHBoxLayout()
+        timing_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         self.bpm_knob = Knob("BPM", 30.0, 300.0, 120.0)
         self.bpm_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("bpm", self.bpm_knob.get_value())
         )
-        layout.addWidget(self.bpm_knob)
+        timing_row.addWidget(self.bpm_knob)
+
+        self.swing_knob = Knob("Swing", 0.0, 0.75, 0.0)
+        self.swing_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("swing", self.swing_knob.get_value())
+        )
+        timing_row.addWidget(self.swing_knob)
+        layout.addLayout(timing_row)
 
         division_layout = QHBoxLayout()
+        division_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         division_layout.addWidget(QLabel("Division:"))
         self.division_combo = QComboBox()
         self.division_combo.addItems(["1/4", "1/8", "1/16", "1/32"])
@@ -51,20 +63,13 @@ class ClockModule(ModuleWidget):
             lambda value: self.parameter_changed.emit("division", value)
         )
         division_layout.addWidget(self.division_combo)
-        layout.addLayout(division_layout)
-
-        self.swing_knob = Knob("Swing", 0.0, 0.75, 0.0)
-        self.swing_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("swing", self.swing_knob.get_value())
-        )
-        layout.addWidget(self.swing_knob)
-
         self.run_checkbox = QCheckBox("Run")
         self.run_checkbox.setChecked(True)
         self.run_checkbox.toggled.connect(
             lambda value: self.parameter_changed.emit("running", value)
         )
-        layout.addWidget(self.run_checkbox)
+        division_layout.addWidget(self.run_checkbox)
+        layout.addLayout(division_layout)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)

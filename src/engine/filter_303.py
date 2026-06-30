@@ -93,7 +93,7 @@ class AcidResonantFilter(Modifier):
         accent_amount: float = 1.0,
         drive_db: float = 6.0,
         output_gain_db: float = -6.0,
-        sample_rate: int = DEFAULT_SAMPLE_RATE,
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
     ) -> None:
         super().__init__()
         self.sample_rate = validate_sample_rate(sample_rate)

@@ -211,10 +211,34 @@ def test_vco_pitch_cv_input_is_dezippered(qapp: Any):
     pitch_source.write(np.ones(32, dtype=np.float32))
     module.process_runtime(32, parameters)
 
-    assert module.component.frequency < 523.2512
-    assert module.component.frequency > 261.6255
+    assert module.component.frequency < 880.0
+    assert module.component.frequency > 440.0
     assert module._last_pitch_cv is not None
     assert 0.0 < module._last_pitch_cv < 1.0
+
+
+def test_vco_v_oct_input_transposes_base_frequency(qapp: Any):
+    del qapp
+    module = ModulatedOscillatorModule()
+    pitch_source = _connect_constant_input(module.freq_input, 0.0)
+    parameters = {
+        "waveform": "Sine",
+        "mode": "analog",
+        "frequency": 330.0,
+        "gain_db": -12.0,
+        "phase": 0.0,
+    }
+
+    module.process_runtime(8, parameters)
+
+    assert module.component.frequency == pytest.approx(330.0)
+    assert module.freq_knob.isEnabled()
+
+    pitch_source.write(np.ones(8, dtype=np.float32))
+    module._last_pitch_cv = None
+    module.process_runtime(8, parameters)
+
+    assert module.component.frequency == pytest.approx(660.0)
 
 
 def test_lfo_frequency_changes_are_ramped_with_clock_input_connected(qapp: Any):

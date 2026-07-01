@@ -20,7 +20,6 @@ from src.engine import (
     TriangleOscillator,
 )
 from src.engine.generators.oscillators.oscillator_modulated import ModulatedOscillator
-from src.engine.utils.cv import pitch_cv_to_frequency
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import (
@@ -43,6 +42,18 @@ from src.gui.widgets import HSlider, Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
 VCO_PITCH_CV_SMOOTHING_MS = 5.0
+
+
+def apply_v_oct_offset(
+    base_frequency: float | np.ndarray, pitch_cv: float | np.ndarray
+) -> float | np.ndarray:
+    """Apply a V/Oct pitch offset around the oscillator's base frequency."""
+    frequencies = np.asarray(base_frequency, dtype=np.float64) * np.power(
+        2.0, np.asarray(pitch_cv, dtype=np.float64)
+    )
+    if np.isscalar(base_frequency) and np.isscalar(pitch_cv):
+        return float(frequencies)
+    return frequencies.astype(np.float32)
 
 
 @register_module()
@@ -311,7 +322,11 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         # Hotswap the active oscillator without rebuilding the widget.
         if self.component is not None:
-            self.component.frequency = new_freq
+            if isinstance(self.component, ModulatedOscillator):
+                self.component.oscillator._freq = new_freq
+                self.component.oscillator.frequency = new_freq
+            else:
+                self.component.frequency = new_freq
 
         self.parameter_changed.emit("frequency", new_freq)
 
@@ -370,16 +385,14 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         logger.debug(f"VCO update_knob_state: Freq port connected={has_freq_cv}")
 
+        self.freq_knob.setEnabled(True)
+        self.freq_knob.setStyleSheet("")
         if has_freq_cv:
-            # Frequency controlled by CV - disable knob
-            self.freq_knob.setEnabled(False)
-            self.freq_knob.setStyleSheet("opacity: 0.5;")
-            self.freq_knob.setToolTip("Frequency controlled by 1V/oct Freq input")
-            logger.debug("VCO: Freq knob DISABLED")
+            self.freq_knob.setToolTip(
+                "Base frequency (Hz); V/Oct input transposes this pitch"
+            )
+            logger.debug("VCO: Freq knob ENABLED with V/Oct pitch input")
         else:
-            # No pitch CV - enable knob
-            self.freq_knob.setEnabled(True)
-            self.freq_knob.setStyleSheet("")
             self.freq_knob.setToolTip("Manual frequency control (Hz)")
             logger.debug("VCO: Freq knob ENABLED")
 
@@ -456,21 +469,17 @@ class ModulatedOscillatorModule(ModuleWidget):
         else:
             raise ValueError(f"Unknown waveform type: {wave_type}")
 
-        # Update UI state for frequency knob
+        # Update UI state for frequency knob. V/Oct transposes the knob's base pitch.
+        self.freq_knob.setEnabled(True)
+        self.freq_knob.setStyleSheet("")
         if has_freq_mod:
-            self.freq_knob.setEnabled(False)
-            self.freq_knob.setStyleSheet("opacity: 0.5;")
-            self.freq_knob.setToolTip("Frequency controlled by Freq input (CV)")
-            logger.debug(
-                "VCO create_engine_component: Freq knob DISABLED (has modulation)"
+            self.freq_knob.setToolTip(
+                "Base frequency (Hz); V/Oct input transposes this pitch"
             )
+            logger.debug("VCO create_engine_component: Freq knob ENABLED with V/Oct")
         else:
-            self.freq_knob.setEnabled(True)
-            self.freq_knob.setStyleSheet("")
             self.freq_knob.setToolTip("Manual frequency control (Hz)")
-            logger.debug(
-                "VCO create_engine_component: Freq knob ENABLED (no modulation)"
-            )
+            logger.debug("VCO create_engine_component: Freq knob ENABLED")
 
         # Update UI state for gain knob
         if has_gain_mod:
@@ -492,8 +501,8 @@ class ModulatedOscillatorModule(ModuleWidget):
         if has_freq_mod or has_gain_mod:
             # Frequency modulation function
             def freq_mod_func(base_freq, pitch_cv):
-                """Convert 1V/oct pitch CV to frequency in Hz."""
-                return pitch_cv_to_frequency(pitch_cv)
+                """Apply 1V/oct pitch CV as an offset around the base frequency."""
+                return apply_v_oct_offset(base_freq, pitch_cv)
 
             # Amplitude modulation function (for gain modulation)
             def amp_mod_func(base_amp, cv_amp):
@@ -559,7 +568,7 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         if self.freq_input.is_connected:
             freq_signal = read_samples(self.freq_input, num_samples)
-            samples = self._render_frequency_signal(freq_signal)
+            samples = self._render_frequency_signal(frequency, freq_signal)
         else:
             self._last_pitch_cv = None
             samples, rendered_frequency = render_with_frequency_ramp(
@@ -575,7 +584,9 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         self.out_port.write(samples)
 
-    def _render_frequency_signal(self, pitch_cv_signal: np.ndarray) -> np.ndarray:
+    def _render_frequency_signal(
+        self, base_frequency: float, pitch_cv_signal: np.ndarray
+    ) -> np.ndarray:
         """Render a 1V/oct pitch-CV buffer without resetting oscillator phase."""
         pitch_cv_signal, self._last_pitch_cv = smooth_control_signal(
             pitch_cv_signal,
@@ -584,7 +595,7 @@ class ModulatedOscillatorModule(ModuleWidget):
             VCO_PITCH_CV_SMOOTHING_MS,
         )
         samples = np.empty(len(pitch_cv_signal), dtype=np.float32)
-        frequencies = pitch_cv_to_frequency(pitch_cv_signal)
+        frequencies = apply_v_oct_offset(base_frequency, pitch_cv_signal)
         for index, frequency in enumerate(frequencies):
             self.component.frequency = float(frequency)
             samples[index] = next(self.component)

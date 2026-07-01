@@ -223,7 +223,7 @@ class SpectrumModule(ModuleWidget):
             return
 
         # Update display with samples
-        if samples:
+        if samples is not None and np.asarray(samples).size > 0:
             self._update_samples(samples)
 
 

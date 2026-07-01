@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
@@ -14,9 +13,9 @@ from src.engine.generators.oscillators.oscillator import (
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
-from src.gui.core.runtime_helpers import float_parameter
+from src.gui.core.runtime_helpers import float_parameter, read_samples
 from src.gui.module_registry import register_module
-from src.gui.modules.source._oscillator_runtime import render_with_frequency_ramp
+from src.gui.modules.source._oscillator_runtime import render_with_clock_resets
 from src.gui.ui_constants import (
     DEFAULT_PW_PERCENTAGE_VALUE,
     MAX_PW_PERCENTAGE_VALUE,
@@ -33,6 +32,7 @@ LFO_MIN_FREQUENCY = 0.01
 LFO_MAX_FREQUENCY = 20.0  # LFO frequency range in Hz
 LFO_DEFAULT_FREQUENCY = 1.0  # Default LFO frequency in Hz
 LFO_DEFAULT_GAIN_DB = 0
+LFO_CLOCK_RESET_SMOOTHING_MS = 2.0
 
 
 @register_module()
@@ -58,6 +58,8 @@ class LFOModule(ModuleWidget):
             color=QColor(100, 140, 200),
         )
 
+        self.clock_input: Port = self.add_input("Clock")
+
         # Create oscillator components FIRST (before creating ports)
         freq = LFO_DEFAULT_FREQUENCY
         pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
@@ -69,19 +71,21 @@ class LFOModule(ModuleWidget):
             gain_db=LFO_DEFAULT_GAIN_DB,
             wave_range=(-1, 1),
             sample_rate=sample_rate,
-            mode="analog",
+            mode="pure",
         )
         self._triangle_oscillator = TriangleOscillator(
             freq,
             gain_db=LFO_DEFAULT_GAIN_DB,
             wave_range=(-1, 1),
             sample_rate=sample_rate,
+            mode="pure",
         )
         self._sawtooth_oscillator = SawtoothOscillator(
             freq,
             gain_db=LFO_DEFAULT_GAIN_DB,
             wave_range=(-1, 1),
             sample_rate=sample_rate,
+            mode="vcv",
         )
         self._square_oscillator = SquareOscillator(
             freq,
@@ -89,6 +93,7 @@ class LFOModule(ModuleWidget):
             wave_range=(-1, 1),
             pulsewidth=pulsewidth,
             sample_rate=sample_rate,
+            mode="vcv",
         )
 
         # Add four output ports - one for each waveform
@@ -120,6 +125,8 @@ class LFOModule(ModuleWidget):
             self._square_oscillator,
         ]
         self._last_runtime_frequency = freq
+        self._previous_clock = 0.0
+        self._last_output_values: list[float | None] = [None] * len(self.oscs)
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -132,6 +139,7 @@ class LFOModule(ModuleWidget):
             LFO_MIN_FREQUENCY,
             LFO_MAX_FREQUENCY,
             LFO_DEFAULT_FREQUENCY,
+            logarithmic=True,
         )
         self.freq_knob.value_changed.connect(self._on_frequency_changed)
         knobs_layout.addWidget(self.freq_knob)
@@ -196,17 +204,31 @@ class LFOModule(ModuleWidget):
 
         self._square_oscillator.pulsewidth = pulsewidth
 
+        clock_signal = (
+            read_samples(self.clock_input, num_samples)
+            if self.clock_input.is_connected
+            else None
+        )
+
         rendered_frequency = self._last_runtime_frequency
-        for port, osc in zip(self.ports, self.oscs, strict=False):
+        final_clock = 0.0
+        for index, (port, osc) in enumerate(zip(self.ports, self.oscs, strict=False)):
             if osc is not None:
-                samples, rendered_frequency = render_with_frequency_ramp(
+                samples, rendered_frequency, final_clock = render_with_clock_resets(
                     osc,
                     self._last_runtime_frequency,
                     frequency,
                     num_samples,
+                    clock_signal,
+                    self._previous_clock,
+                    self._last_output_values[index],
+                    LFO_CLOCK_RESET_SMOOTHING_MS,
                 )
                 port.write(samples)
+                if len(samples) > 0:
+                    self._last_output_values[index] = float(samples[-1])
         self._last_runtime_frequency = rendered_frequency
+        self._previous_clock = final_clock
 
     @staticmethod
     def get_cv_output_range() -> tuple[float, float]:

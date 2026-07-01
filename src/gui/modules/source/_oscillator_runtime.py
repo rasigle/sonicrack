@@ -83,3 +83,112 @@ def render_with_frequency_ramp(
         samples.append(next(oscillator))
     final_frequency = float(frequencies[-1]) if len(frequencies) else target_frequency
     return np.asarray(samples, dtype=np.float32), final_frequency
+
+
+def smooth_continuity_correction(
+    samples: np.ndarray,
+    previous_output: float | None,
+    sample_rate: float,
+    smoothing_time_ms: float,
+) -> np.ndarray:
+    """Remove an output step by decaying a correction over a short window."""
+    if previous_output is None or len(samples) == 0:
+        return samples
+
+    smoothing_samples = int(round(sample_rate * smoothing_time_ms / 1000))
+    smoothing_samples = min(max(smoothing_samples, 1), len(samples))
+    correction = float(previous_output - samples[0])
+    if correction == 0.0:
+        return samples
+
+    smoothed = samples.copy()
+    envelope = np.linspace(1.0, 0.0, smoothing_samples, endpoint=False)
+    smoothed[:smoothing_samples] += correction * envelope
+    return smoothed.astype(np.float32)
+
+
+def render_with_clock_resets(
+    oscillator: RuntimeOscillator,
+    previous_frequency: float,
+    target_frequency: float,
+    num_samples: int,
+    clock_signal: np.ndarray | None,
+    previous_clock: float,
+    last_output_value: float | None,
+    reset_smoothing_time_ms: float,
+) -> tuple[np.ndarray, float, float]:
+    """Render with shared pitch slew and sample-accurate clock resets."""
+    if clock_signal is None:
+        samples, rendered_frequency = render_with_frequency_ramp(
+            oscillator,
+            previous_frequency,
+            target_frequency,
+            num_samples,
+        )
+        return samples, rendered_frequency, 0.0
+
+    samples = []
+    start = 0
+    rendered_frequency = previous_frequency
+    current_previous_clock = previous_clock
+    previous_output = last_output_value
+    pending_reset_previous_output = None
+    sample_rate = float(getattr(oscillator, "sample_rate", 44100.0))
+
+    for index, value in enumerate(clock_signal[:num_samples]):
+        current_clock = float(value)
+        should_reset = current_previous_clock < 0.3 and current_clock > 0.7
+        if should_reset:
+            if index > start:
+                chunk, rendered_frequency = render_with_frequency_ramp(
+                    oscillator,
+                    rendered_frequency,
+                    target_frequency,
+                    index - start,
+                )
+                if pending_reset_previous_output is not None:
+                    chunk = smooth_continuity_correction(
+                        chunk,
+                        pending_reset_previous_output,
+                        sample_rate,
+                        reset_smoothing_time_ms,
+                    )
+                    pending_reset_previous_output = None
+                samples.append(chunk)
+                if len(chunk) > 0:
+                    previous_output = float(chunk[-1])
+
+            reset = getattr(oscillator, "_initialize_osc", None)
+            if callable(reset):
+                reset()
+            pending_reset_previous_output = previous_output
+            start = index
+        current_previous_clock = current_clock
+
+    if start < num_samples:
+        chunk, rendered_frequency = render_with_frequency_ramp(
+            oscillator,
+            rendered_frequency,
+            target_frequency,
+            num_samples - start,
+        )
+        if pending_reset_previous_output is not None:
+            chunk = smooth_continuity_correction(
+                chunk,
+                pending_reset_previous_output,
+                sample_rate,
+                reset_smoothing_time_ms,
+            )
+        samples.append(chunk)
+
+    if not samples:
+        rendered = np.empty(0, dtype=np.float32)
+    else:
+        rendered = np.concatenate(samples).astype(np.float32)
+
+    final_clock = (
+        float(clock_signal[min(num_samples, len(clock_signal)) - 1])
+        if num_samples > 0
+        else current_previous_clock
+    )
+    return rendered, rendered_frequency, final_clock

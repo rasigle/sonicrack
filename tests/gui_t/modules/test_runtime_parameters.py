@@ -63,6 +63,15 @@ def test_audio_rate_frequency_knobs_use_custom_curve(qapp: Any):
     assert vco.freq_knob.max_value == pytest.approx(6000.0)
 
 
+def test_lfo_frequency_knob_uses_logarithmic_pitch_control(qapp: Any):
+    del qapp
+    module = LFOModule()
+
+    assert module.freq_knob.logarithmic is True
+    assert module.freq_knob.min_value == pytest.approx(0.01)
+    assert module.freq_knob.max_value == pytest.approx(20.0)
+
+
 def test_lfo_runtime_applies_frequency_and_pulsewidth(qapp: Any):
     del qapp
     module = LFOModule()
@@ -74,6 +83,44 @@ def test_lfo_runtime_applies_frequency_and_pulsewidth(qapp: Any):
     assert 1.0 < module._sawtooth_oscillator.frequency < 4.0
     assert 1.0 < module._square_oscillator.frequency < 4.0
     assert module._square_oscillator.pulsewidth == pytest.approx(0.75)
+
+
+def test_lfo_clock_input_resets_cycle_on_trigger(qapp: Any):
+    del qapp
+    module = LFOModule()
+    clock_source = _connect_constant_input(module.clock_input, 0.0)
+    clock_source.write(
+        np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    )
+
+    module.process_runtime(8, {"frequency": 1.0, "pulsewidth": 0.5})
+
+    output = np.asarray(module.sine_port.value)
+    assert module._sine_oscillator._sample_index == 4
+    assert abs(float(output[4] - output[3])) < 1e-4
+
+
+def test_lfo_clock_reset_is_smoothed_across_buffer_boundary(qapp: Any):
+    del qapp
+    module = LFOModule()
+    clock_source = _connect_constant_input(module.clock_input, 0.0)
+    clock_source.write(np.zeros(128, dtype=np.float32))
+
+    module.process_runtime(128, {"frequency": 20.0, "pulsewidth": 0.5})
+    first = np.asarray(module.sawtooth_port.value)
+
+    clock_source.write(
+        np.concatenate(
+            (
+                np.ones(1, dtype=np.float32),
+                np.zeros(127, dtype=np.float32),
+            )
+        )
+    )
+    module.process_runtime(128, {"frequency": 20.0, "pulsewidth": 0.5})
+    second = np.asarray(module.sawtooth_port.value)
+
+    assert second[0] == pytest.approx(first[-1], abs=1e-7)
 
 
 def test_oscillator_frequency_changes_are_ramped_across_buffer(qapp: Any):
@@ -97,6 +144,24 @@ def test_lfo_frequency_changes_are_ramped_across_buffer(qapp: Any):
 
     module.process_runtime(128, {"frequency": 1.0, "pulsewidth": 0.5})
     first = np.asarray(module.sine_port.value)
+    module.process_runtime(128, {"frequency": 12.0, "pulsewidth": 0.5})
+    second = np.asarray(module.sine_port.value)
+
+    boundary_jump = abs(float(second[0] - first[-1]))
+    assert boundary_jump < 0.01
+    assert module._sine_oscillator.frequency < 12.0
+    assert module._sine_oscillator.frequency > 1.0
+
+
+def test_lfo_frequency_changes_are_ramped_with_clock_input_connected(qapp: Any):
+    del qapp
+    module = LFOModule()
+    clock_source = _connect_constant_input(module.clock_input, 0.0)
+    clock_source.write(np.zeros(128, dtype=np.float32))
+
+    module.process_runtime(128, {"frequency": 1.0, "pulsewidth": 0.5})
+    first = np.asarray(module.sine_port.value)
+    clock_source.write(np.zeros(128, dtype=np.float32))
     module.process_runtime(128, {"frequency": 12.0, "pulsewidth": 0.5})
     second = np.asarray(module.sine_port.value)
 

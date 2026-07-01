@@ -157,7 +157,12 @@ from src.engine.sequencing import (
 )
 from src.engine.utils.cv import (
     CVScaler,
+    PITCH_CV_REFERENCE_FREQUENCY,
+    PITCH_CV_REFERENCE_NOTE,
     bipolar_to_unipolar,
+    frequency_to_pitch_cv,
+    midi_note_to_pitch_cv,
+    pitch_cv_to_frequency,
     scale_cv,
     unipolar_to_bipolar,
 )
@@ -198,6 +203,11 @@ __all__ = [
     "Clipper",
     "ModulatedClipper",
     "CVScaler",
+    "PITCH_CV_REFERENCE_NOTE",
+    "PITCH_CV_REFERENCE_FREQUENCY",
+    "pitch_cv_to_frequency",
+    "frequency_to_pitch_cv",
+    "midi_note_to_pitch_cv",
     "bipolar_to_unipolar",
     "unipolar_to_bipolar",
     "scale_cv",

@@ -1,7 +1,7 @@
-"""Modulated Oscillator module with frequency modulation input.
+"""Modulated Oscillator module with pitch CV input.
 
 This module provides an oscillator that can have its frequency controlled
-by an external CV source (like MIDI Input). Perfect for MIDI-controlled synthesis!
+by an external 1V/oct pitch CV source.
 """
 
 from typing import Any
@@ -20,6 +20,7 @@ from src.engine import (
     TriangleOscillator,
 )
 from src.engine.generators.oscillators.oscillator_modulated import ModulatedOscillator
+from src.engine.utils.cv import pitch_cv_to_frequency
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import (
@@ -28,7 +29,10 @@ from src.gui.core.runtime_helpers import (
     str_parameter,
 )
 from src.gui.module_registry import register_module
-from src.gui.modules.source._oscillator_runtime import render_with_frequency_ramp
+from src.gui.modules.source._oscillator_runtime import (
+    render_with_frequency_ramp,
+    smooth_control_signal,
+)
 from src.gui.ui_constants import (
     AUDIO_FREQUENCY_KNOB_CURVE,
     DEFAULT_PW_PERCENTAGE_VALUE,
@@ -38,16 +42,18 @@ from src.gui.ui_constants import (
 from src.gui.widgets import HSlider, Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
+VCO_PITCH_CV_SMOOTHING_MS = 5.0
+
 
 @register_module()
 class ModulatedOscillatorModule(ModuleWidget):
-    """Oscillator with frequency modulation input.
+    """Oscillator with 1V/oct pitch CV input.
 
-    This oscillator can have its frequency controlled by an external CV source,
-    making it perfect for MIDI keyboard control via the MIDI Input module.
+    This oscillator can have its frequency controlled by an external 1V/oct CV
+    source, making it usable with MIDI and sequencer pitch outputs.
 
     Inputs:
-        - Freq: Frequency CV input (e.g., from MIDI Input)
+        - Freq: 1V/oct pitch CV input (e.g., from MIDI Input)
 
     Outputs:
         - Out: Audio output
@@ -85,7 +91,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Add ports with component reference
         # Note: Input ports don't have components (they receive signals)
         # Output port has the component reference
-        self.freq_input = self.add_input("Freq")
+        self.freq_input = self.add_input("V/Oct")
         self.gain_mod_input = self.add_input("Gain")
         self.out_port = self.add_output("Out", component=self.component)
 
@@ -118,7 +124,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         knobs_layout = QHBoxLayout()
         knobs_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.freq_knob = Knob(
-            "Base Hz",
+            "Pitch (Hz)",
             11,
             6000,
             self._base_frequency,
@@ -175,6 +181,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.component = self.create_engine_component()
         self._runtime_oscillator_shape: tuple[str, str] | None = None
         self._last_runtime_frequency = self._base_frequency
+        self._last_pitch_cv: float | None = None
 
     @staticmethod
     def _get_available_modes_for_waveform(waveform: str) -> list[str]:
@@ -367,10 +374,10 @@ class ModulatedOscillatorModule(ModuleWidget):
             # Frequency controlled by CV - disable knob
             self.freq_knob.setEnabled(False)
             self.freq_knob.setStyleSheet("opacity: 0.5;")
-            self.freq_knob.setToolTip("Frequency controlled by Freq input (CV)")
+            self.freq_knob.setToolTip("Frequency controlled by 1V/oct Freq input")
             logger.debug("VCO: Freq knob DISABLED")
         else:
-            # No frequency CV - enable knob
+            # No pitch CV - enable knob
             self.freq_knob.setEnabled(True)
             self.freq_knob.setStyleSheet("")
             self.freq_knob.setToolTip("Manual frequency control (Hz)")
@@ -484,9 +491,9 @@ class ModulatedOscillatorModule(ModuleWidget):
         # If we have frequency or gain modulation, create ModulatedOscillator
         if has_freq_mod or has_gain_mod:
             # Frequency modulation function
-            def freq_mod_func(base_freq, cv_freq):
-                """Use CV frequency directly (MIDI sends Hz values)."""
-                return cv_freq
+            def freq_mod_func(base_freq, pitch_cv):
+                """Convert 1V/oct pitch CV to frequency in Hz."""
+                return pitch_cv_to_frequency(pitch_cv)
 
             # Amplitude modulation function (for gain modulation)
             def amp_mod_func(base_amp, cv_amp):
@@ -538,6 +545,7 @@ class ModulatedOscillatorModule(ModuleWidget):
             )
             self._runtime_oscillator_shape = oscillator_shape
             self._last_runtime_frequency = frequency
+            self._last_pitch_cv = None
         else:
             self.component.gain_db = gain_db
             self.component.phase = phase
@@ -552,8 +560,8 @@ class ModulatedOscillatorModule(ModuleWidget):
         if self.freq_input.is_connected:
             freq_signal = read_samples(self.freq_input, num_samples)
             samples = self._render_frequency_signal(freq_signal)
-            self._last_runtime_frequency = float(freq_signal[-1])
         else:
+            self._last_pitch_cv = None
             samples, rendered_frequency = render_with_frequency_ramp(
                 self.component,
                 self._last_runtime_frequency,
@@ -567,12 +575,21 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         self.out_port.write(samples)
 
-    def _render_frequency_signal(self, frequency_signal: np.ndarray) -> np.ndarray:
-        """Render a frequency-CV buffer without resetting oscillator phase."""
-        samples = np.empty(len(frequency_signal), dtype=np.float32)
-        for index, frequency in enumerate(frequency_signal):
+    def _render_frequency_signal(self, pitch_cv_signal: np.ndarray) -> np.ndarray:
+        """Render a 1V/oct pitch-CV buffer without resetting oscillator phase."""
+        pitch_cv_signal, self._last_pitch_cv = smooth_control_signal(
+            pitch_cv_signal,
+            self._last_pitch_cv,
+            float(getattr(self.component, "sample_rate", 44100.0)),
+            VCO_PITCH_CV_SMOOTHING_MS,
+        )
+        samples = np.empty(len(pitch_cv_signal), dtype=np.float32)
+        frequencies = pitch_cv_to_frequency(pitch_cv_signal)
+        for index, frequency in enumerate(frequencies):
             self.component.frequency = float(frequency)
             samples[index] = next(self.component)
+        if len(frequencies) > 0:
+            self._last_runtime_frequency = float(frequencies[-1])
         return samples
 
     @staticmethod

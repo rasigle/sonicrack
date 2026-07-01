@@ -13,7 +13,7 @@ from src.gui.modules.input.midi_keyboard import MIDIKeyboardModule
 from src.gui.modules.modifier.vca import VCAModule
 from src.gui.modules.modulated_source.envelope_adsr import ADSRModule
 from src.gui.modules.source.vco import ModulatedOscillatorModule
-from src.midi_io import midi_to_frequency
+from src.midi_io import midi_note_to_pitch_cv, midi_to_frequency
 
 
 def test_midi_keyboard_note_press_updates_cv_outputs(qapp: Any):
@@ -26,6 +26,7 @@ def test_midi_keyboard_note_press_updates_cv_outputs(qapp: Any):
 
     assert module.cv_converter.current_note == 60
     assert module.cv_converter.gate == pytest.approx(1.0)
+    assert module.cv_converter.pitch_cv == pytest.approx(midi_note_to_pitch_cv(60))
     assert module.cv_converter.frequency == pytest.approx(midi_to_frequency(60))
     assert module.cv_converter.velocity == pytest.approx(64 / 127)
     assert module.note_label.text() == "C4 (60)"
@@ -58,6 +59,7 @@ def test_midi_keyboard_computer_keys_trigger_notes(qapp: Any):
 
     assert module.cv_converter.current_note == 60
     assert module.cv_converter.gate == pytest.approx(1.0)
+    assert module.cv_converter.pitch_cv == pytest.approx(midi_note_to_pitch_cv(60))
     assert module.cv_converter.frequency == pytest.approx(midi_to_frequency(60))
     assert module.note_label.text() == "C4 (60)"
     assert module.key_buttons[0].isDown()
@@ -118,7 +120,7 @@ def test_midi_keyboard_runtime_writes_frequency_gate_velocity(qapp: Any):
 
     np.testing.assert_allclose(
         module.freq_port.value,
-        np.full(8, midi_to_frequency(69), dtype=np.float32),
+        np.full(8, midi_note_to_pitch_cv(69), dtype=np.float32),
     )
     np.testing.assert_allclose(module.gate_port.value, np.ones(8, dtype=np.float32))
     np.testing.assert_allclose(
@@ -158,6 +160,7 @@ def test_midi_keyboard_frequency_can_drive_vco_runtime(qapp: Any):
     output = np.asarray(vco.out_port.value)
     assert output.shape == (128,)
     assert np.any(output != 0.0)
+    assert vco.component.frequency == pytest.approx(midi_to_frequency(60), rel=0.01)
 
 
 def test_midi_keyboard_frequency_can_drive_vco_vectorized_runtime(qapp: Any):

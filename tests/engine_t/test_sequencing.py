@@ -10,7 +10,7 @@ from src.engine.sequencing import (
     StepEvent,
     StepSequencer,
 )
-from src.midi_io.utils import midi_to_frequency
+from src.engine.utils.cv import midi_note_to_pitch_cv
 
 
 def test_step_clock_emits_initial_and_subsequent_pulses():
@@ -45,11 +45,11 @@ def test_step_sequencer_renders_pitch_gate_accent_and_slide():
 
     frame = sequencer.process(10)
 
-    np.testing.assert_allclose(frame.frequency[:4], midi_to_frequency(36))
+    np.testing.assert_allclose(frame.frequency[:4], midi_note_to_pitch_cv(36))
     np.testing.assert_allclose(frame.gate[:4], [1, 1, 1, 0])
     np.testing.assert_allclose(frame.accent[:4], 1.0)
     np.testing.assert_allclose(frame.gate[4:8], 0.0)
-    np.testing.assert_allclose(frame.frequency[8:], midi_to_frequency(39))
+    np.testing.assert_allclose(frame.frequency[8:], midi_note_to_pitch_cv(39))
     np.testing.assert_allclose(frame.slide[8:], 1.0)
 
 
@@ -62,37 +62,37 @@ def test_step_sequencer_accepts_external_clock_pulses():
 
     frame = sequencer.process(6, clock)
 
-    np.testing.assert_allclose(frame.frequency[:3], midi_to_frequency(36))
-    np.testing.assert_allclose(frame.frequency[3:], midi_to_frequency(48))
+    np.testing.assert_allclose(frame.frequency[:3], midi_note_to_pitch_cv(36))
+    np.testing.assert_allclose(frame.frequency[3:], midi_note_to_pitch_cv(48))
 
 
 def test_slide_processor_smooths_only_when_slide_is_active():
     slide = SlideProcessor(time=0.25, sample_rate=4)
 
     output = slide.process(
-        np.array([100.0, 200.0, 200.0, 300.0], dtype=np.float32),
+        np.array([0.0, 1.0, 1.0, 2.0], dtype=np.float32),
         np.array([0.0, 1.0, 1.0, 0.0], dtype=np.float32),
     )
 
-    np.testing.assert_allclose(output, [100.0, 200.0, 200.0, 300.0])
+    np.testing.assert_allclose(output, [0.0, 1.0, 1.0, 2.0])
 
 
 def test_slide_processor_uses_gradual_smoothing_for_longer_times():
     slide = SlideProcessor(time=1.0, sample_rate=4)
 
     output = slide.process(
-        np.full(4, 200.0, dtype=np.float32),
+        np.full(4, 1.0, dtype=np.float32),
         np.ones(4, dtype=np.float32),
     )
 
-    assert output[0] == pytest.approx(200.0)
+    assert output[0] == pytest.approx(1.0)
     second = slide.process(
-        np.full(4, 100.0, dtype=np.float32),
+        np.full(4, 0.0, dtype=np.float32),
         np.ones(4, dtype=np.float32),
     )
-    assert second[0] < 200.0
-    assert second[0] > 100.0
-    assert second[-1] > 100.0
+    assert second[0] < 1.0
+    assert second[0] > 0.0
+    assert second[-1] > 0.0
 
 
 def test_accent_processor_shapes_depth_outputs():

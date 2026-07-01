@@ -1,7 +1,7 @@
 """MIDI CV output adapters for different signal types.
 
 These adapters wrap the MIDIToCV converter to provide specific outputs
-(frequency, gate, velocity) that can be connected to other modules.
+(1V/oct pitch CV, gate, velocity) that can be connected to other modules.
 """
 
 from typing import Any
@@ -13,10 +13,13 @@ from src.midi_io.midi_to_cv import MIDIToCV
 
 
 class CVFrequencyOutput(AudioComponent):
-    """Outputs frequency CV from MIDI converter."""
+    """Outputs 1V/oct pitch CV from MIDI converter.
+
+    The class name is kept for patch/API compatibility with older code.
+    """
 
     def __init__(self, cv_converter: MIDIToCV):
-        """Initialize frequency output.
+        """Initialize pitch CV output.
 
         Args:
             cv_converter: The MIDIToCV converter to read from
@@ -25,7 +28,7 @@ class CVFrequencyOutput(AudioComponent):
         self.cv_converter = cv_converter
 
     def get_samples(self, n: int, *args: Any, **kwargs: Any) -> np.ndarray:
-        """Get frequency samples.
+        """Get pitch CV samples.
 
         Args:
             n: Number of samples to generate
@@ -33,7 +36,7 @@ class CVFrequencyOutput(AudioComponent):
             **kwargs: Additional arguments (ignored, for compatibility)
 
         Returns:
-            Array of frequency values in Hz
+            Array of pitch CV values in volts
         """
         _ = args, kwargs
         return self.cv_converter.get_samples(n)
@@ -44,7 +47,7 @@ class CVFrequencyOutput(AudioComponent):
 
     def __next__(self):
         """Return next CV value (constant)."""
-        return self.cv_converter.frequency
+        return self.cv_converter.pitch_cv
 
 
 class CVGateOutput(AudioComponent):

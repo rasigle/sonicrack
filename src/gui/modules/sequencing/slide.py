@@ -24,7 +24,7 @@ class SlideModule(ModuleWidget):
     metadata = ModuleMetadata(
         title="Slide",
         category=ModuleCategory.MODIFIER,
-        description="Portamento processor for frequency CV",
+        description="Portamento processor for 1V/oct pitch CV",
     )
 
     def __init__(self) -> None:

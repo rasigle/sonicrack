@@ -66,6 +66,7 @@ def test_step_sequencer_module_writes_all_cv_outputs(qapp: Any):
     )
 
     assert np.asarray(module.freq_port.value).shape == (4,)
+    np.testing.assert_allclose(module.freq_port.value, [-2.0, -2.0, -1.0, -1.0])
     np.testing.assert_allclose(module.gate_port.value, [1, 1, 1, 1])
     np.testing.assert_allclose(module.accent_port.value, [1, 1, 0, 0])
     np.testing.assert_allclose(module.slide_port.value, [0, 0, 1, 1])
@@ -76,7 +77,7 @@ def test_slide_module_processes_frequency_cv(qapp: Any):
     module = SlideModule()
     _connect_signal(
         module.freq_input,
-        np.array([100.0, 200.0, 200.0, 200.0], dtype=np.float32),
+        np.array([0.0, 1.0, 1.0, 1.0], dtype=np.float32),
     )
     _connect_signal(
         module.slide_input,
@@ -87,8 +88,8 @@ def test_slide_module_processes_frequency_cv(qapp: Any):
 
     output = np.asarray(module.freq_output.value)
     assert output.shape == (4,)
-    assert output[0] == 100.0
-    assert 100.0 < output[1] < 200.0
+    assert output[0] == 0.0
+    assert 0.0 < output[1] < 1.0
 
 
 def test_accent_module_writes_scaled_cv_outputs(qapp: Any):

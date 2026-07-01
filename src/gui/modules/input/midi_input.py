@@ -5,9 +5,32 @@ It converts MIDI messages to control voltages (CV) that can control oscillators
 and other synthesis parameters.
 
 Outputs:
-    - Freq: Frequency CV based on MIDI note (Hz)
+    - Freq: 1V/oct pitch CV based on MIDI note
     - Gate: Gate signal (1.0 = note on, 0.0 = note off)
     - Vel: Velocity CV (0.0 to 1.0)
+
+Pitch CV convention:
+    AudioPlayground uses 1V/oct for pitch control signals globally. The Freq
+    output is a control voltage in volts, not a frequency in Hz.
+
+    - 0V is MIDI note 60 (C4, about 261.63 Hz)
+    - +1V is one octave up, so it doubles frequency
+    - -1V is one octave down, so it halves frequency
+    - One semitone is 1/12V
+
+    Conversion:
+        pitch_cv = (midi_note - 60) / 12
+        frequency_hz = 261.6255653005986 * 2 ** pitch_cv
+
+    Examples:
+        C3 / MIDI 48 -> -1.000V
+        C4 / MIDI 60 ->  0.000V
+        A4 / MIDI 69 ->  0.750V -> 440 Hz
+        C5 / MIDI 72 ->  1.000V
+
+    Modules that generate pitch should output this voltage convention. Modules
+    that consume pitch, such as VCO and TB-303 Voice, convert the incoming CV to
+    Hz internally at the oscillator/voice boundary.
 
 Features:
     - Device selection from available MIDI inputs
@@ -93,7 +116,7 @@ class MIDIInputModule(ModuleWidget):
         )
 
         # Add output ports
-        self.freq_port = self.add_output("Freq")
+        self.freq_port = self.add_output("1V/Oct")
         self.gate_port = self.add_output("Gate")
         self.vel_port = self.add_output("Vel")
 

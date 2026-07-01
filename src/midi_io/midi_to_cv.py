@@ -5,7 +5,7 @@ to control oscillators and other synthesis parameters in the modular system.
 
 CV Outputs:
     - Gate: 0 or 1 signal indicating note on/off
-    - Pitch: Frequency in Hz corresponding to MIDI note
+    - Pitch: 1V/oct pitch CV, with 0V = C4
     - Velocity: 0.0 to 1.0 normalized velocity
     - Mod Wheel: 0.0 to 1.0 from CC#1
     - Expression: 0.0 to 1.0 from CC#11
@@ -19,7 +19,7 @@ Example:
     >>>
     >>> # Get current state
     >>> print(converter.gate)        # 1.0 (note is on)
-    >>> print(converter.frequency)   # 261.63 Hz (middle C)
+    >>> print(converter.pitch_cv)    # 0.0V (middle C)
     >>> print(converter.velocity)    # 0.787 (100/127)
 """
 
@@ -30,6 +30,7 @@ import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.core.component import AudioComponent
+from src.engine.utils.cv import midi_note_to_pitch_cv, pitch_cv_to_frequency
 from src.midi_io.messages import (
     ControlChangeMessage,
     MIDIMessage,
@@ -49,7 +50,7 @@ class MIDIToCV(AudioComponent):
 
     Outputs:
         - gate: 1.0 when note is on, 0.0 when off
-        - frequency: Frequency in Hz of current note
+        - pitch_cv: 1V/oct pitch CV for current note
         - velocity: Normalized velocity (0.0-1.0)
         - mod_wheel: CC#1 value (0.0-1.0)
         - expression: CC#11 value (0.0-1.0)
@@ -64,7 +65,7 @@ class MIDIToCV(AudioComponent):
         >>>
         >>> # Generate CV signal (constant values)
         >>> cv_samples = converter.get_samples(1000)
-        >>> assert np.all(cv_samples == converter.frequency)
+        >>> assert np.all(cv_samples == converter.pitch_cv)
     """
 
     def __init__(
@@ -85,7 +86,7 @@ class MIDIToCV(AudioComponent):
 
         # Current state
         self.gate: float = 0.0
-        self.frequency: float = 440.0  # A4 default
+        self.pitch_cv: float = midi_note_to_pitch_cv(69)  # A4 default
         self.velocity: float = 0.0
         self.mod_wheel: float = 0.0
         self.expression: float = 1.0
@@ -121,7 +122,12 @@ class MIDIToCV(AudioComponent):
         self.velocity = msg.normalize_velocity()
         self._update_frequency()
 
-        logger.debug(f"Note ON: {msg.note}, freq={self.frequency:.2f}Hz")
+        logger.debug(
+            "Note ON: %s, pitch_cv=%.3fV, freq=%.2fHz",
+            msg.note,
+            self.pitch_cv,
+            self.frequency,
+        )
 
     def _handle_note_off(self, msg: NoteOffMessage):
         """Handle note off message."""
@@ -147,27 +153,34 @@ class MIDIToCV(AudioComponent):
         self._update_frequency()
         logger.debug(f"Pitch Bend: {self.pitch_bend:.3f} semitones")
 
-    def _update_frequency(self):
-        """Update frequency based on current note and pitch bend."""
+    @property
+    def frequency(self) -> float:
+        """Frequency in Hz derived from the current 1V/oct pitch CV."""
+        return float(pitch_cv_to_frequency(self.pitch_cv))
+
+    def _update_pitch_cv(self):
+        """Update pitch CV based on current note and pitch bend."""
         if self.current_note is not None:
-            # Apply pitch bend - midi_to_frequency formula works with float
             note_with_bend = float(self.current_note) + self.pitch_bend
-            # The formula works fine with fractional MIDI notes for microtonal tuning
-            self.frequency = 440.0 * (2 ** ((note_with_bend - 69) / 12))
+            self.pitch_cv = float(midi_note_to_pitch_cv(note_with_bend))
+
+    def _update_frequency(self):
+        """Compatibility alias for older call sites."""
+        self._update_pitch_cv()
 
     def get_samples(self, n: int, *args: Any, **kwargs: Any) -> np.ndarray:
         """Generate constant CV output.
 
-        This returns the frequency as a constant signal. For gate/velocity/etc,
+        This returns pitch CV volts as a constant signal. For gate/velocity/etc,
         access the attributes directly.
 
         Args:
             n: Number of samples to generate
 
         Returns:
-            Array of frequency values (constant)
+            Array of 1V/oct pitch CV values (constant)
         """
-        return np.full(n, self.frequency, dtype=np.float32)
+        return np.full(n, self.pitch_cv, dtype=np.float32)
 
     def get_gate_samples(self, num_samples: int) -> np.ndarray:
         """Get gate signal (0 or 1).
@@ -188,7 +201,7 @@ class MIDIToCV(AudioComponent):
     def reset(self):
         """Reset all CV outputs to default state."""
         self.gate = 0.0
-        self.frequency = 440.0
+        self.pitch_cv = float(midi_note_to_pitch_cv(69))
         self.velocity = 0.0
         self.mod_wheel = 0.0
         self.expression = 1.0

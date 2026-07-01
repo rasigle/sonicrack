@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine import frequency_to_pitch_cv
 from src.engine.dsp.modulators import ADSREnvelope, DecayEnvelope
 from src.engine.generators.oscillators.oscillator_ramp import SawtoothOscillator
 from src.engine.generators.oscillators.oscillator_sine import SineOscillator
@@ -152,6 +153,68 @@ def test_lfo_frequency_changes_are_ramped_across_buffer(qapp: Any):
     assert boundary_jump < 0.01
     assert module._sine_oscillator.frequency < 12.0
     assert module._sine_oscillator.frequency > 1.0
+
+
+def test_lfo_frequency_ramp_state_is_tracked_per_waveform(qapp: Any):
+    del qapp
+    module = LFOModule()
+
+    module.process_runtime(128, {"frequency": 1.0, "pulsewidth": 0.5})
+    module.process_runtime(128, {"frequency": 12.0, "pulsewidth": 0.5})
+
+    for index, oscillator in enumerate(module.oscs):
+        assert module._last_runtime_frequencies[index] == pytest.approx(
+            oscillator.frequency
+        )
+
+
+def test_lfo_can_drive_vco_without_click_on_lfo_frequency_change(qapp: Any):
+    del qapp
+    lfo = LFOModule()
+    vco = ModulatedOscillatorModule()
+    lfo.sine_port.connect(vco.freq_input)
+    parameters = {
+        "waveform": "Sine",
+        "mode": "analog",
+        "frequency": 440.0,
+        "gain_db": -12.0,
+        "phase": 0.0,
+    }
+
+    lfo.process_runtime(512, {"frequency": 1.0, "pulsewidth": 0.5})
+    vco.process_runtime(512, parameters)
+    first = np.asarray(vco.out_port.value)
+
+    lfo.process_runtime(512, {"frequency": 12.0, "pulsewidth": 0.5})
+    vco.process_runtime(512, parameters)
+    second = np.asarray(vco.out_port.value)
+
+    boundary_jump = abs(float(second[0] - first[-1]))
+    assert boundary_jump < 0.08
+
+
+def test_vco_pitch_cv_input_is_dezippered(qapp: Any):
+    del qapp
+    module = ModulatedOscillatorModule()
+    pitch_source = _connect_constant_input(module.freq_input, 0.0)
+    parameters = {
+        "waveform": "Sine",
+        "mode": "analog",
+        "frequency": 440.0,
+        "gain_db": -12.0,
+        "phase": 0.0,
+    }
+
+    pitch_source.write(np.zeros(32, dtype=np.float32))
+    module.process_runtime(32, parameters)
+
+    pitch_source.write(np.ones(32, dtype=np.float32))
+    module.process_runtime(32, parameters)
+
+    assert module.component.frequency < 523.2512
+    assert module.component.frequency > 261.6255
+    assert module._last_pitch_cv is not None
+    assert 0.0 < module._last_pitch_cv < 1.0
 
 
 def test_lfo_frequency_changes_are_ramped_with_clock_input_connected(qapp: Any):
@@ -595,8 +658,9 @@ def test_spectrum_update_display_accepts_numpy_sample_buffer(qapp: Any):
 def test_tb303_voice_runtime_applies_parameters_and_renders(qapp: Any):
     del qapp
     module = TB303VoiceModule()
-    freq_source = _connect_constant_input(module.freq_input, 110.0)
-    freq_source.write(np.full(32, 110.0, dtype=np.float32))
+    pitch_cv = frequency_to_pitch_cv(110.0)
+    freq_source = _connect_constant_input(module.freq_input, pitch_cv)
+    freq_source.write(np.full(32, pitch_cv, dtype=np.float32))
     gate_source = _connect_constant_input(module.gate_input, 1.0)
     gate_source.write(np.ones(32, dtype=np.float32))
 

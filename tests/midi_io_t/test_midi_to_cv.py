@@ -9,6 +9,7 @@ from src.midi_io import (
     NoteOffMessage,
     NoteOnMessage,
     PitchBendMessage,
+    midi_note_to_pitch_cv,
     midi_to_frequency,
 )
 
@@ -21,7 +22,8 @@ class TestMIDIToCV:
         cv = MIDIToCV()
 
         assert cv.gate == 0.0
-        assert cv.frequency == 440.0  # A4 default
+        assert cv.pitch_cv == pytest.approx(midi_note_to_pitch_cv(69))
+        assert cv.frequency == pytest.approx(440.0)  # A4 default
         assert cv.velocity == 0.0
         assert cv.mod_wheel == 0.0
         assert cv.expression == 1.0
@@ -38,6 +40,7 @@ class TestMIDIToCV:
         assert cv.gate == 1.0
         assert cv.current_note == 60
         assert cv.velocity == pytest.approx(100 / 127, rel=0.01)
+        assert cv.pitch_cv == pytest.approx(0.0)
         assert cv.frequency == pytest.approx(midi_to_frequency(60), rel=0.01)
 
     def test_note_off(self):
@@ -95,6 +98,7 @@ class TestMIDIToCV:
         cv.process_message(msg)
 
         # Should be +1 semitone higher
+        assert cv.pitch_cv == pytest.approx(midi_note_to_pitch_cv(61), rel=0.01)
         expected_freq = midi_to_frequency(61)
         assert cv.frequency == pytest.approx(expected_freq, rel=0.01)
 
@@ -109,6 +113,7 @@ class TestMIDIToCV:
         cv.process_message(msg)
 
         expected_freq = midi_to_frequency(72)  # C5
+        assert cv.pitch_cv == pytest.approx(midi_note_to_pitch_cv(72), rel=0.01)
         assert cv.frequency == pytest.approx(expected_freq, rel=0.01)
 
     def test_get_samples(self):
@@ -119,7 +124,7 @@ class TestMIDIToCV:
         samples = cv.get_samples(100)
 
         assert len(samples) == 100
-        assert np.all(samples == 440.0)  # Constant frequency
+        np.testing.assert_allclose(samples, midi_note_to_pitch_cv(69))
 
     def test_get_gate_samples(self):
         """Test generating gate samples."""
@@ -157,7 +162,8 @@ class TestMIDIToCV:
         cv.reset()
 
         assert cv.gate == 0.0
-        assert cv.frequency == 440.0
+        assert cv.pitch_cv == pytest.approx(midi_note_to_pitch_cv(69))
+        assert cv.frequency == pytest.approx(440.0)
         assert cv.velocity == 0.0
         assert cv.mod_wheel == 0.0
         assert cv.expression == 1.0
@@ -170,10 +176,12 @@ class TestMIDIToCV:
 
         # Play C
         cv.process_message(NoteOnMessage(0.0, 0, 60, 100))
+        assert cv.pitch_cv == pytest.approx(midi_note_to_pitch_cv(60))
         assert cv.frequency == pytest.approx(midi_to_frequency(60), rel=0.01)
 
         # Play E (should replace C)
         cv.process_message(NoteOnMessage(0.1, 0, 64, 100))
+        assert cv.pitch_cv == pytest.approx(midi_note_to_pitch_cv(64))
         assert cv.frequency == pytest.approx(midi_to_frequency(64), rel=0.01)
 
         # Release E
@@ -198,4 +206,5 @@ class TestMIDIToCV:
         # Note on channel 5
         cv.process_message(NoteOnMessage(0.2, 5, 64, 100))
         assert cv.gate == 1.0
+        assert cv.pitch_cv == pytest.approx(midi_note_to_pitch_cv(64))
         assert cv.frequency == pytest.approx(midi_to_frequency(64), rel=0.01)

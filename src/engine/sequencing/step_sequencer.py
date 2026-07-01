@@ -7,9 +7,9 @@ from dataclasses import dataclass
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.utils.cv import midi_note_to_pitch_cv
 from src.engine.sequencing.clock import StepClock
 from src.engine.utils.validation import validate_sample_count, validate_sample_rate
-from src.midi_io.utils import midi_to_frequency
 
 
 @dataclass(slots=True)
@@ -28,6 +28,8 @@ class StepEvent:
 class SequencerFrame:
     """Rendered CV outputs for one audio buffer."""
 
+    # Kept as ``frequency`` for compatibility with existing module port names.
+    # Values are 1V/oct pitch CV, not Hz.
     frequency: np.ndarray
     gate: np.ndarray
     accent: np.ndarray
@@ -58,7 +60,7 @@ class StepSequencer:
         )
         self._active_step = -1
         self._samples_in_step = 0
-        self._current_frequency = midi_to_frequency(36)
+        self._current_frequency = midi_note_to_pitch_cv(36)
         self._current_event = StepEvent(36)
 
     def reset(self) -> None:
@@ -66,7 +68,7 @@ class StepSequencer:
         self.clock.reset()
         self._active_step = -1
         self._samples_in_step = 0
-        self._current_frequency = midi_to_frequency(36)
+        self._current_frequency = midi_note_to_pitch_cv(36)
         self._current_event = StepEvent(36)
 
     @property
@@ -127,7 +129,7 @@ class StepSequencer:
 
         if self._current_event.note is not None:
             note = int(np.clip(self._current_event.note + self.transpose, 0, 127))
-            self._current_frequency = midi_to_frequency(note)
+            self._current_frequency = midi_note_to_pitch_cv(note)
 
     @staticmethod
     def _fit_signal(values: np.ndarray, num_samples: int) -> np.ndarray:

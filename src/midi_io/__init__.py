@@ -6,6 +6,7 @@ This package provides MIDI functionality including:
 - MIDI file reading and playback
 - Voice management for polyphony
 - Note-to-frequency conversion utilities
+- 1V/oct pitch CV conversion utilities
 
 Example - Basic MIDI Input:
     >>> from src.midi_io import MIDIInput
@@ -48,6 +49,11 @@ from src.midi_io.messages import (
 from src.midi_io.midi_to_cv import MIDIToCV
 from src.midi_io.monophonic_synth import MonophonicSynth
 from src.midi_io.polyphonic_synth import PolyphonicSynth, Voice
+from src.engine.utils.cv import (
+    frequency_to_pitch_cv,
+    midi_note_to_pitch_cv,
+    pitch_cv_to_frequency,
+)
 from src.midi_io.utils import (
     frequency_to_midi,
     get_note_range,
@@ -75,6 +81,9 @@ __all__ = [
     "note_name_to_frequency",
     "get_note_range",
     "transpose",
+    "pitch_cv_to_frequency",
+    "frequency_to_pitch_cv",
+    "midi_note_to_pitch_cv",
     # Input
     "MIDIInput",
     # File

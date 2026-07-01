@@ -10,11 +10,43 @@ import pytest
 from src.engine import (
     ADSREnvelope,
     CVScaler,
+    PITCH_CV_REFERENCE_FREQUENCY,
     SineOscillator,
     bipolar_to_unipolar,
+    frequency_to_pitch_cv,
+    midi_note_to_pitch_cv,
+    pitch_cv_to_frequency,
     scale_cv,
     unipolar_to_bipolar,
 )
+
+
+class TestPitchCVConversion:
+    """Tests for global 1V/oct pitch CV helpers."""
+
+    def test_midi_note_to_pitch_cv_uses_c4_as_zero_volts(self):
+        assert midi_note_to_pitch_cv(60) == pytest.approx(0.0)
+        assert midi_note_to_pitch_cv(72) == pytest.approx(1.0)
+        assert midi_note_to_pitch_cv(48) == pytest.approx(-1.0)
+
+    def test_pitch_cv_to_frequency_doubles_per_volt(self):
+        assert pitch_cv_to_frequency(0.0) == pytest.approx(PITCH_CV_REFERENCE_FREQUENCY)
+        assert pitch_cv_to_frequency(1.0) == pytest.approx(
+            PITCH_CV_REFERENCE_FREQUENCY * 2.0
+        )
+        assert pitch_cv_to_frequency(-1.0) == pytest.approx(
+            PITCH_CV_REFERENCE_FREQUENCY / 2.0
+        )
+
+    def test_frequency_to_pitch_cv_round_trips_arrays(self):
+        pitch_cv = np.array([-1.0, 0.0, 0.75, 1.0], dtype=np.float32)
+        frequencies = pitch_cv_to_frequency(pitch_cv)
+
+        np.testing.assert_allclose(
+            frequency_to_pitch_cv(frequencies),
+            pitch_cv,
+            atol=1e-6,
+        )
 
 
 class TestCVScaler:

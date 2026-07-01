@@ -47,7 +47,7 @@ class LFOModule(ModuleWidget):
     metadata = ModuleMetadata(
         title="LFO",
         category=ModuleCategory.SOURCE,
-        description="Low-frequency oscillator for modulation",
+        description="Low-frequency 1V/oct control-voltage source",
     )
 
     def __init__(self):
@@ -124,7 +124,7 @@ class LFOModule(ModuleWidget):
             self._sawtooth_oscillator,
             self._square_oscillator,
         ]
-        self._last_runtime_frequency = freq
+        self._last_runtime_frequencies = [freq] * len(self.oscs)
         self._previous_clock = 0.0
         self._last_output_values: list[float | None] = [None] * len(self.oscs)
 
@@ -210,13 +210,12 @@ class LFOModule(ModuleWidget):
             else None
         )
 
-        rendered_frequency = self._last_runtime_frequency
         final_clock = 0.0
         for index, (port, osc) in enumerate(zip(self.ports, self.oscs, strict=False)):
             if osc is not None:
                 samples, rendered_frequency, final_clock = render_with_clock_resets(
                     osc,
-                    self._last_runtime_frequency,
+                    self._last_runtime_frequencies[index],
                     frequency,
                     num_samples,
                     clock_signal,
@@ -225,16 +224,16 @@ class LFOModule(ModuleWidget):
                     LFO_CLOCK_RESET_SMOOTHING_MS,
                 )
                 port.write(samples)
+                self._last_runtime_frequencies[index] = rendered_frequency
                 if len(samples) > 0:
                     self._last_output_values[index] = float(samples[-1])
-        self._last_runtime_frequency = rendered_frequency
         self._previous_clock = final_clock
 
     @staticmethod
     def get_cv_output_range() -> tuple[float, float]:
-        """LFO outputs bipolar signal [-1, 1] for modulation.
+        """LFO outputs bipolar 1V/oct pitch CV in volts.
 
         Returns:
-            (-1.0, 1.0) - bipolar output range
+            (-1.0, 1.0) - one octave down to one octave up
         """
         return -1.0, 1.0

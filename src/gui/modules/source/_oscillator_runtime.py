@@ -21,6 +21,31 @@ class RuntimeOscillator(Protocol):
 DEFAULT_FREQUENCY_SLEW_TIME_MS = 35.0
 
 
+def smooth_control_signal(
+    signal: np.ndarray,
+    previous_value: float | None,
+    sample_rate: float,
+    smoothing_time_ms: float,
+) -> tuple[np.ndarray, float | None]:
+    """One-pole smooth a control signal while preserving buffer state."""
+    values = np.asarray(signal, dtype=np.float32).reshape(-1)
+    if len(values) == 0:
+        return values, previous_value
+    if smoothing_time_ms <= 0.0:
+        return values, float(values[-1])
+
+    smoothing_samples = max(sample_rate * smoothing_time_ms / 1000.0, 1.0)
+    alpha = 1.0 - math.exp(-1.0 / smoothing_samples)
+    current = float(values[0] if previous_value is None else previous_value)
+
+    smoothed = np.empty(len(values), dtype=np.float32)
+    for index, target in enumerate(values):
+        current += (float(target) - current) * alpha
+        smoothed[index] = current
+
+    return smoothed, current
+
+
 def _frequency_slew_values(
     previous_frequency: float,
     target_frequency: float,

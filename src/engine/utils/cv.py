@@ -13,6 +13,40 @@ from src.engine.utils.validation import validate_sample_count
 
 logger = logging.getLogger(__name__)
 
+PITCH_CV_REFERENCE_NOTE = 60
+PITCH_CV_REFERENCE_FREQUENCY = 261.6255653005986
+"""1V/oct reference: 0V is MIDI note 60, C4."""
+
+
+def pitch_cv_to_frequency(volts: float | np.ndarray) -> float | np.ndarray:
+    """Convert 1V/oct pitch CV to frequency in Hz.
+
+    ``0V`` maps to C4, and each +1V doubles the resulting frequency.
+    """
+    values = np.asarray(volts, dtype=np.float64)
+    frequency = PITCH_CV_REFERENCE_FREQUENCY * np.power(2.0, values)
+    if np.isscalar(volts):
+        return float(frequency)
+    return frequency.astype(np.float32)
+
+
+def frequency_to_pitch_cv(frequency_hz: float | np.ndarray) -> float | np.ndarray:
+    """Convert frequency in Hz to 1V/oct pitch CV."""
+    values = np.asarray(frequency_hz, dtype=np.float64)
+    cv = np.log2(values / PITCH_CV_REFERENCE_FREQUENCY)
+    if np.isscalar(frequency_hz):
+        return float(cv)
+    return cv.astype(np.float32)
+
+
+def midi_note_to_pitch_cv(note: int | float | np.ndarray) -> float | np.ndarray:
+    """Convert a MIDI note number to 1V/oct pitch CV."""
+    values = np.asarray(note, dtype=np.float64)
+    cv = (values - PITCH_CV_REFERENCE_NOTE) / 12.0
+    if np.isscalar(note):
+        return float(cv)
+    return cv.astype(np.float32)
+
 
 class CVScaler:
     """Scales CV signals from one range to another.

@@ -99,7 +99,7 @@ class MIDIKeyboardModule(ModuleWidget):
             color=QColor(190, 120, 80),
         )
 
-        self.freq_port = self.add_output("Freq")
+        self.freq_port = self.add_output("1V/Oct")
         self.gate_port = self.add_output("Gate")
         self.vel_port = self.add_output("Vel")
 

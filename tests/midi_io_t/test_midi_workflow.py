@@ -6,7 +6,12 @@ works correctly.
 
 import numpy as np
 
-from src.engine import ADSREnvelope, ModulatedOscillator, SineOscillator
+from src.engine import (
+    ADSREnvelope,
+    ModulatedOscillator,
+    SineOscillator,
+    pitch_cv_to_frequency,
+)
 from src.engine.dsp.modulators import GateTriggeredADSR
 from src.midi_io import (
     CVFrequencyOutput,
@@ -29,10 +34,10 @@ class TestMIDIWorkflow:
         # Create oscillator with frequency modulation
         base_osc = SineOscillator(440)  # Base frequency (ignored when modulated)
 
-        # Frequency modulation function: use CV frequency directly
-        def freq_mod_func(base_freq, cv_freq):
+        # Frequency modulation function: convert 1V/oct pitch CV to Hz
+        def freq_mod_func(base_freq, pitch_cv):
             _ = base_freq
-            return cv_freq
+            return pitch_cv_to_frequency(pitch_cv)
 
         mod_osc = ModulatedOscillator(base_osc, freq_output, freq_mod=freq_mod_func)
 
@@ -97,9 +102,9 @@ class TestMIDIWorkflow:
         # Create oscillator with frequency modulation
         base_osc = SineOscillator(440)
 
-        def freq_mod_func(base, cv_freq):
+        def freq_mod_func(base, pitch_cv):
             _ = base
-            return cv_freq
+            return pitch_cv_to_frequency(pitch_cv)
 
         mod_osc = ModulatedOscillator(base_osc, freq_output, freq_mod=freq_mod_func)
 

@@ -27,10 +27,10 @@ class SlideProcessor:
         self._current_frequency = None if frequency is None else float(frequency)
 
     def process(
-        self, target_frequency: np.ndarray, slide_signal: np.ndarray | None = None
+        self, target_pitch_cv: np.ndarray, slide_signal: np.ndarray | None = None
     ) -> np.ndarray:
-        """Render smoothed frequency CV for one buffer."""
-        targets = np.asarray(target_frequency, dtype=np.float32).reshape(-1)
+        """Render smoothed 1V/oct pitch CV for one buffer."""
+        targets = np.asarray(target_pitch_cv, dtype=np.float32).reshape(-1)
         if slide_signal is None:
             slides = (
                 np.ones(len(targets), dtype=np.float32)

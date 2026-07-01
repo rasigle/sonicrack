@@ -12,7 +12,7 @@ import unittest
 
 import numpy as np
 
-from engine.generator.oscillator import (
+from src.engine.generator.oscillator import (
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,

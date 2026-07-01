@@ -503,13 +503,10 @@ class ModularSynthWindow(QMainWindow):
             self._start_output_playback()  # Will check connections and stop if none
 
     def _start_output_playback(self):
-        """Start playback on the Output module using NEW process-based architecture.
-
-        No compilation needed - modules process audio through their ports directly!
-        """
+        """Start playback on the Output module through the shared render graph."""
         from src.gui.modules.output.output import OutputModule
 
-        logger.info("=== Starting process-based playback ===")
+        logger.info("=== Starting output playback ===")
         patch_canvas = self._require_patch_canvas()
         statusbar = self._require_statusbar()
 
@@ -526,12 +523,14 @@ class ModularSynthWindow(QMainWindow):
 
         logger.info(f"Found Output module: {output_module.metadata.title}")
 
-        # Simply start playback - the Output module's process chain will handle
-        # everything
         try:
-            output_module.start_playback()
-            statusbar.showMessage("Playback started (process-based)")
-            logger.info("Process-based playback started")
+            started = output_module.start_playback()
+            if started:
+                statusbar.showMessage("Playback started")
+                logger.info("Output playback started")
+            else:
+                statusbar.showMessage(output_module.status_label.text())
+                logger.info("Output playback remains stopped")
 
         except Exception as e:
             logger.error(f"Failed to start playback: {e}", exc_info=True)

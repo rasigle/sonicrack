@@ -21,8 +21,8 @@ from src.engine.generator.oscillator_minblep import (
     minimum_phase_minblep_table,
 )
 from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
+from src.engine.utils import filter_provided_args, track_provided_args
 from src.engine.validation import validate_sample_count, validate_sample_rate
-from src.utils.utils import filter_provided_args, track_provided_args
 
 SquareWaveMode = Literal[
     "ideal", "ideal_smooth", "bandlimited", "vcv", "soft", "comparator"

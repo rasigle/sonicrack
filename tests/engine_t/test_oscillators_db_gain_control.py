@@ -13,9 +13,9 @@ import logging
 import numpy as np
 import pytest
 
-from engine.generator.oscillator_ramp import SawtoothOscillator, TriangleOscillator
-from engine.generator.oscillator_sine import SineOscillator
-from engine.generator.oscillator_square import SquareOscillator
+from src.engine.generator.oscillator_ramp import SawtoothOscillator, TriangleOscillator
+from src.engine.generator.oscillator_sine import SineOscillator
+from src.engine.generator.oscillator_square import SquareOscillator
 from src.engine.modifier import ModulatedVolume, Volume
 
 

@@ -471,6 +471,203 @@ def test_preset_built_event_graph_preserves_state_across_sample_rates(
     np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
 
 
+@pytest.mark.parametrize("sample_rate", [44100, 48000, 96000])
+def test_nested_graph_runtime_parameter_changes_preserve_state_across_buffers(
+    sample_rate: int,
+):
+    segment_lengths = (
+        int(sample_rate * 0.011),
+        int(sample_rate * 0.013),
+        int(sample_rate * 0.017),
+    )
+
+    def make_graph() -> tuple[Chain, Delay, Reverb]:
+        bass = Chain(
+            SawtoothOscillator(
+                frequency=sample_rate / 360,
+                gain_db=-15,
+                mode="analog",
+                sample_rate=sample_rate,
+            ),
+            ButterworthFilter(
+                cutoff=min(1400, sample_rate * 0.06),
+                order=3,
+                sample_rate=sample_rate,
+            ),
+            Volume(gain_db=-4),
+        )
+        shimmer_lfo = SineOscillator(
+            frequency=0.8,
+            amplitude=0.2,
+            gain_db=None,
+            sample_rate=sample_rate,
+        )
+        shimmer = Chain(
+            TriangleOscillator(
+                frequency=sample_rate / 160,
+                gain_db=-18,
+                mode="analog",
+                sample_rate=sample_rate,
+            ),
+            ModulatedVolume(
+                shimmer_lfo,
+                sample_rate=sample_rate,
+                smoothing_time_ms=3.0,
+            ),
+        )
+        echo = Delay(
+            SquareOscillator(
+                frequency=sample_rate / 220,
+                gain_db=-20,
+                pulsewidth=0.41,
+                mode="bandlimited",
+                sample_rate=sample_rate,
+            ),
+            delay_time=0.004,
+            feedback=0.22,
+            mix=0.3,
+            sample_rate=sample_rate,
+        )
+        room = Reverb(
+            WaveAdder(bass, shimmer, echo, mix_mode="average"),
+            room_size=0.4,
+            damping=0.35,
+            mix=0.25,
+            sample_rate=sample_rate,
+        )
+        graph = Chain(
+            room,
+            ButterworthFilter(
+                cutoff=min(2600, sample_rate * 0.18),
+                order=4,
+                sample_rate=sample_rate,
+            ),
+            Panner(position=0.15, sample_rate=sample_rate, smoothing_time_ms=2.0),
+        )
+        return graph, echo, room
+
+    def apply_first_change(delay: Delay, reverb: Reverb) -> None:
+        delay.feedback = 0.48
+        delay.mix = 0.42
+        reverb.damping = 0.2
+
+    def apply_second_change(delay: Delay, reverb: Reverb) -> None:
+        delay.delay_time = 0.007
+        reverb.room_size = 0.72
+        reverb.mix = 0.38
+
+    continuous_graph, continuous_delay, continuous_reverb = make_graph()
+    continuous_segments = [
+        continuous_graph.get_samples_vectorized(segment_lengths[0]),
+    ]
+    apply_first_change(continuous_delay, continuous_reverb)
+    continuous_segments.append(
+        continuous_graph.get_samples_vectorized(segment_lengths[1])
+    )
+    apply_second_change(continuous_delay, continuous_reverb)
+    continuous_segments.append(
+        continuous_graph.get_samples_vectorized(segment_lengths[2])
+    )
+    continuous = np.concatenate(continuous_segments)
+
+    chunked_graph, chunked_delay, chunked_reverb = make_graph()
+    chunked_segments = [
+        _render_chunked_total(
+            chunked_graph.get_samples_vectorized,
+            segment_lengths[0],
+        ),
+    ]
+    apply_first_change(chunked_delay, chunked_reverb)
+    chunked_segments.append(
+        _render_chunked_total(
+            chunked_graph.get_samples_vectorized,
+            segment_lengths[1],
+        )
+    )
+    apply_second_change(chunked_delay, chunked_reverb)
+    chunked_segments.append(
+        _render_chunked_total(
+            chunked_graph.get_samples_vectorized,
+            segment_lengths[2],
+        )
+    )
+    chunked = np.concatenate(chunked_segments)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("audio_rate", "modulator_rate"),
+    [(44100, 48000), (48000, 44100), (96000, 48000)],
+)
+def test_modulation_heavy_graph_with_mixed_component_sample_rates_preserves_state(
+    audio_rate: int,
+    modulator_rate: int,
+):
+    def make_graph() -> Chain:
+        amplitude_lfo = SineOscillator(
+            frequency=3.5,
+            amplitude=0.25,
+            gain_db=None,
+            sample_rate=modulator_rate,
+        )
+        pan_lfo = SineOscillator(
+            frequency=1.25,
+            amplitude=0.9,
+            gain_db=None,
+            sample_rate=modulator_rate,
+        )
+        carrier = SineOscillator(
+            frequency=audio_rate / 190,
+            gain_db=-12,
+            mode="analog",
+            sample_rate=audio_rate,
+        )
+        modulator = TriangleOscillator(
+            frequency=4.0,
+            amplitude=0.2,
+            gain_db=None,
+            mode="analog",
+            sample_rate=modulator_rate,
+        )
+        voice = ModulatedOscillator(
+            carrier,
+            modulator,
+            amp_mod=lambda base_amp, mod_value: base_amp * (0.75 + mod_value),
+        )
+        return Chain(
+            voice,
+            ModulatedVolume(
+                amplitude_lfo,
+                sample_rate=audio_rate,
+                smoothing_time_ms=4.0,
+            ),
+            Delay(
+                delay_time=0.003,
+                feedback=0.18,
+                mix=0.22,
+                sample_rate=audio_rate,
+            ),
+            Reverb(
+                room_size=0.32,
+                damping=0.48,
+                mix=0.18,
+                sample_rate=audio_rate,
+            ),
+            ModulatedPanner(
+                pan_lfo,
+                sample_rate=audio_rate,
+                smoothing_time_ms=4.0,
+            ),
+        )
+
+    continuous = make_graph().get_samples_vectorized(TOTAL_SAMPLES)
+    chunked_graph = make_graph()
+    chunked = _render_chunked(chunked_graph.get_samples_vectorized)
+
+    np.testing.assert_allclose(chunked, continuous, rtol=1e-6, atol=1e-6)
+
+
 @pytest.mark.parametrize("mode", ["pure", "warm", "bright", "analog"])
 def test_sine_oscillator_preserves_state_across_buffers(mode: str):
     def make_sine() -> SineOscillator:

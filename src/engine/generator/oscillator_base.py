@@ -7,10 +7,10 @@ import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.audio_component import Generator
+from src.engine.math import db_to_linear, linear_to_db
 from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
+from src.engine.utils import track_provided_args
 from src.engine.validation import validate_sample_count, validate_sample_rate
-from src.utils.math import db_to_linear, linear_to_db
-from src.utils.utils import track_provided_args
 
 DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS = 10
 """Default duration for amplitude smoothing to prevent clicks."""

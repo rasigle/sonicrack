@@ -167,10 +167,19 @@ class TestOutputModuleRouting:
         """Inactive output module must not restart playback."""
         output_module.set_active(False)
 
-        output_module.start_playback()
+        started = output_module.start_playback()
 
+        assert not started
         assert not output_module.audio_output.is_playing
         assert output_module.status_label.text() == "Off"
+
+    def test_disconnected_output_does_not_report_started(self, output_module):
+        """Disconnected output should report that playback did not start."""
+        started = output_module.start_playback()
+
+        assert not started
+        assert not output_module.audio_output.is_playing
+        assert output_module.status_label.text() == "No input"
 
     def test_inactive_output_generates_silence(self, output_module):
         """Inactive output callback must return silence even with inputs."""
@@ -218,19 +227,20 @@ class TestOutputModuleRouting:
 
     def test_right_only_connection_starts_playback(self, output_module):
         """A signal patched only to Right is still a valid output input."""
-        started = False
+        backend_started = False
 
         def start_playback():
-            nonlocal started
-            started = True
+            nonlocal backend_started
+            backend_started = True
             output_module.audio_output.is_playing = True
 
         output_module.audio_output.start_playback = start_playback
         output_module.inp_port_r.connect(Port("output", "Right Source"))
 
-        output_module.start_playback()
+        started = output_module.start_playback()
 
         assert started
+        assert backend_started
         assert output_module.audio_output.is_playing
         assert output_module.status_label.text() == "Playing"
 

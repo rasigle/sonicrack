@@ -14,6 +14,8 @@ All notable changes to AudioPlayground will be documented in this file.
   `RuntimeError` and `AttributeError` from module processing.
 - Fixed legacy `Port.read()` scalar/array mixing when a scalar connection is read
   before an array connection.
+- Fixed Output playback status reporting so the main window no longer reports a
+  start when the Output module intentionally remains stopped.
 
 ### Maintainability
 
@@ -267,7 +269,7 @@ First release of AudioPlayground!
 - Teaching/learning synthesis
 - Game audio development
 
-**Get Started**: See [Quick Start Guide](docs/getting-started/quick-start-gui.md)
+**Get Started**: See [Quick Start Guide](docs/user-guide/getting-started/quick-start-gui.md)
 
 ---
 

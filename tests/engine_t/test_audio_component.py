@@ -10,12 +10,6 @@ Tests cover:
 
 import unittest
 
-from engine.generator.oscillator_modulated import (
-    ModulatedFrequency,
-    ModulatedOscillator,
-)
-from engine.generator.oscillator_ramp import SawtoothOscillator
-from engine.generator.oscillator_square import SquareOscillator
 from src.engine.audio_component import (
     ComponentCategory,
     ComponentDescriptor,
@@ -23,6 +17,12 @@ from src.engine.audio_component import (
 )
 from src.engine.composer import WaveAdder
 from src.engine.effects import Delay, Distortion, Reverb
+from src.engine.generator.oscillator_modulated import (
+    ModulatedFrequency,
+    ModulatedOscillator,
+)
+from src.engine.generator.oscillator_ramp import SawtoothOscillator
+from src.engine.generator.oscillator_square import SquareOscillator
 from src.engine.modifier import (
     Frequency,
     ModulatedClipper,

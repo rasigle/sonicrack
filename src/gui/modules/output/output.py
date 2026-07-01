@@ -120,10 +120,14 @@ class OutputModule(ModuleWidget):
         if was_active and not active:
             self.stop_playback()
 
-    def start_playback(self):
+    def start_playback(self) -> bool:
         """Start audio playback through the engine-owned render graph.
 
         Also stops playback if there are no connections.
+
+        Returns:
+            True if playback is running or was started, False when this module
+            intentionally stays stopped.
         """
         logger.info("OutputModule.start_playback() called")
         logger.info(
@@ -140,7 +144,7 @@ class OutputModule(ModuleWidget):
             self.status_label.setStyleSheet(
                 "color: #888; font-size: 10px; font-style: italic;"
             )
-            return
+            return False
 
         # Check if we have any connections
         if not self.inp_port_l.is_connected and not self.inp_port_r.is_connected:
@@ -155,7 +159,7 @@ class OutputModule(ModuleWidget):
             self.status_label.setStyleSheet(
                 "color: #f80; font-size: 10px; font-style: italic;"
             )
-            return
+            return False
 
         # We have connections - start playback if not already playing
         if not self.audio_output.is_playing:
@@ -165,6 +169,8 @@ class OutputModule(ModuleWidget):
             self.status_label.setStyleSheet(
                 "color: #4f4; font-size: 10px; font-weight: bold;"
             )
+
+        return True
 
     def stop_playback(self, graceful: bool = True):
         """Stop audio playback.

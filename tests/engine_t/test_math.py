@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from src.utils.math import db_to_linear, linear_to_db, squish_val
+from src.engine.math import db_to_linear, linear_to_db, squish_val
 
 
 class TestOscillatorDBControl:

@@ -45,10 +45,10 @@ from src.engine.audio_component import (
 )
 from src.engine.audio_component_registry import ComponentCategory, register_component
 from src.engine.generator.oscillator import _derive_amplitude_from_init
+from src.engine.math import db_to_linear, linear_to_db
 from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
+from src.engine.utils import track_provided_args
 from src.engine.validation import validate_numeric_range, validate_sample_rate
-from src.utils.math import db_to_linear, linear_to_db
-from src.utils.utils import track_provided_args
 
 logger = logging.getLogger(__name__)
 

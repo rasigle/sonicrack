@@ -194,11 +194,11 @@ The `docs/` folder is extensive, but it is a mix of:
 
 Useful starting points:
 
-- `docs/README.md`
-- `docs/REPO_ANALYSIS_2026-05-26.md`
-- `docs/ARCHITECTURE_VISUAL_GUIDE.md`
-- `docs/PROCESS_ARCHITECTURE_ANALYSIS.md`
-- `docs/troubleshooting.md`
+- `docs/index.md`
+- `docs/archive/REPO_ANALYSIS_2026-05-26.md`
+- `docs/developer-guide/ARCHITECTURE_VISUAL_GUIDE.md`
+- `docs/developer-guide/PROCESS_ARCHITECTURE_ANALYSIS.md`
+- `docs/user-guide/troubleshooting.md`
 
 Some older docs still describe the project as more polished or more final than the current repository state supports, so treat historical status claims carefully.
 

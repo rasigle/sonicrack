@@ -800,7 +800,7 @@ class Reverb(Modifier):
             buffer = self._comb_buffers[index]
             pos = self._comb_positions[index]
 
-            output = float(buffer[pos])
+            output = buffer[pos]
             filtered = (
                 output * self._damp2 + self._comb_filter_states[index] * self._damp1
             )
@@ -816,7 +816,7 @@ class Reverb(Modifier):
             buffer = self._allpass_buffers[index]
             pos = self._allpass_positions[index]
 
-            delayed = float(buffer[pos])
+            delayed = buffer[pos]
             output = -wet + delayed
             buffer[pos] = wet + delayed * 0.5
             self._allpass_positions[index] = (pos + 1) % self._allpass_buffer_lengths[
@@ -855,7 +855,7 @@ class Reverb(Modifier):
                 buffer = comb_buffers[index]
                 pos = comb_positions[index]
 
-                output = float(buffer[pos])
+                output = buffer[pos]
                 filtered = output * damp2 + comb_states[index] * damp1
                 comb_states[index] = filtered
                 buffer[pos] = input_value + filtered * feedback
@@ -873,7 +873,7 @@ class Reverb(Modifier):
                 buffer = allpass_buffers[index]
                 pos = allpass_positions[index]
 
-                delayed = float(buffer[pos])
+                delayed = buffer[pos]
                 output = -wet + delayed
                 buffer[pos] = wet + delayed * 0.5
 

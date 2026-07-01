@@ -19,8 +19,8 @@ from src.engine.generator.oscillator_minblep import (
     VCV_MINBLEP_ZERO_CROSSINGS,
     minimum_phase_minblep_table,
 )
+from src.engine.utils import filter_provided_args, track_provided_args
 from src.engine.validation import validate_sample_count
-from src.utils.utils import filter_provided_args, track_provided_args
 
 SawtoothMode = Literal["pure", "analog", "vcv"]
 

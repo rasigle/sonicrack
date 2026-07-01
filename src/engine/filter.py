@@ -50,9 +50,9 @@ from src.engine.audio_component import (
     make_parameter_descriptors,
 )
 from src.engine.audio_component_registry import register_component
+from src.engine.math import db_to_linear
 from src.engine.modifier import Modifier
 from src.engine.validation import validate_sample_rate
-from src.utils.math import db_to_linear
 
 
 @register_component()

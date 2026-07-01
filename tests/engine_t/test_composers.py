@@ -4,8 +4,8 @@ import unittest
 
 import numpy as np
 
-from engine.generator.oscillator import SineOscillator, TriangleOscillator
 from src.engine.composer import Chain, WaveAdder
+from src.engine.generator.oscillator import SineOscillator, TriangleOscillator
 from src.engine.modifier import Clipper, ModulatedPanner, Panner, Volume
 
 
@@ -53,7 +53,7 @@ class TestChain(unittest.TestCase):
 
     def test_trigger_release(self) -> None:
         """Test trigger_release propagates to oscillator."""
-        from engine.generator.oscillator_modulated import ModulatedOscillator
+        from src.engine.generator.oscillator_modulated import ModulatedOscillator
         from src.engine.modulator import ADSREnvelope
 
         env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
@@ -68,7 +68,7 @@ class TestChain(unittest.TestCase):
 
     def test_ended_property(self) -> None:
         """Test ended property reflects component state."""
-        from engine.generator.oscillator_modulated import ModulatedOscillator
+        from src.engine.generator.oscillator_modulated import ModulatedOscillator
         from src.engine.modulator import ADSREnvelope
 
         env = ADSREnvelope(0.1, 0.1, 0.7, 0.1)
@@ -169,7 +169,7 @@ class TestWaveAdder(unittest.TestCase):
 
     def test_trigger_release(self) -> None:
         """Test trigger_release propagates to all generators."""
-        from engine.generator.oscillator_modulated import ModulatedOscillator
+        from src.engine.generator.oscillator_modulated import ModulatedOscillator
         from src.engine.modulator import ADSREnvelope
 
         env1 = ADSREnvelope(0.1, 0.1, 0.7, 0.1)

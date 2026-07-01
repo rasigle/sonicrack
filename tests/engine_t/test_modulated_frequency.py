@@ -13,13 +13,13 @@ Tests cover:
 import numpy as np
 import pytest
 
-from engine.generator.oscillator import (
+from src.engine.generator.oscillator import (
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
     TriangleOscillator,
 )
-from engine.generator.oscillator_modulated import (
+from src.engine.generator.oscillator_modulated import (
     ModulatedFrequency,
     ModulatedOscillator,
 )

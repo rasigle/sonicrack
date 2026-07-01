@@ -1,0 +1,188 @@
+{
+  "metadata": {
+    "name": "Untitled Preset",
+    "author": "",
+    "description": "",
+    "tags": [],
+    "category": "User",
+    "created": "2026-07-01T16:22:42.037698",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": {
+        "x": 1324.0,
+        "y": -55.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 1,
+      "type": "Delay",
+      "custom_name": "Rhythmic Space",
+      "module_category": "Modifier",
+      "position": {
+        "x": 1018.0,
+        "y": -79.0
+      },
+      "parameters": {
+        "active": true,
+        "delay_time": 0.29699999999999943,
+        "feedback": 0.29000000000000004,
+        "mix": 0.3399999999999997
+      }
+    },
+    {
+      "id": 2,
+      "type": "Clipper",
+      "custom_name": "Hard Limit",
+      "module_category": "Modifier",
+      "position": {
+        "x": 795.0,
+        "y": -73.0
+      },
+      "parameters": {
+        "active": true,
+        "threshold": 0.745
+      }
+    },
+    {
+      "id": 3,
+      "type": "Filter",
+      "custom_name": "Tighten Low End",
+      "module_category": "Modifier",
+      "position": {
+        "x": 545.0,
+        "y": -82.0
+      },
+      "parameters": {
+        "active": true,
+        "cutoff": 3450.7488875014296,
+        "high_cutoff": 2000,
+        "order": 3.313,
+        "filter_type": "Low-pass"
+      }
+    },
+    {
+      "id": 4,
+      "type": "Distortion",
+      "custom_name": "Extra Crunch",
+      "module_category": "Modifier",
+      "position": {
+        "x": 296.0,
+        "y": -65.0
+      },
+      "parameters": {
+        "active": true,
+        "drive": 1.0,
+        "mix": 0.7,
+        "distortion_type": "hard"
+      }
+    },
+    {
+      "id": 5,
+      "type": "TB-303 Voice",
+      "custom_name": "Acid Bass",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": -74.0,
+        "y": -90.0
+      },
+      "parameters": {
+        "active": true,
+        "waveform": "Sawtooth",
+        "tuning": 1.2324999999999997,
+        "pulsewidth": 0.5,
+        "cutoff": 1199.6285580384936,
+        "resonance": 3.836366091642431,
+        "env_amount": 1.3800000000000001,
+        "decay": 0.15849999999999997,
+        "accent": 0.6950000000000001,
+        "slide_time": 0.38250000000000006,
+        "drive_db": 23.519999999999992,
+        "volume": 0.9
+      }
+    },
+    {
+      "id": 6,
+      "type": "Step Sequencer",
+      "custom_name": "Funk Bass Pattern",
+      "module_category": "Source",
+      "position": {
+        "x": -550.0,
+        "y": -61.0
+      },
+      "parameters": {
+        "active": true,
+        "notes": "36,36,36,-,36,36,43,43,36,36,36,-,36,43,43,36",
+        "accents": "1,0,0,0,1,0,1,0,1,0,0,0,1,1,0,0",
+        "slides": "0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0",
+        "bpm": 107.95000000000003,
+        "gate_length": 0.6594999999999998,
+        "division": "1/16"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 0,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 1,
+      "target_port": "In"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 2,
+      "target_port": "In"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "In"
+    },
+    {
+      "source_module": 5,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Slide",
+      "target_module": 5,
+      "target_port": "Slide"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Accent",
+      "target_module": 5,
+      "target_port": "Accent"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Gate",
+      "target_module": 5,
+      "target_port": "Gate"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Freq",
+      "target_module": 5,
+      "target_port": "Freq"
+    }
+  ]
+}

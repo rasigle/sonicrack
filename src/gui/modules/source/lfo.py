@@ -32,6 +32,7 @@ LFO_MIN_FREQUENCY = 0.01
 LFO_MAX_FREQUENCY = 20.0  # LFO frequency range in Hz
 LFO_DEFAULT_FREQUENCY = 1.0  # Default LFO frequency in Hz
 LFO_DEFAULT_GAIN_DB = 0
+LFO_FREQUENCY_SLEW_TIME_MS = 120.0
 LFO_CLOCK_RESET_SMOOTHING_MS = 2.0
 
 
@@ -222,6 +223,7 @@ class LFOModule(ModuleWidget):
                     self._previous_clock,
                     self._last_output_values[index],
                     LFO_CLOCK_RESET_SMOOTHING_MS,
+                    LFO_FREQUENCY_SLEW_TIME_MS,
                 )
                 port.write(samples)
                 self._last_runtime_frequencies[index] = rendered_frequency

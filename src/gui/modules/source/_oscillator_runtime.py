@@ -88,6 +88,7 @@ def render_with_frequency_ramp(
     previous_frequency: float,
     target_frequency: float,
     num_samples: int,
+    slew_time_ms: float = DEFAULT_FREQUENCY_SLEW_TIME_MS,
 ) -> tuple[np.ndarray, float]:
     """Render one buffer while slewing frequency smoothly across samples."""
     sample_rate = float(getattr(oscillator, "sample_rate", 44100.0))
@@ -100,7 +101,7 @@ def render_with_frequency_ramp(
         target_frequency,
         num_samples,
         sample_rate,
-        DEFAULT_FREQUENCY_SLEW_TIME_MS,
+        slew_time_ms,
     )
     samples = []
     for frequency in frequencies:
@@ -141,6 +142,7 @@ def render_with_clock_resets(
     previous_clock: float,
     last_output_value: float | None,
     reset_smoothing_time_ms: float,
+    frequency_slew_time_ms: float = DEFAULT_FREQUENCY_SLEW_TIME_MS,
 ) -> tuple[np.ndarray, float, float]:
     """Render with shared pitch slew and sample-accurate clock resets."""
     if clock_signal is None:
@@ -149,6 +151,7 @@ def render_with_clock_resets(
             previous_frequency,
             target_frequency,
             num_samples,
+            frequency_slew_time_ms,
         )
         return samples, rendered_frequency, 0.0
 
@@ -170,6 +173,7 @@ def render_with_clock_resets(
                     rendered_frequency,
                     target_frequency,
                     index - start,
+                    frequency_slew_time_ms,
                 )
                 if pending_reset_previous_output is not None:
                     chunk = smooth_continuity_correction(
@@ -196,6 +200,7 @@ def render_with_clock_resets(
             rendered_frequency,
             target_frequency,
             num_samples - start,
+            frequency_slew_time_ms,
         )
         if pending_reset_previous_output is not None:
             chunk = smooth_continuity_correction(

@@ -104,6 +104,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
         # Parameter registry for automatic get/set (widget, getter, setter)
         self._parameters: dict[str, tuple[Any, str, str]] = {}
+        self._parameter_values: dict[str, Any] = {}
+        self.parameter_changed.connect(self._cache_parameter_value)
 
         # Make module movable and selectable
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
@@ -258,6 +260,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             ```
         """
         self._parameters[name] = (widget, getter, setter)
+        if hasattr(widget, getter):
+            self._parameter_values[name] = getattr(widget, getter)()
 
     def get_parameters(self) -> dict[str, Any]:
         """Get all registered parameters automatically.
@@ -269,10 +273,14 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             Dictionary of parameter names to values
         """
         params = {"active": self.is_active}
-        for name, (widget, getter, _) in self._parameters.items():
-            if hasattr(widget, getter):
-                params[name] = getattr(widget, getter)()
+        for name in self._parameters:
+            if name in self._parameter_values:
+                params[name] = self._parameter_values[name]
         return params
+
+    def _cache_parameter_value(self, name: str, value: Any) -> None:
+        if name in self._parameters:
+            self._parameter_values[name] = value
 
     def set_parameters(self, params: dict[str, Any]):
         """Set all registered parameters automatically.
@@ -294,6 +302,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 widget, _, setter = self._parameters[name]
                 if hasattr(widget, setter):
                     getattr(widget, setter)(value)
+                self._parameter_values[name] = value
 
     # === Active / Bypass State ===
 

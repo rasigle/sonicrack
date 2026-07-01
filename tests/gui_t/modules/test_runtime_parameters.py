@@ -231,7 +231,7 @@ def test_lfo_frequency_changes_are_ramped_with_clock_input_connected(qapp: Any):
 
     boundary_jump = abs(float(second[0] - first[-1]))
     assert boundary_jump < 0.01
-    assert module._sine_oscillator.frequency < 12.0
+    assert module._sine_oscillator.frequency < 1.2
     assert module._sine_oscillator.frequency > 1.0
 
 

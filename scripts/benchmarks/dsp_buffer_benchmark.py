@@ -23,7 +23,7 @@ from src.engine import (
     TriangleOscillator,
     Volume,
 )
-from src.engine.filter import ButterworthFilter
+from src.engine.dsp.filters.butterworth import ButterworthFilter
 
 RenderFn = Callable[[], np.ndarray]
 

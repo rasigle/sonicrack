@@ -17,7 +17,7 @@ import inspect
 import logging
 from collections.abc import Callable
 
-from src.engine.audio_component import (
+from src.engine.core.component import (
     AudioComponent,
     ComponentCategory,
     ComponentDescriptor,

@@ -43,16 +43,16 @@ from scipy.signal import butter as scipy_butter
 from scipy.signal import filtfilt, lfilter, lfilter_zi
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import (
+from src.engine.core.component import (
     ComponentCategory,
     ComponentDescriptor,
     ParameterDescriptor,
     make_parameter_descriptors,
 )
-from src.engine.audio_component_registry import register_component
-from src.engine.math import db_to_linear
-from src.engine.modifier import Modifier
-from src.engine.validation import validate_sample_rate
+from src.engine.core.registry import register_component
+from src.engine.dsp.modifiers.base import Modifier
+from src.engine.utils.math import db_to_linear
+from src.engine.utils.validation import validate_sample_rate
 
 
 @register_component()

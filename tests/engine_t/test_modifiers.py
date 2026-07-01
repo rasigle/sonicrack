@@ -6,12 +6,8 @@ from typing import cast
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB
-from src.engine.composer import Chain
-from src.engine.generator.oscillator_modulated import ModulatedFrequency
-from src.engine.generator.oscillator_ramp import TriangleOscillator
-from src.engine.generator.oscillator_sine import SineOscillator
-from src.engine.generator.oscillator_square import SquareOscillator
-from src.engine.modifier import (
+from src.engine.core.composer import Chain
+from src.engine.dsp.modifiers import (
     Clipper,
     Frequency,
     ModulatedPanner,
@@ -19,7 +15,11 @@ from src.engine.modifier import (
     Panner,
     Volume,
 )
-from src.engine.modulator import ADSREnvelope
+from src.engine.dsp.modulators import ADSREnvelope
+from src.engine.generators.oscillators.oscillator_modulated import ModulatedFrequency
+from src.engine.generators.oscillators.oscillator_ramp import TriangleOscillator
+from src.engine.generators.oscillators.oscillator_sine import SineOscillator
+from src.engine.generators.oscillators.oscillator_square import SquareOscillator
 
 
 class TestPanner(unittest.TestCase):

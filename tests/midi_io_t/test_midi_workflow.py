@@ -7,7 +7,7 @@ works correctly.
 import numpy as np
 
 from src.engine import ADSREnvelope, ModulatedOscillator, SineOscillator
-from src.engine.modulator import GateTriggeredADSR
+from src.engine.dsp.modulators import GateTriggeredADSR
 from src.midi_io import (
     CVFrequencyOutput,
     CVGateOutput,

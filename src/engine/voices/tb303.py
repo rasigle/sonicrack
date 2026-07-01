@@ -5,11 +5,14 @@ from __future__ import annotations
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.filter_303 import AcidResonantFilter
-from src.engine.generator.oscillator import SawtoothOscillator, SquareOscillator
-from src.engine.modulator import DecayEnvelope
+from src.engine.dsp.filters.acid_303 import AcidResonantFilter
+from src.engine.dsp.modulators import DecayEnvelope
+from src.engine.generators.oscillators.oscillator import (
+    SawtoothOscillator,
+    SquareOscillator,
+)
 from src.engine.sequencing import AccentProcessor, SlideProcessor
-from src.engine.validation import validate_sample_count, validate_sample_rate
+from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
 
 class TB303Voice:

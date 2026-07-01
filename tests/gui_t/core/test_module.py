@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from src.engine.generator.oscillator import SineOscillator
+from src.engine.generators.oscillators.oscillator import SineOscillator
 from src.gui.core.module import ModuleCategory
 from src.gui.modules.mixer import MixerModule
 from src.gui.modules.modifier.volume_mod import VolumeModule

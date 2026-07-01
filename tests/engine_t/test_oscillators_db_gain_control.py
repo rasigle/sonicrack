@@ -13,10 +13,13 @@ import logging
 import numpy as np
 import pytest
 
-from src.engine.generator.oscillator_ramp import SawtoothOscillator, TriangleOscillator
-from src.engine.generator.oscillator_sine import SineOscillator
-from src.engine.generator.oscillator_square import SquareOscillator
-from src.engine.modifier import ModulatedVolume, Volume
+from src.engine.dsp.modifiers import ModulatedVolume, Volume
+from src.engine.generators.oscillators.oscillator_ramp import (
+    SawtoothOscillator,
+    TriangleOscillator,
+)
+from src.engine.generators.oscillators.oscillator_sine import SineOscillator
+from src.engine.generators.oscillators.oscillator_square import SquareOscillator
 
 
 class TestOscillatorDBControl:

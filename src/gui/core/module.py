@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from src.engine.audio_component import AudioComponent
+from src.engine.core.component import AudioComponent
 from src.gui.core.port import Port
 
 

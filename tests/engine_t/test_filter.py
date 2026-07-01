@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.filter import (
+from src.engine.dsp.filters.butterworth import (
     BiquadResonantFilter,
     ButterworthFilter,
     apply_filter,
@@ -278,8 +278,8 @@ class TestButterworthFilterIntegration(unittest.TestCase):
 
     def test_filter_in_chain(self):
         """Test filter can be used in a processing chain."""
-        from src.engine.composer import Chain
-        from src.engine.generator.oscillator import SineOscillator
+        from src.engine.core.composer import Chain
+        from src.engine.generators.oscillators.oscillator import SineOscillator
 
         # Create chain: Oscillator -> Filter
         osc = SineOscillator(frequency=1000, amplitude=1.0, sample_rate=10000)
@@ -298,7 +298,7 @@ class TestButterworthFilterIntegration(unittest.TestCase):
 
     def test_filter_with_noise(self):
         """Test filter can process noise."""
-        from src.engine.generator.noise import NoiseGenerator
+        from src.engine.generators.noise import NoiseGenerator
 
         noise = NoiseGenerator(noise_type="White", amplitude=1.0, sample_rate=10000)
         filt = ButterworthFilter(cutoff=1000, sample_rate=10000)

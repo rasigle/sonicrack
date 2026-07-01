@@ -8,21 +8,21 @@ from typing import Literal, Protocol, runtime_checkable
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import (
+from src.engine.core.component import (
     ComponentDescriptor,
     ParameterDescriptor,
     make_parameter_descriptors,
 )
-from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.generator.oscillator_base import Oscillator
-from src.engine.generator.oscillator_minblep import (
+from src.engine.core.registry import ComponentCategory, register_component
+from src.engine.generators.oscillators.oscillator_base import Oscillator
+from src.engine.generators.oscillators.oscillator_minblep import (
     VCV_MINBLEP_OVERSAMPLE,
     VCV_MINBLEP_ZERO_CROSSINGS,
     minimum_phase_minblep_table,
 )
-from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
-from src.engine.utils import filter_provided_args, track_provided_args
-from src.engine.validation import validate_sample_count, validate_sample_rate
+from src.engine.utils.decorators import filter_provided_args, track_provided_args
+from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples
+from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
 SquareWaveMode = Literal[
     "ideal", "ideal_smooth", "bandlimited", "vcv", "soft", "comparator"

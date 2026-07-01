@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
-from src.engine.generator.oscillator import (
+from src.engine.generators.oscillators.oscillator import (
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,

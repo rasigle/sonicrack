@@ -8,7 +8,7 @@ import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.sequencing.clock import StepClock
-from src.engine.validation import validate_sample_count, validate_sample_rate
+from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 from src.midi_io.utils import midi_to_frequency
 
 

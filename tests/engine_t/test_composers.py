@@ -4,9 +4,12 @@ import unittest
 
 import numpy as np
 
-from src.engine.composer import Chain, WaveAdder
-from src.engine.generator.oscillator import SineOscillator, TriangleOscillator
-from src.engine.modifier import Clipper, ModulatedPanner, Panner, Volume
+from src.engine.core.composer import Chain, WaveAdder
+from src.engine.dsp.modifiers import Clipper, ModulatedPanner, Panner, Volume
+from src.engine.generators.oscillators.oscillator import (
+    SineOscillator,
+    TriangleOscillator,
+)
 
 
 class TestChain(unittest.TestCase):
@@ -53,8 +56,10 @@ class TestChain(unittest.TestCase):
 
     def test_trigger_release(self) -> None:
         """Test trigger_release propagates to oscillator."""
-        from src.engine.generator.oscillator_modulated import ModulatedOscillator
-        from src.engine.modulator import ADSREnvelope
+        from src.engine.dsp.modulators import ADSREnvelope
+        from src.engine.generators.oscillators.oscillator_modulated import (
+            ModulatedOscillator,
+        )
 
         env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
         mod_osc = ModulatedOscillator(
@@ -68,8 +73,10 @@ class TestChain(unittest.TestCase):
 
     def test_ended_property(self) -> None:
         """Test ended property reflects component state."""
-        from src.engine.generator.oscillator_modulated import ModulatedOscillator
-        from src.engine.modulator import ADSREnvelope
+        from src.engine.dsp.modulators import ADSREnvelope
+        from src.engine.generators.oscillators.oscillator_modulated import (
+            ModulatedOscillator,
+        )
 
         env = ADSREnvelope(0.1, 0.1, 0.7, 0.1)
         mod_osc = ModulatedOscillator(
@@ -169,8 +176,10 @@ class TestWaveAdder(unittest.TestCase):
 
     def test_trigger_release(self) -> None:
         """Test trigger_release propagates to all generators."""
-        from src.engine.generator.oscillator_modulated import ModulatedOscillator
-        from src.engine.modulator import ADSREnvelope
+        from src.engine.dsp.modulators import ADSREnvelope
+        from src.engine.generators.oscillators.oscillator_modulated import (
+            ModulatedOscillator,
+        )
 
         env1 = ADSREnvelope(0.1, 0.1, 0.7, 0.1)
         env2 = ADSREnvelope(0.1, 0.1, 0.7, 0.1)

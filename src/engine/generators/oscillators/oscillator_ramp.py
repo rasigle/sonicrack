@@ -1,26 +1,26 @@
 """Ramp-based oscillators such as sawtooth and triangle."""
 
 import math
-from typing import Literal
+from typing import Literal, cast
 
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import (
+from src.engine.core.component import (
     ComponentDescriptor,
     ParameterDescriptor,
     make_parameter_descriptors,
 )
-from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.generator.oscillator_base import Oscillator
-from src.engine.generator.oscillator_minblep import (
+from src.engine.core.registry import ComponentCategory, register_component
+from src.engine.generators.oscillators.oscillator_base import Oscillator
+from src.engine.generators.oscillators.oscillator_minblep import (
     TWO_PI,
     VCV_MINBLEP_OVERSAMPLE,
     VCV_MINBLEP_ZERO_CROSSINGS,
     minimum_phase_minblep_table,
 )
-from src.engine.utils import filter_provided_args, track_provided_args
-from src.engine.validation import validate_sample_count
+from src.engine.utils.decorators import filter_provided_args, track_provided_args
+from src.engine.utils.validation import validate_sample_count
 
 SawtoothMode = Literal["pure", "analog", "vcv"]
 
@@ -85,7 +85,7 @@ class SawtoothOscillator(Oscillator):
         self._update_dc_alpha()
 
     def _post_freq_set(self):
-        old_period = getattr(self, "_period", None)
+        old_period = cast(float | None, getattr(self, "_period", None))
         self._period = self._sample_rate / self._f
         if not hasattr(self, "_phase_degrees"):
             self._phase_degrees = 0.0
@@ -147,6 +147,13 @@ class SawtoothOscillator(Oscillator):
             analog = analog * 1.02
         return analog * 0.92
 
+    def _apply_analog_character_buffer(
+        self, values: np.ndarray, sample_indices: np.ndarray | None = None
+    ) -> np.ndarray:
+        return np.asarray(
+            self._apply_analog_character(values, sample_indices), dtype=np.float32
+        )
+
     @staticmethod
     def _crossing_subsample(
         threshold: float, start_phase: float, end_phase: float
@@ -201,7 +208,7 @@ class SawtoothOscillator(Oscillator):
             increment = self._f / self._sample_rate
             self._vcv_prev_phase = (current_phase - increment) % 1.0
 
-        start_phase = self._vcv_prev_phase
+        start_phase = cast(float, self._vcv_prev_phase)
         delta = current_phase - start_phase
         if delta < -0.5:
             current_phase_unwrapped = current_phase + 1.0
@@ -236,9 +243,10 @@ class SawtoothOscillator(Oscillator):
         if self._mode == "vcv":
             val = self._process_vcv_normalized_sample(div)
         else:
-            val = 2 * (div - np.floor(0.5 + div))
+            val = float(2 * (div - np.floor(0.5 + div)))
         if self._mode == "analog":
             val = self._apply_analog_character(val)
+        val = float(val)
         self._i = self._i + 1
         val = self._apply_wave_range_value(val)
         return val * self._a
@@ -254,8 +262,9 @@ class SawtoothOscillator(Oscillator):
                 val = 2 * (div - np.floor(0.5 + div))
         else:
             val = np.zeros(n, dtype=np.float32)
+        val = np.asarray(val, dtype=np.float32)
         if self._mode == "analog":
-            val = self._apply_analog_character(val, indices)
+            val = self._apply_analog_character_buffer(val, indices)
         val = self._apply_wave_range_values(val)
         samples = self._apply_amplitude_to_buffer(val)
         self._i += n
@@ -289,7 +298,7 @@ class TriangleOscillator(SawtoothOscillator):
         ),
     )
 
-    def set_mode(self, mode: Literal["pure", "analog"]) -> None:
+    def set_mode(self, mode: SawtoothMode) -> None:
         if mode not in self.get_available_modes():
             raise ValueError(f"Invalid mode '{mode}'. Must be 'pure' or 'analog'")
         self._mode = mode
@@ -311,12 +320,21 @@ class TriangleOscillator(SawtoothOscillator):
             analog = analog * 1.01
         return analog * 0.95
 
+    def _apply_analog_character_triangle_buffer(
+        self, values: np.ndarray, sample_indices: np.ndarray | None = None
+    ) -> np.ndarray:
+        return np.asarray(
+            self._apply_analog_character_triangle(values, sample_indices),
+            dtype=np.float32,
+        )
+
     def __next__(self):
         div = (self._i + self._p) / self._period if self._period != 0 else 0
         val = 2 * (div - np.floor(0.5 + div))
         val = (abs(val) - 0.5) * 2
         if self._mode == "analog":
             val = self._apply_analog_character_triangle(val)
+        val = float(val)
         self._i = self._i + 1
         val = self._apply_wave_range_value(val)
         return val * self._a
@@ -330,8 +348,9 @@ class TriangleOscillator(SawtoothOscillator):
             val = (np.abs(val) - 0.5) * 2
         else:
             val = np.zeros(n, dtype=np.float32)
+        val = np.asarray(val, dtype=np.float32)
         if self._mode == "analog":
-            val = self._apply_analog_character_triangle(val, indices)
+            val = self._apply_analog_character_triangle_buffer(val, indices)
         val = self._apply_wave_range_values(val)
         samples = self._apply_amplitude_to_buffer(val)
         self._i += n

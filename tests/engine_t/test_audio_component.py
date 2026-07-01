@@ -10,20 +10,14 @@ Tests cover:
 
 import unittest
 
-from src.engine.audio_component import (
+from src.engine.core.component import (
     ComponentCategory,
     ComponentDescriptor,
     ParameterDescriptor,
 )
-from src.engine.composer import WaveAdder
-from src.engine.effects import Delay, Distortion, Reverb
-from src.engine.generator.oscillator_modulated import (
-    ModulatedFrequency,
-    ModulatedOscillator,
-)
-from src.engine.generator.oscillator_ramp import SawtoothOscillator
-from src.engine.generator.oscillator_square import SquareOscillator
-from src.engine.modifier import (
+from src.engine.core.composer import WaveAdder
+from src.engine.dsp.effects import Delay, Distortion, Reverb
+from src.engine.dsp.modifiers import (
     Frequency,
     ModulatedClipper,
     ModulatedPanner,
@@ -31,6 +25,12 @@ from src.engine.modifier import (
     Panner,
     Volume,
 )
+from src.engine.generators.oscillators.oscillator_modulated import (
+    ModulatedFrequency,
+    ModulatedOscillator,
+)
+from src.engine.generators.oscillators.oscillator_ramp import SawtoothOscillator
+from src.engine.generators.oscillators.oscillator_square import SquareOscillator
 
 
 class TestComponentDescriptor(unittest.TestCase):

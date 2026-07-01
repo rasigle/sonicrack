@@ -6,7 +6,7 @@ from numbers import Real
 
 import numpy as np
 
-from src.engine.validation import validate_sample_rate
+from src.engine.utils.validation import validate_sample_rate
 
 
 def duration_ms_to_samples(

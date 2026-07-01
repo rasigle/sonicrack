@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from src.engine.ramping import (
+from src.engine.utils.ramping import (
     consume_linear_ramp,
     duration_ms_to_samples,
     fill_linear_ramp,

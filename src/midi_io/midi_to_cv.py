@@ -29,7 +29,7 @@ from typing import Any
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import AudioComponent
+from src.engine.core.component import AudioComponent
 from src.midi_io.messages import (
     ControlChangeMessage,
     MIDIMessage,

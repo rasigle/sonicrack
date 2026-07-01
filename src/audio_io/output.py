@@ -8,7 +8,7 @@ import numpy as np
 import sounddevice as sd
 
 from src.audio_io.realtime import RealtimeAudioCallback
-from src.engine.ramping import duration_ms_to_samples, fill_linear_ramp
+from src.engine.utils.ramping import duration_ms_to_samples, fill_linear_ramp
 
 logger = logging.getLogger(__name__)
 

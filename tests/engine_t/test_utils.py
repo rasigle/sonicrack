@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.engine.utils import track_provided_args
+from src.engine.utils.decorators import track_provided_args
 
 
 class TestTrackProvidedArgs:

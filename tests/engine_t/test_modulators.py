@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from src.engine.modulator import ADSREnvelope, DecayEnvelope, getadsr
+from src.engine.dsp.modulators import ADSREnvelope, DecayEnvelope, getadsr
 
 
 class TestADSREnvelope(unittest.TestCase):

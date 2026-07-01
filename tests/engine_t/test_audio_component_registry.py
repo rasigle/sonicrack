@@ -10,8 +10,8 @@ Tests cover:
 
 import unittest
 
-from src.engine.audio_component import ComponentCategory
-from src.engine.audio_component_registry import audio_registry, register_component
+from src.engine.core.component import ComponentCategory
+from src.engine.core.registry import audio_registry, register_component
 
 
 class TestAudioComponentRegistry(unittest.TestCase):

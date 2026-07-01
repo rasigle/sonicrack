@@ -41,15 +41,15 @@ from typing import Any
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import (
+from src.engine.core.component import (
     AudioComponent,
     ComponentDescriptor,
     ParameterDescriptor,
 )
-from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.generator.oscillator import Oscillator
-from src.engine.generator.oscillator_modulated import ModulatedOscillator
-from src.engine.validation import validate_sample_count
+from src.engine.core.registry import ComponentCategory, register_component
+from src.engine.generators.oscillators.oscillator import Oscillator
+from src.engine.generators.oscillators.oscillator_modulated import ModulatedOscillator
+from src.engine.utils.validation import validate_sample_count
 
 logger = logging.getLogger(__name__)
 

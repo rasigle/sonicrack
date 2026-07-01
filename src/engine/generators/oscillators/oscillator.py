@@ -55,14 +55,17 @@ Note:
     during audio generation.
 """
 
-from src.engine.generator.oscillator_base import (
+from src.engine.generators.oscillators.oscillator_base import (
     DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS,
     Oscillator,
     _derive_amplitude_from_init,
 )
-from src.engine.generator.oscillator_ramp import SawtoothOscillator, TriangleOscillator
-from src.engine.generator.oscillator_sine import SineOscillator
-from src.engine.generator.oscillator_square import (
+from src.engine.generators.oscillators.oscillator_ramp import (
+    SawtoothOscillator,
+    TriangleOscillator,
+)
+from src.engine.generators.oscillators.oscillator_sine import SineOscillator
+from src.engine.generators.oscillators.oscillator_square import (
     BandlimitedSquareStrategy,
     ComparatorSquareStrategy,
     IdealSquareStrategy,

@@ -21,7 +21,7 @@ from src.engine import (
     Volume,
     WaveAdder,
 )
-from src.engine.filter import BiquadResonantFilter, ButterworthFilter
+from src.engine.dsp.filters.butterworth import BiquadResonantFilter, ButterworthFilter
 from src.engine.presets import PresetBuilder
 
 CHUNKS = [64, 128, 320, 511, 1024, 2049]

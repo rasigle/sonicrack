@@ -21,20 +21,20 @@ from enum import Enum
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import (
+from src.engine.core.component import (
     ComponentDescriptor,
     Generator,
     ParameterDescriptor,
     make_parameter_descriptors,
 )
-from src.engine.audio_component_registry import (
+from src.engine.core.registry import (
     ComponentCategory,
     register_component,
 )
-from src.engine.generator.oscillator import _derive_amplitude_from_init
-from src.engine.ramping import consume_linear_ramp, duration_ms_to_samples
-from src.engine.utils import track_provided_args
-from src.engine.validation import validate_sample_count, validate_sample_rate
+from src.engine.generators.oscillators.oscillator import _derive_amplitude_from_init
+from src.engine.utils.decorators import track_provided_args
+from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples
+from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
 
 class WaveShape(Enum):

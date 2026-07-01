@@ -19,7 +19,7 @@ from src.engine import (
     SquareOscillator,
     TriangleOscillator,
 )
-from src.engine.generator.oscillator_modulated import ModulatedOscillator
+from src.engine.generators.oscillators.oscillator_modulated import ModulatedOscillator
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import (

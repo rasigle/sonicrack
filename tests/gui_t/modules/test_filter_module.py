@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.engine.filter import BiquadResonantFilter, ButterworthFilter
+from src.engine.dsp.filters.butterworth import BiquadResonantFilter, ButterworthFilter
 from src.gui.core.port import Port
 from src.gui.core.runtime import process_runtime_module
 from src.gui.modules.modifier.filter import FilterModule

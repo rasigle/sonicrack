@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from src.engine.audio_component import AudioComponent
+from src.engine.core.component import AudioComponent
 from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters, get_runtime_spec

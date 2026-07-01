@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.validation import validate_sample_rate
+from src.engine.utils.validation import validate_sample_rate
 
 
 @dataclass(slots=True)

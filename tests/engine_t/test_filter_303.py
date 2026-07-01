@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from src.engine.filter_303 import AcidResonantFilter
+from src.engine.dsp.filters.acid_303 import AcidResonantFilter
 
 
 def test_acid_filter_processes_finite_output():

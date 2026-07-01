@@ -12,13 +12,13 @@ import unittest
 
 import numpy as np
 
-from src.engine.generator.oscillator import (
+from src.engine.generators.oscillators.oscillator import (
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
     TriangleOscillator,
 )
-from src.engine.synthesis import synth
+from src.engine.utils.synthesis import synth
 
 
 class TestOscillatorBase(unittest.TestCase):

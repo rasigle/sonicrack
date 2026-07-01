@@ -5,15 +5,15 @@ from typing import Literal
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import (
+from src.engine.core.component import (
     ComponentDescriptor,
     ParameterDescriptor,
     make_parameter_descriptors,
 )
-from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.generator.oscillator_base import Oscillator
-from src.engine.utils import filter_provided_args, track_provided_args
-from src.engine.validation import validate_sample_count
+from src.engine.core.registry import ComponentCategory, register_component
+from src.engine.generators.oscillators.oscillator_base import Oscillator
+from src.engine.utils.decorators import filter_provided_args, track_provided_args
+from src.engine.utils.validation import validate_sample_count
 
 
 @register_component()

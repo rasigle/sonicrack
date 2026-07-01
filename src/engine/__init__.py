@@ -82,7 +82,7 @@ Note:
 
 """
 
-from src.engine.audio_component import (
+from src.engine.core.component import (
     COMMON_PARAMETER_DESCRIPTORS,
     AudioComponent,
     ComponentCategory,
@@ -90,35 +90,42 @@ from src.engine.audio_component import (
     ParameterDescriptor,
     make_parameter_descriptors,
 )
-from src.engine.audio_component_registry import (
-    AudioComponentRegistry,
-    audio_registry,
-    register_component,
-)
-from src.engine.composer import (
+from src.engine.core.composer import (
     Chain,
     Composer,
     WaveAdder,
 )
-from src.engine.cv_utils import (
-    CVScaler,
-    bipolar_to_unipolar,
-    scale_cv,
-    unipolar_to_bipolar,
+from src.engine.core.registry import (
+    AudioComponentRegistry,
+    audio_registry,
+    register_component,
 )
-from src.engine.effects import (
-    Delay,
-    Distortion,
-    Reverb,
-)
-from src.engine.filter import (
+from src.engine.dsp.effects.delay import Delay
+from src.engine.dsp.effects.distortion import Distortion
+from src.engine.dsp.effects.reverb import Reverb
+from src.engine.dsp.filters.acid_303 import AcidResonantFilter
+from src.engine.dsp.filters.butterworth import (
     BiquadResonantFilter,
     ButterworthFilter,
     apply_filter,
     butter,
 )
-from src.engine.filter_303 import AcidResonantFilter
-from src.engine.generator.noise import (
+from src.engine.dsp.modifiers.amplitude import (
+    Clipper,
+    ModulatedClipper,
+    ModulatedVolume,
+    Volume,
+)
+from src.engine.dsp.modifiers.base import Modifier
+from src.engine.dsp.modifiers.frequency import Frequency
+from src.engine.dsp.modifiers.panning import ModulatedPanner, Panner
+from src.engine.dsp.modulators.base import Modulator
+from src.engine.dsp.modulators.envelopes import (
+    ADSREnvelope,
+    DecayEnvelope,
+    getadsr,
+)
+from src.engine.generators.noise import (
     NoiseGenerator,
     blue_noise,
     brownian_noise,
@@ -129,32 +136,16 @@ from src.engine.generator.noise import (
     velvet_noise,
     white_noise,
 )
-from src.engine.generator.oscillator import (
+from src.engine.generators.oscillators.oscillator import (
     Oscillator,
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
     TriangleOscillator,
 )
-from src.engine.generator.oscillator_modulated import (
+from src.engine.generators.oscillators.oscillator_modulated import (
     ModulatedFrequency,
     ModulatedOscillator,
-)
-from src.engine.modifier import (
-    Clipper,
-    Frequency,
-    Modifier,
-    ModulatedClipper,
-    ModulatedPanner,
-    ModulatedVolume,
-    Panner,
-    Volume,
-)
-from src.engine.modulator import (
-    ADSREnvelope,
-    DecayEnvelope,
-    Modulator,
-    getadsr,
 )
 from src.engine.presets.preset_builder import PresetBuilder
 from src.engine.presets.preset_library import PresetLibrary
@@ -167,7 +158,13 @@ from src.engine.sequencing import (
     StepEvent,
     StepSequencer,
 )
-from src.engine.synthesis import synth
+from src.engine.utils.cv import (
+    CVScaler,
+    bipolar_to_unipolar,
+    scale_cv,
+    unipolar_to_bipolar,
+)
+from src.engine.utils.synthesis import synth
 from src.engine.voices import TB303Voice
 
 __all__ = [

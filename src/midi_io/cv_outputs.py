@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from src.engine.audio_component import AudioComponent
+from src.engine.core.component import AudioComponent
 from src.midi_io.midi_to_cv import MIDIToCV
 
 

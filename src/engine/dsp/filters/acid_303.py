@@ -5,16 +5,16 @@ from __future__ import annotations
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import (
+from src.engine.core.component import (
     ComponentCategory,
     ComponentDescriptor,
     ParameterDescriptor,
     make_parameter_descriptors,
 )
-from src.engine.audio_component_registry import register_component
-from src.engine.filter import BiquadResonantFilter
-from src.engine.modifier import Modifier
-from src.engine.validation import validate_sample_rate
+from src.engine.core.registry import register_component
+from src.engine.dsp.filters.butterworth import BiquadResonantFilter
+from src.engine.dsp.modifiers.base import Modifier
+from src.engine.utils.validation import validate_sample_rate
 
 
 @register_component()

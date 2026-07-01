@@ -8,8 +8,8 @@ import logging
 
 import numpy as np
 
-from src.engine.audio_component import AudioComponent
-from src.engine.validation import validate_sample_count
+from src.engine.core.component import AudioComponent
+from src.engine.utils.validation import validate_sample_count
 
 logger = logging.getLogger(__name__)
 

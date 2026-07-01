@@ -65,20 +65,20 @@ from typing import cast
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component import (
+from src.engine.core.component import (
     ComponentDescriptor,
     Generator,
     ParameterDescriptor,
 )
-from src.engine.audio_component_registry import ComponentCategory, register_component
-from src.engine.generator.oscillator import (
+from src.engine.core.registry import ComponentCategory, register_component
+from src.engine.generators.oscillators.oscillator import (
     Oscillator,
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
     TriangleOscillator,
 )
-from src.engine.validation import validate_sample_count
+from src.engine.utils.validation import validate_sample_count
 
 
 @register_component()

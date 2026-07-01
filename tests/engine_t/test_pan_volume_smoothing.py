@@ -6,7 +6,7 @@ Verifies that changing pan position and volume amplitude doesn't cause clicks.
 
 import numpy as np
 
-from src.engine.modifier import Panner, Volume
+from src.engine.dsp.modifiers import Panner, Volume
 
 
 def test_panner_smoothing():

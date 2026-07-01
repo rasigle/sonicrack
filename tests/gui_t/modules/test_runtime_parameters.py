@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.generator.oscillator_ramp import SawtoothOscillator
-from src.engine.generator.oscillator_sine import SineOscillator
-from src.engine.generator.oscillator_square import SquareOscillator
-from src.engine.modulator import ADSREnvelope, DecayEnvelope
+from src.engine.dsp.modulators import ADSREnvelope, DecayEnvelope
+from src.engine.generators.oscillators.oscillator_ramp import SawtoothOscillator
+from src.engine.generators.oscillators.oscillator_sine import SineOscillator
+from src.engine.generators.oscillators.oscillator_square import SquareOscillator
 from src.gui.core.port import Port
 from src.gui.modules.effects.effects_distortion import DistortionModule
 from src.gui.modules.mixer import MixerModule

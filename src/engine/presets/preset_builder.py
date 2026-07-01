@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.audio_component_registry import ComponentCategory, audio_registry
+from src.engine.core.registry import ComponentCategory, audio_registry
 
 logger = logging.getLogger(__name__)
 

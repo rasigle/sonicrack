@@ -7,7 +7,7 @@ import math
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.validation import validate_sample_count, validate_sample_rate
+from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
 
 class StepClock:

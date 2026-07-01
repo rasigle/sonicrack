@@ -14,9 +14,9 @@ from src.engine import (
     SineOscillator,
     WaveAdder,
 )
-from src.engine.cv_utils import CVScaler
-from src.engine.filter import ButterworthFilter
-from src.engine.validation import validate_numeric_range
+from src.engine.dsp.filters.butterworth import ButterworthFilter
+from src.engine.utils.cv import CVScaler
+from src.engine.utils.validation import validate_numeric_range
 
 
 @pytest.mark.parametrize(

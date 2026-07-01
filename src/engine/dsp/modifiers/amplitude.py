@@ -166,11 +166,11 @@ class Volume(Modifier):
     def amplitude(self, value: float):
         if value < 0:
             raise ValueError(f"amplitude must be non-negative, got {value}")
-        # Initiate smooth transition (prevents clicks)
+        
+        #  Don't update _amplitude immediately. Initiate smooth transition to 
+        #  prevent clicks.
         self._target_amplitude = float(value)
         self._smoothing_samples_remaining = self._smoothing_duration_samples
-        # Don't update _amplitude immediately - let smoothing handle it
-        # self._amplitude = float(value)  # REMOVED - causes hot-swap to fail!
 
     @property
     def gain_db(self) -> float:
@@ -189,11 +189,11 @@ class Volume(Modifier):
     @gain_db.setter
     def gain_db(self, value: float):
         new_amplitude = float(db_to_linear(value))
-        # Initiate smooth transition (prevents clicks)
+
+        #  Don't update _amplitude immediately. Initiate smooth transition to
+        #  prevent clicks.
         self._target_amplitude = new_amplitude
         self._smoothing_samples_remaining = self._smoothing_duration_samples
-        # Don't update _amplitude immediately - let smoothing handle it
-        # self._amplitude = new_amplitude  # REMOVED - causes hot-swap to fail!
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray

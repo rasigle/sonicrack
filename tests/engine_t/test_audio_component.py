@@ -16,7 +16,7 @@ from src.engine.core.component import (
     ParameterDescriptor,
 )
 from src.engine.core.composer import WaveAdder
-from src.engine.dsp.effects import Delay, Distortion, Reverb
+from src.engine.dsp.effects import Compressor, Delay, Distortion, Reverb
 from src.engine.dsp.modifiers import (
     Frequency,
     ModulatedClipper,
@@ -111,6 +111,14 @@ def test_effect_descriptors_expose_strict_parameter_policy():
         Delay: {
             "delay_time": (0.001, 2.0),
             "feedback": (0.0, 0.95),
+            "mix": (0.0, 1.0),
+        },
+        Compressor: {
+            "threshold_db": (-60.0, 0.0),
+            "ratio": (1.0, 20.0),
+            "attack_ms": (0.1, 200.0),
+            "release_ms": (1.0, 1000.0),
+            "makeup_gain_db": (-24.0, 24.0),
             "mix": (0.0, 1.0),
         },
         Reverb: {

@@ -1,11 +1,24 @@
 """Math utility functions for audio processing."""
+from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING, overload
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
-def db_to_linear(db: float | np.ndarray) -> float | np.ndarray:
+
+@overload
+def db_to_linear(db: float) -> float: ...
+
+
+@overload
+def db_to_linear(db: NDArray[np.floating]) -> NDArray[np.floating]: ...
+
+
+def db_to_linear(db: float | NDArray[np.floating]) -> float | NDArray[np.floating]:
     """Convert decibels to linear amplitude.
 
     Standard audio conversion using the formula: amplitude = 10^(dB/20)

@@ -13,6 +13,7 @@ from src.engine.generators.oscillators.oscillator_ramp import SawtoothOscillator
 from src.engine.generators.oscillators.oscillator_sine import SineOscillator
 from src.engine.generators.oscillators.oscillator_square import SquareOscillator
 from src.gui.core.port import Port
+from src.gui.modules.effects.effects_compressor import CompressorModule
 from src.gui.modules.effects.effects_distortion import DistortionModule
 from src.gui.modules.mixer import MixerModule
 from src.gui.modules.modifier.acid_filter import AcidFilterModule
@@ -472,6 +473,36 @@ def test_distortion_runtime_applies_drive_and_mix_cv(qapp: Any):
     assert output[2] == pytest.approx(output[1])
     assert module.component.drive == pytest.approx(0.0)
     assert module.component.mix == pytest.approx(1.0)
+
+
+def test_compressor_runtime_applies_parameters(qapp: Any):
+    del qapp
+    module = CompressorModule()
+    input_source = _connect_constant_input(module.in_port, 1.0)
+    input_source.write(np.ones(64, dtype=np.float32))
+
+    module.process_runtime(
+        64,
+        {
+            "threshold_db": -30.0,
+            "ratio": 12.0,
+            "attack_ms": 0.1,
+            "release_ms": 50.0,
+            "makeup_gain_db": 0.0,
+            "mix": 1.0,
+        },
+    )
+
+    assert module.component.threshold_db == pytest.approx(-30.0)
+    assert module.component.ratio == pytest.approx(12.0)
+    assert module.component.attack_ms == pytest.approx(0.1)
+    assert module.component.release_ms == pytest.approx(50.0)
+    assert module.component.makeup_gain_db == pytest.approx(0.0)
+    assert module.component.mix == pytest.approx(1.0)
+    output = np.asarray(module.out_port.value)
+    assert output.shape == (64,)
+    assert output[-1] < 1.0
+    assert np.all(np.isfinite(output))
 
 
 def test_tb303_voice_runtime_outputs_silence_without_required_inputs(qapp: Any):

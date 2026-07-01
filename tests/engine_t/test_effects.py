@@ -7,6 +7,7 @@ import unittest
 import numpy as np
 
 from src.engine import (
+    Compressor,
     Delay,
     Distortion,
     Reverb,
@@ -216,6 +217,89 @@ class TestDelay(unittest.TestCase):
 
         self.assertEqual(len(samples), 100000)
         self.assertTrue(np.all(np.isfinite(samples)))
+
+
+class TestCompressor(unittest.TestCase):
+    """Test suite for Compressor effect."""
+
+    def setUp(self):
+        """Create test oscillator."""
+        self.osc = SineOscillator(frequency=440, gain_db=0)
+
+    def test_initialization(self):
+        """Test compressor initialization."""
+        compressor = Compressor(
+            self.osc,
+            threshold_db=-24.0,
+            ratio=6.0,
+            attack_ms=5.0,
+            release_ms=80.0,
+            makeup_gain_db=3.0,
+            mix=0.75,
+        )
+
+        self.assertEqual(compressor.threshold_db, -24.0)
+        self.assertEqual(compressor.ratio, 6.0)
+        self.assertEqual(compressor.attack_ms, 5.0)
+        self.assertEqual(compressor.release_ms, 80.0)
+        self.assertEqual(compressor.makeup_gain_db, 3.0)
+        self.assertEqual(compressor.mix, 0.75)
+
+    def test_strict_parameter_validation(self):
+        """Test that out-of-range parameters raise ValueError."""
+        invalid_cases = [
+            {"threshold_db": -80.0},
+            {"threshold_db": 3.0},
+            {"ratio": 0.5},
+            {"ratio": 40.0},
+            {"attack_ms": 0.0},
+            {"attack_ms": 400.0},
+            {"release_ms": 0.0},
+            {"release_ms": 2000.0},
+            {"makeup_gain_db": -48.0},
+            {"makeup_gain_db": 48.0},
+            {"mix": -0.1},
+            {"mix": 2.0},
+        ]
+
+        for kwargs in invalid_cases:
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                Compressor(self.osc, **kwargs)
+
+    def test_compression_reduces_loud_signal(self):
+        """Test that compressor reduces a signal above threshold."""
+        samples = np.full(256, 1.0, dtype=np.float32)
+        compressor = Compressor(
+            threshold_db=-24.0,
+            ratio=20.0,
+            attack_ms=0.1,
+            release_ms=100.0,
+            mix=1.0,
+        )
+
+        output = compressor(samples)
+
+        self.assertLess(abs(output[-1]), abs(samples[-1]))
+        self.assertTrue(np.all(np.isfinite(output)))
+
+    def test_below_threshold_signal_passes_through(self):
+        """Test that quiet signals are unchanged without makeup gain."""
+        samples = np.full(32, 0.01, dtype=np.float32)
+        compressor = Compressor(threshold_db=-24.0, ratio=8.0)
+
+        output = compressor(samples)
+
+        np.testing.assert_allclose(output, samples, rtol=1e-6, atol=1e-6)
+
+    def test_vectorized_vs_iterator(self):
+        """Test that vectorized and iterator modes produce similar results."""
+        comp_vec = Compressor(SineOscillator(440, gain_db=0), threshold_db=-30.0)
+        comp_iter = Compressor(SineOscillator(440, gain_db=0), threshold_db=-30.0)
+
+        samples_vec = comp_vec.get_samples_vectorized(100)
+        samples_iter = comp_iter.get_samples(100, mode="iterator")
+
+        np.testing.assert_allclose(samples_vec, samples_iter, rtol=1e-5, atol=1e-6)
 
 
 class TestReverb(unittest.TestCase):

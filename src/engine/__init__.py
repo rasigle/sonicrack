@@ -90,16 +90,13 @@ from src.engine.core.component import (
     ParameterDescriptor,
     make_parameter_descriptors,
 )
-from src.engine.core.composer import (
-    Chain,
-    Composer,
-    WaveAdder,
-)
+from src.engine.core.composer import Chain, Composer, WaveAdder
 from src.engine.core.registry import (
     AudioComponentRegistry,
     audio_registry,
     register_component,
 )
+from src.engine.dsp.effects.compressor import Compressor
 from src.engine.dsp.effects.delay import Delay
 from src.engine.dsp.effects.distortion import Distortion
 from src.engine.dsp.effects.reverb import Reverb
@@ -219,6 +216,7 @@ __all__ = [
     "sample_hold_noise",
     "NoiseGenerator",
     "Distortion",
+    "Compressor",
     "Delay",
     "Reverb",
     "PresetBuilder",

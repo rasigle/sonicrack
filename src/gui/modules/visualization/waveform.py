@@ -86,12 +86,12 @@ class WaveformModule(ModuleWidget):
             self._buffer_lock = None
             logger.warning("Threading not available - waveform may have issues")
 
-        # Visualization timer (20 Hz = 50ms, on UI thread)
+        # Visualization timer (12 Hz). Scopes should never compete with audio.
         self._viz_timer = QtCore.QTimer()
-        self._viz_timer.setInterval(50)  # 50ms = 20 Hz
+        self._viz_timer.setInterval(83)
         self._viz_timer.timeout.connect(self._update_display)
         self._viz_timer.start()
-        logger.info("Waveform visualization timer started (20 Hz / 50ms)")
+        logger.info("Waveform visualization timer started (12 Hz / 83ms)")
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -427,17 +427,21 @@ class WaveformDisplay(QWidget):
             self.is_stereo = False
 
         # Downsample if needed (preserve columns for stereo)
+        target_samples = min(
+            self.display_samples,
+            max(128, min(2048, self.width() * 2)),
+        )
         if not self.is_stereo:
-            if samples.size > self.display_samples:
-                step = max(1, samples.size // self.display_samples)
-                self.samples = samples[::step][: self.display_samples]
+            if samples.size > target_samples:
+                step = max(1, samples.size // target_samples)
+                self.samples = samples[::step][:target_samples]
             else:
                 self.samples = samples
         else:
             # stereo: samples shape is (N,2)
-            if samples.shape[0] > self.display_samples:
-                step = max(1, samples.shape[0] // self.display_samples)
-                self.samples = samples[::step][: self.display_samples, :]
+            if samples.shape[0] > target_samples:
+                step = max(1, samples.shape[0] // target_samples)
+                self.samples = samples[::step][:target_samples, :]
             else:
                 self.samples = samples
 
@@ -560,7 +564,7 @@ class WaveformDisplay(QWidget):
     def paintEvent(self, event):
         """Paint the professional waveform display."""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
 
         # Draw background with gradient
         gradient = QLinearGradient(0, 0, 0, self.height())

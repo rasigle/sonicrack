@@ -79,6 +79,9 @@ class Port:
         self._latest_buffer: float | np.ndarray = 0.0
         self._tap_history: np.ndarray | None = None
         self._tap_history_limit = 65536
+        self._tap_write_index = 0
+        self._tap_count = 0
+        self._tap_history_enabled = False
 
     def connect(self, other: Port) -> None:
         """Connect this port to another port (bidirectional).
@@ -108,6 +111,8 @@ class Port:
         self.connected_to.append(other)
         if self not in other.connected_to:
             other.connected_to.append(self)
+        self._sync_tap_history_subscription()
+        other._sync_tap_history_subscription()
 
     def disconnect(self, other: Port | None = None) -> None:
         """Disconnect from a specific connected port (bidirectional), or all if other
@@ -126,6 +131,7 @@ class Port:
             self.connected_to.clear()
             # Clear port data to prevent stale audio
             self.clear()
+            self._sync_tap_history_subscription()
             return
 
         try:
@@ -133,9 +139,11 @@ class Port:
             # Also remove from other side (bidirectional)
             if self in other.connected_to:
                 other.connected_to.remove(self)
+                other._sync_tap_history_subscription()
             logger.debug(f"Port disconnected: {self.port_name} <-/-> {other.port_name}")
             # Clear port data to prevent stale audio
             self.clear()
+            self._sync_tap_history_subscription()
         except ValueError:
             # Port not in list; no-op
             pass
@@ -149,6 +157,8 @@ class Port:
         self.value = 0.0
         self._latest_buffer = 0.0
         self._tap_history = None
+        self._tap_write_index = 0
+        self._tap_count = 0
         logger.debug(f"Port data cleared: {self.port_name}")
 
     def read(self, num_samples: int | None = None) -> float | np.ndarray:
@@ -169,12 +179,10 @@ class Port:
         """
         render_context = None
         if num_samples is not None:
-            try:
+            with contextlib.suppress(ImportError):
                 from src.gui.audio_engine import get_active_render_context
 
                 render_context = get_active_render_context()
-            except ImportError:
-                render_context = None
 
         if render_context is not None:
             return render_context.read_port(self)
@@ -243,16 +251,19 @@ class Port:
         """
         if isinstance(value, np.ndarray):
             self.value = value
-            self._latest_buffer = value.copy()
-            self._append_tap_history(value)
+            self._update_tap_history(value)
+
         elif isinstance(value, (float, int)):
             self.value = float(value)
             self._latest_buffer = self.value
-            self._append_tap_history(np.array([self.value], dtype=np.float32))
+            if self._tap_history_enabled:
+                self._append_tap_history(np.array([self.value], dtype=np.float32))
+
         elif isinstance(value, Sequence):
-            self.value = np.array(value, dtype=np.float32)
-            self._latest_buffer = self.value.copy()
-            self._append_tap_history(self.value)
+            array_value = np.array(value, dtype=np.float32)
+            self.value = array_value
+            self._update_tap_history(array_value)
+
         else:
             raise TypeError(
                 f"Port write value must be float or np.ndarray, "
@@ -274,38 +285,106 @@ class Port:
         """
         value = self._latest_buffer
         if self._tap_history is not None and self._tap_history.size > 0:
+            ordered = self._ordered_tap_history()
             if num_samples is not None and num_samples > 0:
-                return self._tap_history[-num_samples:].copy()
-            return self._tap_history.copy()
+                return ordered[-num_samples:].copy()
+            return ordered.copy()
         if isinstance(value, np.ndarray):
             if num_samples is not None and num_samples > 0:
                 return value[-num_samples:].copy()
             return value.copy()
         return value
 
+    def _update_tap_history(self, value: np.ndarray) -> None:
+        """Update latest buffer and tap history for array values.
+
+        Args:
+            value: Array value to store
+        """
+        if self._tap_history_enabled:
+            self._latest_buffer = value.copy()
+            self._append_tap_history(value)
+        else:
+            self._latest_buffer = value
+
     def _append_tap_history(self, value: np.ndarray) -> None:
-        """Append rendered samples to the passive tap history."""
+        """Append rendered samples to bounded passive tap history."""
         samples = np.asarray(value)
         if samples.size == 0:
             return
         if samples.ndim == 0:
             samples = samples.reshape(1)
+        if len(samples) > self._tap_history_limit:
+            samples = samples[-self._tap_history_limit :]
 
         if self._tap_history is None:
-            self._tap_history = samples.copy()
+            self._allocate_tap_history(samples)
+            self._write_tap_samples(samples)
             return
 
         if self._tap_history.ndim != samples.ndim:
-            self._tap_history = samples.copy()
+            self._allocate_tap_history(samples)
+            self._write_tap_samples(samples)
             return
 
         if samples.ndim > 1 and self._tap_history.shape[1:] != samples.shape[1:]:
-            self._tap_history = samples.copy()
+            self._allocate_tap_history(samples)
+            self._write_tap_samples(samples)
             return
 
-        self._tap_history = np.concatenate((self._tap_history, samples), axis=0)
-        if len(self._tap_history) > self._tap_history_limit:
-            self._tap_history = self._tap_history[-self._tap_history_limit :].copy()
+        self._write_tap_samples(samples)
+
+    def _allocate_tap_history(self, samples: np.ndarray) -> None:
+        """Allocate or reset the fixed-size visualizer tap buffer."""
+        shape = (self._tap_history_limit, *samples.shape[1:])
+        self._tap_history = np.zeros(shape, dtype=samples.dtype)
+        self._tap_write_index = 0
+        self._tap_count = 0
+
+    def _write_tap_samples(self, samples: np.ndarray) -> None:
+        """Write samples into the circular tap buffer."""
+        if self._tap_history is None:
+            return
+
+        count = len(samples)
+        end = self._tap_write_index + count
+        if end <= self._tap_history_limit:
+            self._tap_history[self._tap_write_index : end] = samples
+        else:
+            first_count = self._tap_history_limit - self._tap_write_index
+            self._tap_history[self._tap_write_index :] = samples[:first_count]
+            self._tap_history[: end % self._tap_history_limit] = samples[first_count:]
+
+        self._tap_write_index = end % self._tap_history_limit
+        self._tap_count = min(self._tap_count + count, self._tap_history_limit)
+
+    def _ordered_tap_history(self) -> np.ndarray:
+        """Return tap history in chronological order."""
+        if self._tap_history is None or self._tap_count == 0:
+            return np.empty(0, dtype=np.float32)
+        if self._tap_count < self._tap_history_limit:
+            return self._tap_history[: self._tap_count]
+        return np.concatenate(
+            (
+                self._tap_history[self._tap_write_index :],
+                self._tap_history[: self._tap_write_index],
+            ),
+            axis=0,
+        )
+
+    def _sync_tap_history_subscription(self) -> None:
+        """Enable audio tap history only while a visualization input is attached."""
+        should_enable = self.port_type == "output" and any(
+            _is_visualization_input(connected_port)
+            for connected_port in self.connected_to
+        )
+        if should_enable == self._tap_history_enabled:
+            return
+
+        self._tap_history_enabled = should_enable
+        self._tap_history = None
+        self._tap_write_index = 0
+        self._tap_count = 0
 
     @property
     def is_connected(self) -> bool:
@@ -356,3 +435,16 @@ class Port:
         else:
             value_str = f"{self.value:.3f}"
         return f"{self.port_type} port '{self.port_name}' = {value_str}"
+
+
+def _is_visualization_input(port: Port) -> bool:
+    """Return True when a port belongs to a visualization sink input."""
+    if port.port_type != "input":
+        return False
+    module = port.parent_module
+    metadata = getattr(module, "metadata", None)
+    category = getattr(metadata, "category", None)
+    return (
+        category == "Visualization"
+        or getattr(category, "value", None) == "Visualization"
+    )

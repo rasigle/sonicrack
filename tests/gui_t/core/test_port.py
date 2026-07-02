@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from src.engine import SineOscillator, TriangleOscillator
+from src.gui.core.module import ModuleCategory
 from src.gui.core.port import Port
 
 
@@ -1016,9 +1017,14 @@ class TestPortNumpySupport:
         assert isinstance(port.value, np.ndarray)
         np.testing.assert_array_equal(port.value, array)
 
-    def test_peek_recent_reads_tap_history_without_connections(self):
+    def test_peek_recent_reads_tap_history_for_visualizer_connections(self):
         """Test passive tap snapshots do not require graph traversal."""
         port = Port("output", "audio_out")
+        visualizer = MagicMock()
+        visualizer.metadata.category = ModuleCategory.VISUALIZATION
+        visualizer_input = Port("input", "scope_in", parent_module=visualizer)
+        visualizer_input.connect(port)
+
         port.write(np.array([1.0, 2.0, 3.0], dtype=np.float32))
         port.write(np.array([4.0, 5.0], dtype=np.float32))
 

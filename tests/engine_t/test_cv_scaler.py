@@ -8,9 +8,9 @@ import numpy as np
 import pytest
 
 from src.engine import (
+    PITCH_CV_REFERENCE_FREQUENCY,
     ADSREnvelope,
     CVScaler,
-    PITCH_CV_REFERENCE_FREQUENCY,
     SineOscillator,
     bipolar_to_unipolar,
     frequency_to_pitch_cv,

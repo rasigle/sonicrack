@@ -156,9 +156,9 @@ from src.engine.sequencing import (
     StepSequencer,
 )
 from src.engine.utils.cv import (
-    CVScaler,
     PITCH_CV_REFERENCE_FREQUENCY,
     PITCH_CV_REFERENCE_NOTE,
+    CVScaler,
     bipolar_to_unipolar,
     frequency_to_pitch_cv,
     midi_note_to_pitch_cv,

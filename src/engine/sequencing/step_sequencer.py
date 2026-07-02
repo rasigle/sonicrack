@@ -7,8 +7,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine.utils.cv import midi_note_to_pitch_cv
 from src.engine.sequencing.clock import StepClock
+from src.engine.utils.cv import midi_note_to_pitch_cv
 from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
 

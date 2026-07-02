@@ -1,4 +1,5 @@
 """Math utility functions for audio processing."""
+
 from __future__ import annotations
 
 import math

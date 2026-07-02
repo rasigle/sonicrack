@@ -30,6 +30,11 @@ Example - Note Conversion:
     >>> note = note_name_to_midi("C4")  # Middle C = 60
 """
 
+from src.engine.utils.cv import (
+    frequency_to_pitch_cv,
+    midi_note_to_pitch_cv,
+    pitch_cv_to_frequency,
+)
 from src.midi_io.cv_outputs import (
     CVFrequencyOutput,
     CVGateOutput,
@@ -49,11 +54,6 @@ from src.midi_io.messages import (
 from src.midi_io.midi_to_cv import MIDIToCV
 from src.midi_io.monophonic_synth import MonophonicSynth
 from src.midi_io.polyphonic_synth import PolyphonicSynth, Voice
-from src.engine.utils.cv import (
-    frequency_to_pitch_cv,
-    midi_note_to_pitch_cv,
-    pitch_cv_to_frequency,
-)
 from src.midi_io.utils import (
     frequency_to_midi,
     get_note_range,

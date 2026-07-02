@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel
 
 from src.constants import DEFAULT_GAIN_DB
 from src.engine import (
+    PITCH_CV_REFERENCE_FREQUENCY,
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
@@ -29,6 +30,7 @@ from src.gui.core.runtime_helpers import (
 )
 from src.gui.module_registry import register_module
 from src.gui.modules.source._oscillator_runtime import (
+    _frequency_slew_values,
     render_with_frequency_ramp,
     smooth_control_signal,
 )
@@ -42,6 +44,11 @@ from src.gui.widgets import HSlider, Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
 VCO_PITCH_CV_SMOOTHING_MS = 5.0
+VCO_DEFAULT_FM_AMOUNT_PERCENT = 0.0
+VCO_MIN_FM_AMOUNT_PERCENT = -100.0
+VCO_MAX_FM_AMOUNT_PERCENT = 100.0
+VCO_FM_MODE_V_OCT = "1V/octave"
+VCO_FM_MODE_LINEAR = "Linear"
 
 
 def apply_v_oct_offset(
@@ -54,6 +61,51 @@ def apply_v_oct_offset(
     if np.isscalar(base_frequency) and np.isscalar(pitch_cv):
         return float(frequencies)
     return frequencies.astype(np.float32)
+
+
+def apply_linear_fm_offset(
+    base_frequency: float | np.ndarray,
+    fm_signal: float | np.ndarray,
+    fm_amount_percent: float,
+) -> float | np.ndarray:
+    """Apply VCV-style linear FM as a C4-scaled signed Hz offset."""
+    amount = float(fm_amount_percent) / 100.0
+    frequencies = np.asarray(base_frequency, dtype=np.float64) + (
+        np.asarray(fm_signal, dtype=np.float64)
+        * amount
+        * PITCH_CV_REFERENCE_FREQUENCY
+    )
+    frequencies = np.maximum(frequencies, 0.0)
+    if np.isscalar(base_frequency) and np.isscalar(fm_signal):
+        return float(frequencies)
+    return frequencies.astype(np.float32)
+
+
+def apply_exponential_fm_offset(
+    base_frequency: float | np.ndarray,
+    fm_signal: float | np.ndarray,
+    fm_amount_percent: float,
+) -> float | np.ndarray:
+    """Apply VCV-style exponential FM as an additional 1V/oct pitch offset."""
+    amount = float(fm_amount_percent) / 100.0
+    frequencies = np.asarray(base_frequency, dtype=np.float64) * np.power(
+        2.0, np.asarray(fm_signal, dtype=np.float64) * amount
+    )
+    if np.isscalar(base_frequency) and np.isscalar(fm_signal):
+        return float(frequencies)
+    return frequencies.astype(np.float32)
+
+
+def apply_vcv_fm_offset(
+    base_frequency: float | np.ndarray,
+    fm_signal: float | np.ndarray,
+    fm_amount_percent: float,
+    fm_mode: str,
+) -> float | np.ndarray:
+    """Apply FM using the same mode semantics as VCV Rack Fundamental VCO."""
+    if fm_mode == VCO_FM_MODE_LINEAR:
+        return apply_linear_fm_offset(base_frequency, fm_signal, fm_amount_percent)
+    return apply_exponential_fm_offset(base_frequency, fm_signal, fm_amount_percent)
 
 
 @register_module()
@@ -95,6 +147,8 @@ class ModulatedOscillatorModule(ModuleWidget):
         self._gain_db = DEFAULT_GAIN_DB
         self._phase = 0.0
         self._pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
+        self._fm_amount = VCO_DEFAULT_FM_AMOUNT_PERCENT
+        self._fm_mode = VCO_FM_MODE_V_OCT
 
         # Create the base oscillator component FIRST
         self.component = self._create_base_oscillator()
@@ -103,6 +157,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Note: Input ports don't have components (they receive signals)
         # Output port has the component reference
         self.freq_input = self.add_input("V/Oct")
+        self.fm_input = self.add_input("FM")
         self.gain_mod_input = self.add_input("Gain")
         self.out_port = self.add_output("Out", component=self.component)
 
@@ -130,6 +185,16 @@ class ModulatedOscillatorModule(ModuleWidget):
         self._refresh_mode_options(self._waveform, preserve_current=False)
         mode_layout.addWidget(self.mode_combo)
         layout.addLayout(mode_layout)
+
+        fm_mode_layout = QHBoxLayout()
+        fm_mode_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        fm_mode_layout.addWidget(QLabel("FM Mode:"))
+        self.fm_mode_combo = QtWidgets.QComboBox()
+        self.fm_mode_combo.addItems([VCO_FM_MODE_V_OCT, VCO_FM_MODE_LINEAR])
+        self.fm_mode_combo.setCurrentText(self._fm_mode)
+        self.fm_mode_combo.currentTextChanged.connect(self._on_fm_mode_changed)
+        fm_mode_layout.addWidget(self.fm_mode_combo)
+        layout.addLayout(fm_mode_layout)
 
         # Frequency control (base frequency when no modulation)
         knobs_layout = QHBoxLayout()
@@ -161,6 +226,20 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.gain_knob.value_changed.connect(self._on_gain_changed)
         knobs_layout.addWidget(self.gain_knob)
 
+        self.fm_amount_knob = Knob(
+            label="FM Amt %",
+            min_value=VCO_MIN_FM_AMOUNT_PERCENT,
+            max_value=VCO_MAX_FM_AMOUNT_PERCENT,
+            default_value=self._fm_amount,
+            logarithmic=False,
+        )
+        self.fm_amount_knob.setToolTip(
+            "Signed FM depth. In 1V/octave mode this scales pitch CV; "
+            "in Linear mode this scales C4 Hz per volt."
+        )
+        self.fm_amount_knob.value_changed.connect(self._on_fm_amount_changed)
+        knobs_layout.addWidget(self.fm_amount_knob)
+
         self.pulsewidth_knob = Knob(
             label="PW",
             min_value=MIN_PW_PERCENTAGE_VALUE / 100,
@@ -190,8 +269,15 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.register_parameter(
             "mode", self.mode_combo, getter="currentText", setter="setCurrentText"
         )
+        self.register_parameter(
+            "fm_mode",
+            self.fm_mode_combo,
+            getter="currentText",
+            setter="setCurrentText",
+        )
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("gain_db", self.gain_knob)
+        self.register_parameter("fm_amount", self.fm_amount_knob)
         self.register_parameter("phase", self.phase_slider)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
@@ -352,6 +438,17 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         self.parameter_changed.emit("gain_db", gain_value)
 
+    def _on_fm_amount_changed(self):
+        """Handle FM depth changes."""
+        fm_amount = self.fm_amount_knob.get_value()
+        self._fm_amount = fm_amount
+        self.parameter_changed.emit("fm_amount", fm_amount)
+
+    def _on_fm_mode_changed(self, fm_mode: str):
+        """Handle FM mode changes."""
+        self._fm_mode = fm_mode
+        self.parameter_changed.emit("fm_mode", fm_mode)
+
     def _on_pulsewidth_changed(self):
         """Handle square pulse width changes."""
         pulsewidth = self.pulsewidth_knob.get_value()
@@ -366,15 +463,18 @@ class ModulatedOscillatorModule(ModuleWidget):
         return []  # No required inputs - Freq and Gain are optional
 
     def get_modulation_inputs(self) -> list[str]:
-        """VCO accepts modulation on Gain port."""
-        return ["Gain"]
+        """VCO accepts modulation on Gain and FM ports."""
+        return ["Gain", "FM"]
 
     def get_cv_range(self, port_name: str = "Gain") -> tuple[float, float]:
-        """VCO Gain port expects unipolar CV range [0, 1].
+        """Return the expected CV range for VCO modulation inputs.
 
         Returns:
-            (0.0, 1.0) - unipolar range for amplitude modulation
+            Gain: (0.0, 1.0) - unipolar range for amplitude modulation
+            FM: (-1.0, 1.0) - bipolar range scaled by FM Amt %
         """
+        if port_name == "FM":
+            return -1.0, 1.0
         return 0.0, 1.0
 
     def update_knob_state(self):
@@ -404,8 +504,10 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         # Check if Gain input is connected
         has_gain_cv = self.gain_mod_input.is_connected
+        has_fm = self.fm_input.is_connected
 
         logger.debug(f"VCO update_knob_state: Gain port connected={has_gain_cv}")
+        logger.debug(f"VCO update_knob_state: FM port connected={has_fm}")
 
         if has_gain_cv:
             # Gain controlled by CV - disable knob
@@ -419,6 +521,16 @@ class ModulatedOscillatorModule(ModuleWidget):
             self.gain_knob.setStyleSheet("")
             self.gain_knob.setToolTip("Manual gain control (dB)")
             logger.debug("VCO: Gain knob ENABLED")
+
+        if has_fm:
+            self.fm_amount_knob.setToolTip(
+                "Signed FM depth for the connected FM input"
+            )
+        else:
+            self.fm_amount_knob.setToolTip(
+                "Signed FM depth. In 1V/octave mode this scales pitch CV; "
+                "in Linear mode this scales C4 Hz per volt."
+            )
 
     def create_engine_component(
         self,
@@ -439,6 +551,8 @@ class ModulatedOscillatorModule(ModuleWidget):
         mode = self.mode_combo.currentText()
         base_freq = self.freq_knob.get_value()
         gain_db = self.gain_knob.get_value()
+        fm_amount = self.fm_amount_knob.get_value()
+        fm_mode = self.fm_mode_combo.currentText()
         phase = self.phase_slider.get_value()
         pulsewidth = self.pulsewidth_knob.get_value()
 
@@ -451,11 +565,18 @@ class ModulatedOscillatorModule(ModuleWidget):
         gain_modulator = (
             modulation_components.get("Gain") if modulation_components else None
         )
+        fm_modulator = (
+            modulation_components.get("FM") if modulation_components else None
+        )
 
         has_freq_mod = freq_modulator is not None
         has_gain_mod = gain_modulator is not None
+        has_fm_mod = fm_modulator is not None and fm_amount != 0.0
 
-        logger.debug(f"VCO: freq_mod={has_freq_mod}, gain_mod={has_gain_mod}")
+        logger.debug(
+            f"VCO: freq_mod={has_freq_mod}, gain_mod={has_gain_mod}, "
+            f"fm_mod={has_fm_mod}"
+        )
 
         # Create the base oscillator
         if wave_type == "Sine":
@@ -503,12 +624,21 @@ class ModulatedOscillatorModule(ModuleWidget):
                 "VCO create_engine_component: Gain knob ENABLED (no modulation)"
             )
 
-        # If we have frequency or gain modulation, create ModulatedOscillator
-        if has_freq_mod or has_gain_mod:
+        # If we have frequency, FM, or gain modulation, create ModulatedOscillator
+        if has_freq_mod or has_gain_mod or has_fm_mod:
             # Frequency modulation function
             def freq_mod_func(base_freq, pitch_cv):
                 """Apply 1V/oct pitch CV as an offset around the base frequency."""
                 return apply_v_oct_offset(base_freq, pitch_cv)
+
+            def fm_mod_func(current_freq, fm_signal):
+                """Apply VCV-style FM after base pitch CV."""
+                return apply_vcv_fm_offset(
+                    current_freq,
+                    fm_signal,
+                    fm_amount,
+                    fm_mode,
+                )
 
             # Amplitude modulation function (for gain modulation)
             def amp_mod_func(base_amp, cv_amp):
@@ -519,13 +649,14 @@ class ModulatedOscillatorModule(ModuleWidget):
 
             logger.debug(
                 f"VCO: Creating ModulatedOscillator (freq_mod={has_freq_mod}, "
-                f"gain_mod={has_gain_mod})"
+                f"gain_mod={has_gain_mod}, fm_mod={has_fm_mod})"
             )
 
             # Build modulator list based on what's connected
             modulators = []
             amp_mod = None
             freq_mod = None
+            fm_mod = None
 
             if has_gain_mod:
                 modulators.append(gain_modulator)
@@ -535,8 +666,16 @@ class ModulatedOscillatorModule(ModuleWidget):
                 modulators.append(freq_modulator)
                 freq_mod = freq_mod_func
 
+            if has_fm_mod:
+                modulators.append(fm_modulator)
+                fm_mod = fm_mod_func
+
             return ModulatedOscillator(
-                osc, *modulators, amp_mod=amp_mod, freq_mod=freq_mod
+                osc,
+                *modulators,
+                amp_mod=amp_mod,
+                freq_mod=freq_mod,
+                fm_mod=fm_mod,
             )
 
         # No modulation - return plain oscillator
@@ -546,8 +685,12 @@ class ModulatedOscillatorModule(ModuleWidget):
         """Render VCO output for the current engine cycle."""
         wave_type = str_parameter(parameters, "waveform", self.wave_combo.currentText)
         mode = str_parameter(parameters, "mode", self.mode_combo.currentText)
+        fm_mode = str_parameter(parameters, "fm_mode", self.fm_mode_combo.currentText)
         frequency = float_parameter(parameters, "frequency", self.freq_knob.get_value)
         gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)
+        fm_amount = float_parameter(
+            parameters, "fm_amount", self.fm_amount_knob.get_value
+        )
         phase = float_parameter(parameters, "phase", self.phase_slider.get_value)
         pulsewidth = float_parameter(
             parameters, "pulsewidth", self.pulsewidth_knob.get_value
@@ -568,13 +711,35 @@ class ModulatedOscillatorModule(ModuleWidget):
                 self.component.pulsewidth = pulsewidth
 
         freq_signal = None
+        fm_signal = None
         gain_signal = None
         if self.gain_mod_input.is_connected:
             gain_signal = read_samples(self.gain_mod_input, num_samples)
+        if self.fm_input.is_connected and fm_amount != 0.0:
+            fm_signal = read_samples(self.fm_input, num_samples)
 
         if self.freq_input.is_connected:
             freq_signal = read_samples(self.freq_input, num_samples)
-            samples = self._render_frequency_signal(frequency, freq_signal)
+            samples = self._render_frequency_signal(
+                frequency,
+                freq_signal,
+                fm_signal=fm_signal,
+                fm_amount=fm_amount,
+                fm_mode=fm_mode,
+            )
+        elif fm_signal is not None:
+            base_frequencies, rendered_frequency = self._build_base_frequency_ramp(
+                frequency,
+                num_samples,
+            )
+            samples = self._render_frequency_signal(
+                base_frequencies,
+                None,
+                fm_signal=fm_signal,
+                fm_amount=fm_amount,
+                fm_mode=fm_mode,
+            )
+            self._last_runtime_frequency = rendered_frequency
         else:
             self._last_pitch_cv = None
             samples, rendered_frequency = render_with_frequency_ramp(
@@ -591,23 +756,62 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.out_port.write(samples)
 
     def _render_frequency_signal(
-        self, base_frequency: float, pitch_cv_signal: np.ndarray
+        self,
+        base_frequency: float | np.ndarray,
+        pitch_cv_signal: np.ndarray | None,
+        *,
+        fm_signal: np.ndarray | None = None,
+        fm_amount: float = 0.0,
+        fm_mode: str = VCO_FM_MODE_V_OCT,
     ) -> np.ndarray:
-        """Render a 1V/oct pitch-CV buffer without resetting oscillator phase."""
-        pitch_cv_signal, self._last_pitch_cv = smooth_control_signal(
-            pitch_cv_signal,
-            self._last_pitch_cv,
-            float(getattr(self.component, "sample_rate", 44100.0)),
-            VCO_PITCH_CV_SMOOTHING_MS,
-        )
+        """Render a pitch-CV/FM buffer without resetting oscillator phase."""
+        if pitch_cv_signal is None:
+            self._last_pitch_cv = None
+            length = len(fm_signal) if fm_signal is not None else len(base_frequency)
+            pitch_cv_signal = np.zeros(length, dtype=np.float32)
+        else:
+            pitch_cv_signal, self._last_pitch_cv = smooth_control_signal(
+                pitch_cv_signal,
+                self._last_pitch_cv,
+                float(getattr(self.component, "sample_rate", 44100.0)),
+                VCO_PITCH_CV_SMOOTHING_MS,
+            )
+
         samples = np.empty(len(pitch_cv_signal), dtype=np.float32)
         frequencies = apply_v_oct_offset(base_frequency, pitch_cv_signal)
+        if fm_signal is not None:
+            frequencies = apply_vcv_fm_offset(
+                frequencies,
+                fm_signal,
+                fm_amount,
+                fm_mode,
+            )
         for index, frequency in enumerate(frequencies):
             self.component.frequency = float(frequency)
             samples[index] = next(self.component)
         if len(frequencies) > 0:
             self._last_runtime_frequency = float(frequencies[-1])
         return samples
+
+    def _build_base_frequency_ramp(
+        self, target_frequency: float, num_samples: int
+    ) -> tuple[np.ndarray, float]:
+        """Build the base-frequency trajectory for FM-only rendering."""
+        sample_rate = float(getattr(self.component, "sample_rate", 44100.0))
+        if self._last_runtime_frequency == target_frequency:
+            frequencies = np.full(num_samples, target_frequency, dtype=np.float64)
+        else:
+            frequencies = _frequency_slew_values(
+                self._last_runtime_frequency,
+                target_frequency,
+                num_samples,
+                sample_rate,
+                35.0,
+            )
+        final_frequency = (
+            float(frequencies[-1]) if len(frequencies) > 0 else target_frequency
+        )
+        return frequencies, final_frequency
 
     @staticmethod
     def _create_runtime_base_oscillator(

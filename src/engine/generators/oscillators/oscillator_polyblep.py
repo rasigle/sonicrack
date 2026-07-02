@@ -31,6 +31,7 @@ from src.engine.core.registry import (
     ComponentCategory,
     register_component,
 )
+from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
 from src.engine.generators.oscillators.oscillator import _derive_amplitude_from_init
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples
@@ -586,7 +587,10 @@ class PolyBLEPOscillator(Generator):
         return np.array([next(self) for _ in range(n)], dtype=np.float32)
 
     def get_samples(
-        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+        self,
+        n: int = DEFAULT_SAMPLE_RATE,
+        reset: bool = False,
+        mode: SampleMode = "auto",
     ) -> np.ndarray:
         """Generate n samples using specified method.
 
@@ -603,7 +607,7 @@ class PolyBLEPOscillator(Generator):
             ValueError: If mode is invalid
         """
         n = validate_sample_count(n)
-        if mode not in ("auto", "iterator", "vectorized"):
+        if mode not in VALID_SAMPLE_MODES:
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
             )

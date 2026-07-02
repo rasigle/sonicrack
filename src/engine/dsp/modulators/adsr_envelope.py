@@ -18,6 +18,7 @@ from src.engine.core.component import (
     make_parameter_descriptors,
 )
 from src.engine.core.registry import register_component
+from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
 from src.engine.dsp.modulators.base import Modulator
 from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
@@ -334,7 +335,10 @@ class ADSREnvelope(Modulator):
         self.trigger_release()
 
     def get_samples(
-        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+        self,
+        n: int = DEFAULT_SAMPLE_RATE,
+        reset: bool = False,
+        mode: SampleMode = "auto",
     ) -> np.ndarray:
         """Generate n samples using vectorized computation (recommended).
 
@@ -366,7 +370,7 @@ class ADSREnvelope(Modulator):
             get_samples_iterator() directly. This is only useful for testing
             or educational purposes.
         """
-        if mode not in ("auto", "iterator", "vectorized"):
+        if mode not in VALID_SAMPLE_MODES:
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
             )

@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine import frequency_to_pitch_cv
+from src.engine import PITCH_CV_REFERENCE_FREQUENCY, frequency_to_pitch_cv
 from src.engine.dsp.modulators import ADSREnvelope, DecayEnvelope
 from src.engine.generators.oscillators.oscillator_ramp import SawtoothOscillator
 from src.engine.generators.oscillators.oscillator_sine import SineOscillator
@@ -239,6 +239,108 @@ def test_vco_v_oct_input_transposes_base_frequency(qapp: Any):
     module.process_runtime(8, parameters)
 
     assert module.component.frequency == pytest.approx(660.0)
+
+
+def test_vco_fm_input_defaults_to_vcv_exponential_mode(qapp: Any):
+    del qapp
+    module = ModulatedOscillatorModule()
+    fm_source = _connect_constant_input(module.fm_input, 1.0)
+    fm_source.write(np.ones(16, dtype=np.float32))
+
+    assert module.fm_amount_knob.min_value == pytest.approx(-100.0)
+    assert module.fm_amount_knob.max_value == pytest.approx(100.0)
+    assert module.fm_mode_combo.currentText() == "1V/octave"
+
+    module.process_runtime(
+        16,
+        {
+            "waveform": "Sine",
+            "mode": "analog",
+            "frequency": 330.0,
+            "gain_db": -12.0,
+            "phase": 0.0,
+            "fm_amount": 50.0,
+        },
+    )
+
+    output = np.asarray(module.out_port.value)
+    assert output.shape == (16,)
+    assert np.all(np.isfinite(output))
+    assert module.component.frequency == pytest.approx(330.0 * np.sqrt(2.0))
+    assert module.get_modulation_inputs() == ["Gain", "FM"]
+    assert module.get_cv_range("FM") == pytest.approx((-1.0, 1.0))
+
+    module.process_runtime(
+        16,
+        {
+            "waveform": "Sine",
+            "mode": "analog",
+            "frequency": 330.0,
+            "gain_db": -12.0,
+            "phase": 0.0,
+            "fm_amount": -50.0,
+        },
+    )
+
+    assert module.component.frequency == pytest.approx(330.0 / np.sqrt(2.0))
+
+
+def test_vco_linear_fm_uses_vcv_c4_scaled_hz_offset(qapp: Any):
+    del qapp
+    module = ModulatedOscillatorModule()
+    fm_source = _connect_constant_input(module.fm_input, 1.0)
+    fm_source.write(np.ones(16, dtype=np.float32))
+
+    module.process_runtime(
+        16,
+        {
+            "waveform": "Sine",
+            "mode": "analog",
+            "fm_mode": "Linear",
+            "frequency": 330.0,
+            "gain_db": -12.0,
+            "phase": 0.0,
+            "fm_amount": 50.0,
+        },
+    )
+
+    assert module.component.frequency == pytest.approx(
+        330.0 + (PITCH_CV_REFERENCE_FREQUENCY * 0.5)
+    )
+
+
+def test_vco_lfo_fm_differs_from_v_oct_pitch_input(qapp: Any):
+    del qapp
+    lfo_for_pitch = LFOModule()
+    lfo_for_fm = LFOModule()
+    pitch_vco = ModulatedOscillatorModule()
+    fm_vco = ModulatedOscillatorModule()
+    parameters = {
+        "waveform": "Sine",
+        "mode": "analog",
+        "fm_mode": "Linear",
+        "frequency": 440.0,
+        "gain_db": -12.0,
+        "phase": 0.0,
+        "fm_amount": 25.0,
+    }
+
+    lfo_parameters = {"frequency": 5.0, "pulsewidth": 0.5}
+    lfo_for_pitch.sine_port.connect(pitch_vco.freq_input)
+    lfo_for_fm.sine_port.connect(fm_vco.fm_input)
+
+    lfo_for_pitch.process_runtime(1024, lfo_parameters)
+    pitch_vco._last_pitch_cv = None
+    pitch_vco.process_runtime(1024, parameters)
+    pitch_output = np.asarray(pitch_vco.out_port.value)
+
+    lfo_for_fm.process_runtime(1024, lfo_parameters)
+    fm_vco.process_runtime(1024, parameters)
+    fm_output = np.asarray(fm_vco.out_port.value)
+
+    assert pitch_vco.get_runtime_spec().input_names == ("V/Oct", "FM", "Gain")
+    assert fm_vco.component.frequency != pytest.approx(pitch_vco.component.frequency)
+    assert np.max(np.abs(pitch_output - fm_output)) > 0.01
 
 
 def test_lfo_frequency_changes_are_ramped_with_clock_input_connected(qapp: Any):

@@ -120,6 +120,50 @@ class TestFrequencyModulation(unittest.TestCase):
         # Frequency should have been modulated
         # (Hard to test precisely, but we can verify it didn't crash)
 
+    def test_linear_fm_vectorized_matches_iterator(self) -> None:
+        """Vectorized rendering should support a separate linear-FM lane."""
+        sample_rate = 4000
+        iterator_osc = SineOscillator(
+            frequency=220,
+            amplitude=0.7,
+            gain_db=None,
+            sample_rate=sample_rate,
+        )
+        vectorized_osc = SineOscillator(
+            frequency=220,
+            amplitude=0.7,
+            gain_db=None,
+            sample_rate=sample_rate,
+        )
+        iterator_mod = SineOscillator(
+            frequency=11,
+            amplitude=50.0,
+            gain_db=None,
+            sample_rate=sample_rate,
+        )
+        vectorized_mod = SineOscillator(
+            frequency=11,
+            amplitude=50.0,
+            gain_db=None,
+            sample_rate=sample_rate,
+        )
+
+        mod_iter = ModulatedOscillator(
+            iterator_osc,
+            iterator_mod,
+            fm_mod=lambda current_freq, fm_val: current_freq + fm_val,
+        )
+        mod_vec = ModulatedOscillator(
+            vectorized_osc,
+            vectorized_mod,
+            fm_mod=lambda current_freq, fm_val: current_freq + fm_val,
+        )
+
+        samples_iter = mod_iter.get_samples_iterator(512, reset=True)
+        samples_vec = mod_vec.get_samples_vectorized(512)
+
+        np.testing.assert_allclose(samples_iter, samples_vec, rtol=1e-5, atol=1e-5)
+
 
 class TestPhaseModulation(unittest.TestCase):
     """Test phase modulation functionality."""

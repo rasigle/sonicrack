@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 
 from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.core.sample_mode import SampleMode
 from src.engine.generators.oscillators.oscillator_ramp import (
     SawtoothOscillator,
     TriangleOscillator,
@@ -23,7 +24,7 @@ def synth(
     amplitude: float = 1.0,
     sr: float | int = DEFAULT_SAMPLE_RATE,
     stype: str = "sine",
-    mode: str = "auto",
+    mode: SampleMode = "auto",
 ) -> np.ndarray:
     """Synthesize a waveform of the requested type.
 

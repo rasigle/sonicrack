@@ -36,7 +36,7 @@ Example:
     >>> mod_osc.trigger_release()
 
 Example - Frequency Modulation (Vibrato):
-    >>> from src.engine.oscillator_modulated import ModulatedFrequency
+    >>> from src.engine import ModulatedFrequency
     >>>
     >>> # Carrier oscillator
     >>> carrier = SineOscillator(frequency=440, amplitude=0.5)
@@ -60,7 +60,8 @@ Note:
     making it suitable for voice management in polyphonic synthesizers.
 """
 
-from typing import cast
+from enum import StrEnum
+from typing import TypedDict, cast
 
 import numpy as np
 
@@ -71,6 +72,7 @@ from src.engine.core.component import (
     ParameterDescriptor,
 )
 from src.engine.core.registry import ComponentCategory, register_component
+from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
 from src.engine.generators.oscillators.oscillator import (
     Oscillator,
     SawtoothOscillator,
@@ -79,6 +81,29 @@ from src.engine.generators.oscillators.oscillator import (
     TriangleOscillator,
 )
 from src.engine.utils.validation import validate_sample_count
+
+class ModulationLane(StrEnum):
+    """Internal modulation lanes supported by ModulatedOscillator."""
+
+    AMP = "amp"
+    FREQ = "freq"
+    FM = "fm"
+    PHASE = "phase"
+
+
+class PhaseStateKind(StrEnum):
+    """Internal phase-state representations used by vectorized rendering."""
+
+    ANGULAR = "angular"
+    CYCLE = "cycle"
+
+
+class PhaseState(TypedDict, total=False):
+    """State needed to commit vectorized oscillator phase after rendering."""
+
+    kind: PhaseStateKind
+    carrier_end: float
+    sample_index_end: float
 
 
 @register_component()
@@ -124,6 +149,11 @@ class ModulatedOscillator(Generator):
                 default=None,
                 description="Optional frequency modulation function.",
             ),
+            "fm_mod": ParameterDescriptor(
+                name="fm_mod",
+                default=None,
+                description="Optional linear FM modulation function.",
+            ),
             "phase_mod": ParameterDescriptor(
                 name="phase_mod",
                 default=None,
@@ -138,6 +168,7 @@ class ModulatedOscillator(Generator):
         *modulators,
         amp_mod=None,
         freq_mod=None,
+        fm_mod=None,
         phase_mod=None,
     ):
         """Initialize the ModulatedOscillator.
@@ -160,6 +191,9 @@ class ModulatedOscillator(Generator):
                 If set the second modulator of the last modulator is used for the
                 values.
 
+            fm_mod : Any function that takes in the frequency after pitch modulation
+                and the modulator value and returns the linear-FM frequency value.
+
             phase_mod : Any function that takes in the initial oscillator phase
                 value and the modulator value and returns the modified value.
                 If set the third modulator of the last modulator is used for the values.
@@ -175,6 +209,7 @@ class ModulatedOscillator(Generator):
 
         self.amp_mod = amp_mod
         self.freq_mod = freq_mod
+        self.fm_mod = fm_mod
         self.phase_mod = phase_mod
         self._modulators_count = len(modulators)
 
@@ -188,19 +223,58 @@ class ModulatedOscillator(Generator):
         return self
 
     def _modulate(self, mod_vals):
+        frequency = self.oscillator.init_freq
+
         if self.amp_mod is not None:
-            new_amp = self.amp_mod(self.oscillator.init_amp, mod_vals[0])
+            mod_val = mod_vals[self._get_modulation_index(ModulationLane.AMP)]
+            new_amp = self.amp_mod(self.oscillator.init_amp, mod_val)
             self.oscillator.amplitude = new_amp
 
         if self.freq_mod is not None:
-            mod_val = mod_vals[1 if self._modulators_count == 2 else 0]
-            new_freq = self.freq_mod(self.oscillator.init_freq, mod_val)
-            self.oscillator.frequency = new_freq
+            mod_val = mod_vals[self._get_modulation_index(ModulationLane.FREQ)]
+            frequency = self.freq_mod(self.oscillator.init_freq, mod_val)
+
+        if self.fm_mod is not None:
+            mod_val = mod_vals[self._get_modulation_index(ModulationLane.FM)]
+            frequency = self.fm_mod(frequency, mod_val)
+
+        if self.freq_mod is not None or self.fm_mod is not None:
+            self.oscillator.frequency = frequency
 
         if self.phase_mod is not None:
-            mod_val = mod_vals[2 if self._modulators_count == 3 else -1]
+            mod_val = mod_vals[self._get_modulation_index(ModulationLane.PHASE)]
             new_phase = self.phase_mod(self.oscillator.init_phase, mod_val)
             self.oscillator.phase = new_phase
+
+    def _get_modulation_index(self, target: ModulationLane) -> int:
+        """Return the modulator index for a modulation lane."""
+        if self.fm_mod is None:
+            if target is ModulationLane.AMP:
+                return 0
+            if target is ModulationLane.FREQ:
+                return 1 if self._modulators_count == 2 else 0
+            if target is ModulationLane.PHASE:
+                return 2 if self._modulators_count == 3 else -1
+
+        active_targets: list[ModulationLane] = []
+        if self.amp_mod is not None:
+            active_targets.append(ModulationLane.AMP)
+        if self.freq_mod is not None:
+            active_targets.append(ModulationLane.FREQ)
+        if self.fm_mod is not None:
+            active_targets.append(ModulationLane.FM)
+        if self.phase_mod is not None:
+            active_targets.append(ModulationLane.PHASE)
+
+        if self._modulators_count <= 1:
+            return 0
+
+        try:
+            index = active_targets.index(target)
+        except ValueError:
+            return -1
+
+        return min(index, self._modulators_count - 1)
 
     def trigger_release(self):
         tr = "trigger_release"
@@ -329,17 +403,29 @@ class ModulatedOscillator(Generator):
             base_value=base_freq,
             mod_arrays=mod_arrays,
             mod_func=self.freq_mod,
-            mod_index=(1 if self._modulators_count == 2 else 0),
+            mod_index=self._get_modulation_index(ModulationLane.FREQ),
         )
         if freqs is None:
             freqs = np.full(n, base_freq, dtype=np.float64)
+
+        fm_freqs = self._evaluate_modulation_array(
+            n=n,
+            base_value=0.0,
+            mod_arrays=mod_arrays,
+            mod_func=None
+            if self.fm_mod is None
+            else lambda _base, mod_val: self.fm_mod(freqs, mod_val),
+            mod_index=self._get_modulation_index(ModulationLane.FM),
+        )
+        if fm_freqs is not None:
+            freqs = fm_freqs
 
         amps = self._evaluate_modulation_array(
             n=n,
             base_value=base_amp,
             mod_arrays=mod_arrays,
             mod_func=self.amp_mod,
-            mod_index=0,
+            mod_index=self._get_modulation_index(ModulationLane.AMP),
         )
         if amps is None:
             amps = np.full(n, base_amp, dtype=np.float64)
@@ -349,7 +435,7 @@ class ModulatedOscillator(Generator):
             base_value=base_phase,
             mod_arrays=mod_arrays,
             mod_func=self.phase_mod,
-            mod_index=(2 if self._modulators_count == 3 else -1),
+            mod_index=self._get_modulation_index(ModulationLane.PHASE),
         )
 
         if not isinstance(
@@ -413,7 +499,7 @@ class ModulatedOscillator(Generator):
         freqs: np.ndarray | None,
         phase_offsets_deg: np.ndarray | None,
         sample_rate: float,
-    ) -> tuple[np.ndarray, dict[str, float | str]]:
+    ) -> tuple[np.ndarray, PhaseState]:
         """Generate a waveform buffer that respects the underlying oscillator type."""
         osc = self.oscillator
 
@@ -439,7 +525,7 @@ class ModulatedOscillator(Generator):
         freqs: np.ndarray | None,
         phase_offsets_deg: np.ndarray | None,
         sample_rate: float,
-    ) -> tuple[np.ndarray, dict[str, float | str]]:
+    ) -> tuple[np.ndarray, PhaseState]:
         assert freqs is not None
         osc = cast(SineOscillator, self.oscillator)
         increments = (2.0 * np.pi * freqs) / sample_rate
@@ -462,7 +548,7 @@ class ModulatedOscillator(Generator):
             cast(np.ndarray, osc._apply_wave_range_values(waveform)), dtype=np.float64
         )
         return waveform, {
-            "kind": "angular",
+            "kind": PhaseStateKind.ANGULAR,
             "carrier_end": end_phase,
             "sample_index_end": float(getattr(osc, "_sample_index", 0) + len(freqs)),
         }
@@ -472,7 +558,7 @@ class ModulatedOscillator(Generator):
         freqs: np.ndarray | None,
         phase_offsets_deg: np.ndarray | None,
         sample_rate: float,
-    ) -> tuple[np.ndarray, dict[str, float | str]]:
+    ) -> tuple[np.ndarray, PhaseState]:
         assert freqs is not None
         osc = cast(SquareOscillator, self.oscillator)
         increments = (2.0 * np.pi * freqs) / sample_rate
@@ -491,7 +577,7 @@ class ModulatedOscillator(Generator):
             high_value=osc._wave_range[1],
         )
         return np.asarray(waveform, dtype=np.float64), {
-            "kind": "angular",
+            "kind": PhaseStateKind.ANGULAR,
             "carrier_end": end_phase,
         }
 
@@ -500,7 +586,7 @@ class ModulatedOscillator(Generator):
         freqs: np.ndarray | None,
         phase_offsets_deg: np.ndarray | None,
         sample_rate: float,
-    ) -> tuple[np.ndarray, dict[str, float | str]]:
+    ) -> tuple[np.ndarray, PhaseState]:
         assert freqs is not None
         osc = cast(SawtoothOscillator, self.oscillator)
         increments = freqs / sample_rate
@@ -523,6 +609,7 @@ class ModulatedOscillator(Generator):
             waveform = osc._generate_vcv_from_cycles(cycles)
         else:
             waveform = 2 * (cycles - np.floor(0.5 + cycles))
+
         if osc.mode == "analog":
             sample_indices = getattr(osc, "_i", 0.0) + np.arange(
                 len(freqs), dtype=np.float64
@@ -531,17 +618,16 @@ class ModulatedOscillator(Generator):
                 np.ndarray,
                 osc._apply_analog_character(waveform, sample_indices),
             )
-        waveform = np.asarray(
-            cast(np.ndarray, osc._apply_wave_range_values(waveform)), dtype=np.float64
-        )
-        return waveform, {"kind": "cycle", "carrier_end": end_cycle}
+
+        waveform = np.asarray(osc._apply_wave_range_values(waveform), dtype=np.float64)
+        return waveform, {"kind": PhaseStateKind.CYCLE, "carrier_end": end_cycle}
 
     def _generate_triangle_waveform(
         self,
         freqs: np.ndarray | None,
         phase_offsets_deg: np.ndarray | None,
         sample_rate: float,
-    ) -> tuple[np.ndarray, dict[str, float | str]]:
+    ) -> tuple[np.ndarray, PhaseState]:
         assert freqs is not None
         osc = cast(TriangleOscillator, self.oscillator)
         increments = freqs / sample_rate
@@ -573,7 +659,7 @@ class ModulatedOscillator(Generator):
         waveform = np.asarray(
             cast(np.ndarray, osc._apply_wave_range_values(waveform)), dtype=np.float64
         )
-        return waveform, {"kind": "cycle", "carrier_end": end_cycle}
+        return waveform, {"kind": PhaseStateKind.CYCLE, "carrier_end": end_cycle}
 
     @staticmethod
     def _build_carrier_phase_buffer(
@@ -604,19 +690,17 @@ class ModulatedOscillator(Generator):
             return 0.0
         return oscillator._p / oscillator._period
 
-    def _update_phase_state_from_vectorized(
-        self, phase_state: dict[str, float | str]
-    ) -> None:
+    def _update_phase_state_from_vectorized(self, phase_state: PhaseState) -> None:
         """Commit the carrier phase accumulated during vectorized generation."""
         kind = phase_state.get("kind")
-        if kind == "angular":
+        if kind is PhaseStateKind.ANGULAR:
             self.oscillator._i = float(phase_state["carrier_end"]) % (2.0 * np.pi)
             sample_index_end = phase_state.get("sample_index_end")
             if sample_index_end is not None and isinstance(
                 self.oscillator, SineOscillator
             ):
                 self.oscillator._sample_index = int(sample_index_end)
-        elif kind == "cycle":
+        elif kind is PhaseStateKind.CYCLE:
             carrier_cycle = float(phase_state["carrier_end"]) % 1.0
             period = float(getattr(self.oscillator, "_period", 0.0))
             if period != 0.0:
@@ -652,7 +736,10 @@ class ModulatedOscillator(Generator):
         return samples
 
     def get_samples(
-        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+        self,
+        n: int = DEFAULT_SAMPLE_RATE,
+        reset: bool = False,
+        mode: SampleMode = "auto",
     ) -> np.ndarray:
         """Generate n samples using the specified method.
 
@@ -680,7 +767,7 @@ class ModulatedOscillator(Generator):
             >>> samples2 = mod_osc.get_samples(100,mode="iterator")
         """
         n = validate_sample_count(n)
-        if mode not in ("auto", "iterator", "vectorized"):
+        if mode not in VALID_SAMPLE_MODES:
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
             )

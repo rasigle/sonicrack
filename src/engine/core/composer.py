@@ -47,6 +47,7 @@ from src.engine.core.component import (
     ParameterDescriptor,
 )
 from src.engine.core.registry import ComponentCategory, register_component
+from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
 from src.engine.generators.oscillators.oscillator import Oscillator
 from src.engine.generators.oscillators.oscillator_modulated import ModulatedOscillator
 from src.engine.utils.validation import validate_sample_count
@@ -110,7 +111,10 @@ class Composer(AudioComponent, ABC):
         )
 
     def get_samples(
-        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+        self,
+        n: int = DEFAULT_SAMPLE_RATE,
+        reset: bool = False,
+        mode: SampleMode = "auto",
     ) -> np.ndarray:
         """Generate n samples using the specified method.
 
@@ -136,7 +140,7 @@ class Composer(AudioComponent, ABC):
             >>> samples2 = chain.get_samples(100,mode="iterator")
         """
         n = validate_sample_count(n)
-        if mode not in ("auto", "iterator", "vectorized"):
+        if mode not in VALID_SAMPLE_MODES:
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
             )

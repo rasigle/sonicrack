@@ -12,6 +12,7 @@ from src.engine.core.component import (
     make_parameter_descriptors,
 )
 from src.engine.core.registry import register_component
+from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
 from src.engine.dsp.modulators.base import Modulator
 from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
@@ -117,9 +118,15 @@ class DecayEnvelope(Modulator):
         """Pluck envelopes ignore note-off; decay continues naturally."""
 
     def get_samples(
-        self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False, mode: str = "auto"
+        self,
+        n: int = DEFAULT_SAMPLE_RATE,
+        reset: bool = False,
+        mode: SampleMode = "auto",
     ) -> np.ndarray:
-        _ = mode
+        if mode not in VALID_SAMPLE_MODES:
+            raise ValueError(
+                f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
+            )
         n = validate_sample_count(n)
         if reset:
             self.reset()

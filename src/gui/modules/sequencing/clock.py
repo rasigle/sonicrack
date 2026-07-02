@@ -41,10 +41,7 @@ class ClockModule(ModuleWidget):
         timing_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.bpm_knob = Knob(
-            label="BPM",
-            min_value=30.0,
-            max_value=300.0,
-            default_value=120.0
+            label="BPM", min_value=30.0, max_value=300.0, default_value=120.0
         )
         self.bpm_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("bpm", self.bpm_knob.get_value())
@@ -52,10 +49,7 @@ class ClockModule(ModuleWidget):
         timing_row.addWidget(self.bpm_knob)
 
         self.swing_knob = Knob(
-            label="Swing",
-            min_value=0.0,
-            max_value=0.75,
-            default_value=0.0
+            label="Swing", min_value=0.0, max_value=0.75, default_value=0.0
         )
         self.swing_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("swing", self.swing_knob.get_value())

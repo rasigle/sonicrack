@@ -77,9 +77,7 @@ class VCAModule(ModuleWidget):
             default_value=1.0,
             logarithmic=False,
         )
-        self.cv_attn_knob.setToolTip(
-            "CV influence amount: 0 = Gain only, 1 = CV only"
-        )
+        self.cv_attn_knob.setToolTip("CV influence amount: 0 = Gain only, 1 = CV only")
         self.cv_attn_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "cv_attenuation", self.cv_attn_knob.get_value()

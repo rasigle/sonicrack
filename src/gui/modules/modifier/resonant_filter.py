@@ -68,7 +68,7 @@ class ResonantFilterModule(ModuleWidget):
             min_value=20,
             max_value=20000,
             default_value=1200,
-            logarithmic=True
+            logarithmic=True,
         )
         self.cutoff_value_label = QLabel("1200 Hz")
         self.cutoff_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -86,7 +86,7 @@ class ResonantFilterModule(ModuleWidget):
             min_value=0.1,
             max_value=12.0,
             default_value=0.707,
-            logarithmic=True
+            logarithmic=True,
         )
         self.resonance_value_label = QLabel("0.71")
         self.resonance_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -103,10 +103,7 @@ class ResonantFilterModule(ModuleWidget):
         cv_label = QLabel("CV Depth")
         cv_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cv_depth_knob = Knob(
-            label="Oct",
-            min_value=-5.0,
-            max_value=5.0,
-            default_value=0.0
+            label="Oct", min_value=-5.0, max_value=5.0, default_value=0.0
         )
         self.cv_depth_value_label = QLabel("0.0 oct")
         self.cv_depth_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -120,10 +117,7 @@ class ResonantFilterModule(ModuleWidget):
         drive_label = QLabel("Drive")
         drive_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drive_knob = Knob(
-            label="dB",
-            min_value=0.0,
-            max_value=24.0,
-            default_value=0.0
+            label="dB", min_value=0.0, max_value=24.0, default_value=0.0
         )
         self.drive_value_label = QLabel("0 dB")
         self.drive_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -135,10 +129,7 @@ class ResonantFilterModule(ModuleWidget):
         output_label = QLabel("Output")
         output_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.output_gain_knob = Knob(
-            label="dB",
-            min_value=-24.0,
-            max_value=12.0,
-            default_value=-6.0
+            label="dB", min_value=-24.0, max_value=12.0, default_value=-6.0
         )
         self.output_gain_value_label = QLabel("-6 dB")
         self.output_gain_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

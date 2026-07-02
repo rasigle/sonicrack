@@ -52,7 +52,7 @@ class SimpleVolumeModule(ModuleWidget):
             min_value=-60,
             max_value=12,
             default_value=DEFAULT_GAIN_DB,
-            logarithmic=False
+            logarithmic=False,
         )
         self.gain_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("gain_db", self.gain_knob.get_value())

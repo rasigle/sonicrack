@@ -75,9 +75,7 @@ class TB303VoiceModule(ModuleWidget):
             default_value=0.5,
         )
         self.pw_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "pulsewidth", self.pw_knob.get_value()
-            )
+            lambda: self.parameter_changed.emit("pulsewidth", self.pw_knob.get_value())
         )
         osc_row.addWidget(self.pw_knob)
         layout.addLayout(osc_row)

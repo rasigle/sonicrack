@@ -8,10 +8,10 @@ from PyQt6.QtCore import QPointF
 from src.engine.core.component import AudioComponent
 from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.patch_canvas import PatchCanvas
 from src.gui.core.runtime import RuntimeParameters, get_runtime_spec
 from src.gui.core.runtime_helpers import read_samples
 from src.gui.modules.visualization.waveform import WaveformModule
+from src.gui.patch_canvas import PatchCanvas
 from src.gui.widgets.module_widget import ModuleWidget
 
 

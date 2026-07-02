@@ -7,6 +7,7 @@ import pytest
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
 
+from src.engine import Volume
 from src.gui.core.port import Port
 from src.gui.module_registry import initialize_module_registry
 from src.gui.modules.input.midi_keyboard import MIDIKeyboardModule
@@ -269,5 +270,63 @@ def test_midi_keyboard_velocity_can_drive_vca_runtime(qapp: Any):
 
     np.testing.assert_allclose(
         vca.out_port.value,
-        np.full(8, 100 / 127, dtype=np.float32),
+        np.full(8, 0.25 * (100 / 127), dtype=np.float32),
     )
+
+
+def test_vca_cv_attenuation_blends_gain_and_cv_runtime(qapp: Any):
+    del qapp
+    vca = VCAModule()
+    source = Port("output", "Audio")
+    cv = Port("output", "CV")
+
+    source.write(np.ones(8, dtype=np.float32))
+    cv.write(np.full(8, 0.75, dtype=np.float32))
+    source.connect(vca.in_port)
+    cv.connect(vca.cv_port)
+
+    vca.process_runtime(8, {"amplitude": 0.25, "cv_attenuation": 0.5})
+
+    np.testing.assert_allclose(
+        vca.out_port.value,
+        np.full(8, 0.21875, dtype=np.float32),
+    )
+
+
+def test_vca_zero_cv_attenuation_uses_manual_gain_runtime(qapp: Any):
+    del qapp
+    vca = VCAModule()
+    source = Port("output", "Audio")
+    cv = Port("output", "CV")
+
+    source.write(np.ones(8, dtype=np.float32))
+    cv.write(np.full(8, 0.9, dtype=np.float32))
+    source.connect(vca.in_port)
+    cv.connect(vca.cv_port)
+
+    vca.process_runtime(8, {"amplitude": 0.3, "cv_attenuation": 0.0})
+
+    np.testing.assert_allclose(
+        vca.out_port.value,
+        np.full(8, 0.3, dtype=np.float32),
+    )
+
+
+def test_vca_registers_cv_attenuation_parameter(qapp: Any):
+    del qapp
+    vca = VCAModule()
+    vca.cv_attn_knob.set_value(0.4)
+
+    assert vca.get_parameters()["cv_attenuation"] == pytest.approx(0.4)
+
+
+def test_vca_zero_cv_attenuation_component_uses_manual_gain(qapp: Any):
+    del qapp
+    vca = VCAModule()
+    vca.gain_knob.set_value(0.4)
+    vca.cv_attn_knob.set_value(0.0)
+
+    component = vca.create_engine_component(modulation_components={"CV In": object()})
+
+    assert isinstance(component, Volume)
+    assert component.amplitude == pytest.approx(0.4)

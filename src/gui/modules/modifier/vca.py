@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
@@ -23,8 +24,9 @@ class VCAModule(ModuleWidget):
     A VCA controls the amplitude/volume of an input signal. It can be controlled
     manually with the amplitude knob, or via a control voltage (CV) input.
 
-    When CV is connected, the knob is disabled and amplitude is controlled by
-    the CV signal (typically an envelope or LFO).
+    Gain controls the final output level. When CV is connected, the CV Attn knob
+    controls how strongly the CV signal influences the VCA before that final gain.
+    At 0.0, CV has no influence. At 1.0, CV has maximum influence.
 
     Inputs:
         - In: Audio input signal
@@ -34,7 +36,8 @@ class VCAModule(ModuleWidget):
         - Out: Amplitude-controlled audio output
 
     Parameters:
-        - Amplitude: Manual amplitude control (0.0 to 1.0)
+        - Amplitude: Final output gain (0.0 to 1.0)
+        - CV Attn: CV influence amount (0.0 to 1.0)
     """
 
     runtime_kind = "vca"
@@ -50,14 +53,14 @@ class VCAModule(ModuleWidget):
     def __init__(self):
         """Initialize VCA module."""
         super().__init__(
-            width=180,
+            width=220,
             height=180,
             color=QColor(100, 140, 180),
         )
 
         # Add ports
         self.in_port = self.add_input("In")
-        self.cv_port = self.add_input("CV")
+        self.cv_port = self.add_input("CV In")
         self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
@@ -66,25 +69,44 @@ class VCAModule(ModuleWidget):
 
         # Amplitude control
         knobs_layout = QHBoxLayout()
-        self.amp_knob = Knob(
-            label="Amplitude",
+
+        self.cv_attn_knob = Knob(
+            label="CV Attn",
             min_value=0.0,
             max_value=1.0,
-            default_value=0.7,
-            logarithmic=False
+            default_value=1.0,
+            logarithmic=False,
         )
-        self.amp_knob.setToolTip("Amplitude/Volume control (0.0 to 1.0)")
-        self.amp_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("amplitude", self.amp_knob.get_value())
+        self.cv_attn_knob.setToolTip(
+            "CV influence amount: 0 = Gain only, 1 = CV only"
         )
-        knobs_layout.addWidget(self.amp_knob)
+        self.cv_attn_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit(
+                "cv_attenuation", self.cv_attn_knob.get_value()
+            )
+        )
+        knobs_layout.addWidget(self.cv_attn_knob)
+
+        self.gain_knob = Knob(
+            label="Gain",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=1.0,
+            logarithmic=False,
+        )
+        self.gain_knob.setToolTip("Final VCA output gain (0.0 to 1.0)")
+        self.gain_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("amplitude", self.gain_knob.get_value())
+        )
+        knobs_layout.addWidget(self.gain_knob)
         layout.addLayout(knobs_layout)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
         # Register parameters for automatic get/set
-        self.register_parameter("amplitude", self.amp_knob)
+        self.register_parameter("amplitude", self.gain_knob)
+        self.register_parameter("cv_attenuation", self.cv_attn_knob)
 
         self.component = self.create_engine_component()
 
@@ -94,9 +116,9 @@ class VCAModule(ModuleWidget):
 
     def get_modulation_inputs(self) -> list[str]:
         """VCA accepts modulation on CV port."""
-        return ["CV"]
+        return ["CV In"]
 
-    def get_cv_range(self, port_name: str = "CV") -> tuple[float, float]:
+    def get_cv_range(self, port_name: str = "CV In") -> tuple[float, float]:
         """VCA CV port expects unipolar range [0, 1] for amplitude modulation.
 
         Returns:
@@ -105,15 +127,11 @@ class VCAModule(ModuleWidget):
         return 0.0, 1.0
 
     def update_knob_state(self):
-        """Update amplitude knob enabled state based on CV port connection.
-
-        When CV is connected, the knob is disabled to show that amplitude
-        is controlled externally.
-        """
+        """Update control tooltips based on CV port connection."""
         # Check CV port connection
         cv_port = None
         for port in self.input_ports:
-            if port.port_name == "CV":
+            if port.port_name == "CV In":
                 cv_port = port
                 break
 
@@ -124,18 +142,18 @@ class VCAModule(ModuleWidget):
             f"{len(cv_port.cables) if cv_port else 0} cables, has_cv={has_cv}"
         )
 
+        self.gain_knob.setEnabled(True)
+        self.gain_knob.setStyleSheet("")
         if has_cv:
-            # Amplitude controlled by CV - disable knob
-            self.amp_knob.setEnabled(False)
-            self.amp_knob.setStyleSheet("opacity: 0.5;")
-            self.amp_knob.setToolTip("Amplitude controlled by CV input")
-            logger.info("VCA: Amplitude knob DISABLED (CV connected)")
+            self.gain_knob.setToolTip("Final VCA output gain after CV modulation")
+            self.cv_attn_knob.setToolTip(
+                "CV influence amount: 0 = Gain only, 1 = CV only"
+            )
+            logger.info("VCA: CV connected; Gain remains editable as output gain")
         else:
-            # No CV - enable knob for manual control
-            self.amp_knob.setEnabled(True)
-            self.amp_knob.setStyleSheet("")
-            self.amp_knob.setToolTip("Manual amplitude control (0.0 to 1.0)")
-            logger.info("VCA: Amplitude knob ENABLED (no CV)")
+            self.gain_knob.setToolTip("Final VCA output gain (0.0 to 1.0)")
+            self.cv_attn_knob.setToolTip("CV influence when CV input is connected")
+            logger.info("VCA: No CV connected; Gain controls amplitude")
 
     def create_engine_component(
         self,
@@ -154,35 +172,50 @@ class VCAModule(ModuleWidget):
         Returns:
             Volume or ModulatedVolume component (patch compiler wraps in Chain)
         """
-        amplitude = self.amp_knob.get_value()
+        amplitude = self.gain_knob.get_value()
+        cv_attenuation = self.cv_attn_knob.get_value()
 
         # Check for CV modulation
         cv_modulator = (
-            modulation_components.get("CV")
+            modulation_components.get("CV In")
             if modulation_components and isinstance(modulation_components, dict)
             else None
         )
         has_cv = cv_modulator is not None
 
         logger.info(
-            f"VCA: Creating component with amplitude={amplitude:.3f}, has_cv={has_cv}, "
+            f"VCA: Creating component with amplitude={amplitude:.3f}, "
+            f"cv_attenuation={cv_attenuation:.3f}, has_cv={has_cv}, "
             f"modulation_components={modulation_components}"
         )
 
         # Update UI state
         if has_cv:
-            self.amp_knob.setEnabled(False)
-            self.amp_knob.setStyleSheet("opacity: 0.5;")
-            self.amp_knob.setToolTip("Amplitude controlled by CV input")
-            logger.info(
-                "VCA create_engine_component: Amplitude knob DISABLED (CV connected)"
+            self.gain_knob.setEnabled(True)
+            self.gain_knob.setStyleSheet("")
+            self.gain_knob.setToolTip("Final VCA output gain after CV modulation")
+            self.cv_attn_knob.setToolTip(
+                "CV influence amount: 0 = Gain only, 1 = CV only"
             )
+            logger.info("VCA create_engine_component: CV connected")
 
-            # Create ModulatedVolume with CV control
-            # CV input directly controls amplitude (should be in [0, 1] range)
+            # Create ModulatedVolume with CV influence control.
             # Patch compiler will wrap: Chain(input_signal, ModulatedVolume)
+            if cv_attenuation <= 0.0:
+                volume_component = Volume(amplitude=amplitude)
+                logger.info(
+                    f"VCA: Returning manual Volume component: {volume_component}, "
+                    f"type={type(volume_component).__name__}"
+                )
+                return volume_component
+
+            influenced_cv = _CVInfluenceAmplitude(
+                cv_modulator,
+                output_gain=amplitude,
+                influence=cv_attenuation,
+            )
             modulated_component = ModulatedVolume(
-                cv_modulator, modulation_target="amplitude"
+                influenced_cv, modulation_target="amplitude"
             )
             logger.info(
                 f"VCA: Returning ModulatedVolume component: {modulated_component}, "
@@ -191,9 +224,10 @@ class VCAModule(ModuleWidget):
             return modulated_component
 
         # Static volume component (no CV)
-        self.amp_knob.setEnabled(True)
-        self.amp_knob.setStyleSheet("")
-        self.amp_knob.setToolTip("Manual amplitude control (0.0 to 1.0)")
+        self.gain_knob.setEnabled(True)
+        self.gain_knob.setStyleSheet("")
+        self.gain_knob.setToolTip("Final VCA output gain (0.0 to 1.0)")
+        self.cv_attn_knob.setToolTip("CV influence when CV input is connected")
         logger.info("VCA create_engine_component: Amplitude knob ENABLED (no CV)")
 
         # Create simple Volume with manual control
@@ -212,9 +246,81 @@ class VCAModule(ModuleWidget):
             return
 
         input_signal = read_samples(self.in_port, num_samples)
-        amplitude = (
-            read_samples(self.cv_port, num_samples)
-            if self.cv_port.is_connected
-            else float_parameter(parameters, "amplitude", self.amp_knob.get_value)
+        manual_amplitude = float_parameter(
+            parameters, "amplitude", self.gain_knob.get_value
         )
+        if self.cv_port.is_connected:
+            cv_attenuation = float_parameter(
+                parameters, "cv_attenuation", self.cv_attn_knob.get_value
+            )
+            cv_amplitude = read_samples(self.cv_port, num_samples)
+            amplitude = _apply_cv_influence(
+                cv_amplitude,
+                cv_attenuation,
+                output_gain=manual_amplitude,
+            )
+        else:
+            amplitude = manual_amplitude
         self.out_port.write(input_signal * amplitude)
+
+
+def _apply_cv_influence(
+    cv_amplitude: float | np.ndarray,
+    influence: float,
+    *,
+    output_gain: float,
+) -> float | np.ndarray:
+    """Apply CV influence, then final output gain."""
+    amount = max(0.0, min(1.0, float(influence)))
+    modulation = (1.0 - amount) + (cv_amplitude * amount)
+    return np.clip(modulation * float(output_gain), 0.0, 1.0)
+
+
+class _CVInfluenceAmplitude:
+    """Iterator/generator adapter that blends manual gain with incoming CV."""
+
+    def __init__(self, source: Any, *, output_gain: float, influence: float):
+        self._source = source
+        self._iterator = iter(source)
+        self._output_gain = float(output_gain)
+        self._influence = float(influence)
+
+    def __iter__(self):
+        self._iterator = iter(self._source)
+        return self
+
+    def __next__(self):
+        return float(
+            _apply_cv_influence(
+                next(self._iterator),
+                self._influence,
+                output_gain=self._output_gain,
+            )
+        )
+
+    def get_samples(self, num_samples: int, **kwargs) -> np.ndarray:
+        if hasattr(self._source, "get_samples_vectorized") and not kwargs:
+            cv_values = self._source.get_samples_vectorized(num_samples)
+        elif hasattr(self._source, "get_samples"):
+            cv_values = self._source.get_samples(num_samples, **kwargs)
+        else:
+            cv_values = np.array(
+                [next(self._iterator) for _ in range(num_samples)],
+                dtype=np.float32,
+            )
+        return np.asarray(
+            _apply_cv_influence(
+                cv_values,
+                self._influence,
+                output_gain=self._output_gain,
+            ),
+            dtype=np.float32,
+        )
+
+    def trigger_release(self):
+        if hasattr(self._source, "trigger_release"):
+            self._source.trigger_release()
+
+    @property
+    def ended(self):
+        return bool(getattr(self._source, "ended", False))

@@ -9,6 +9,7 @@ import numpy as np
 from src.gui.core.port import Port
 from src.gui.module_registry import discover_modules, get_registry
 from src.gui.modules.sequencing.accent import AccentModule
+from src.gui.modules.sequencing.behringer_182 import Behringer182Module
 from src.gui.modules.sequencing.clock import ClockModule
 from src.gui.modules.sequencing.slide import SlideModule
 from src.gui.modules.sequencing.step_sequencer import StepSequencerModule
@@ -30,6 +31,7 @@ def test_sequencing_modules_are_discoverable(qapp: Any):
     assert "Step Sequencer" in registered
     assert "Slide" in registered
     assert "Accent" in registered
+    assert "Behringer 182" in registered
     assert "Acid Filter" in registered
     assert "TB-303 Voice" in registered
 
@@ -70,6 +72,115 @@ def test_step_sequencer_module_writes_all_cv_outputs(qapp: Any):
     np.testing.assert_allclose(module.gate_port.value, [1, 1, 1, 1])
     np.testing.assert_allclose(module.accent_port.value, [1, 1, 0, 0])
     np.testing.assert_allclose(module.slide_port.value, [0, 0, 1, 1])
+
+
+def test_behringer_182_module_writes_dual_cv_and_gate_outputs(qapp: Any):
+    del qapp
+    module = Behringer182Module()
+    _connect_signal(
+        module.clock_input,
+        np.array([1.0, 0.0, 1.0, 0.0], dtype=np.float32),
+    )
+
+    module.process_runtime(
+        4,
+        {
+            "cv_a": "0,0.5",
+            "cv_b": "1,0.25",
+            "gates": "1,0",
+            "steps": "2",
+            "direction": "forward",
+            "gate_length": 1.0,
+            "cv_a_range": 4.0,
+            "cv_b_range": 2.0,
+            "bpm": 60.0,
+            "division": "1/4",
+        },
+    )
+
+    np.testing.assert_allclose(module.cv_a_port.value, [0.0, 0.0, 2.0, 2.0])
+    np.testing.assert_allclose(module.cv_b_port.value, [2.0, 2.0, 0.5, 0.5])
+    np.testing.assert_allclose(module.gate_port.value, [1.0, 1.0, 0.0, 0.0])
+    np.testing.assert_allclose(module.trigger_port.value, [1.0, 0.0, 0.0, 0.0])
+    np.testing.assert_allclose(module.end_port.value, [0.0, 0.0, 0.0, 0.0])
+
+
+def test_behringer_182_module_stops_gate_outputs(qapp: Any):
+    del qapp
+    module = Behringer182Module()
+    _connect_signal(
+        module.clock_input,
+        np.array([1.0, 0.0, 1.0, 0.0], dtype=np.float32),
+    )
+
+    module.process_runtime(
+        4,
+        {
+            "cv_a_1": 0.25,
+            "cv_b_1": 0.75,
+            "gates": "1,1",
+            "steps": "2",
+            "direction": "forward",
+            "gate_length": 1.0,
+            "cv_a_range": 4.0,
+            "cv_b_range": 2.0,
+            "bpm": 60.0,
+            "division": "1/4",
+            "running": False,
+        },
+    )
+
+    np.testing.assert_allclose(module.cv_a_port.value, [1.0, 1.0, 1.0, 1.0])
+    np.testing.assert_allclose(module.cv_b_port.value, [1.5, 1.5, 1.5, 1.5])
+    np.testing.assert_allclose(module.gate_port.value, 0.0)
+    np.testing.assert_allclose(module.trigger_port.value, 0.0)
+    np.testing.assert_allclose(module.end_port.value, 0.0)
+
+
+def test_behringer_182_cv_knob_changes_without_resetting_step(qapp: Any):
+    del qapp
+    module = Behringer182Module()
+    clock_output = _connect_signal(
+        module.clock_input,
+        np.array([1.0, 0.0, 1.0], dtype=np.float32),
+    )
+
+    module.process_runtime(
+        3,
+        {
+            "cv_a_1": 0.0,
+            "cv_a_2": 0.25,
+            "gates": "1,1",
+            "steps": "2",
+            "direction": "forward",
+            "gate_length": 1.0,
+            "cv_a_range": 4.0,
+            "cv_b_range": 2.0,
+            "bpm": 60.0,
+            "division": "1/4",
+            "running": True,
+        },
+    )
+
+    clock_output.write(np.zeros(2, dtype=np.float32))
+    module.process_runtime(
+        2,
+        {
+            "cv_a_1": 0.0,
+            "cv_a_2": 0.75,
+            "gates": "1,1",
+            "steps": "2",
+            "direction": "forward",
+            "gate_length": 1.0,
+            "cv_a_range": 4.0,
+            "cv_b_range": 2.0,
+            "bpm": 60.0,
+            "division": "1/4",
+            "running": True,
+        },
+    )
+
+    np.testing.assert_allclose(module.cv_a_port.value, [3.0, 3.0])
 
 
 def test_slide_module_processes_frequency_cv(qapp: Any):

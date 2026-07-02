@@ -54,6 +54,7 @@ class MixerModule(ModuleWidget):
             description="Adjusts the gain for channel 1",
             min_value=0.0,
             max_value=1.0,
+            default_value=DEFAULT_CHANNEL_VOLUME,
             logarithmic=False,
         )
         self.ch1_gain_knob.value_changed.connect(lambda: self._on_gain_changed(0))
@@ -63,6 +64,7 @@ class MixerModule(ModuleWidget):
             description="Adjusts the gain for channel 2",
             min_value=0.0,
             max_value=1.0,
+            default_value=DEFAULT_CHANNEL_VOLUME,
             logarithmic=False,
         )
         self.ch2_gain_knob.value_changed.connect(lambda: self._on_gain_changed(1))
@@ -77,6 +79,7 @@ class MixerModule(ModuleWidget):
             description="Adjusts the gain for channel 3",
             min_value=0.0,
             max_value=1.0,
+            default_value=DEFAULT_CHANNEL_VOLUME,
             logarithmic=False,
         )
         self.ch3_gain_knob.value_changed.connect(lambda: self._on_gain_changed(2))
@@ -86,6 +89,7 @@ class MixerModule(ModuleWidget):
             description="Adjusts the gain for channel 4",
             min_value=0.0,
             max_value=1.0,
+            default_value=DEFAULT_CHANNEL_VOLUME,
             logarithmic=False,
         )
         self.ch4_gain_knob.value_changed.connect(lambda: self._on_gain_changed(3))
@@ -135,6 +139,7 @@ class MixerModule(ModuleWidget):
 
         # Update the Volume component amplitude (click-free)
         self._volume_components[channel_index].amplitude = new_gain
+        self.parameter_changed.emit(f"gain{channel_index + 1}", new_gain)
 
         logger.debug(f"Mixer: Ch {channel_index + 1} gain set to {new_gain:.3f}")
 

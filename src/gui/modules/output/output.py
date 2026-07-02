@@ -75,7 +75,7 @@ class OutputModule(ModuleWidget):
         self.master_gain_knob = Knob(
             label="Master",
             description="Controls the master output gain",
-            min_value=0.0,
+            min_value=-80.0,
             max_value=12.0,
             default_value=0.0,
             callback=self._on_gain_changed,

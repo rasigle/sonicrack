@@ -150,6 +150,8 @@ from src.engine.presets.preset_library import PresetLibrary
 from src.engine.sequencing import (
     AccentFrame,
     AccentProcessor,
+    Behringer182Frame,
+    Behringer182Sequencer,
     SequencerFrame,
     SlideProcessor,
     StepClock,
@@ -236,6 +238,8 @@ __all__ = [
     "PresetLibrary",
     "AccentFrame",
     "AccentProcessor",
+    "Behringer182Frame",
+    "Behringer182Sequencer",
     "SequencerFrame",
     "SlideProcessor",
     "StepClock",

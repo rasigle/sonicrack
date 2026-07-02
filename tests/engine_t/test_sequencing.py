@@ -5,6 +5,7 @@ import pytest
 
 from src.engine.sequencing import (
     AccentProcessor,
+    Behringer182Sequencer,
     SlideProcessor,
     StepClock,
     StepEvent,
@@ -120,3 +121,51 @@ def test_accent_processor_preserves_decay_across_buffers():
 
     np.testing.assert_allclose(first.amp, [1.0])
     np.testing.assert_allclose(second.amp, [0.75, 0.5])
+
+
+def test_behringer_182_renders_dual_cv_rows_gate_and_triggers():
+    sequencer = Behringer182Sequencer(
+        cv_a=[0.0, 0.5, 1.0],
+        cv_b=[1.0, 0.5, 0.0],
+        gates=[True, False, True],
+        steps=3,
+        gate_length=1.0,
+        cv_a_range=5.0,
+        cv_b_range=2.0,
+        bpm=60.0,
+        division="1/4",
+        sample_rate=10,
+    )
+    clock = np.array([1, 0, 1, 0, 1, 0, 1], dtype=np.float32)
+
+    frame = sequencer.process(7, clock)
+
+    np.testing.assert_allclose(frame.cv_a, [0.0, 0.0, 2.5, 2.5, 5.0, 5.0, 0.0])
+    np.testing.assert_allclose(frame.cv_b, [2.0, 2.0, 1.0, 1.0, 0.0, 0.0, 2.0])
+    np.testing.assert_allclose(frame.gate, [1, 1, 0, 0, 1, 1, 1])
+    np.testing.assert_allclose(frame.trigger, [1, 0, 0, 0, 1, 0, 1])
+    np.testing.assert_allclose(frame.end, [0, 0, 0, 0, 0, 0, 1])
+    np.testing.assert_allclose(frame.step, [0, 0, 1, 1, 2, 2, 0])
+
+
+def test_behringer_182_reset_and_hold_control_position():
+    sequencer = Behringer182Sequencer(
+        cv_a=[0.0, 0.25, 0.5],
+        steps=3,
+        cv_a_range=4.0,
+        sample_rate=10,
+    )
+    clock = np.array([1, 1, 1, 1, 1], dtype=np.float32)
+    reset = np.array([0, 0, 1, 0, 0], dtype=np.float32)
+    hold = np.array([0, 1, 0, 0, 0], dtype=np.float32)
+
+    frame = sequencer.process(5, clock, reset_pulses=reset, hold_signal=hold)
+
+    np.testing.assert_allclose(frame.cv_a, [0.0, 0.0, 0.0, 1.0, 2.0])
+    np.testing.assert_allclose(frame.step, [0, 0, 0, 1, 2])
+
+
+def test_behringer_182_is_registered_component():
+    from src.engine.core.registry import audio_registry
+
+    assert audio_registry.get("Behringer182Sequencer") is Behringer182Sequencer

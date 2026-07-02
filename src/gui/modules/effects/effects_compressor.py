@@ -46,7 +46,7 @@ class CompressorModule(ModulatedModuleBase):
             description="Sets the threshold for the compressor",
             min_value=-60.0,
             max_value=0.0,
-            default_value=0.1,
+            default_value=-18.0,
         )
         self.threshold_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -60,7 +60,7 @@ class CompressorModule(ModulatedModuleBase):
             description="Sets the compression ratio",
             min_value=1.0,
             max_value=20.0,
-            default_value=0.1,
+            default_value=4.0,
         )
         self.ratio_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("ratio", self.ratio_knob.get_value())
@@ -75,7 +75,7 @@ class CompressorModule(ModulatedModuleBase):
             description="Sets the attack time of the compressor",
             min_value=0.001,
             max_value=200.0,
-            default_value=0.1,
+            default_value=10.0,
         )
         self.attack_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -87,9 +87,9 @@ class CompressorModule(ModulatedModuleBase):
         self.release_knob = Knob(
             label="Release",
             description="Sets the release time of the compressor",
-            min_value=0.01,
+            min_value=1.0,
             max_value=1000.0,
-            default_value=0.1,
+            default_value=100.0,
         )
         self.release_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -104,9 +104,9 @@ class CompressorModule(ModulatedModuleBase):
         self.makeup_knob = Knob(
             label="Makeup",
             description="Adjusts the makeup gain after compression",
-            min_value=0.0,
+            min_value=-24.0,
             max_value=24.0,
-            default_value=0.1,
+            default_value=0.0,
         )
         self.makeup_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -120,7 +120,7 @@ class CompressorModule(ModulatedModuleBase):
             description="Controls the dry/wet mix of the compressor",
             min_value=0.0,
             max_value=1.0,
-            default_value=0.1,
+            default_value=1.0,
         )
         self.mix_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())

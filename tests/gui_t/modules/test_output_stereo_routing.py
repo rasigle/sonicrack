@@ -163,6 +163,16 @@ class TestCombineLRToStereo:
 class TestOutputModuleRouting:
     """Test cases for OutputModule stereo routing logic (integration tests)."""
 
+    def test_master_gain_defaults_to_unity_and_can_mute(self, output_module):
+        """Master gain is in dB: 0 dB is unity, -80 dB is mute."""
+        assert output_module.master_gain_knob.min_value == pytest.approx(-80.0)
+        assert output_module.master_gain_knob.max_value == pytest.approx(12.0)
+        assert output_module.gain_db == pytest.approx(0.0)
+
+        output_module.master_gain_knob.set_value(-80.0)
+
+        assert output_module.gain_db == pytest.approx(-80.0)
+
     def test_inactive_output_does_not_start_playback(self, output_module):
         """Inactive output module must not restart playback."""
         output_module.set_active(False)

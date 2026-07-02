@@ -450,6 +450,18 @@ def test_mixer_runtime_applies_channel_gains(qapp: Any):
     assert module._volume_components[1].amplitude == pytest.approx(0.5)
 
 
+def test_mixer_gain_knobs_update_runtime_parameters(qapp: Any):
+    del qapp
+    module = MixerModule()
+
+    assert module.get_parameters()["gain1"] == pytest.approx(0.7)
+
+    module.ch1_gain_knob.set_value(0.33)
+
+    assert module._volume_components[0].amplitude == pytest.approx(0.33)
+    assert module.get_parameters()["gain1"] == pytest.approx(0.33)
+
+
 def test_filter_runtime_applies_filter_parameters(qapp: Any):
     del qapp
     module = FilterModule()

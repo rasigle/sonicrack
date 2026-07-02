@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import QPointF, Qt
@@ -12,13 +12,10 @@ from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QMessageBox
 
 from src.gui.core.module import ModuleCategory
+from src.gui.modules.output.output import OutputModule
 from src.gui.widgets.cable_widget import Cable
+from src.gui.widgets.module_widget import ModuleWidget
 from src.gui.widgets.port_widget import PortWidget
-
-if TYPE_CHECKING:
-    from src.gui.modules.output.output import OutputModule
-    from src.gui.widgets.module_widget import ModuleWidget
-
 
 logger = logging.getLogger(__name__)
 
@@ -394,8 +391,6 @@ class PatchCanvas(QGraphicsView):
         Returns:
             The OutputModule instance, or None if not found
         """
-        from src.gui.modules.output.output import OutputModule
-
         for module in self.get_modules():
             if module.metadata.category == ModuleCategory.OUTPUT:
                 return cast(OutputModule, module)

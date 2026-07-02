@@ -111,7 +111,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
-        self.setToolTip("Click the power button to bypass this module.")
+        self.setAcceptHoverEvents(True)
 
     # === UI Construction Helpers ===
     @staticmethod
@@ -395,6 +395,18 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         y = (self._title_bar_height() - size) / 2
         return QRectF(margin, y, size, size)
 
+    def _tooltip_text_at(self, pos: QPointF) -> str:
+        """Return context-sensitive tooltip text for the module surface."""
+        if self._power_button_rect().contains(pos):
+            return "Click the power button to bypass this module."
+        if 0 <= pos.y() <= self._title_bar_height():
+            return self.metadata.description
+        return ""
+
+    def _update_tooltip_at(self, pos: QPointF) -> None:
+        """Update the native Qt tooltip for the current hover position."""
+        self.setToolTip(self._tooltip_text_at(pos))
+
     def shape(self):
         """Return the shape for collision detection.
 
@@ -675,6 +687,21 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
     def mouseReleaseEvent(self, event):
         """Handle mouse release."""
         super().mouseReleaseEvent(event)
+
+    def hoverEnterEvent(self, event):
+        """Set the tooltip before Qt's native tooltip delay starts."""
+        self._update_tooltip_at(event.pos())
+        super().hoverEnterEvent(event)
+
+    def hoverMoveEvent(self, event):
+        """Keep the tooltip scoped to the current header subregion."""
+        self._update_tooltip_at(event.pos())
+        super().hoverMoveEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        """Clear region-specific tooltip text when leaving the module."""
+        self.setToolTip("")
+        super().hoverLeaveEvent(event)
 
     def create_engine_component(
         self,

@@ -50,6 +50,8 @@ class PatchCanvas(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
 
         # Background
         self.setBackgroundBrush(QColor(45, 45, 48))

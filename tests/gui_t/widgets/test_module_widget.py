@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+from PyQt6.QtCore import QPointF
 
 from src.engine.core.component import AudioComponent
 from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.patch_canvas import PatchCanvas
 from src.gui.core.runtime import RuntimeParameters, get_runtime_spec
 from src.gui.core.runtime_helpers import read_samples
 from src.gui.modules.visualization.waveform import WaveformModule
@@ -87,7 +89,11 @@ class _VisualizerWidget(ModuleWidget):
 
 
 class _ModifierWidget(ModuleWidget):
-    metadata = ModuleMetadata("Test Modifier", ModuleCategory.MODIFIER)
+    metadata = ModuleMetadata(
+        "Test Modifier",
+        ModuleCategory.MODIFIER,
+        description="Test modifier description",
+    )
     runtime_kind = "component_modifier"
 
     def __init__(self):
@@ -148,6 +154,35 @@ def test_port_widgets_show_direction_tooltips(qapp: Any):
 
     assert modifier.input_ports[0].toolTip() == "Test Modifier Input: In"
     assert modifier.output_ports[0].toolTip() == "Test Modifier Output: Out"
+
+
+def test_module_header_tooltip_uses_module_description(qapp: Any):
+    del qapp
+    modifier = _ModifierWidget()
+
+    assert modifier.toolTip() == ""
+    modifier._update_tooltip_at(QPointF(40, 10))
+
+    assert modifier.toolTip() == "Test modifier description"
+
+
+def test_module_power_button_tooltip_is_scoped_to_button(qapp: Any):
+    del qapp
+    modifier = _ModifierWidget()
+
+    modifier._update_tooltip_at(modifier._power_button_rect().center())
+    assert modifier.toolTip() == "Click the power button to bypass this module."
+
+    modifier._update_tooltip_at(QPointF(40, modifier._title_bar_height() + 10))
+    assert modifier.toolTip() == ""
+
+
+def test_patch_canvas_enables_mouse_tracking_for_graphics_tooltips(qapp: Any):
+    del qapp
+    canvas = PatchCanvas()
+
+    assert canvas.hasMouseTracking()
+    assert canvas.viewport().hasMouseTracking()
 
 
 def test_inactive_modifier_passes_required_input_through(qapp: Any):

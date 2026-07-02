@@ -66,7 +66,13 @@ class NoiseModule(ModuleWidget):
         layout.addLayout(type_layout)
 
         # Gain in dB control (alternative to amplitude)
-        self.gain_knob = Knob("Gain (dB)", -60, 12, DEFAULT_GAIN_DB, logarithmic=False)
+        self.gain_knob = Knob(
+            label="Gain (dB)",
+            min_value=-60,
+            max_value=12,
+            default_value=DEFAULT_GAIN_DB,
+            logarithmic=False
+        )
         self.gain_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("gain_db", self.gain_knob.get_value())
         )

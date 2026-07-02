@@ -4,7 +4,7 @@ import math
 from collections.abc import Callable, Sequence
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import QWidget
 
@@ -20,6 +20,7 @@ class Knob(QWidget):
     def __init__(
         self,
         label: str = "",
+        description: str | None = None,
         min_value: float = 0.0,
         max_value: float = 1.0,
         default_value: float | None = None,
@@ -32,6 +33,7 @@ class Knob(QWidget):
 
         Args:
             label: Text label displayed below the knob
+            description: Tooltip description for the knob
             min_value: Minimum value
             max_value: Maximum value
             default_value: Default value (defaults to min_value)
@@ -51,6 +53,10 @@ class Knob(QWidget):
         self.default_value = default_value if default_value is not None else min_value
         self._value = self.default_value
 
+        self._description = description
+        if self._description:
+            self.setToolTip(self._description)
+
         # Visual properties
         self.knob_size = 44
         self.setMinimumSize(82, 78)
@@ -61,11 +67,10 @@ class Knob(QWidget):
         self.last_y = 0
         self.last_x = 0
 
-        # Angle range (270 degrees of rotation)
+        # Angle range (This creates a 270-degree arc with the gap at the bottom)
         # Inverted: open zone at bottom
         self.min_angle = 225  # Bottom-right (starting point)
         self.max_angle = -45  # Bottom-left (ending point)
-        # This creates a 270-degree arc with the gap at the bottom
 
     @staticmethod
     def _validate_curve_points(
@@ -380,6 +385,8 @@ class Knob(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging = False
             self.setCursor(Qt.CursorShape.ArrowCursor)
+            if self._description:
+                self.setToolTip(self._description)
             event.accept()
 
     def mouseDoubleClickEvent(self, event):
@@ -387,6 +394,8 @@ class Knob(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self.set_value(self.default_value)
             self.setToolTip(f"{self.label}: {self.default_value:.3f} (default)")
+            if self._description:
+                QTimer.singleShot(2000, lambda: self.setToolTip(self._description))
             event.accept()
 
     def wheelEvent(self, event):

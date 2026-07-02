@@ -142,6 +142,14 @@ def test_inactive_source_outputs_silence(qapp: Any):
     assert np.allclose(source.out_port.value, np.zeros(4, dtype=np.float32))
 
 
+def test_port_widgets_show_direction_tooltips(qapp: Any):
+    del qapp
+    modifier = _ModifierWidget()
+
+    assert modifier.input_ports[0].toolTip() == "Test Modifier Input: In"
+    assert modifier.output_ports[0].toolTip() == "Test Modifier Output: Out"
+
+
 def test_inactive_modifier_passes_required_input_through(qapp: Any):
     del qapp
     engine = AudioEngine()

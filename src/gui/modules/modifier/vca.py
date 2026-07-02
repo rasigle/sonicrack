@@ -66,7 +66,13 @@ class VCAModule(ModuleWidget):
 
         # Amplitude control
         knobs_layout = QHBoxLayout()
-        self.amp_knob = Knob("Amplitude", 0.0, 1.0, 0.7, logarithmic=False)
+        self.amp_knob = Knob(
+            label="Amplitude",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.7,
+            logarithmic=False
+        )
         self.amp_knob.setToolTip("Amplitude/Volume control (0.0 to 1.0)")
         self.amp_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("amplitude", self.amp_knob.get_value())

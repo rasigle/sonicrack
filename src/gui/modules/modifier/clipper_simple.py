@@ -44,7 +44,13 @@ class ClipperModule(ModuleWidget):
         layout = self._create_standard_layout()
 
         # Threshold knob
-        self.threshold_knob = Knob("Threshold", 0.0, 1.0, 1.0)
+        self.threshold_knob = Knob(
+            label="Threshold",
+            description="Sets the clipping threshold",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.01,
+        )
         self.threshold_knob.value_changed.connect(self._on_threshold_changed)
         layout.addWidget(self.threshold_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 

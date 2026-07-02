@@ -41,7 +41,13 @@ class CompressorModule(ModulatedModuleBase):
 
         threshold_ratio_row = QHBoxLayout()
         threshold_ratio_row.setSpacing(10)
-        self.threshold_knob = Knob("Thresh", -60.0, 0.0, -18.0)
+        self.threshold_knob = Knob(
+            label="Thresh",
+            description="Sets the threshold for the compressor",
+            min_value=-60.0,
+            max_value=0.0,
+            default_value=0.1,
+        )
         self.threshold_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "threshold_db", self.threshold_knob.get_value()
@@ -49,7 +55,13 @@ class CompressorModule(ModulatedModuleBase):
         )
         threshold_ratio_row.addWidget(self.threshold_knob)
 
-        self.ratio_knob = Knob("Ratio", 1.0, 20.0, 4.0)
+        self.ratio_knob = Knob(
+            label="Ratio",
+            description="Sets the compression ratio",
+            min_value=1.0,
+            max_value=20.0,
+            default_value=0.1,
+        )
         self.ratio_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("ratio", self.ratio_knob.get_value())
         )
@@ -58,7 +70,13 @@ class CompressorModule(ModulatedModuleBase):
 
         timing_row = QHBoxLayout()
         timing_row.setSpacing(10)
-        self.attack_knob = Knob("Attack", 0.1, 200.0, 10.0)
+        self.attack_knob = Knob(
+            label="Attack",
+            description="Sets the attack time of the compressor",
+            min_value=0.001,
+            max_value=200.0,
+            default_value=0.1,
+        )
         self.attack_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "attack_ms", self.attack_knob.get_value()
@@ -66,7 +84,13 @@ class CompressorModule(ModulatedModuleBase):
         )
         timing_row.addWidget(self.attack_knob)
 
-        self.release_knob = Knob("Release", 1.0, 1000.0, 100.0)
+        self.release_knob = Knob(
+            label="Release",
+            description="Sets the release time of the compressor",
+            min_value=0.01,
+            max_value=1000.0,
+            default_value=0.1,
+        )
         self.release_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "release_ms", self.release_knob.get_value()
@@ -77,7 +101,13 @@ class CompressorModule(ModulatedModuleBase):
 
         output_row = QHBoxLayout()
         output_row.setSpacing(10)
-        self.makeup_knob = Knob("Makeup", -24.0, 24.0, 0.0)
+        self.makeup_knob = Knob(
+            label="Makeup",
+            description="Adjusts the makeup gain after compression",
+            min_value=0.0,
+            max_value=24.0,
+            default_value=0.1,
+        )
         self.makeup_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "makeup_gain_db", self.makeup_knob.get_value()
@@ -85,7 +115,13 @@ class CompressorModule(ModulatedModuleBase):
         )
         output_row.addWidget(self.makeup_knob)
 
-        self.mix_knob = Knob("Mix", 0.0, 1.0, 1.0)
+        self.mix_knob = Knob(
+            label="Mix",
+            description="Controls the dry/wet mix of the compressor",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.1,
+        )
         self.mix_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
         )

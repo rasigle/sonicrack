@@ -45,7 +45,13 @@ class ReverbModule(ModulatedModuleBase):
         knobs_row = QHBoxLayout()
         knobs_row.setSpacing(10)
 
-        self.room_size_knob = Knob("Room Size", 0.0, 1.0, 0.5)
+        self.room_size_knob = Knob(
+            label="Room Size",
+            description="Adjusts the perceived size of the room",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
+        )
         self.room_size_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "room_size", self.room_size_knob.get_value()
@@ -53,7 +59,13 @@ class ReverbModule(ModulatedModuleBase):
         )
         knobs_row.addWidget(self.room_size_knob)
 
-        self.damping_knob = Knob("Damping", 0.0, 1.0, 0.5)
+        self.damping_knob = Knob(
+            label="Damping",
+            description="Controls the high-frequency damping of the reverb",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
+        )
         self.damping_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "damping", self.damping_knob.get_value()
@@ -64,7 +76,13 @@ class ReverbModule(ModulatedModuleBase):
 
         mix_row = QHBoxLayout()
         mix_row.setSpacing(10)
-        self.mix_knob = Knob("Mix", 0.0, 1.0, 0.5)
+        self.mix_knob = Knob(
+            label="Mix",
+            description="Controls the dry/wet mix of the reverb effect",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
+        )
         self.mix_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
         )

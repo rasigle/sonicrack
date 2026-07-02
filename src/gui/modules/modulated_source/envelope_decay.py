@@ -43,7 +43,13 @@ class DecayEnvelopeModule(ModuleWidget):
 
         timing_row = QHBoxLayout()
         timing_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.attack_knob = Knob("Attack", 0.0, 0.2, 0.0)
+        self.attack_knob = Knob(
+            label="Attack",
+            description="Sets the attack time of the envelope",
+            min_value=0.001,
+            max_value=0.2,
+            default_value=0.001,
+        )
         self.attack_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "attack_duration", self.attack_knob.get_value()
@@ -51,7 +57,13 @@ class DecayEnvelopeModule(ModuleWidget):
         )
         timing_row.addWidget(self.attack_knob)
 
-        self.decay_knob = Knob("Decay", 0.001, 2.0, 0.18)
+        self.decay_knob = Knob(
+            label="Decay",
+            description="Sets the decay time of the envelope",
+            min_value=0.001,
+            max_value=2.0,
+            default_value=0.001,
+        )
         self.decay_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "decay_duration", self.decay_knob.get_value()
@@ -62,19 +74,31 @@ class DecayEnvelopeModule(ModuleWidget):
 
         amount_row = QHBoxLayout()
         amount_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.amount_knob = Knob("Amount", 0.0, 1.0, 1.0)
+        self.amount_knob = Knob(
+            label="Amount",
+            description="Scales the overall output of the envelope",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.001,
+        )
         self.amount_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("amount", self.amount_knob.get_value())
         )
         amount_row.addWidget(self.amount_knob)
 
-        self.accent_amount_knob = Knob("Accent", 0.0, 1.0, 0.0)
-        self.accent_amount_knob.value_changed.connect(
+        self.accent_knob = Knob(
+            label="Accent",
+            description="Scales the accent input's effect on the envelope",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.001,
+        )
+        self.accent_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
-                "accent_amount", self.accent_amount_knob.get_value()
+                "accent_amount", self.accent_knob.get_value()
             )
         )
-        amount_row.addWidget(self.accent_amount_knob)
+        amount_row.addWidget(self.accent_knob)
         layout.addLayout(amount_row)
 
         self.trigger_button = QPushButton("trig")
@@ -87,7 +111,7 @@ class DecayEnvelopeModule(ModuleWidget):
         self.register_parameter("attack_duration", self.attack_knob)
         self.register_parameter("decay_duration", self.decay_knob)
         self.register_parameter("amount", self.amount_knob)
-        self.register_parameter("accent_amount", self.accent_amount_knob)
+        self.register_parameter("accent_amount", self.accent_knob)
 
     def get_required_inputs(self) -> list[str]:
         return []
@@ -118,7 +142,7 @@ class DecayEnvelopeModule(ModuleWidget):
         if self.accent_input.is_connected:
             accent_signal = read_samples(self.accent_input, num_samples)
             accent_amount = float_parameter(
-                parameters, "accent_amount", self.accent_amount_knob.get_value
+                parameters, "accent_amount", self.accent_knob.get_value
             )
             samples = np.clip(samples * (1.0 + accent_signal * accent_amount), 0.0, 1.0)
 

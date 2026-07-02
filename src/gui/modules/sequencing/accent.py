@@ -42,13 +42,23 @@ class AccentModule(ModuleWidget):
 
         top_row = QHBoxLayout()
         top_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.amount_knob = Knob("Amount", 0.0, 1.0, 1.0)
+        self.amount_knob = Knob(
+            label="Amount",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=1.0
+        )
         self.amount_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("amount", self.amount_knob.get_value())
         )
         top_row.addWidget(self.amount_knob)
 
-        self.decay_knob = Knob("Decay", 0.0, 0.5, 0.08)
+        self.decay_knob = Knob(
+            label="Decay",
+            min_value=0.0,
+            max_value=0.5,
+            default_value=0.08
+        )
         self.decay_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("decay", self.decay_knob.get_value())
         )
@@ -57,7 +67,12 @@ class AccentModule(ModuleWidget):
 
         depth_row = QHBoxLayout()
         depth_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.amp_depth_knob = Knob("Amp", 0.0, 1.0, 0.35)
+        self.amp_depth_knob = Knob(
+            label="Amp",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.35
+        )
         self.amp_depth_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "amp_depth", self.amp_depth_knob.get_value()
@@ -65,7 +80,12 @@ class AccentModule(ModuleWidget):
         )
         depth_row.addWidget(self.amp_depth_knob)
 
-        self.cutoff_depth_knob = Knob("Cutoff", 0.0, 1.0, 0.6)
+        self.cutoff_depth_knob = Knob(
+            label="Cutoff",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.6
+        )
         self.cutoff_depth_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "cutoff_depth", self.cutoff_depth_knob.get_value()
@@ -73,7 +93,12 @@ class AccentModule(ModuleWidget):
         )
         depth_row.addWidget(self.cutoff_depth_knob)
 
-        self.env_depth_knob = Knob("Env", 0.0, 1.0, 0.5)
+        self.env_depth_knob = Knob(
+            label="Env",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5
+        )
         self.env_depth_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "envelope_depth", self.env_depth_knob.get_value()

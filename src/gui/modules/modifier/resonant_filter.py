@@ -63,7 +63,13 @@ class ResonantFilterModule(ModuleWidget):
         cutoff_layout = QVBoxLayout()
         cutoff_label = QLabel("Cutoff")
         cutoff_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.cutoff_knob = Knob("Hz", 20, 20000, 1200, logarithmic=True)
+        self.cutoff_knob = Knob(
+            label="Hz",
+            min_value=20,
+            max_value=20000,
+            default_value=1200,
+            logarithmic=True
+        )
         self.cutoff_value_label = QLabel("1200 Hz")
         self.cutoff_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cutoff_knob.value_changed.connect(self._on_cutoff_changed)
@@ -75,7 +81,13 @@ class ResonantFilterModule(ModuleWidget):
         resonance_layout = QVBoxLayout()
         resonance_label = QLabel("Resonance")
         resonance_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.resonance_knob = Knob("Q", 0.1, 12.0, 0.707, logarithmic=True)
+        self.resonance_knob = Knob(
+            label="Q",
+            min_value=0.1,
+            max_value=12.0,
+            default_value=0.707,
+            logarithmic=True
+        )
         self.resonance_value_label = QLabel("0.71")
         self.resonance_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.resonance_knob.value_changed.connect(self._on_resonance_changed)
@@ -90,7 +102,12 @@ class ResonantFilterModule(ModuleWidget):
         cv_layout = QVBoxLayout()
         cv_label = QLabel("CV Depth")
         cv_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.cv_depth_knob = Knob("Oct", -5.0, 5.0, 0.0)
+        self.cv_depth_knob = Knob(
+            label="Oct",
+            min_value=-5.0,
+            max_value=5.0,
+            default_value=0.0
+        )
         self.cv_depth_value_label = QLabel("0.0 oct")
         self.cv_depth_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cv_depth_knob.value_changed.connect(self._on_cv_depth_changed)
@@ -102,7 +119,12 @@ class ResonantFilterModule(ModuleWidget):
         drive_layout = QVBoxLayout()
         drive_label = QLabel("Drive")
         drive_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.drive_knob = Knob("dB", 0.0, 24.0, 0.0)
+        self.drive_knob = Knob(
+            label="dB",
+            min_value=0.0,
+            max_value=24.0,
+            default_value=0.0
+        )
         self.drive_value_label = QLabel("0 dB")
         self.drive_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drive_knob.value_changed.connect(self._on_drive_changed)
@@ -112,7 +134,12 @@ class ResonantFilterModule(ModuleWidget):
         output_layout = QVBoxLayout()
         output_label = QLabel("Output")
         output_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.output_gain_knob = Knob("dB", -24.0, 12.0, -6.0)
+        self.output_gain_knob = Knob(
+            label="dB",
+            min_value=-24.0,
+            max_value=12.0,
+            default_value=-6.0
+        )
         self.output_gain_value_label = QLabel("-6 dB")
         self.output_gain_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.output_gain_knob.value_changed.connect(self._on_output_gain_changed)

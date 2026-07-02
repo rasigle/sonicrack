@@ -135,10 +135,10 @@ class ModulatedOscillatorModule(ModuleWidget):
         knobs_layout = QHBoxLayout()
         knobs_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.freq_knob = Knob(
-            "Pitch (Hz)",
-            11,
-            6000,
-            self._base_frequency,
+            label="Pitch (Hz)",
+            min_value=11,
+            max_value=6000,
+            default_value=self._base_frequency,
             curve_points=AUDIO_FREQUENCY_KNOB_CURVE,
         )
         self.freq_knob.setToolTip(
@@ -148,7 +148,13 @@ class ModulatedOscillatorModule(ModuleWidget):
         knobs_layout.addWidget(self.freq_knob)
 
         # Gain in dB
-        self.gain_knob = Knob("Gain (dB)", -60, 12, DEFAULT_GAIN_DB, logarithmic=False)
+        self.gain_knob = Knob(
+            label="Gain (dB)",
+            min_value=-60,
+            max_value=12,
+            default_value=DEFAULT_GAIN_DB,
+            logarithmic=False,
+        )
         self.gain_knob.setToolTip(
             "Oscillator gain (dB)\nRange: -60 to +12 dB\nDefault: -20 dB"
         )
@@ -156,10 +162,10 @@ class ModulatedOscillatorModule(ModuleWidget):
         knobs_layout.addWidget(self.gain_knob)
 
         self.pulsewidth_knob = Knob(
-            "PW",
-            MIN_PW_PERCENTAGE_VALUE / 100,
-            MAX_PW_PERCENTAGE_VALUE / 100,
-            self._pulsewidth,
+            label="PW",
+            min_value=MIN_PW_PERCENTAGE_VALUE / 100,
+            max_value=MAX_PW_PERCENTAGE_VALUE / 100,
+            default_value=self._pulsewidth,
         )
         self.pulsewidth_knob.setToolTip("Square pulse width")
         self.pulsewidth_knob.value_changed.connect(self._on_pulsewidth_changed)
@@ -211,10 +217,10 @@ class ModulatedOscillatorModule(ModuleWidget):
     def _get_default_mode_for_waveform(cls, waveform: str) -> str:
         """Return a sensible default mode for each waveform."""
         preferred_defaults = {
-            "Sine": "analog",
-            "Square": "ideal",
-            "Sawtooth": "analog",
-            "Triangle": "analog",
+            "Sine": "pure",
+            "Square": "vcv",
+            "Sawtooth": "vcv",
+            "Triangle": "pure",
         }
         available_modes = cls._get_available_modes_for_waveform(waveform)
         preferred = preferred_defaults.get(waveform, available_modes[0])

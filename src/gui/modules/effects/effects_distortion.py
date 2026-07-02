@@ -56,13 +56,25 @@ class DistortionModule(ModulatedModuleBase):
         knobs_row = QHBoxLayout()
         knobs_row.setSpacing(10)
 
-        self.drive_knob = Knob("Drive", 0.0, 1.0, 0.5)
+        self.drive_knob = Knob(
+            label="Drive",
+            description="Controls the amount of distortion",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
+        )
         self.drive_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("drive", self.drive_knob.get_value())
         )
         knobs_row.addWidget(self.drive_knob)
 
-        self.mix_knob = Knob("Mix", 0.0, 1.0, 0.5)
+        self.mix_knob = Knob(
+            label="Mix",
+            description="Controls the dry/wet mix of the distortion effect",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
+        )
         self.mix_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
         )

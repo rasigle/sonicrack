@@ -72,14 +72,15 @@ class OutputModule(ModuleWidget):
 
         # Master gain control
         self.gain_db = 0.0  # Initialize at 0 dB
-        self.gain_knob = Knob(
-            label="Master Gain",
-            min_value=-80.0,  # Effectively -infinity
+        self.master_gain_knob = Knob(
+            label="Master",
+            description="Controls the master output gain",
+            min_value=0.0,
             max_value=12.0,
             default_value=0.0,
             callback=self._on_gain_changed,
         )
-        layout.addWidget(self.gain_knob)  # Add knob to layout
+        layout.addWidget(self.master_gain_knob)  # Add knob to layout
 
         # Status label only; sample/buffer configured globally
         self.status_label = QtWidgets.QLabel("Stopped")

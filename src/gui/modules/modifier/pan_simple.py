@@ -53,7 +53,12 @@ class SimplePannerModule(ModuleWidget):
         layout = self._create_standard_layout()
 
         # Pan knob
-        self.pan_knob = Knob("Pan", -1.0, 1.0, 0.0)
+        self.pan_knob = Knob(
+            label="Pan",
+            min_value=-1.0,
+            max_value=1.0,
+            default_value=0.0
+        )
         self.pan_knob.value_changed.connect(self._on_pan_changed)
         layout.addWidget(self.pan_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 

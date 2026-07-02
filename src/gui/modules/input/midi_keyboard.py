@@ -125,7 +125,13 @@ class MIDIKeyboardModule(ModuleWidget):
         )
         settings_layout.addWidget(self.octave_combo)
 
-        self.velocity_knob = Knob("Velocity", 1, 127, 100)
+        self.velocity_knob = Knob(
+            label="Velocity",
+            description="Sets the MIDI velocity for notes played on the keyboard",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
+        )
         self.velocity_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "velocity", int(self.velocity_knob.get_value())

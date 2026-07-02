@@ -12,12 +12,11 @@ To use this plugin:
 from typing import Any
 
 import numpy as np
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from engine import Modifier
+from src.engine import Modifier
 from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.module_registry import register_module
+from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -89,19 +88,26 @@ class SimpleFilterModule(ModuleWidget):
         layout = self._create_standard_layout()
 
         # Add controls
-        self.cutoff_knob = Knob("Cutoff", 20, 20000, 1000)
-        self.cutoff_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("cutoff", self.cutoff_knob.get_value())
+        # Add a knob for cutoff frequency
+        self.cutoff_knob = Knob(
+            "Cutoff",
+            description="Sets the cutoff frequency of the filter",
+            min_value=20,
+            max_value=20000,
+            default_value=1000,
+            logarithmic=True,
         )
-        layout.addWidget(self.cutoff_knob, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.add_control("cutoff", self.cutoff_knob)
 
-        self.resonance_knob = Knob("Resonance", 0.0, 1.0, 0.5)
-        self.resonance_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "resonance", self.resonance_knob.get_value()
-            )
+        # Add a knob for resonance
+        self.resonance_knob = Knob(
+            "Resonance",
+            description="Adjusts the resonance of the filter",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
         )
-        layout.addWidget(self.resonance_knob, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.add_control("resonance", self.resonance_knob)
 
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)

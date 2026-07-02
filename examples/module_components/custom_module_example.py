@@ -107,7 +107,14 @@ class LowPassFilterModule(ModuleWidget):
         layout.setContentsMargins(5, 5, 5, 5)
 
         # Cutoff frequency knob
-        self.cutoff_knob = Knob("Cutoff", 20, 20000, 1000)
+        self.cutoff_knob = Knob(
+            "Cutoff",
+            description="Sets the cutoff frequency of the filter",
+            min_value=20,
+            max_value=20000,
+            default_value=1000,
+            logarithmic=True,
+        )
         self.cutoff_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("cutoff", self.cutoff_knob.get_value())
         )

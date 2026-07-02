@@ -38,7 +38,12 @@ class SlideModule(ModuleWidget):
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
-        self.time_knob = Knob("Time", 0.0, 0.5, 0.08)
+        self.time_knob = Knob(
+            label="Time",
+            min_value=0.0,
+            max_value=0.5,
+            default_value=0.08
+        )
         self.time_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("time", self.time_knob.get_value())
         )

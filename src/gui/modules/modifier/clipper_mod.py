@@ -46,7 +46,13 @@ class ClipperModulatedModule(ModulatedModuleBase):
         layout = self._create_standard_layout()
 
         # Threshold knob (0.1 to 1.0, default 1.0 = no clipping)
-        self.threshold_knob = Knob("Threshold", 0.1, 1.0, 1.0)
+        self.threshold_knob = Knob(
+            label="Threshold",
+            description="Sets the clipping threshold",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=1.0,
+        )
         self.threshold_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "wave_range",

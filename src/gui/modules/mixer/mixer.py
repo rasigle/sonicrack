@@ -49,51 +49,67 @@ class MixerModule(ModuleWidget):
         layout = self._create_standard_layout()
 
         # First row of knobs (Ch 1 & 2)
-        self.gain1_knob = Knob(
-            "Ch 1", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
+        self.ch1_gain_knob = Knob(
+            label="Gain 1",
+            description="Adjusts the gain for channel 1",
+            min_value=0.0,
+            max_value=1.0,
+            logarithmic=False,
         )
-        self.gain1_knob.value_changed.connect(lambda: self._on_gain_changed(0))
+        self.ch1_gain_knob.value_changed.connect(lambda: self._on_gain_changed(0))
 
-        self.gain2_knob = Knob(
-            "Ch 2", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
+        self.ch2_gain_knob = Knob(
+            label="Gain 2",
+            description="Adjusts the gain for channel 2",
+            min_value=0.0,
+            max_value=1.0,
+            logarithmic=False,
         )
-        self.gain2_knob.value_changed.connect(lambda: self._on_gain_changed(1))
+        self.ch2_gain_knob.value_changed.connect(lambda: self._on_gain_changed(1))
 
         knobs_row1 = QHBoxLayout()
-        knobs_row1.addWidget(self.gain1_knob)
-        knobs_row1.addWidget(self.gain2_knob)
+        knobs_row1.addWidget(self.ch1_gain_knob)
+        knobs_row1.addWidget(self.ch2_gain_knob)
         layout.addLayout(knobs_row1)
 
-        self.gain3_knob = Knob(
-            "Ch 3", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
+        self.ch3_gain_knob = Knob(
+            label="Gain 3",
+            description="Adjusts the gain for channel 3",
+            min_value=0.0,
+            max_value=1.0,
+            logarithmic=False,
         )
-        self.gain3_knob.value_changed.connect(lambda: self._on_gain_changed(2))
+        self.ch3_gain_knob.value_changed.connect(lambda: self._on_gain_changed(2))
 
-        self.gain4_knob = Knob(
-            "Ch 4", 0.0, 1.0, DEFAULT_CHANNEL_VOLUME, logarithmic=False
+        self.ch4_gain_knob = Knob(
+            label="Gain 4",
+            description="Adjusts the gain for channel 4",
+            min_value=0.0,
+            max_value=1.0,
+            logarithmic=False,
         )
-        self.gain4_knob.value_changed.connect(lambda: self._on_gain_changed(3))
+        self.ch4_gain_knob.value_changed.connect(lambda: self._on_gain_changed(3))
 
         self.gain_knobs = [
-            self.gain1_knob,
-            self.gain2_knob,
-            self.gain3_knob,
-            self.gain4_knob,
+            self.ch1_gain_knob,
+            self.ch2_gain_knob,
+            self.ch3_gain_knob,
+            self.ch4_gain_knob,
         ]
 
         # Second row of knobs (Ch 3 & 4)
         knobs_row2 = QHBoxLayout()
-        knobs_row2.addWidget(self.gain3_knob)
-        knobs_row2.addWidget(self.gain4_knob)
+        knobs_row2.addWidget(self.ch3_gain_knob)
+        knobs_row2.addWidget(self.ch4_gain_knob)
         layout.addLayout(knobs_row2)
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
         # Register parameters for automatic get/set
-        self.register_parameter("gain1", self.gain1_knob)
-        self.register_parameter("gain2", self.gain2_knob)
-        self.register_parameter("gain3", self.gain3_knob)
-        self.register_parameter("gain4", self.gain4_knob)
+        self.register_parameter("gain1", self.ch1_gain_knob)
+        self.register_parameter("gain2", self.ch2_gain_knob)
+        self.register_parameter("gain3", self.ch3_gain_knob)
+        self.register_parameter("gain4", self.ch4_gain_knob)
 
         # Create Volume components for each channel (for gain control)
         self._volume_components = [

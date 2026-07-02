@@ -60,7 +60,13 @@ class ADSRModule(ModuleWidget):
         knobs_layout = QHBoxLayout()
         knobs_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.attack_knob = Knob("Attack", 0.005, 5.0, 0.01)  # Min 5ms, default 10ms
+        self.attack_knob = Knob(
+            label="Attack",
+            description="Sets the attack time of the envelope",
+            min_value=0.0,
+            max_value=5.0,
+            default_value=0.01,
+        )
         self.attack_knob.setToolTip(
             "Attack time (seconds)\nRange: 0.005-5.0s\nLower values may cause clicks"
         )
@@ -71,7 +77,13 @@ class ADSRModule(ModuleWidget):
         )
         knobs_layout.addWidget(self.attack_knob)
 
-        self.decay_knob = Knob("Decay", 0.001, 5.0, 0.2)
+        self.decay_knob = Knob(
+            label="Decay",
+            description="Sets the decay time of the envelope",
+            min_value=0.0,
+            max_value=5.0,
+            default_value=0.2,
+        )
         self.decay_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "decay_duration", self.decay_knob.get_value()
@@ -84,7 +96,13 @@ class ADSRModule(ModuleWidget):
         knobs_layout2 = QHBoxLayout()
         knobs_layout2.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.sustain_knob = Knob("Sustain", 0.0, 1.0, 0.7)
+        self.sustain_knob = Knob(
+            label="Sustain",
+            description="Sets the sustain level of the envelope",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.7,
+        )
         self.sustain_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "sustain_level", self.sustain_knob.get_value()
@@ -92,7 +110,13 @@ class ADSRModule(ModuleWidget):
         )
         knobs_layout2.addWidget(self.sustain_knob)
 
-        self.release_knob = Knob("Release", 0.001, 5.0, 0.3)
+        self.release_knob = Knob(
+            label="Release",
+            description="Sets the release time of the envelope",
+            min_value=0.0,
+            max_value=5.0,
+            default_value=0.3,
+        )
         self.release_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "release_duration", self.release_knob.get_value()

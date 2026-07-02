@@ -57,6 +57,7 @@ class PortWidget(QGraphicsItem):
         # Qt setup
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsScenePositionChanges)
         self.setAcceptHoverEvents(True)
+        self.setToolTip(self._tooltip_text())
 
     # ========================================================================
     # Property Delegation - Expose model properties for backward compatibility
@@ -140,6 +141,12 @@ class PortWidget(QGraphicsItem):
             value: The value to write
         """
         self.port.write(value)
+
+    def _tooltip_text(self) -> str:
+        """Return the tooltip shown when hovering over this port."""
+        module_name = self.parent_module.get_display_name()
+        direction = "Input" if self.port_type == "input" else "Output"
+        return f"{module_name} {direction}: {self.port_name}"
 
     # ========================================================================
     # UI Methods - Rendering and Interaction

@@ -45,15 +45,27 @@ class DelayModule(ModulatedModuleBase):
         knobs_row = QHBoxLayout()
         knobs_row.setSpacing(10)
 
-        self.delay_time = Knob("Time", 0.0, 3.0, 0.5)
-        self.delay_time.value_changed.connect(
+        self.time_knob = Knob(
+            label="Time",
+            description="Sets the delay time",
+            min_value=0.001,
+            max_value=3.0,
+            default_value=0.5,
+        )
+        self.time_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
-                "delay_time", self.delay_time.get_value()
+                "delay_time", self.time_knob.get_value()
             )
         )
-        knobs_row.addWidget(self.delay_time)
+        knobs_row.addWidget(self.time_knob)
 
-        self.feedback_knob = Knob("Feedback", 0.0, 1.0, 0.5)
+        self.feedback_knob = Knob(
+            label="Feedback",
+            description="Controls the amount of feedback in the delay line",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
+        )
         self.feedback_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "feedback", self.feedback_knob.get_value()
@@ -64,7 +76,13 @@ class DelayModule(ModulatedModuleBase):
 
         mix_row = QHBoxLayout()
         mix_row.setSpacing(10)
-        self.mix_knob = Knob("Mix", 0.0, 1.0, 0.5)
+        self.mix_knob = Knob(
+            label="Mix",
+            description="Controls the dry/wet mix of the delay effect",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
+        )
         self.mix_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
         )
@@ -77,12 +95,12 @@ class DelayModule(ModulatedModuleBase):
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
         # Register parameters for automatic get/set
-        self.register_parameter("delay_time", self.delay_time)
+        self.register_parameter("delay_time", self.time_knob)
         self.register_parameter("feedback", self.feedback_knob)
         self.register_parameter("mix", self.mix_knob)
 
         # Set control_knob for base class functionality
-        self.control_knob = self.delay_time
+        self.control_knob = self.time_knob
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -103,7 +121,7 @@ class DelayModule(ModulatedModuleBase):
 
     def create_unmodulated_component(self):
         """Create simple Delay without modulation."""
-        delay_time = self.delay_time.get_value()
+        delay_time = self.time_knob.get_value()
         feedback = self.feedback_knob.get_value()
         mix = self.mix_knob.get_value()
         return Delay(delay_time=delay_time, feedback=feedback, mix=mix)
@@ -118,7 +136,7 @@ class DelayModule(ModulatedModuleBase):
             self.component = self.create_unmodulated_component()
 
         self.component.delay_time = float_parameter(
-            parameters, "delay_time", self.delay_time.get_value
+            parameters, "delay_time", self.time_knob.get_value
         )
         self.component.feedback = float_parameter(
             parameters, "feedback", self.feedback_knob.get_value

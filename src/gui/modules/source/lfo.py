@@ -137,10 +137,11 @@ class LFOModule(ModuleWidget):
         # Frequency control (knob) - optimized for LFO range
         knobs_layout = QHBoxLayout()
         self.freq_knob = Knob(
-            "Frequency (Hz)",
-            LFO_MIN_FREQUENCY,
-            LFO_MAX_FREQUENCY,
-            LFO_DEFAULT_FREQUENCY,
+            label="Freq",
+            description="Sets the frequency of the LFO",
+            min_value=LFO_MIN_FREQUENCY,
+            max_value=LFO_MAX_FREQUENCY,
+            default_value=LFO_DEFAULT_FREQUENCY,
             logarithmic=True,
         )
         self.freq_knob.value_changed.connect(self._on_frequency_changed)
@@ -150,10 +151,11 @@ class LFOModule(ModuleWidget):
         # Pulse width control (for square wave)
         pw_layout = QHBoxLayout()
         self.pulsewidth_knob = Knob(
-            "PW",
-            MIN_PW_PERCENTAGE_VALUE / 100,
-            MAX_PW_PERCENTAGE_VALUE / 100,
-            DEFAULT_PW_PERCENTAGE_VALUE / 100,
+            label="PW",
+            description="Adjusts the pulse width of the square wave",
+            min_value=MIN_PW_PERCENTAGE_VALUE / 100,
+            max_value=MAX_PW_PERCENTAGE_VALUE / 100,
+            default_value=DEFAULT_PW_PERCENTAGE_VALUE / 100,
         )
         self.pulsewidth_knob.value_changed.connect(self._on_pulsewidth_changed)
         pw_layout.addWidget(self.pulsewidth_knob)

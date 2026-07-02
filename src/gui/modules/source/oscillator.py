@@ -121,10 +121,11 @@ class OscillatorModule(ModuleWidget):
         # Frequency control (knobs)
         knobs_layout = QHBoxLayout()
         self.freq_knob = Knob(
-            "Freq (Hz)",
-            OSCILLATOR_MIN_FREQUENCY,
-            OSCILLATOR_MAX_FREQUENCY,
-            OSCILLATOR_DEFAULT_FREQUENCY,
+            label="Freq",
+            description="Sets the base frequency of the oscillator",
+            min_value=OSCILLATOR_MIN_FREQUENCY,
+            max_value=OSCILLATOR_MAX_FREQUENCY,
+            default_value=OSCILLATOR_DEFAULT_FREQUENCY,
             curve_points=AUDIO_FREQUENCY_KNOB_CURVE,
         )
         self.freq_knob.value_changed.connect(self._on_frequency_changed)
@@ -134,10 +135,11 @@ class OscillatorModule(ModuleWidget):
         # Pulse width control (for square wave)
         pw_layout = QHBoxLayout()
         self.pulsewidth_knob = Knob(
-            "PW",
-            MIN_PW_PERCENTAGE_VALUE / 100,
-            MAX_PW_PERCENTAGE_VALUE / 100,
-            DEFAULT_PW_PERCENTAGE_VALUE / 100,
+            label="PW",
+            description="Adjusts the pulse width of the square wave",
+            min_value=MIN_PW_PERCENTAGE_VALUE / 100,
+            max_value=MAX_PW_PERCENTAGE_VALUE / 100,
+            default_value=DEFAULT_PW_PERCENTAGE_VALUE / 100,
         )
         self.pulsewidth_knob.value_changed.connect(self._on_pulsewidth_changed)
         pw_layout.addWidget(self.pulsewidth_knob)

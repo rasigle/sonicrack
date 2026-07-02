@@ -55,30 +55,56 @@ class TB303VoiceModule(ModuleWidget):
 
         osc_row = QHBoxLayout()
         osc_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.tuning_knob = Knob("Tune", 0.5, 2.0, 1.0)
-        self.tuning_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("tuning", self.tuning_knob.get_value())
+        self.tune_knob = Knob(
+            label="Tune",
+            description="Adjusts the fine-tuning of the oscillator",
+            min_value=-1.0,
+            max_value=1.0,
+            default_value=0.0,
         )
-        osc_row.addWidget(self.tuning_knob)
+        self.tune_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("tuning", self.tune_knob.get_value())
+        )
+        osc_row.addWidget(self.tune_knob)
 
-        self.pulsewidth_knob = Knob("PW", 0.05, 0.95, 0.5)
-        self.pulsewidth_knob.value_changed.connect(
+        self.pw_knob = Knob(
+            label="PW",
+            description="Adjusts the pulse width of the square wave",
+            min_value=0.05,
+            max_value=0.95,
+            default_value=0.5,
+        )
+        self.pw_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
-                "pulsewidth", self.pulsewidth_knob.get_value()
+                "pulsewidth", self.pw_knob.get_value()
             )
         )
-        osc_row.addWidget(self.pulsewidth_knob)
+        osc_row.addWidget(self.pw_knob)
         layout.addLayout(osc_row)
 
         filter_row = QHBoxLayout()
         filter_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.cutoff_knob = Knob("Cutoff", 20.0, 12000.0, 700.0, logarithmic=True)
+        self.cutoff_knob = Knob(
+            label="Cutoff",
+            description="Sets the cutoff frequency of the filter",
+            min_value=20.0,
+            max_value=12000.0,
+            default_value=700.0,
+            logarithmic=True,
+        )
         self.cutoff_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("cutoff", self.cutoff_knob.get_value())
         )
         filter_row.addWidget(self.cutoff_knob)
 
-        self.resonance_knob = Knob("Res", 0.1, 18.0, 8.0, logarithmic=True)
+        self.resonance_knob = Knob(
+            label="Resonance",
+            description="Adjusts the resonance of the filter",
+            min_value=0.0,
+            max_value=18.0,
+            default_value=8.0,
+            logarithmic=True,
+        )
         self.resonance_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "resonance", self.resonance_knob.get_value()
@@ -86,47 +112,83 @@ class TB303VoiceModule(ModuleWidget):
         )
         filter_row.addWidget(self.resonance_knob)
 
-        self.env_amount_knob = Knob("Env", 0.0, 6.0, 2.5)
-        self.env_amount_knob.value_changed.connect(
+        self.env_mod_knob = Knob(
+            label="Env.Mod",
+            description="Controls the envelope modulation depth",
+            min_value=0.0,
+            max_value=6.0,
+            default_value=2.5,
+        )
+        self.env_mod_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
-                "env_amount", self.env_amount_knob.get_value()
+                "env_amount", self.env_mod_knob.get_value()
             )
         )
-        filter_row.addWidget(self.env_amount_knob)
+        filter_row.addWidget(self.env_mod_knob)
         layout.addLayout(filter_row)
 
         shape_row = QHBoxLayout()
         shape_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.decay_knob = Knob("Decay", 0.01, 1.0, 0.18)
+        self.decay_knob = Knob(
+            label="Decay",
+            description="Sets the decay time of the envelope",
+            min_value=0.01,
+            max_value=1.0,
+            default_value=0.18,
+        )
         self.decay_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("decay", self.decay_knob.get_value())
         )
         shape_row.addWidget(self.decay_knob)
 
-        self.accent_knob = Knob("Accent", 0.0, 1.0, 0.7)
+        self.accent_knob = Knob(
+            label="Accent",
+            description="Controls the accent amount",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.7,
+        )
         self.accent_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("accent", self.accent_knob.get_value())
         )
         shape_row.addWidget(self.accent_knob)
 
-        self.slide_time_knob = Knob("Slide", 0.0, 0.5, 0.08)
-        self.slide_time_knob.value_changed.connect(
+        self.slide_knob = Knob(
+            label="Slide",
+            description="Controls the slide time between notes",
+            min_value=0.0,
+            max_value=0.5,
+            default_value=0.08,
+        )
+        self.slide_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
-                "slide_time", self.slide_time_knob.get_value()
+                "slide_time", self.slide_knob.get_value()
             )
         )
-        shape_row.addWidget(self.slide_time_knob)
+        shape_row.addWidget(self.slide_knob)
         layout.addLayout(shape_row)
 
         gain_row = QHBoxLayout()
         gain_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.drive_knob = Knob("Drive", 0.0, 24.0, 6.0)
+        self.drive_knob = Knob(
+            label="Drive",
+            description="Adjusts the drive of the filter",
+            min_value=0.0,
+            max_value=24.0,
+            default_value=6.0,
+        )
         self.drive_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("drive_db", self.drive_knob.get_value())
         )
         gain_row.addWidget(self.drive_knob)
 
-        self.volume_knob = Knob("Volume", 0.0, 1.0, 0.8)
+        self.volume_knob = Knob(
+            label="Volume",
+            description="Adjusts the output volume",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.8,
+        )
         self.volume_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("volume", self.volume_knob.get_value())
         )
@@ -139,14 +201,14 @@ class TB303VoiceModule(ModuleWidget):
         self.register_parameter(
             "waveform", self.wave_combo, getter="currentText", setter="setCurrentText"
         )
-        self.register_parameter("tuning", self.tuning_knob)
-        self.register_parameter("pulsewidth", self.pulsewidth_knob)
+        self.register_parameter("tuning", self.tune_knob)
+        self.register_parameter("pulsewidth", self.pw_knob)
         self.register_parameter("cutoff", self.cutoff_knob)
         self.register_parameter("resonance", self.resonance_knob)
-        self.register_parameter("env_amount", self.env_amount_knob)
+        self.register_parameter("env_amount", self.env_mod_knob)
         self.register_parameter("decay", self.decay_knob)
         self.register_parameter("accent", self.accent_knob)
-        self.register_parameter("slide_time", self.slide_time_knob)
+        self.register_parameter("slide_time", self.slide_knob)
         self.register_parameter("drive_db", self.drive_knob)
         self.register_parameter("volume", self.volume_knob)
 
@@ -172,10 +234,10 @@ class TB303VoiceModule(ModuleWidget):
             parameters.get("waveform", self.wave_combo.currentText())
         )
         self.component.tuning = float_parameter(
-            parameters, "tuning", self.tuning_knob.get_value
+            parameters, "tuning", self.tune_knob.get_value
         )
         self.component.pulsewidth = float_parameter(
-            parameters, "pulsewidth", self.pulsewidth_knob.get_value
+            parameters, "pulsewidth", self.pw_knob.get_value
         )
         self.component.cutoff = float_parameter(
             parameters, "cutoff", self.cutoff_knob.get_value
@@ -184,7 +246,7 @@ class TB303VoiceModule(ModuleWidget):
             parameters, "resonance", self.resonance_knob.get_value
         )
         self.component.env_amount = float_parameter(
-            parameters, "env_amount", self.env_amount_knob.get_value
+            parameters, "env_amount", self.env_mod_knob.get_value
         )
         self.component.decay = float_parameter(
             parameters, "decay", self.decay_knob.get_value
@@ -193,7 +255,7 @@ class TB303VoiceModule(ModuleWidget):
             parameters, "accent", self.accent_knob.get_value
         )
         self.component.slide_time = float_parameter(
-            parameters, "slide_time", self.slide_time_knob.get_value
+            parameters, "slide_time", self.slide_knob.get_value
         )
         self.component.drive_db = float_parameter(
             parameters, "drive_db", self.drive_knob.get_value

@@ -67,13 +67,25 @@ class StepSequencerModule(ModuleWidget):
         layout.addWidget(self.slide_edit)
 
         clock_layout = QHBoxLayout()
-        self.bpm_knob = Knob("BPM", 30.0, 300.0, 120.0)
+        self.bpm_knob = Knob(
+            label="BPM",
+            description="Sets the tempo of the sequencer in beats per minute",
+            min_value=20.0,
+            max_value=300.0,
+            default_value=120.0,
+        )
         self.bpm_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("bpm", self.bpm_knob.get_value())
         )
         clock_layout.addWidget(self.bpm_knob)
 
-        self.gate_length_knob = Knob("Gate", 0.05, 1.0, 0.8)
+        self.gate_length_knob = Knob(
+            label="Gate",
+            description="Adjusts the length of the gate for each step",
+            min_value=0.1,
+            max_value=1.0,
+            default_value=0.8,
+        )
         self.gate_length_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "gate_length", self.gate_length_knob.get_value()

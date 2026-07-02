@@ -10,6 +10,8 @@ from src.engine.sequencing import (
     StepClock,
     StepEvent,
     StepSequencer,
+    TB303StepEvent,
+    TB303StepSequencer,
 )
 from src.engine.utils.cv import midi_note_to_pitch_cv
 
@@ -33,11 +35,11 @@ def test_step_clock_preserves_phase_across_buffers():
 
 
 def test_step_sequencer_renders_pitch_gate_accent_and_slide():
-    sequencer = StepSequencer(
+    sequencer = TB303StepSequencer(
         [
-            StepEvent(36, accent=True),
-            StepEvent(None, gate=False),
-            StepEvent(39, slide=True),
+            TB303StepEvent(36, accent=True),
+            TB303StepEvent(None, gate=False),
+            TB303StepEvent(39, slide=True),
         ],
         bpm=60.0,
         division="1/4",
@@ -55,8 +57,8 @@ def test_step_sequencer_renders_pitch_gate_accent_and_slide():
 
 
 def test_step_sequencer_accepts_external_clock_pulses():
-    sequencer = StepSequencer(
-        [StepEvent(36), StepEvent(48)],
+    sequencer = TB303StepSequencer(
+        [TB303StepEvent(36), TB303StepEvent(48)],
         sample_rate=10,
     )
     clock = np.array([1, 0, 0, 1, 0, 0], dtype=np.float32)
@@ -169,3 +171,8 @@ def test_behringer_182_is_registered_component():
     from src.engine.core.registry import audio_registry
 
     assert audio_registry.get("Behringer182Sequencer") is Behringer182Sequencer
+
+
+def test_tb303_step_sequencer_keeps_legacy_aliases():
+    assert StepEvent is TB303StepEvent
+    assert StepSequencer is TB303StepSequencer

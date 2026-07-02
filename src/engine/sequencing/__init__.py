@@ -8,6 +8,9 @@ from src.engine.sequencing.step_sequencer import (
     SequencerFrame,
     StepEvent,
     StepSequencer,
+    TB303SequencerFrame,
+    TB303StepEvent,
+    TB303StepSequencer,
 )
 
 __all__ = [
@@ -20,4 +23,7 @@ __all__ = [
     "StepClock",
     "StepEvent",
     "StepSequencer",
+    "TB303SequencerFrame",
+    "TB303StepEvent",
+    "TB303StepSequencer",
 ]

@@ -1,4 +1,4 @@
-"""Monophonic step sequencer primitives."""
+"""TB-303-style monophonic step sequencer primitives."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from src.engine.utils.validation import validate_sample_count, validate_sample_r
 
 
 @dataclass(slots=True)
-class StepEvent:
-    """One monophonic sequencer step."""
+class TB303StepEvent:
+    """One TB-303-style monophonic sequencer step."""
 
     note: int | None
     gate: bool = True
@@ -25,8 +25,8 @@ class StepEvent:
 
 
 @dataclass(slots=True)
-class SequencerFrame:
-    """Rendered CV outputs for one audio buffer."""
+class TB303SequencerFrame:
+    """Rendered TB-303-style CV outputs for one audio buffer."""
 
     # Kept as ``frequency`` for compatibility with existing module port names.
     # Values are 1V/oct pitch CV, not Hz.
@@ -36,12 +36,12 @@ class SequencerFrame:
     slide: np.ndarray
 
 
-class StepSequencer:
-    """Render monophonic pitch, gate, accent, and slide CV from a pattern."""
+class TB303StepSequencer:
+    """Render monophonic pitch, gate, accent, and slide CV from a 303 pattern."""
 
     def __init__(
         self,
-        pattern: list[StepEvent] | None = None,
+        pattern: list[TB303StepEvent] | None = None,
         *,
         bpm: float = 120.0,
         division: str = "1/16",
@@ -50,7 +50,7 @@ class StepSequencer:
         sample_rate: float = DEFAULT_SAMPLE_RATE,
     ) -> None:
         self.sample_rate = validate_sample_rate(sample_rate)
-        self.pattern = pattern or [StepEvent(36)]
+        self.pattern = pattern or [TB303StepEvent(36)]
         self.transpose = int(transpose)
         self.clock = StepClock(
             bpm=bpm,
@@ -61,7 +61,7 @@ class StepSequencer:
         self._active_step = -1
         self._samples_in_step = 0
         self._current_frequency = midi_note_to_pitch_cv(36)
-        self._current_event = StepEvent(36)
+        self._current_event = TB303StepEvent(36)
 
     def reset(self) -> None:
         """Reset pattern and clock state."""
@@ -69,7 +69,7 @@ class StepSequencer:
         self._active_step = -1
         self._samples_in_step = 0
         self._current_frequency = midi_note_to_pitch_cv(36)
-        self._current_event = StepEvent(36)
+        self._current_event = TB303StepEvent(36)
 
     @property
     def step_samples(self) -> int:
@@ -77,7 +77,7 @@ class StepSequencer:
 
     def process(
         self, num_samples: int, clock_pulses: np.ndarray | None = None
-    ) -> SequencerFrame:
+    ) -> TB303SequencerFrame:
         """Render sequencer CV outputs for one buffer."""
         num_samples = validate_sample_count(num_samples)
         if clock_pulses is None:
@@ -106,7 +106,7 @@ class StepSequencer:
             slide[index] = 1.0 if event.slide else 0.0
             self._samples_in_step += 1
 
-        return SequencerFrame(
+        return TB303SequencerFrame(
             frequency=frequency,
             gate=gate,
             accent=accent,
@@ -121,7 +121,7 @@ class StepSequencer:
 
     def _advance_step(self) -> None:
         if not self.pattern:
-            self.pattern = [StepEvent(None, gate=False)]
+            self.pattern = [TB303StepEvent(None, gate=False)]
 
         self._active_step = (self._active_step + 1) % len(self.pattern)
         self._current_event = self.pattern[self._active_step]
@@ -141,3 +141,9 @@ class StepSequencer:
         padded = np.zeros(num_samples, dtype=np.float32)
         padded[: len(signal)] = signal
         return padded
+
+
+# Backward-compatible names for existing imports and saved patches.
+StepEvent = TB303StepEvent
+SequencerFrame = TB303SequencerFrame
+StepSequencer = TB303StepSequencer

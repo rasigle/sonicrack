@@ -157,6 +157,9 @@ from src.engine.sequencing import (
     StepClock,
     StepEvent,
     StepSequencer,
+    TB303SequencerFrame,
+    TB303StepEvent,
+    TB303StepSequencer,
 )
 from src.engine.utils.cv import (
     PITCH_CV_REFERENCE_FREQUENCY,
@@ -245,5 +248,8 @@ __all__ = [
     "StepClock",
     "StepEvent",
     "StepSequencer",
+    "TB303SequencerFrame",
+    "TB303StepEvent",
+    "TB303StepSequencer",
     "TB303Voice",
 ]

@@ -5,7 +5,7 @@ from __future__ import annotations
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit
 
-from src.engine.sequencing import StepEvent, StepSequencer
+from src.engine.sequencing import TB303StepEvent, TB303StepSequencer
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
@@ -37,7 +37,7 @@ class StepSequencerModule(ModuleWidget):
         self.accent_port = self.add_output("Accent")
         self.slide_port = self.add_output("Slide")
 
-        self.component = StepSequencer(sample_rate=audio_config.sample_rate)
+        self.component = TB303StepSequencer(sample_rate=audio_config.sample_rate)
         self._previous_pattern_key: tuple[str, str, str, str, float] | None = None
         self._previous_reset = 0.0
 
@@ -185,11 +185,11 @@ class StepSequencerModule(ModuleWidget):
         accents_text: str,
         slides_text: str,
         gate_length: float,
-    ) -> list[StepEvent]:
+    ) -> list[TB303StepEvent]:
         notes = [item.strip() for item in notes_text.split(",") if item.strip()]
         accents = StepSequencerModule._parse_flags(accents_text, len(notes))
         slides = StepSequencerModule._parse_flags(slides_text, len(notes))
-        pattern: list[StepEvent] = []
+        pattern: list[TB303StepEvent] = []
         for index, item in enumerate(notes):
             if item in {"-", "r", "R", "rest", "Rest"}:
                 note = None
@@ -202,7 +202,7 @@ class StepSequencerModule(ModuleWidget):
                     note = None
                     gate = False
             pattern.append(
-                StepEvent(
+                TB303StepEvent(
                     note=note,
                     gate=gate,
                     accent=accents[index],
@@ -210,7 +210,7 @@ class StepSequencerModule(ModuleWidget):
                     gate_length=gate_length,
                 )
             )
-        return pattern or [StepEvent(None, gate=False)]
+        return pattern or [TB303StepEvent(None, gate=False)]
 
     @staticmethod
     def _parse_flags(text: str, length: int) -> list[bool]:

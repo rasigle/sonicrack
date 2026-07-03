@@ -169,6 +169,7 @@ def test_remaining_registry_descriptors_expose_ui_preset_limits():
             "modulators",
             "amp_mod",
             "freq_mod",
+            "fm_mod",
             "phase_mod",
         ],
         ModulatedFrequency: ["oscillator", "modulator", "freq_mod_func"],

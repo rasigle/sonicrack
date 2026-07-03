@@ -66,6 +66,47 @@ def _get_vectorized_samples(component: Any, n: int) -> np.ndarray:
     return np.array([next(component) for _ in range(n)], dtype=np.float32)
 
 
+def _process_modifier_block(modifier: Any, samples: np.ndarray) -> Any:
+    """Apply a modifier through the standardized block API when available."""
+    if hasattr(modifier, "process_block"):
+        return modifier.process_block(samples)
+    return modifier(samples)
+
+
+def _stereo_tuple_to_array(result: Any) -> np.ndarray | None:
+    """Convert ``(left, right)`` block results to an ``(n, 2)`` array."""
+    if isinstance(result, tuple) and len(result) == 2:
+        left, right = result
+        return np.column_stack((left, right))
+    return None
+
+
+def _apply_modifier_to_buffer(modifier: Any, samples: np.ndarray) -> np.ndarray:
+    """Apply one modifier to mono or stereo sample buffers."""
+    if samples.ndim == 1:
+        result = _process_modifier_block(modifier, samples)
+        stereo_result = _stereo_tuple_to_array(result)
+        if stereo_result is not None:
+            return stereo_result
+        return np.asarray(result)
+
+    try:
+        result = _process_modifier_block(modifier, samples)
+    except (TypeError, ValueError):
+        result = None
+
+    if isinstance(result, np.ndarray) and result.shape == samples.shape:
+        return result
+
+    left_result = _process_modifier_block(modifier, samples[:, 0])
+    stereo_left = _stereo_tuple_to_array(left_result)
+    if stereo_left is not None:
+        return stereo_left
+
+    right_result = _process_modifier_block(modifier, samples[:, 1])
+    return np.column_stack((left_result, right_result))
+
+
 class Composer(AudioComponent, ABC):
     """Base for components that combine signals (chain, mixer)."""
 
@@ -263,9 +304,9 @@ class Chain(Composer):
     def get_samples_vectorized(self, n: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
         """Generate n samples using fully vectorized processing.
 
-        Applies each modifier using their __call__ method, which handles
-        vectorization internally. Modifiers that return tuples (left, right)
-        are automatically detected as panners and converted to stereo arrays.
+        Applies each modifier through its block-processing API when available.
+        Modifiers that return tuples (left, right) are automatically detected as
+        panners and converted to stereo arrays.
 
         Args:
             n: Number of samples to produce.
@@ -279,39 +320,8 @@ class Chain(Composer):
         # Generate samples from oscillator (vectorized)
         samples = _get_vectorized_samples(self.oscillator, n)
 
-        # Apply each modifier in sequence using vectorized methods
         for modifier in self.modifiers:
-            # Use the modifier's __call__ method directly
-            # This works for all modifiers: Panner, ModulatedPanner, Volume, etc.
-
-            if samples.ndim == 1:
-                # Mono input - call modifier
-                result = modifier(samples)
-
-                # Check if result is stereo (tuple) - indicates panning
-                if isinstance(result, tuple) and len(result) == 2:
-                    # Panner/ModulatedPanner returned (left, right)
-                    left, right = result
-                    samples = np.column_stack((left, right))
-                else:
-                    # Regular modifier (Volume, etc.) returned modified samples
-                    samples = result
-            else:
-                # Stereo input - apply modifier to left channel
-                # (Panners shouldn't receive stereo input, but handle gracefully)
-                if modifier.__class__.__name__ == "ButterworthFilter":
-                    result = modifier(samples)
-                    if isinstance(result, np.ndarray) and result.shape == samples.shape:
-                        samples = result
-                        continue
-
-                result = modifier(samples[:, 0])
-                if isinstance(result, tuple) and len(result) == 2:
-                    left, right = result
-                    samples = np.column_stack((left, right))
-                else:
-                    # Apply same modification to both channels
-                    samples = np.column_stack((result, modifier(samples[:, 1])))
+            samples = _apply_modifier_to_buffer(modifier, np.asarray(samples))
 
         return samples.astype(np.float32)
 

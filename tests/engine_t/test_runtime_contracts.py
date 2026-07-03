@@ -8,10 +8,14 @@ import pytest
 from src.engine import (
     ADSREnvelope,
     Chain,
+    Clipper,
     Delay,
+    Distortion,
     NoiseGenerator,
+    Panner,
     Reverb,
     SineOscillator,
+    Volume,
     WaveAdder,
 )
 from src.engine.dsp.filters.butterworth import ButterworthFilter
@@ -115,3 +119,43 @@ def test_zero_sample_render_returns_empty_array():
     assert isinstance(samples, np.ndarray)
     assert samples.shape == (0,)
     assert samples.dtype == np.float32
+
+
+@pytest.mark.parametrize(
+    "modifier",
+    [
+        Volume(gain_db=0.0),
+        Clipper(),
+        Panner(),
+        ButterworthFilter(),
+        Distortion(),
+        Delay(),
+        Reverb(),
+    ],
+)
+def test_modifiers_expose_uniform_process_block_api(modifier):
+    samples = np.full(32, 0.1, dtype=np.float32)
+
+    result = modifier.process_block(samples)
+
+    if isinstance(result, tuple):
+        assert len(result) == 2
+        assert all(channel.shape == samples.shape for channel in result)
+    else:
+        assert isinstance(result, np.ndarray)
+        assert result.shape == samples.shape
+
+
+def test_chain_uses_process_block_for_stereo_buffers():
+    chain = Chain(
+        SineOscillator(frequency=110.0, gain_db=-12.0),
+        Panner(0.0),
+        Volume(gain_db=-6.0),
+        ButterworthFilter(cutoff=1000.0),
+    )
+
+    samples = chain.get_samples_vectorized(128)
+
+    assert samples.shape == (128, 2)
+    assert samples.dtype == np.float32
+    assert np.all(np.isfinite(samples))

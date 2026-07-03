@@ -3,6 +3,90 @@
 All notable changes to AudioPlayground will be documented in this file.
 
 
+## Engine Package Review - 2026-07-03
+
+### Implemented Engine Features
+
+- Core DSP package is separated under `src.engine`, with optional audio-device
+  and MIDI concerns kept outside the base engine import surface.
+- Component model includes descriptors, parameter metadata, fluent-builder names,
+  global registration, config serialization helpers, and sample-mode contracts.
+- Generator support includes sine, square, sawtooth, triangle, PolyBLEP
+  oscillator utilities, minBLEP helpers, VCV-style square/saw behavior, gain-dB
+  handling, amplitude smoothing, and oscillator/vectorized continuity coverage.
+- Noise support includes white, pink, brownian, blue, grey, velvet,
+  sample-and-hold, and Perlin-style generators.
+- Modulation support includes ADSR, decay and gate-triggered envelopes,
+  amplitude/frequency/linear-FM/phase lanes, retrigger modes, CV scaling, and
+  pitch-CV conversion helpers.
+- Modifier/effect support includes volume, panning, clipping, modulated volume,
+  modulated panning, modulated clipping, distortion, compressor, delay, reverb,
+  Butterworth filters, resonant RBJ biquad filters, and an acid/303-style
+  resonant low-pass filter.
+- Composition and voice support includes `Chain`, `WaveAdder`, preset builder
+  and library helpers, sample-accurate step clocking, TB-303-style sequencing,
+  accent/slide processing, Behringer 182-style sequencing, and a composable
+  `TB303Voice`.
+- Realtime-oriented test coverage now exercises render contracts, buffer
+  continuity, oscillator edge strategies, smoothing, filters, effects,
+  sequencers, presets, and GUI runtime integration paths.
+
+### Review Findings
+
+- Stereo handling is inconsistent across composers, modifiers, filters, and
+  effects. `Chain` special-cases some stereo paths by class name, while several
+  effects primarily process mono arrays.
+- Modulation and composer internals reach into oscillator private fields for
+  phase/state commits, which makes oscillator refactors risky.
+- Parameter descriptors are useful for UI/presets but do not yet enforce a
+  single source of truth for runtime validation, smoothing policy, units, or
+  automation semantics.
+- The preset builder can serialize simple component parameters, but arbitrary
+  modulation callables and nested graph topology are not yet a robust portable
+  patch format.
+
+### Planned Engine Work
+
+- Introduce a first-class engine render graph with typed mono/stereo/CV/audio
+  ports, topological scheduling, cycle diagnostics, graph validation, and a
+  stable process-block API independent of GUI modules.
+- Standardize the block-processing contract around shape, dtype, sample rate,
+  reset semantics, channel count, zero-length buffers, and state carry across
+  buffer boundaries.
+- Replace class-name stereo special cases with explicit channel-layout metadata
+  and shared mono/stereo adapter utilities.
+- Add a parameter automation system with sample-accurate ramps, curves, tempo
+  sync, unit conversion, smoothing policy, and thread-safe parameter updates.
+- Add latency accounting, lookahead support, dry/wet latency compensation, and
+  plugin-host style delay reporting for future processors.
+- Add oversampling and anti-aliasing policy for nonlinear processors such as
+  distortion, filters with drive, and hard clipping.
+- Expand DSP modules toward full synth coverage: wavetable/sample playback,
+  granular playback, oscillator sync, PWM/LFO shape sets, chorus/flanger/phaser,
+  EQ, limiter, gate/expander, envelope follower, waveshapers, convolution
+  reverb, and utility meters.
+- Add polyphonic voice allocation, voice stealing, note expression, MIDI/MPE
+  mapping, glide/portamento policy, and per-voice modulation routing.
+- Build a modulation matrix that can connect CV/audio-rate modulators to any
+  automatable parameter with scaling, polarity, offset, and clipping.
+- Add offline rendering/export, deterministic benchmarking, golden-audio
+  regression tests, denormal protection, NaN/Inf guards, and performance budgets
+  for realtime-safe components.
+- Harden preset serialization with schema versions, migration tests, component
+  IDs, nested graph persistence, and non-callable declarative modulation specs.
+- Audit wheel contents before release to confirm generated cache artifacts and
+  other local-only files are excluded.
+
+### Fixed
+
+- Removed generated cache artifacts from `src/engine`, including the engine-local
+  `.mypy_cache` and nested `__pycache__` directories, and ignored `.mypy_cache/`
+  to prevent the caches from returning to source/package paths.
+- Added a uniform `process_block()` API to engine modifiers, filters, and
+  effects, and updated `Chain` to prefer that block-processing contract when
+  applying modifiers to mono and stereo buffers.
+
+
 ## Repository Review Fixes - 2026-06-30
 
 ### Fixed

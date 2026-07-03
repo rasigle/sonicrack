@@ -98,3 +98,12 @@ class Modifier(AudioComponent):
         Returns:
             Modified value (same type as input).
         """
+
+    def process_block(self, samples: np.ndarray) -> Any:
+        """Process an audio/control block through the modifier.
+
+        ``__call__`` remains the scalar-friendly compatibility API. New engine
+        routing code should prefer this method when processing buffers so all
+        modifiers, filters, and effects expose the same block entry point.
+        """
+        return self(samples)

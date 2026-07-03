@@ -13,6 +13,7 @@ from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
 from src.gui.modules.visualization.visualizer_utils import (
     get_visualizer_samples,
+    stop_visualizer_timer,
     validate_samples,
 )
 from src.gui.widgets.module_widget import ModuleWidget
@@ -225,6 +226,12 @@ class SpectrumModule(ModuleWidget):
         # Update display with samples
         if samples is not None and np.asarray(samples).size > 0:
             self._update_samples(samples)
+
+    def shutdown(self, graceful: bool = True) -> None:
+        """Stop visualization updates before the module is deleted."""
+        del graceful
+        stop_visualizer_timer(self, self._update_display)
+        audio_config.remove_sample_rate_listener(self._on_sample_rate_changed)
 
 
 class SpectrumAnalyzer(QWidget):

@@ -69,9 +69,11 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
     # Signals
     parameter_changed = pyqtSignal(str, object)  # (param_name, value)
+
     # Runtime classification used by AudioEngine/render specs. Subclasses with
     # DSP behavior should override this with a registered kind from core.runtime.
     runtime_kind = "unknown"
+
     # Visual-only sink modules set this to False so they can receive rendered
     # buffers without being treated as processors inside the graph.
     is_processing_module = True
@@ -561,77 +563,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 self.set_custom_name(new_name)
 
         elif action == delete_action:
-            # Delete this module
-            scene = self.scene()
-            if scene:
-                # Store references before removing from scene
-                from src.gui.patch_canvas import PatchCanvas
-
-                canvas = scene.parent() if scene else None
-                views = scene.views() if scene else []
-
-                # Clear all port data to prevent stale audio
-                for port in self.input_ports + self.output_ports:
-                    if hasattr(port, "port") and port.port:
-                        with contextlib.suppress(RuntimeError, AttributeError):
-                            # Port might already be cleared or deleted
-                            port.port.clear()
-
-                # Collect all cables to remove
-                cables_to_remove = []
-                for port in self.input_ports + self.output_ports:
-                    with contextlib.suppress(RuntimeError, AttributeError):
-                        # Port might be deleted
-                        cables_to_remove.extend(port.cables[:])
-
-                # Remove cables silently (without triggering signals)
-                # This prevents multiple patch recompilations during deletion
-                for cable in cables_to_remove:
-                    # Cable or port might already be deleted - this is okay
-                    with contextlib.suppress(RuntimeError, AttributeError):
-                        # Disconnect the underlying Port data models
-                        if (
-                            cable.start_port
-                            and cable.end_port
-                            and hasattr(cable.start_port, "port")
-                            and hasattr(cable.end_port, "port")
-                            and cable.start_port.port
-                            and cable.end_port.port
-                        ):
-                            cable.start_port.port.disconnect(cable.end_port.port)
-
-                        # Remove cable from UI
-                        if cable.start_port:
-                            cable.start_port.remove_cable(cable)
-                        if cable.end_port:
-                            cable.end_port.remove_cable(cable)
-                        if cable.scene():
-                            cable.scene().removeItem(cable)
-
-                # Remove the module from scene (after this, self.scene() becomes None)
-                with contextlib.suppress(RuntimeError):
-                    scene.removeItem(self)
-
-                # Mark patch as modified and trigger playback restart
-                if canvas and isinstance(canvas, PatchCanvas):
-                    # Get main window to trigger patch update
-                    for view in views:
-                        main_window = view.window()
-                        if hasattr(main_window, "_mark_patch_modified"):
-                            main_window._mark_patch_modified()
-
-                        # Stop and restart playback to refresh audio callback
-                        # This ensures we're not using stale connections/components
-                        if hasattr(main_window, "_restart_output_playback"):
-                            logger.info(
-                                "Module deleted - restarting playback to refresh audio"
-                            )
-                            main_window._restart_output_playback()
-                        elif hasattr(main_window, "_start_output_playback"):
-                            # Fallback: just call start (which should detect
-                            # disconnections)
-                            main_window._start_output_playback()
-                        break
+            self.delete_from_patch()
 
         elif action == info_action:
             # Show module info dialog
@@ -702,6 +634,57 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         """Clear region-specific tooltip text when leaving the module."""
         self.setToolTip("")
         super().hoverLeaveEvent(event)
+
+    def delete_from_patch(self) -> None:
+        """Remove this module using the same lifecycle path as canvas deletion."""
+        scene = self.scene()
+        if scene is None:
+            return
+
+        from src.gui.patch_canvas import PatchCanvas
+
+        canvas = scene.parent()
+
+        # Clear all port data to prevent stale audio.
+        for port in self.input_ports + self.output_ports:
+            if hasattr(port, "port") and port.port:
+                with contextlib.suppress(RuntimeError, AttributeError):
+                    port.port.clear()
+
+        # Collect all cables to remove.
+        cables_to_remove = []
+        for port in self.input_ports + self.output_ports:
+            with contextlib.suppress(RuntimeError, AttributeError):
+                cables_to_remove.extend(port.cables[:])
+
+        # Remove cables silently. The module_deleted signal below triggers one
+        # coherent audio refresh through MainWindow._on_module_deleted().
+        for cable in cables_to_remove:
+            with contextlib.suppress(RuntimeError, AttributeError):
+                if (
+                    cable.start_port
+                    and cable.end_port
+                    and hasattr(cable.start_port, "port")
+                    and hasattr(cable.end_port, "port")
+                    and cable.start_port.port
+                    and cable.end_port.port
+                ):
+                    cable.start_port.port.disconnect(cable.end_port.port)
+
+                if cable.start_port:
+                    cable.start_port.remove_cable(cable)
+                if cable.end_port:
+                    cable.end_port.remove_cable(cable)
+                if cable.scene():
+                    cable.scene().removeItem(cable)
+
+        # Remove the module from the scene before notifying the main window so
+        # playback recompilation sees the final canvas state.
+        with contextlib.suppress(RuntimeError):
+            scene.removeItem(self)
+
+        if isinstance(canvas, PatchCanvas):
+            canvas.module_deleted.emit(self)
 
     def create_engine_component(
         self,

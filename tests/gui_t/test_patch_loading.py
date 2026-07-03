@@ -185,3 +185,22 @@ def test_window_respects_disabled_restore_last_patch_setting(tmp_path, monkeypat
     restored = ModularSynthWindow(autosave_patch_path=autosave_path)
 
     assert restored._require_patch_canvas().get_modules() == []
+
+
+def test_context_delete_uses_module_shutdown_and_engine_cleanup(monkeypatch):
+    """Context-menu deletion should not leave timers or engine modules alive."""
+    window = ModularSynthWindow(restore_last_patch=False)
+    monkeypatch.setattr(window, "_start_output_playback", lambda: None)
+
+    window._add_module("Waveform")
+    module = window._require_patch_canvas().get_modules()[0]
+    timer = module._viz_timer
+
+    assert timer.isActive()
+    assert module in window.audio_engine.modules
+
+    module.delete_from_patch()
+
+    assert not timer.isActive()
+    assert module not in window._require_patch_canvas().get_modules()
+    assert module not in window.audio_engine.modules

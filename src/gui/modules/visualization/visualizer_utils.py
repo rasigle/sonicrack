@@ -8,10 +8,26 @@ as ``Oscillator -> Waveform`` to animate without an Output module.
 """
 
 import logging
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def stop_visualizer_timer(module: Any, callback: Callable[[], None]) -> None:
+    """Stop and detach a module's visualization timer if it exists."""
+    timer = getattr(module, "_viz_timer", None)
+    if timer is None:
+        return
+
+    if timer.isActive():
+        timer.stop()
+    try:
+        timer.timeout.disconnect(callback)
+    except TypeError:
+        pass
 
 
 def get_visualizer_samples(

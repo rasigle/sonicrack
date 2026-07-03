@@ -19,7 +19,10 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
-from src.gui.modules.visualization.visualizer_utils import get_visualizer_samples
+from src.gui.modules.visualization.visualizer_utils import (
+    get_visualizer_samples,
+    stop_visualizer_timer,
+)
 from src.gui.widgets.knob_widget import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -349,6 +352,11 @@ class WaveformModule(ModuleWidget):
 
         except Exception as e:
             logger.error(f"Error in _update_display: {e}", exc_info=True)
+
+    def shutdown(self, graceful: bool = True) -> None:
+        """Stop visualization updates before the module is deleted."""
+        del graceful
+        stop_visualizer_timer(self, self._update_display)
 
 
 class WaveformDisplay(QWidget):

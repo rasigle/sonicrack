@@ -4,7 +4,7 @@ This module provides an oscillator that can have its frequency controlled
 by an external 1V/oct pitch CV source.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from PyQt6 import QtWidgets
@@ -21,6 +21,9 @@ from src.engine import (
     TriangleOscillator,
 )
 from src.engine.generators.oscillators.oscillator_modulated import ModulatedOscillator
+from src.engine.generators.oscillators.oscillator_ramp import SawtoothMode
+from src.engine.generators.oscillators.oscillator_sine import SineWaveMode
+from src.engine.generators.oscillators.oscillator_square import SquareWaveMode
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import (
@@ -49,6 +52,18 @@ VCO_MIN_FM_AMOUNT_PERCENT = -100.0
 VCO_MAX_FM_AMOUNT_PERCENT = 100.0
 VCO_FM_MODE_V_OCT = "1V/octave"
 VCO_FM_MODE_LINEAR = "Linear"
+
+
+def _as_sine_mode(mode: str) -> SineWaveMode:
+    return cast(SineWaveMode, mode)
+
+
+def _as_square_mode(mode: str) -> SquareWaveMode:
+    return cast(SquareWaveMode, mode)
+
+
+def _as_sawtooth_mode(mode: str) -> SawtoothMode:
+    return cast(SawtoothMode, mode)
 
 
 def apply_v_oct_offset(
@@ -342,7 +357,7 @@ class ModulatedOscillatorModule(ModuleWidget):
                 self._base_frequency,
                 gain_db=self._gain_db,
                 phase=self._phase,
-                mode=self._mode,
+                mode=_as_sine_mode(self._mode),
             )
         elif self._waveform == "Square":
             return SquareOscillator(
@@ -350,21 +365,21 @@ class ModulatedOscillatorModule(ModuleWidget):
                 gain_db=self._gain_db,
                 phase=self._phase,
                 pulsewidth=self._pulsewidth,
-                mode=self._mode,
+                mode=_as_square_mode(self._mode),
             )
         elif self._waveform == "Sawtooth":
             return SawtoothOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
                 phase=self._phase,
-                mode=self._mode,
+                mode=_as_sawtooth_mode(self._mode),
             )
         elif self._waveform == "Triangle":
             return TriangleOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
                 phase=self._phase,
-                mode=self._mode,
+                mode=_as_sawtooth_mode(self._mode),
             )
         else:
             # Default to sine
@@ -372,7 +387,7 @@ class ModulatedOscillatorModule(ModuleWidget):
                 self._base_frequency,
                 gain_db=self._gain_db,
                 phase=self._phase,
-                mode=self._mode,
+                mode=_as_sine_mode(self._mode),
             )
 
     def _on_wave_changed(self, wave_type: str):
@@ -591,19 +606,25 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         # Create the base oscillator
         if wave_type == "Sine":
-            osc = SineOscillator(base_freq, gain_db=gain_db, phase=phase, mode=mode)
+            osc = SineOscillator(
+                base_freq, gain_db=gain_db, phase=phase, mode=_as_sine_mode(mode)
+            )
         elif wave_type == "Square":
             osc = SquareOscillator(
                 base_freq,
                 gain_db=gain_db,
                 phase=phase,
                 pulsewidth=pulsewidth,
-                mode=mode,
+                mode=_as_square_mode(mode),
             )
         elif wave_type == "Sawtooth":
-            osc = SawtoothOscillator(base_freq, gain_db=gain_db, phase=phase, mode=mode)
+            osc = SawtoothOscillator(
+                base_freq, gain_db=gain_db, phase=phase, mode=_as_sawtooth_mode(mode)
+            )
         elif wave_type == "Triangle":
-            osc = TriangleOscillator(base_freq, gain_db=gain_db, phase=phase, mode=mode)
+            osc = TriangleOscillator(
+                base_freq, gain_db=gain_db, phase=phase, mode=_as_sawtooth_mode(mode)
+            )
         else:
             raise ValueError(f"Unknown waveform type: {wave_type}")
 
@@ -838,21 +859,29 @@ class ModulatedOscillatorModule(ModuleWidget):
     ):
         """Create the VCO base oscillator from a runtime parameter snapshot."""
         if wave_type == "Sine":
-            return SineOscillator(frequency, gain_db=gain_db, phase=phase, mode=mode)
+            return SineOscillator(
+                frequency, gain_db=gain_db, phase=phase, mode=_as_sine_mode(mode)
+            )
         if wave_type == "Square":
             return SquareOscillator(
                 frequency,
                 gain_db=gain_db,
                 phase=phase,
                 pulsewidth=pulsewidth,
-                mode=mode,
+                mode=_as_square_mode(mode),
             )
         if wave_type == "Sawtooth":
             return SawtoothOscillator(
-                frequency, gain_db=gain_db, phase=phase, mode=mode
+                frequency,
+                gain_db=gain_db,
+                phase=phase,
+                mode=_as_sawtooth_mode(mode),
             )
         if wave_type == "Triangle":
             return TriangleOscillator(
-                frequency, gain_db=gain_db, phase=phase, mode=mode
+                frequency,
+                gain_db=gain_db,
+                phase=phase,
+                mode=_as_sawtooth_mode(mode),
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")

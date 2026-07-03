@@ -15,6 +15,8 @@ from src.engine.generators.oscillators.oscillator_base import Oscillator
 from src.engine.utils.decorators import filter_provided_args, track_provided_args
 from src.engine.utils.validation import validate_sample_count
 
+SineWaveMode = Literal["pure", "warm", "bright", "analog"]
+
 
 @register_component()
 class SineOscillator(Oscillator):
@@ -52,8 +54,9 @@ class SineOscillator(Oscillator):
         phase: float = 0.0,
         sample_rate: float = DEFAULT_SAMPLE_RATE,
         wave_range: tuple[float, float] = (-1, 1),
-        mode: Literal["pure", "warm", "bright", "analog"] = "pure",
+        mode: SineWaveMode = "pure",
     ):
+        self._mode: SineWaveMode = "pure"
         self.set_mode(mode)
         kwargs = filter_provided_args(
             self._provided_args,  # noqa
@@ -77,14 +80,14 @@ class SineOscillator(Oscillator):
         self._sample_index = 0
 
     @property
-    def mode(self) -> Literal["pure", "warm", "bright", "analog"]:
+    def mode(self) -> SineWaveMode:
         return self._mode
 
     @mode.setter
-    def mode(self, value: Literal["pure", "warm", "bright", "analog"]):
+    def mode(self, value: SineWaveMode):
         self.set_mode(value)
 
-    def set_mode(self, mode: Literal["pure", "warm", "bright", "analog"]) -> None:
+    def set_mode(self, mode: SineWaveMode) -> None:
         if mode not in self.get_available_modes():
             raise ValueError(
                 f"Invalid mode '{mode}'. Must be 'pure', 'warm', 'bright', or 'analog'"

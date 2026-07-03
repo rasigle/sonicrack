@@ -263,6 +263,10 @@ class Volume(Modifier):
                     n,
                 )
             )
+            if samples.ndim > 1:
+                amp_envelope = amp_envelope.reshape(
+                    -1, *([1] * (samples.ndim - 1))
+                )
             result = samples * amp_envelope
 
             if self._smoothing_samples_remaining <= 0:
@@ -484,9 +488,15 @@ class ModulatedVolume(Volume):
         if self._modulation_target == "gain_db":
             # Convert dB values to linear amplitude
             amplitude_values = np.asarray(db_to_linear(mod_values), dtype=np.float32)
+            if samples.ndim > 1:
+                amplitude_values = amplitude_values.reshape(
+                    -1, *([1] * (samples.ndim - 1))
+                )
             return (samples * amplitude_values).astype(np.float32)
 
         # Direct amplitude modulation
+        if samples.ndim > 1:
+            mod_values = mod_values.reshape(-1, *([1] * (samples.ndim - 1)))
         return (samples * mod_values).astype(np.float32)
 
     def _get_next_modulation_value(self) -> float:

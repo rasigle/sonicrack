@@ -207,7 +207,9 @@ class Distortion(Modifier):
 
         return np.asarray(distorted, dtype=np.float32)
 
-    def __call__(self, val: float | np.ndarray) -> float | np.ndarray:
+    def __call__(
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
         """Apply distortion to value(s) - Modifier interface.
 
         This allows Distortion to be used directly in Chain.
@@ -226,6 +228,10 @@ class Distortion(Modifier):
             )[0]
             mixed = dry_sample * (1.0 - self._mix) + wet_sample * self._mix
             return mixed * self._output_gain
+
+        if isinstance(val, tuple):
+            result = self(np.asarray(val, dtype=np.float32))
+            return tuple(float(sample) for sample in np.asarray(result))
 
         # Handle array
         dry_samples = np.asarray(val, dtype=np.float32)

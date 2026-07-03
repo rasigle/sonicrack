@@ -145,9 +145,33 @@ class Reverb(Modifier):
         self._allpass_positions = [0] * len(self._allpass_delays)
         self._allpass_count = len(self._allpass_buffers)
         self._allpass_buffer_lengths = [len(buffer) for buffer in self._allpass_buffers]
+        self._sample_shape: tuple[int, ...] = ()
 
         # Update feedback coefficients
         self._update_coefficients()
+
+    def _ensure_buffer_shape(self, sample_shape: tuple[int, ...]) -> None:
+        """Resize reverb memory for mono or multi-channel frames."""
+        if sample_shape == self._sample_shape:
+            return
+
+        self._sample_shape = sample_shape
+        self._comb_buffers = [
+            np.zeros((delay, *sample_shape), dtype=np.float32)
+            for delay in self._comb_delays
+        ]
+        self._comb_positions = [0] * len(self._comb_delays)
+        self._comb_filter_states = [
+            np.zeros(sample_shape, dtype=np.float32) for _ in self._comb_delays
+        ]
+        self._comb_buffer_lengths = [len(buffer) for buffer in self._comb_buffers]
+
+        self._allpass_buffers = [
+            np.zeros((delay, *sample_shape), dtype=np.float32)
+            for delay in self._allpass_delays
+        ]
+        self._allpass_positions = [0] * len(self._allpass_delays)
+        self._allpass_buffer_lengths = [len(buffer) for buffer in self._allpass_buffers]
 
     def _update_coefficients(self):
         """Update filter coefficients based on room size and damping."""
@@ -245,7 +269,9 @@ class Reverb(Modifier):
 
     def _process_sample(self, input_sample: float) -> float:
         """Process one mono sample through all reverb delay lines."""
-        comb_sum = 0.0
+        input_value = np.asarray(input_sample, dtype=np.float32)
+        self._ensure_buffer_shape(input_value.shape)
+        comb_sum = np.zeros(input_value.shape, dtype=np.float32)
         for index in range(self._comb_count):
             buffer = self._comb_buffers[index]
             pos = self._comb_positions[index]
@@ -255,7 +281,7 @@ class Reverb(Modifier):
                 output * self._damp2 + self._comb_filter_states[index] * self._damp1
             )
             self._comb_filter_states[index] = filtered
-            buffer[pos] = input_sample + filtered * self._feedback
+            buffer[pos] = input_value + filtered * self._feedback
             self._comb_positions[index] = (pos + 1) % self._comb_buffer_lengths[index]
 
             comb_sum += output
@@ -274,11 +300,19 @@ class Reverb(Modifier):
             ]
             wet = output
 
-        return input_sample * (1.0 - self._mix) + wet * self._mix
+        output_value = input_value * (1.0 - self._mix) + wet * self._mix
+        if output_value.shape == ():
+            return float(output_value)
+        return output_value.astype(np.float32, copy=False)
 
     def _process_buffer(self, input_samples: np.ndarray) -> np.ndarray:
-        """Process a mono sample buffer through the reverb delay network."""
-        output_samples = np.empty(len(input_samples), dtype=np.float32)
+        """Process a mono or multi-channel sample buffer through the reverb."""
+        input_samples = np.asarray(input_samples, dtype=np.float32)
+        if input_samples.size == 0:
+            return input_samples.copy()
+
+        self._ensure_buffer_shape(input_samples.shape[1:])
+        output_samples = np.empty_like(input_samples, dtype=np.float32)
 
         comb_buffers = self._comb_buffers
         comb_positions = self._comb_positions
@@ -298,8 +332,8 @@ class Reverb(Modifier):
         dry_mix = 1.0 - mix
 
         for sample_index, input_sample in enumerate(input_samples):
-            input_value = float(input_sample)
-            comb_sum = 0.0
+            input_value = input_sample
+            comb_sum = np.zeros(input_samples.shape[1:], dtype=np.float32)
 
             for index in range(comb_count):
                 buffer = comb_buffers[index]
@@ -337,7 +371,9 @@ class Reverb(Modifier):
 
         return output_samples
 
-    def __call__(self, val: float | np.ndarray) -> float | np.ndarray:
+    def __call__(
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
         """Apply reverb to value(s) - Modifier interface.
 
         Args:
@@ -350,7 +386,10 @@ class Reverb(Modifier):
         if isinstance(val, (float, int, np.number)):
             return self._process_sample(float(val))
 
-        # Handle array
+        if isinstance(val, tuple):
+            result = self._process_sample(np.asarray(val, dtype=np.float32))
+            return tuple(float(sample) for sample in np.asarray(result))
+
         input_samples = np.asarray(val)
         return self._process_buffer(input_samples)
 
@@ -366,11 +405,8 @@ class Reverb(Modifier):
         if self.source is None:
             raise ValueError("source is required for iterator usage")
 
-        # Get input sample
         source = cast(Any, self.source)
-        input_sample = next(source)
-
-        return self._process_sample(float(input_sample))
+        return self(next(source))
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         """Generate n reverb samples.

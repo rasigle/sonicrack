@@ -118,6 +118,7 @@ class Delay(Modifier):
         self._buffer = np.zeros(max_delay_samples, dtype=np.float32)
         self._buffer_size = max_delay_samples
         self._write_pos = 0
+        self._sample_shape: tuple[int, ...] = ()
 
         # Calculate delay in samples
         self._delay_samples = int(self._delay_time * self._sample_rate)
@@ -127,6 +128,51 @@ class Delay(Modifier):
         """Clear the delay buffer to prevent clicks when reusing the delay."""
         self._buffer.fill(0)
         self._write_pos = 0
+
+    def _ensure_buffer_shape(self, sample_shape: tuple[int, ...]) -> None:
+        """Resize delay memory for mono or multi-channel frames."""
+        if sample_shape == self._sample_shape:
+            return
+        self._sample_shape = sample_shape
+        self._buffer = np.zeros(
+            (self._buffer_size, *sample_shape), dtype=np.float32
+        )
+        self._write_pos = 0
+
+    def _process_frame(self, input_sample: float | np.ndarray) -> float | np.ndarray:
+        sample = np.asarray(input_sample, dtype=np.float32)
+        self._ensure_buffer_shape(sample.shape)
+
+        read_pos = (self._write_pos - self._delay_samples) % self._buffer_size
+        delayed_sample = self._buffer[read_pos].copy()
+        self._buffer[self._write_pos] = sample + delayed_sample * self._feedback
+        self._write_pos = (self._write_pos + 1) % self._buffer_size
+
+        output = sample * (1.0 - self._mix) + delayed_sample * self._mix
+        if output.shape == ():
+            return float(output)
+        return output.astype(np.float32, copy=False)
+
+    def _process_buffer(self, input_samples: np.ndarray) -> np.ndarray:
+        input_samples = np.asarray(input_samples, dtype=np.float32)
+        if input_samples.size == 0:
+            return input_samples.copy()
+
+        self._ensure_buffer_shape(input_samples.shape[1:])
+        output_samples = np.empty_like(input_samples, dtype=np.float32)
+
+        for index, input_sample in enumerate(input_samples):
+            read_pos = (self._write_pos - self._delay_samples) % self._buffer_size
+            delayed_sample = self._buffer[read_pos].copy()
+            output_samples[index] = (
+                input_sample * (1.0 - self._mix) + delayed_sample * self._mix
+            )
+            self._buffer[self._write_pos] = (
+                input_sample + delayed_sample * self._feedback
+            )
+            self._write_pos = (self._write_pos + 1) % self._buffer_size
+
+        return output_samples
 
     @property
     def delay_time(self) -> float:
@@ -175,7 +221,9 @@ class Delay(Modifier):
         """Set mix amount."""
         self._mix = validate_numeric_range(value, 0.0, 1.0, name="mix")
 
-    def __call__(self, val: float | np.ndarray) -> float | np.ndarray:
+    def __call__(
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
         """Apply delay to value(s) - Modifier interface.
 
         Args:
@@ -184,32 +232,14 @@ class Delay(Modifier):
         Returns:
             Delayed value (same type as input)
         """
-        # Handle scalar
         if isinstance(val, (float, int, np.number)):
-            input_sample = float(val)
-            read_pos = (self._write_pos - self._delay_samples) % self._buffer_size
-            delayed_sample = self._buffer[read_pos]
-            output_sample = delayed_sample
-            feedback_sample = input_sample + delayed_sample * self._feedback
-            self._buffer[self._write_pos] = feedback_sample
-            self._write_pos = (self._write_pos + 1) % self._buffer_size
-            return input_sample * (1.0 - self._mix) + output_sample * self._mix
+            return self._process_frame(float(val))
 
-        # Handle array
-        input_samples = np.asarray(val)
-        output_samples = np.zeros(len(input_samples), dtype=np.float32)
+        if isinstance(val, tuple):
+            result = self._process_frame(np.asarray(val, dtype=np.float32))
+            return tuple(float(sample) for sample in np.asarray(result))
 
-        for i in range(len(input_samples)):
-            read_pos = (self._write_pos - self._delay_samples) % self._buffer_size
-            delayed_sample = self._buffer[read_pos]
-            output_samples[i] = delayed_sample
-            feedback_sample = input_samples[i] + delayed_sample * self._feedback
-            self._buffer[self._write_pos] = feedback_sample
-            self._write_pos = (self._write_pos + 1) % self._buffer_size
-
-        return (input_samples * (1.0 - self._mix) + output_samples * self._mix).astype(
-            np.float32
-        )
+        return self._process_buffer(np.asarray(val, dtype=np.float32))
 
     def __iter__(self):
         """Initialize iterator."""
@@ -223,26 +253,8 @@ class Delay(Modifier):
         if self.source is None:
             raise ValueError("source is required for iterator usage")
 
-        # Get input sample
         source = cast(Any, self.source)
-        input_sample = next(source)
-
-        # Calculate read position (circular buffer)
-        read_pos = (self._write_pos - self._delay_samples) % self._buffer_size
-
-        # Read delayed sample
-        delayed_sample = self._buffer[read_pos]
-
-        # Create output with feedback
-        output_sample = delayed_sample
-        feedback_sample = input_sample + delayed_sample * self._feedback
-
-        # Write to buffer
-        self._buffer[self._write_pos] = feedback_sample
-        self._write_pos = (self._write_pos + 1) % self._buffer_size
-
-        # Mix dry and wet
-        return input_sample * (1.0 - self._mix) + output_sample * self._mix
+        return self(next(source))
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         """Generate n delayed samples using vectorized processing.
@@ -257,31 +269,8 @@ class Delay(Modifier):
         if self.source is None:
             raise ValueError("source is required for get_samples_vectorized()")
 
-        # Get input samples
         source = cast(Any, self.source)
-        input_samples = source.get_samples_vectorized(n)
-        output_samples = np.zeros(n, dtype=np.float32)
-
-        # Process each sample (delay requires sequential processing for feedback)
-        for i in range(n):
-            # Calculate read position
-            read_pos = (self._write_pos - self._delay_samples) % self._buffer_size
-
-            # Read delayed sample
-            delayed_sample = self._buffer[read_pos]
-
-            # Create output with feedback
-            output_samples[i] = delayed_sample
-            feedback_sample = input_samples[i] + delayed_sample * self._feedback
-
-            # Write to buffer
-            self._buffer[self._write_pos] = feedback_sample
-            self._write_pos = (self._write_pos + 1) % self._buffer_size
-
-        # Mix dry and wet
-        return (input_samples * (1.0 - self._mix) + output_samples * self._mix).astype(
-            np.float32
-        )
+        return self._process_buffer(source.get_samples_vectorized(n))
 
     def get_samples(
         self, n: int, mode: SampleMode = "vectorized", **kwargs

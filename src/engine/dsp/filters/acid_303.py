@@ -116,7 +116,9 @@ class AcidResonantFilter(Modifier):
         """Reset filter memory."""
         self._filter.reset_state()
 
-    def __call__(self, val: float | tuple[float, ...] | np.ndarray):
+    def __call__(
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
         if isinstance(val, np.ndarray):
             return self.process_modulated(val)
         return self._filter(val)

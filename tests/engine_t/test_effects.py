@@ -7,12 +7,42 @@ import unittest
 import numpy as np
 
 from src.engine import (
+    Chain,
     Compressor,
     Delay,
     Distortion,
+    Panner,
     Reverb,
     SineOscillator,
+    Volume,
 )
+
+
+class StereoImpulseSource:
+    """Small deterministic stereo source for effect routing tests."""
+
+    def __init__(self, samples):
+        self.samples = np.asarray(samples, dtype=np.float32)
+        self.index = 0
+
+    def __iter__(self):
+        self.index = 0
+        return self
+
+    def __next__(self):
+        if self.index >= len(self.samples):
+            return tuple(np.zeros(self.samples.shape[1], dtype=np.float32))
+        value = self.samples[self.index]
+        self.index += 1
+        return tuple(value)
+
+    def get_samples_vectorized(self, n):
+        out = np.zeros((n, self.samples.shape[1]), dtype=np.float32)
+        available = min(n, max(0, len(self.samples) - self.index))
+        if available:
+            out[:available] = self.samples[self.index : self.index + available]
+            self.index += available
+        return out
 
 
 class TestDistortion(unittest.TestCase):
@@ -218,6 +248,22 @@ class TestDelay(unittest.TestCase):
         self.assertEqual(len(samples), 100000)
         self.assertTrue(np.all(np.isfinite(samples)))
 
+    def test_stereo_buffer_preserves_independent_channels(self):
+        source = StereoImpulseSource([[1.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
+        delay = Delay(
+            source,
+            delay_time=0.001,
+            feedback=0.0,
+            mix=1.0,
+            sample_rate=1000,
+        )
+
+        samples = delay.get_samples_vectorized(3)
+
+        self.assertEqual(samples.shape, (3, 2))
+        np.testing.assert_allclose(samples[:, 0], [0.0, 1.0, 0.0], atol=1e-6)
+        np.testing.assert_allclose(samples[:, 1], [0.0, 0.0, 0.0], atol=1e-6)
+
 
 class TestCompressor(unittest.TestCase):
     """Test suite for Compressor effect."""
@@ -300,6 +346,21 @@ class TestCompressor(unittest.TestCase):
         samples_iter = comp_iter.get_samples(100, mode="iterator")
 
         np.testing.assert_allclose(samples_vec, samples_iter, rtol=1e-5, atol=1e-6)
+
+    def test_stereo_buffer_preserves_shape(self):
+        samples = np.column_stack(
+            (
+                np.full(64, 1.0, dtype=np.float32),
+                np.full(64, 0.01, dtype=np.float32),
+            )
+        )
+        compressor = Compressor(threshold_db=-24.0, ratio=20.0, attack_ms=0.1)
+
+        output = compressor(samples)
+
+        self.assertEqual(output.shape, samples.shape)
+        self.assertLess(output[-1, 0], samples[-1, 0])
+        np.testing.assert_allclose(output[:, 1], samples[:, 1], rtol=1e-6, atol=1e-6)
 
 
 class TestReverb(unittest.TestCase):
@@ -435,6 +496,17 @@ class TestReverb(unittest.TestCase):
         self.assertEqual(len(reverb._allpass_buffers), 4)
         self.assertEqual(len(reverb._allpass_positions), 4)
 
+    def test_stereo_buffer_preserves_shape_and_channel_state(self):
+        samples = np.zeros((256, 2), dtype=np.float32)
+        samples[0, 0] = 1.0
+        reverb = Reverb(room_size=0.6, mix=1.0, sample_rate=44100)
+
+        output = reverb(samples)
+
+        self.assertEqual(output.shape, samples.shape)
+        self.assertTrue(np.any(np.abs(output[:, 0]) > 0.0))
+        np.testing.assert_allclose(output[:, 1], 0.0, atol=1e-6)
+
 
 class TestEffectChaining(unittest.TestCase):
     """Test chaining multiple effects together."""
@@ -475,6 +547,33 @@ class TestEffectChaining(unittest.TestCase):
 
         # Should have reasonable amplitude
         self.assertLess(np.max(np.abs(samples)), 2.0)
+
+    def test_chain_processes_stereo_effect_blocks_without_channel_bleed(self):
+        source = StereoImpulseSource([[1.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
+        chain = Chain(
+            source,
+            Delay(delay_time=0.001, feedback=0.0, mix=1.0, sample_rate=1000),
+        )
+
+        samples = chain.get_samples(3, mode="vectorized")
+
+        self.assertEqual(samples.shape, (3, 2))
+        np.testing.assert_allclose(samples[:, 0], [0.0, 1.0, 0.0], atol=1e-6)
+        np.testing.assert_allclose(samples[:, 1], [0.0, 0.0, 0.0], atol=1e-6)
+
+    def test_chain_volume_smoothing_accepts_stereo_blocks(self):
+        volume = Volume(amplitude=0.5, gain_db=None, sample_rate=1000)
+        chain = Chain(
+            SineOscillator(440, sample_rate=1000),
+            Panner(0.0),
+            volume,
+        )
+        volume.amplitude = 1.0
+
+        samples = chain.get_samples(16, mode="vectorized")
+
+        self.assertEqual(samples.shape, (16, 2))
+        self.assertTrue(np.all(np.isfinite(samples)))
 
 
 if __name__ == "__main__":

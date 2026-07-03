@@ -33,9 +33,6 @@ All notable changes to AudioPlayground will be documented in this file.
 
 ### Review Findings
 
-- Stereo handling is inconsistent across composers, modifiers, filters, and
-  effects. `Chain` special-cases some stereo paths by class name, while several
-  effects primarily process mono arrays.
 - Parameter descriptors are useful for UI/presets but do not yet enforce a
   single source of truth for runtime validation, smoothing policy, units, or
   automation semantics.
@@ -294,6 +291,9 @@ First release of AudioPlayground!
   slewing for more natural sweeps.
 
 ### Fixed
+- Fixed stereo block handling for stateful effects and smoothed volume paths:
+  delay, reverb, compressor, volume, and modulated volume now preserve `(n, 2)`
+  buffers without channel-state bleed.
 - Fixed state carry across buffer boundaries for `ButterworthFilter`.
 - Fixed stereo `Chain` plus `ButterworthFilter` rendering so channel state is
   preserved independently.

@@ -157,7 +157,8 @@ class Compressor(Modifier):
             makeup_gain_db, -24.0, 24.0, name="makeup_gain_db"
         )
         self._mix = validate_numeric_range(mix, 0.0, 1.0, name="mix")
-        self._gain_reduction_db = 0.0
+        self._gain_reduction_db: float | np.ndarray = 0.0
+        self._sample_shape: tuple[int, ...] = ()
         self._update_coefficients()
 
     @property
@@ -226,6 +227,7 @@ class Compressor(Modifier):
     def reset(self) -> None:
         """Clear compressor envelope state."""
         self._gain_reduction_db = 0.0
+        self._sample_shape = ()
 
     def _update_coefficients(self) -> None:
         attack_seconds = self._attack_ms / 1000.0
@@ -235,40 +237,74 @@ class Compressor(Modifier):
             np.exp(-1.0 / (release_seconds * self._sample_rate))
         )
 
-    def _target_gain_reduction_db(self, sample: float) -> float:
-        level_db = 20.0 * np.log10(max(abs(sample), 1.0e-12))
-        if level_db <= self._threshold_db or self._ratio <= 1.0:
-            return 0.0
+    def _ensure_state_shape(self, sample_shape: tuple[int, ...]) -> None:
+        if sample_shape == self._sample_shape:
+            return
+        self._sample_shape = sample_shape
+        self._gain_reduction_db = (
+            0.0
+            if sample_shape == ()
+            else np.zeros(sample_shape, dtype=np.float32)
+        )
+
+    def _target_gain_reduction_db(self, sample: np.ndarray) -> np.ndarray:
+        level_db = 20.0 * np.log10(np.maximum(np.abs(sample), 1.0e-12))
+        if self._ratio <= 1.0:
+            return np.zeros_like(level_db, dtype=np.float32)
 
         compressed_level = self._threshold_db + (
             (level_db - self._threshold_db) / self._ratio
         )
-        return float(compressed_level - level_db)
+        target = compressed_level - level_db
+        return np.where(level_db <= self._threshold_db, 0.0, target).astype(
+            np.float32,
+            copy=False,
+        )
 
     def _process_sample(self, sample: float) -> float:
+        return float(self._process_frame(np.asarray(sample, dtype=np.float32)))
+
+    def _process_frame(self, sample: np.ndarray) -> np.ndarray:
+        self._ensure_state_shape(sample.shape)
         target_reduction = self._target_gain_reduction_db(sample)
-        coeff = (
-            self._attack_coeff
-            if target_reduction < self._gain_reduction_db
-            else self._release_coeff
+        coeff = np.where(
+            target_reduction < self._gain_reduction_db,
+            self._attack_coeff,
+            self._release_coeff,
         )
         self._gain_reduction_db = (
             coeff * self._gain_reduction_db + (1.0 - coeff) * target_reduction
         )
         gain = 10.0 ** ((self._gain_reduction_db + self._makeup_gain_db) / 20.0)
         wet = sample * gain
-        return sample * (1.0 - self._mix) + wet * self._mix
+        return (sample * (1.0 - self._mix) + wet * self._mix).astype(
+            np.float32,
+            copy=False,
+        )
 
-    def __call__(self, val: float | np.ndarray) -> float | np.ndarray:
+    def _process_buffer(self, samples: np.ndarray) -> np.ndarray:
+        samples = np.asarray(samples, dtype=np.float32)
+        if samples.size == 0:
+            return samples.copy()
+
+        self._ensure_state_shape(samples.shape[1:])
+        output = np.empty_like(samples, dtype=np.float32)
+        for index, sample in enumerate(samples):
+            output[index] = self._process_frame(sample)
+        return output
+
+    def __call__(
+        self, val: float | tuple[float, ...] | np.ndarray
+    ) -> float | tuple[float, ...] | np.ndarray:
         """Apply compression to a scalar or sample buffer."""
         if isinstance(val, (float, int, np.number)):
             return self._process_sample(float(val))
 
-        samples = np.asarray(val, dtype=np.float32)
-        output = np.empty(len(samples), dtype=np.float32)
-        for index, sample in enumerate(samples):
-            output[index] = self._process_sample(float(sample))
-        return output
+        if isinstance(val, tuple):
+            result = self._process_frame(np.asarray(val, dtype=np.float32))
+            return tuple(float(sample) for sample in result)
+
+        return self._process_buffer(np.asarray(val, dtype=np.float32))
 
     def __iter__(self):
         if self.source is not None:

@@ -10,14 +10,21 @@ import argparse
 import logging
 import sys
 from collections.abc import Callable, Sequence
-from typing import cast
+from typing import Any, cast
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QApplication, QSplashScreen
 
-from src.constants import LOG_FILENAME, SPLASH_RESOURCE, resource, resource_path
+from src.constants import (
+    CRASH_TRACE_FILENAME,
+    LOG_FILENAME,
+    SPLASH_RESOURCE,
+    resource,
+    resource_path,
+)
 from src.gui.main_window import ModularSynthWindow
+from src.utils.crash_diagnostics import activate_crash_diagnostics
 from src.utils.logging_config import setup_logging
 
 APP_NAME = "AudioPlayground Modular Synth"
@@ -126,22 +133,11 @@ def activate_ui_exception_logging(
     get_window: Callable[[], ModularSynthWindow | None],
 ) -> None:
     """Log uncaught UI exceptions and request a controlled application exit."""
-    previous_hook = sys.excepthook
-
-    def exception_hook(exc_type, exc_value, exc_traceback) -> None:
-        if issubclass(exc_type, KeyboardInterrupt):
-            previous_hook(exc_type, exc_value, exc_traceback)
-            app.exit(130)
-            return
-
-        logger.critical(
-            "Unhandled exception in UI thread",
-            exc_info=(exc_type, exc_value, exc_traceback),
-        )
-        _shutdown_window(get_window, graceful=False)
-        app.exit(1)
-
-    sys.excepthook = exception_hook
+    activate_crash_diagnostics(
+        app,
+        cast(Callable[[], Any | None], get_window),
+        trace_file=CRASH_TRACE_FILENAME,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:

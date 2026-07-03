@@ -12,6 +12,7 @@ from pathlib import Path
 
 # Logging
 LOG_FILENAME = "mod_synth.log"
+CRASH_TRACE_FILENAME = "mod_synth_fault_trace.log"
 LOG_DIRECTORY: Path = Path(__file__).parent.parent
 
 # Package resources

@@ -158,15 +158,18 @@ python -m pytest tests --collect-only -q
 ```text
 AudioPlayground/
 ├── src/
-│   ├── engine/               # DSP engine and audio components
+│   ├── audio_io/             # Realtime audio interface
+│   ├── engine/               # DSP engine
 │   ├── gui/                  # PyQt6 modular synth UI
+│   ├── midi_io/              # Utilities for MIDI input/output
+│   ├── utils/
+│   ├── resources/            # packaged runtime assets
 │   ├── modular_synth_app.py  # GUI entry point
-│   ├── constants.py
-│   └── utils/
+│   └── constants.py
 ├── tests/
-│   ├── engine/
-│   ├── gui/
-│   └── utils/
+│   ├── engine_t/
+│   ├── gui_t/
+│   └── utils_t/
 ├── examples/
 │   ├── audio_components/
 │   ├── filter/
@@ -177,7 +180,6 @@ AudioPlayground/
 │   ├── sequencer/
 │   └── signal_analysis/
 ├── docs/                     # design notes, implementation docs, status docs
-├── resources/
 ├── pyproject.toml
 └── run_modular_synth.bat
 ```

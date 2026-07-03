@@ -16,7 +16,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QApplication, QSplashScreen
 
-from src.constants import LOG_FILENAME, SPLASH_PATH
+from src.constants import LOG_FILENAME, SPLASH_RESOURCE, resource, resource_path
 from src.gui.main_window import ModularSynthWindow
 from src.utils.logging_config import setup_logging
 
@@ -81,13 +81,15 @@ def _create_splash(app: QApplication, enabled: bool) -> QSplashScreen | None:
     if not enabled:
         return None
 
-    if not SPLASH_PATH.exists():
-        logger.info("Splash image not found: %s", SPLASH_PATH)
+    splash_resource = resource(*SPLASH_RESOURCE)
+    if not splash_resource.is_file():
+        logger.info("Splash image not found: %s", splash_resource)
         return None
 
-    splash_pixmap = QPixmap(str(SPLASH_PATH))
+    with resource_path(*SPLASH_RESOURCE) as splash_path:
+        splash_pixmap = QPixmap(str(splash_path))
     if splash_pixmap.isNull():
-        logger.warning("Splash image could not be loaded: %s", SPLASH_PATH)
+        logger.warning("Splash image could not be loaded: %s", splash_resource)
         return None
 
     splash = QSplashScreen(splash_pixmap, Qt.WindowType.WindowStaysOnTopHint)

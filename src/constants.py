@@ -4,16 +4,37 @@ This module defines global constants for sample rates, buffer sizes,
 and other audio-related values.
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from importlib.resources import as_file, files
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 # Logging
 LOG_FILENAME = "mod_synth.log"
 LOG_DIRECTORY: Path = Path(__file__).parent.parent
 
-# Standard library paths
-RESOURCES_PATH = Path(__file__).parent.parent / "resources"
-SPLASH_PATH = Path(RESOURCES_PATH) / "splash" / "splash.png"
+# Package resources
+RESOURCE_PACKAGE = "src.resources"
+RESOURCES = files(RESOURCE_PACKAGE)
+SPLASH_RESOURCE = ("splash", "splash.png")
 PRESET_FILE_EXTENSION = ".apr"  # Audio Preset file extension
+
+
+def resource(*parts: str) -> Traversable:
+    """Return a package resource without assuming a filesystem layout."""
+    current = RESOURCES
+    for part in parts:
+        current = current.joinpath(part)
+    return current
+
+
+@contextmanager
+def resource_path(*parts: str) -> Iterator[Path]:
+    """Yield a filesystem path for a package resource."""
+    with as_file(resource(*parts)) as path:
+        yield path
+
 
 # Sample rate constants
 DEFAULT_SAMPLE_RATE = 44100  # CD quality

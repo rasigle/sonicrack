@@ -36,8 +36,6 @@ All notable changes to AudioPlayground will be documented in this file.
 - Stereo handling is inconsistent across composers, modifiers, filters, and
   effects. `Chain` special-cases some stereo paths by class name, while several
   effects primarily process mono arrays.
-- Modulation and composer internals reach into oscillator private fields for
-  phase/state commits, which makes oscillator refactors risky.
 - Parameter descriptors are useful for UI/presets but do not yet enforce a
   single source of truth for runtime validation, smoothing policy, units, or
   automation semantics.
@@ -85,6 +83,13 @@ All notable changes to AudioPlayground will be documented in this file.
 - Added a uniform `process_block()` API to engine modifiers, filters, and
   effects, and updated `Chain` to prefer that block-processing contract when
   applying modifiers to mono and stereo buffers.
+- Moved modulated oscillator phase rendering and state commits behind
+  oscillator-owned `render_modulated_waveform()` and
+  `commit_modulated_phase_state()` hooks, removing direct private phase-field
+  coupling from modulation internals.
+- Fixed VCO waveform changes so dependent mode parameters are normalized and
+  cached together; changing waveform no longer leaves the runtime with an
+  invalid stale mode that can mute output until the mode selector is changed.
 
 
 ## Repository Review Fixes - 2026-06-30

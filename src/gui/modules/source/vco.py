@@ -315,10 +315,9 @@ class ModulatedOscillatorModule(ModuleWidget):
     def _refresh_mode_options(self, waveform: str, preserve_current: bool = True):
         """Refresh mode choices when the selected waveform changes."""
         available_modes = self._get_available_modes_for_waveform(waveform)
-        selected_mode = self._mode if preserve_current else None
-
-        if selected_mode not in available_modes:
-            selected_mode = self._get_default_mode_for_waveform(waveform)
+        selected_mode = self._normalize_mode_for_waveform(
+            waveform, self._mode if preserve_current else None
+        )
 
         self.mode_combo.blockSignals(True)
         self.mode_combo.clear()
@@ -327,6 +326,14 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.mode_combo.blockSignals(False)
 
         self._mode = selected_mode
+
+    @classmethod
+    def _normalize_mode_for_waveform(cls, waveform: str, mode: str | None) -> str:
+        """Return a valid mode for the selected waveform."""
+        available_modes = cls._get_available_modes_for_waveform(waveform)
+        if mode in available_modes:
+            return str(mode)
+        return cls._get_default_mode_for_waveform(waveform)
 
     def _create_base_oscillator(self):
         """Create the base oscillator component based on current waveform."""
@@ -374,16 +381,18 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         logger = logging.getLogger(__name__)
 
+        previous_mode = self._mode
         self._waveform = wave_type
         self._refresh_mode_options(wave_type)
         logger.debug(f"VCO: Waveform changed to {wave_type}")
 
         # Recreate the base oscillator with new waveform
         self.component = self._create_base_oscillator()
-        # Update the port's component reference
         self.out_port.component = self.component
 
         self.parameter_changed.emit("waveform", wave_type)
+        if self._mode != previous_mode:
+            self.parameter_changed.emit("mode", self._mode)
 
     def _on_mode_changed(self, mode: str):
         """Handle oscillator mode changes by recreating the component."""
@@ -548,7 +557,9 @@ class ModulatedOscillatorModule(ModuleWidget):
         logger = logging.getLogger(__name__)
 
         wave_type = self.wave_combo.currentText()
-        mode = self.mode_combo.currentText()
+        mode = self._normalize_mode_for_waveform(
+            wave_type, self.mode_combo.currentText()
+        )
         base_freq = self.freq_knob.get_value()
         gain_db = self.gain_knob.get_value()
         fm_amount = self.fm_amount_knob.get_value()
@@ -684,7 +695,10 @@ class ModulatedOscillatorModule(ModuleWidget):
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render VCO output for the current engine cycle."""
         wave_type = str_parameter(parameters, "waveform", self.wave_combo.currentText)
-        mode = str_parameter(parameters, "mode", self.mode_combo.currentText)
+        mode = self._normalize_mode_for_waveform(
+            wave_type,
+            str_parameter(parameters, "mode", self.mode_combo.currentText),
+        )
         fm_mode = str_parameter(parameters, "fm_mode", self.fm_mode_combo.currentText)
         frequency = float_parameter(parameters, "frequency", self.freq_knob.get_value)
         gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)

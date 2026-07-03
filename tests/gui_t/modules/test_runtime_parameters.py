@@ -850,3 +850,41 @@ def test_vco_runtime_applies_oscillator_parameters(qapp: Any):
     assert module.component.gain_db == pytest.approx(-6.0)
     assert module.component.phase == pytest.approx(np.deg2rad(45.0))
     assert module.component.pulsewidth == pytest.approx(0.25)
+
+
+def test_vco_waveform_change_updates_cached_mode(qapp: Any):
+    del qapp
+    module = ModulatedOscillatorModule()
+    module.wave_combo.setCurrentText("Square")
+    module.mode_combo.setCurrentText("vcv")
+    assert module.get_parameters()["mode"] == "vcv"
+
+    module.wave_combo.setCurrentText("Sine")
+
+    assert module.mode_combo.currentText() == "pure"
+    assert module.get_parameters()["waveform"] == "Sine"
+    assert module.get_parameters()["mode"] == "pure"
+
+
+def test_vco_runtime_normalizes_stale_mode_after_waveform_change(qapp: Any):
+    del qapp
+    module = ModulatedOscillatorModule()
+
+    module.process_runtime(
+        32,
+        {
+            "waveform": "Sine",
+            "mode": "vcv",
+            "frequency": 330.0,
+            "gain_db": -6.0,
+            "phase": 0.0,
+            "pulsewidth": 0.5,
+        },
+    )
+
+    assert isinstance(module.component, SineOscillator)
+    assert module.component.mode == "pure"
+    output = np.asarray(module.out_port.value)
+    assert output.shape == (32,)
+    assert np.all(np.isfinite(output))
+    assert np.max(np.abs(output)) > 0.0

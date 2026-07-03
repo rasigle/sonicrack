@@ -171,3 +171,37 @@ class SineOscillator(Oscillator):
         self._i = (self._i + self._step * n) % (2 * np.pi)
         self._sample_index += n
         return samples.astype(np.float32)
+
+    def render_modulated_waveform(
+        self,
+        freqs: np.ndarray,
+        phase_offsets_deg: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, dict[str, float]]:
+        """Render an unamplified waveform for per-sample modulation."""
+        increments = (2.0 * np.pi * freqs) / self.sample_rate
+        phase_offsets = np.concatenate(
+            ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
+        )
+        carrier_phases = self._i + phase_offsets
+        carrier_end = float(self._i + float(np.sum(increments, dtype=np.float64)))
+
+        if phase_offsets_deg is None:
+            phase_offsets_rad = np.full(len(freqs), self._p, dtype=np.float64)
+        else:
+            phase_offsets_rad = np.deg2rad(phase_offsets_deg)
+
+        sample_indices = self._sample_index + np.arange(len(freqs), dtype=np.float64)
+        waveform = np.asarray(
+            self._generate_waveform(carrier_phases + phase_offsets_rad, sample_indices),
+            dtype=np.float64,
+        )
+        waveform = np.asarray(self._apply_wave_range_values(waveform), dtype=np.float64)
+        return waveform, {
+            "carrier_phase": carrier_end,
+            "sample_index": float(self._sample_index + len(freqs)),
+        }
+
+    def commit_modulated_phase_state(self, state: dict[str, float]) -> None:
+        """Commit phase state produced by ``render_modulated_waveform``."""
+        self._i = float(state["carrier_phase"]) % (2.0 * np.pi)
+        self._sample_index = int(state["sample_index"])

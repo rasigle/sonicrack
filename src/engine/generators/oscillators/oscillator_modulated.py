@@ -61,7 +61,6 @@ Note:
 """
 
 from enum import StrEnum
-from typing import TypedDict, cast
 
 import numpy as np
 
@@ -73,13 +72,7 @@ from src.engine.core.component import (
 )
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
-from src.engine.generators.oscillators.oscillator import (
-    Oscillator,
-    SawtoothOscillator,
-    SineOscillator,
-    SquareOscillator,
-    TriangleOscillator,
-)
+from src.engine.generators.oscillators.oscillator import Oscillator
 from src.engine.utils.validation import validate_sample_count
 
 class ModulationLane(StrEnum):
@@ -89,21 +82,6 @@ class ModulationLane(StrEnum):
     FREQ = "freq"
     FM = "fm"
     PHASE = "phase"
-
-
-class PhaseStateKind(StrEnum):
-    """Internal phase-state representations used by vectorized rendering."""
-
-    ANGULAR = "angular"
-    CYCLE = "cycle"
-
-
-class PhaseState(TypedDict, total=False):
-    """State needed to commit vectorized oscillator phase after rendering."""
-
-    kind: PhaseStateKind
-    carrier_end: float
-    sample_index_end: float
 
 
 @register_component()
@@ -396,7 +374,6 @@ class ModulatedOscillator(Generator):
         base_freq = self.oscillator.init_freq
         base_amp = self.oscillator.init_amp
         base_phase = self.oscillator.init_phase
-        sample_rate = self.oscillator.sample_rate
 
         freqs = self._evaluate_modulation_array(
             n=n,
@@ -438,17 +415,16 @@ class ModulatedOscillator(Generator):
             mod_index=self._get_modulation_index(ModulationLane.PHASE),
         )
 
-        if not isinstance(
-            self.oscillator,
-            (SineOscillator, SquareOscillator, TriangleOscillator, SawtoothOscillator),
+        if not (
+            hasattr(self.oscillator, "render_modulated_waveform")
+            and hasattr(self.oscillator, "commit_modulated_phase_state")
         ):
             return self._get_samples_fallback(n, mod_arrays)
 
-        # Step 3: Generate waveform while preserving oscillator-specific behavior.
-        waveform, phase_state = self._generate_vectorized_waveform(
+        # Step 3: Generate waveform through the carrier-owned phase/state API.
+        waveform, phase_state = self.oscillator.render_modulated_waveform(
             freqs=freqs,
             phase_offsets_deg=phase_offsets_deg,
-            sample_rate=sample_rate,
         )
 
         # Step 4: Apply amplitude modulation.
@@ -458,7 +434,7 @@ class ModulatedOscillator(Generator):
         if mod_arrays:
             self._modulate([mod_arr[-1] for mod_arr in mod_arrays])
 
-        self._update_phase_state_from_vectorized(phase_state)
+        self.oscillator.commit_modulated_phase_state(phase_state)
 
         return samples
 
@@ -493,220 +469,6 @@ class ModulatedOscillator(Generator):
             result = [mod_func(base_value, mod_vals[i]) for i in range(n)]
 
         return self._coerce_modulation_result(result, n)
-
-    def _generate_vectorized_waveform(
-        self,
-        freqs: np.ndarray | None,
-        phase_offsets_deg: np.ndarray | None,
-        sample_rate: float,
-    ) -> tuple[np.ndarray, PhaseState]:
-        """Generate a waveform buffer that respects the underlying oscillator type."""
-        osc = self.oscillator
-
-        if isinstance(osc, SquareOscillator):
-            return self._generate_square_waveform(freqs, phase_offsets_deg, sample_rate)
-        if isinstance(osc, SineOscillator):
-            return self._generate_sine_waveform(freqs, phase_offsets_deg, sample_rate)
-        if isinstance(osc, TriangleOscillator):
-            return self._generate_triangle_waveform(
-                freqs, phase_offsets_deg, sample_rate
-            )
-        if isinstance(osc, SawtoothOscillator):
-            return self._generate_sawtooth_waveform(
-                freqs, phase_offsets_deg, sample_rate
-            )
-
-        raise TypeError(
-            f"Unsupported oscillator type for vectorized generation: {type(osc)!r}"
-        )
-
-    def _generate_sine_waveform(
-        self,
-        freqs: np.ndarray | None,
-        phase_offsets_deg: np.ndarray | None,
-        sample_rate: float,
-    ) -> tuple[np.ndarray, PhaseState]:
-        assert freqs is not None
-        osc = cast(SineOscillator, self.oscillator)
-        increments = (2.0 * np.pi * freqs) / sample_rate
-        carrier_phases, end_phase = self._build_carrier_phase_buffer(osc._i, increments)
-
-        if phase_offsets_deg is None:
-            phase_offsets = np.full(len(freqs), osc._p, dtype=np.float64)
-        else:
-            phase_offsets = np.deg2rad(phase_offsets_deg)
-
-        total_phases = carrier_phases + phase_offsets
-        sample_indices = getattr(osc, "_sample_index", 0) + np.arange(
-            len(freqs), dtype=np.float64
-        )
-        waveform = np.asarray(
-            osc._generate_waveform(total_phases, sample_indices),
-            dtype=np.float64,
-        )
-        waveform = np.asarray(
-            cast(np.ndarray, osc._apply_wave_range_values(waveform)), dtype=np.float64
-        )
-        return waveform, {
-            "kind": PhaseStateKind.ANGULAR,
-            "carrier_end": end_phase,
-            "sample_index_end": float(getattr(osc, "_sample_index", 0) + len(freqs)),
-        }
-
-    def _generate_square_waveform(
-        self,
-        freqs: np.ndarray | None,
-        phase_offsets_deg: np.ndarray | None,
-        sample_rate: float,
-    ) -> tuple[np.ndarray, PhaseState]:
-        assert freqs is not None
-        osc = cast(SquareOscillator, self.oscillator)
-        increments = (2.0 * np.pi * freqs) / sample_rate
-        carrier_phases, end_phase = self._build_carrier_phase_buffer(osc._i, increments)
-
-        if phase_offsets_deg is None:
-            phase_offsets = np.full(len(freqs), osc._p, dtype=np.float64)
-        else:
-            phase_offsets = np.deg2rad(phase_offsets_deg)
-
-        wrapped_phases = (carrier_phases + phase_offsets) % (2.0 * np.pi)
-        waveform = osc._strategy.generate_samples(
-            phases=wrapped_phases,
-            pulsewidth_threshold=osc._pulsewidth_threshold,
-            low_value=osc._wave_range[0],
-            high_value=osc._wave_range[1],
-        )
-        return np.asarray(waveform, dtype=np.float64), {
-            "kind": PhaseStateKind.ANGULAR,
-            "carrier_end": end_phase,
-        }
-
-    def _generate_sawtooth_waveform(
-        self,
-        freqs: np.ndarray | None,
-        phase_offsets_deg: np.ndarray | None,
-        sample_rate: float,
-    ) -> tuple[np.ndarray, PhaseState]:
-        assert freqs is not None
-        osc = cast(SawtoothOscillator, self.oscillator)
-        increments = freqs / sample_rate
-        carrier_cycles, end_cycle = self._build_carrier_phase_buffer(
-            self._get_saw_like_carrier_cycle(osc),
-            increments,
-        )
-
-        if phase_offsets_deg is None:
-            phase_offsets = np.full(
-                len(freqs),
-                self._get_saw_like_phase_offset_cycle(osc),
-                dtype=np.float64,
-            )
-        else:
-            phase_offsets = phase_offsets_deg / 360.0
-
-        cycles = carrier_cycles + phase_offsets
-        if osc.mode == "vcv":
-            waveform = osc._generate_vcv_from_cycles(cycles)
-        else:
-            waveform = 2 * (cycles - np.floor(0.5 + cycles))
-
-        if osc.mode == "analog":
-            sample_indices = getattr(osc, "_i", 0.0) + np.arange(
-                len(freqs), dtype=np.float64
-            )
-            waveform = cast(
-                np.ndarray,
-                osc._apply_analog_character(waveform, sample_indices),
-            )
-
-        waveform = np.asarray(osc._apply_wave_range_values(waveform), dtype=np.float64)
-        return waveform, {"kind": PhaseStateKind.CYCLE, "carrier_end": end_cycle}
-
-    def _generate_triangle_waveform(
-        self,
-        freqs: np.ndarray | None,
-        phase_offsets_deg: np.ndarray | None,
-        sample_rate: float,
-    ) -> tuple[np.ndarray, PhaseState]:
-        assert freqs is not None
-        osc = cast(TriangleOscillator, self.oscillator)
-        increments = freqs / sample_rate
-        carrier_cycles, end_cycle = self._build_carrier_phase_buffer(
-            self._get_saw_like_carrier_cycle(osc),
-            increments,
-        )
-
-        if phase_offsets_deg is None:
-            phase_offsets = np.full(
-                len(freqs),
-                self._get_saw_like_phase_offset_cycle(osc),
-                dtype=np.float64,
-            )
-        else:
-            phase_offsets = phase_offsets_deg / 360.0
-
-        cycles = carrier_cycles + phase_offsets
-        waveform = 2 * (cycles - np.floor(0.5 + cycles))
-        waveform = (np.abs(waveform) - 0.5) * 2
-        if osc.mode == "analog":
-            sample_indices = getattr(osc, "_i", 0.0) + np.arange(
-                len(freqs), dtype=np.float64
-            )
-            waveform = cast(
-                np.ndarray,
-                osc._apply_analog_character_triangle(waveform, sample_indices),
-            )
-        waveform = np.asarray(
-            cast(np.ndarray, osc._apply_wave_range_values(waveform)), dtype=np.float64
-        )
-        return waveform, {"kind": PhaseStateKind.CYCLE, "carrier_end": end_cycle}
-
-    @staticmethod
-    def _build_carrier_phase_buffer(
-        start_phase: float, increments: np.ndarray
-    ) -> tuple[np.ndarray, float]:
-        """Build a phase buffer where sample k uses the phase before increment k."""
-        if len(increments) == 0:
-            return np.empty(0, dtype=np.float64), float(start_phase)
-
-        phase_offsets = np.concatenate(
-            ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
-        )
-        phases = start_phase + phase_offsets
-        end_phase = float(start_phase + float(np.sum(increments, dtype=np.float64)))
-        return phases, end_phase
-
-    @staticmethod
-    def _get_saw_like_carrier_cycle(oscillator: SawtoothOscillator) -> float:
-        """Get the continuous carrier phase cycle for saw/triangle oscillators."""
-        if getattr(oscillator, "_period", 0) == 0:
-            return 0.0
-        return oscillator._i / oscillator._period
-
-    @staticmethod
-    def _get_saw_like_phase_offset_cycle(oscillator: SawtoothOscillator) -> float:
-        """Get the current phase-offset cycle for saw/triangle oscillators."""
-        if getattr(oscillator, "_period", 0) == 0:
-            return 0.0
-        return oscillator._p / oscillator._period
-
-    def _update_phase_state_from_vectorized(self, phase_state: PhaseState) -> None:
-        """Commit the carrier phase accumulated during vectorized generation."""
-        kind = phase_state.get("kind")
-        if kind is PhaseStateKind.ANGULAR:
-            self.oscillator._i = float(phase_state["carrier_end"]) % (2.0 * np.pi)
-            sample_index_end = phase_state.get("sample_index_end")
-            if sample_index_end is not None and isinstance(
-                self.oscillator, SineOscillator
-            ):
-                self.oscillator._sample_index = int(sample_index_end)
-        elif kind is PhaseStateKind.CYCLE:
-            carrier_cycle = float(phase_state["carrier_end"]) % 1.0
-            period = float(getattr(self.oscillator, "_period", 0.0))
-            if period != 0.0:
-                self.oscillator._i = carrier_cycle * period
-            else:
-                self.oscillator._i = 0.0
 
     def _get_samples_fallback(self, n: int, mod_arrays: list) -> np.ndarray:
         """Fallback to sample-by-sample generation for unknown oscillator types.

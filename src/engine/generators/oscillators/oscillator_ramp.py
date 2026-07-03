@@ -270,6 +270,47 @@ class SawtoothOscillator(Oscillator):
         self._i += n
         return samples.astype(np.float32)
 
+    def render_modulated_waveform(
+        self,
+        freqs: np.ndarray,
+        phase_offsets_deg: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, dict[str, float]]:
+        """Render an unamplified waveform for per-sample modulation."""
+        increments = freqs / self.sample_rate
+        start_cycle = self._i / self._period if self._period != 0 else 0.0
+        phase_offsets = np.concatenate(
+            ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
+        )
+        carrier_cycles = start_cycle + phase_offsets
+        carrier_end = float(start_cycle + float(np.sum(increments, dtype=np.float64)))
+
+        if phase_offsets_deg is None:
+            offset_cycles = np.full(
+                len(freqs),
+                self._p / self._period if self._period != 0 else 0.0,
+                dtype=np.float64,
+            )
+        else:
+            offset_cycles = phase_offsets_deg / 360.0
+
+        cycles = carrier_cycles + offset_cycles
+        if self.mode == "vcv":
+            waveform = self._generate_vcv_from_cycles(cycles)
+        else:
+            waveform = 2 * (cycles - np.floor(0.5 + cycles))
+
+        if self.mode == "analog":
+            sample_indices = self._i + np.arange(len(freqs), dtype=np.float64)
+            waveform = self._apply_analog_character(waveform, sample_indices)
+
+        waveform = np.asarray(self._apply_wave_range_values(waveform), dtype=np.float64)
+        return waveform, {"carrier_cycle": carrier_end}
+
+    def commit_modulated_phase_state(self, state: dict[str, float]) -> None:
+        """Commit phase state produced by ``render_modulated_waveform``."""
+        carrier_cycle = float(state["carrier_cycle"]) % 1.0
+        self._i = carrier_cycle * self._period if self._period != 0 else 0.0
+
 
 @register_component()
 class TriangleOscillator(SawtoothOscillator):
@@ -355,3 +396,36 @@ class TriangleOscillator(SawtoothOscillator):
         samples = self._apply_amplitude_to_buffer(val)
         self._i += n
         return samples.astype(np.float32)
+
+    def render_modulated_waveform(
+        self,
+        freqs: np.ndarray,
+        phase_offsets_deg: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, dict[str, float]]:
+        """Render an unamplified waveform for per-sample modulation."""
+        increments = freqs / self.sample_rate
+        start_cycle = self._i / self._period if self._period != 0 else 0.0
+        phase_offsets = np.concatenate(
+            ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
+        )
+        carrier_cycles = start_cycle + phase_offsets
+        carrier_end = float(start_cycle + float(np.sum(increments, dtype=np.float64)))
+
+        if phase_offsets_deg is None:
+            offset_cycles = np.full(
+                len(freqs),
+                self._p / self._period if self._period != 0 else 0.0,
+                dtype=np.float64,
+            )
+        else:
+            offset_cycles = phase_offsets_deg / 360.0
+
+        cycles = carrier_cycles + offset_cycles
+        waveform = 2 * (cycles - np.floor(0.5 + cycles))
+        waveform = (np.abs(waveform) - 0.5) * 2
+        if self.mode == "analog":
+            sample_indices = self._i + np.arange(len(freqs), dtype=np.float64)
+            waveform = self._apply_analog_character_triangle(waveform, sample_indices)
+
+        waveform = np.asarray(self._apply_wave_range_values(waveform), dtype=np.float64)
+        return waveform, {"carrier_cycle": carrier_end}

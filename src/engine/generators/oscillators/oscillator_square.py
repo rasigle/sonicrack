@@ -785,3 +785,33 @@ class SquareOscillator(Oscillator):
             samples = self._apply_amplitude_to_buffer(val)
         self._i = (self._i + self._step * n) % TWO_PI
         return samples.astype(np.float32)
+
+    def render_modulated_waveform(
+        self,
+        freqs: np.ndarray,
+        phase_offsets_deg: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, dict[str, float]]:
+        """Render an unamplified waveform for per-sample modulation."""
+        increments = (TWO_PI * freqs) / self.sample_rate
+        phase_offsets = np.concatenate(
+            ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
+        )
+        carrier_phases = self._i + phase_offsets
+        carrier_end = float(self._i + float(np.sum(increments, dtype=np.float64)))
+
+        if phase_offsets_deg is None:
+            offset_phases = np.full(len(freqs), self._p, dtype=np.float64)
+        else:
+            offset_phases = np.deg2rad(phase_offsets_deg)
+
+        waveform = self._strategy.generate_samples(
+            phases=(carrier_phases + offset_phases) % TWO_PI,
+            pulsewidth_threshold=self._pulsewidth_threshold,
+            low_value=self._wave_range[0],
+            high_value=self._wave_range[1],
+        )
+        return np.asarray(waveform, dtype=np.float64), {"carrier_phase": carrier_end}
+
+    def commit_modulated_phase_state(self, state: dict[str, float]) -> None:
+        """Commit phase state produced by ``render_modulated_waveform``."""
+        self._i = float(state["carrier_phase"]) % TWO_PI

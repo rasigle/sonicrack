@@ -27,7 +27,10 @@ classifiers = [
 
 requires-python = ">=3.11"
 dependencies = [
+    "coverage>=7.15.0",
+    "ipython>=9.15.0",
     "numpy>=2.4.6",
+    "ruff>=0.15.20",
     "scipy",
 ]
 
@@ -51,7 +54,7 @@ examples = [
     "pyqtgraph>=0.13.7", # Example visual analyzers
     "notebook>=7.4.7", # Jupyter notebooks in examples/
     "ipykernel>=7.3.0",
-    "ipython>=9.14.1", # Interactive Python shell for examples
+    "ipython>=9.15.0", # Interactive Python shell for examples
 ]
 full = [
     "audioplayground[audio-io, gui, midi, examples]",
@@ -63,7 +66,7 @@ full = [
     # Linting
     "black[jupyter]",
     "flake8>=7.3.0",
-    "ruff>=0.15.8",
+    "ruff>=0.15.20",
     "pylint>=4.0.6",
     "pylint-json2html>=0.5.0",
 
@@ -76,7 +79,7 @@ full = [
     "pytest-cov>=4.1.0",
     "pytest-html",
     "pytest-mock",
-    "coverage",
+    "coverage>=7.15.0",
 ]
 
 

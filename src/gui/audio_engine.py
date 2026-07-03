@@ -140,7 +140,12 @@ class RenderContext:
 
     def render_node(self, node: GraphNode) -> None:
         """Render one compiled graph node."""
-        self.render_module(node.module, node.spec, node.input_ports, node.parameters)
+        self.render_module(
+            node.module,
+            node.spec,
+            node.input_ports,
+            resolve_runtime_parameters(node.module, node.spec),
+        )
 
     def render_module(
         self,
@@ -333,6 +338,11 @@ class AudioEngine(QtCore.QObject):
 
         self.modules: list[RenderModule] = []
         self.connections: list[object] = []
+        self._graph_version = 0
+        self._render_plan_cache: dict[
+            tuple[tuple[Port, ...], int],
+            RenderPlan,
+        ] = {}
 
         self._monitor_timer = QtCore.QTimer(self)
         self._monitor_timer.setInterval(50)
@@ -349,6 +359,7 @@ class AudioEngine(QtCore.QObject):
             mod: Module to add
         """
         self.modules.append(mod)
+        self.mark_graph_changed()
 
     def _on_config_changed(self, value):
         """Handle sample rate or buffer size changes.
@@ -358,9 +369,15 @@ class AudioEngine(QtCore.QObject):
         _ = value
         self.sample_rate = audio_config.sample_rate
         self.buffer_size = audio_config.buffer_size
+        self.mark_graph_changed()
         logger.debug(
             f"AudioEngine config updated: SR={self.sample_rate}, BS={self.buffer_size}"
         )
+
+    def mark_graph_changed(self) -> None:
+        """Invalidate cached render plans after topology/config changes."""
+        self._graph_version += 1
+        self._render_plan_cache.clear()
 
     def invalidate_all_caches(self):
         """Invalidate all module caches.
@@ -442,7 +459,11 @@ class AudioEngine(QtCore.QObject):
             ``Port.read``.
         """
         self.invalidate_all_caches()
-        plan = self.compile_render_plan(ports)
+        plan_key = (tuple(ports), self._graph_version)
+        plan = self._render_plan_cache.get(plan_key)
+        if plan is None:
+            plan = self.compile_render_plan(ports)
+            self._render_plan_cache[plan_key] = plan
         with self.render_context(num_samples) as context:
             return context.render_plan(plan)
 

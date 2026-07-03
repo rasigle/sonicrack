@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
@@ -99,9 +100,9 @@ class MIDIKeyboardModule(ModuleWidget):
             color=QColor(190, 120, 80),
         )
 
-        self.freq_port = self.add_output("1V/Oct")
-        self.gate_port = self.add_output("Gate")
-        self.vel_port = self.add_output("Vel")
+        self.freq_port = self.add_output("1V/Oct", signal=PortSignal.PITCH_CV)
+        self.gate_port = self.add_output("Gate", signal=PortSignal.GATE)
+        self.vel_port = self.add_output("Vel", signal=PortSignal.CONTROL_CV)
 
         self.cv_converter = MIDIToCV()
         self.freq_output = CVFrequencyOutput(self.cv_converter)
@@ -297,6 +298,7 @@ class MIDIKeyboardModule(ModuleWidget):
 
     def get_output_component(self, port_name: str) -> Any:
         outputs = {
+            "1V/Oct": self.freq_output,
             "Freq": self.freq_output,
             "Gate": self.gate_output,
             "Vel": self.vel_output,

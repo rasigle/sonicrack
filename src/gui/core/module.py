@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import Any
 
 from src.engine.core.component import AudioComponent
-from src.gui.core.port import Port
+from src.gui.core.port import Port, PortSignal, normalize_port_signal
 
 
 class ModuleCategory(StrEnum):
@@ -230,31 +230,116 @@ class AudioModule(ABC):
                 return port
         return None
 
-    def add_input(self, name: str, component=None):
+    def add_input(
+        self,
+        name: str,
+        component=None,
+        signal: str | PortSignal | None = None,
+    ):
         """Add an input port to this module.
 
         Args:
             name: Name of the input port
             component: Optional engine component associated with this port
+            signal: Specifies type of Signal.
 
         Returns:
             The created Port instance
         """
-        port = Port("input", name, parent_module=self, component=component)
+        port = Port(
+            "input",
+            name,
+            parent_module=self,
+            component=component,
+            signal=signal or infer_port_signal(name, "input"),
+        )
         self.inputs[name] = port
         return port
 
-    def add_output(self, name: str, component=None) -> Port:
+    def add_output(
+        self,
+        name: str,
+        component=None,
+        signal: str | PortSignal | None = None,
+    ) -> Port:
         """Add an output port to this module.
 
         Args:
             name: Name of the output port
             component: Optional engine component associated with this port
                       (e.g., SineOscillator for a "Sine" output)
+            signal: Specifies type of Signal.
 
         Returns:
             The created Port instance
         """
-        port = Port("output", name, parent_module=self, component=component)
+        port = Port(
+            "output",
+            name,
+            parent_module=self,
+            component=component,
+            signal=signal or infer_port_signal(name, "output"),
+        )
         self.outputs[name] = port
         return port
+
+
+def infer_port_signal(name: str, direction: str) -> PortSignal:
+    """Infer a conservative signal kind from established port names."""
+    normalized = name.strip().lower().replace("_", " ")
+
+    if normalized in {"1v/oct", "v/oct", "pitch"}:
+        return PortSignal.PITCH_CV
+
+    if normalized in {"freq", "freq in", "freq out", "hz", "frequency hz", "freq hz"}:
+        return PortSignal.FREQUENCY_HZ
+
+    if normalized in {"gate", "clock", "reset", "trig", "trigger", "end", "hold"}:
+        return PortSignal.GATE
+
+    if normalized in {
+        "accent",
+        "slide",
+        "vel",
+        "cv",
+        "cv in",
+        "cv a",
+        "cv b",
+        "cutoff cv",
+        "env cv",
+        "amp cv",
+        "accent cv",
+        "cv drive",
+        "cv mix",
+        "cv_drive",
+        "cv_mix",
+        "mod",
+        "fm",
+        "gain",
+    }:
+        return PortSignal.CONTROL_CV
+
+    if normalized in {
+        "in",
+        "in 1",
+        "in 2",
+        "in 3",
+        "in 4",
+        "out",
+        "left/mono",
+        "right",
+        "l/mono",
+        "r",
+    }:
+        return PortSignal.AUDIO
+
+    if direction == "output" and normalized in {
+        "sine",
+        "triangle",
+        "sawtooth",
+        "square",
+        "noise",
+    }:
+        return PortSignal.AUDIO
+
+    return normalize_port_signal(None)

@@ -10,10 +10,82 @@ from __future__ import annotations
 import contextlib
 import logging
 from collections.abc import Sequence
+from enum import StrEnum
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+class PortSignal(StrEnum):
+    """Signal/unit contract for patch-cable compatibility checks."""
+
+    UNKNOWN = "unknown"
+    AUDIO = "audio"
+    FREQUENCY_HZ = "frequency_hz"
+    PITCH_CV = "pitch_cv"
+    GATE = "gate"
+    CONTROL_CV = "control_cv"
+
+
+_ANALOG_PATCH_SIGNALS = frozenset(
+    {
+        PortSignal.AUDIO,
+        PortSignal.PITCH_CV,
+        PortSignal.GATE,
+        PortSignal.CONTROL_CV,
+    }
+)
+
+
+def normalize_port_signal(signal: str | PortSignal | None) -> PortSignal:
+    """Normalize a signal-kind value to a PortSignal enum."""
+    if signal is None:
+        return PortSignal.UNKNOWN
+    if isinstance(signal, PortSignal):
+        return signal
+    try:
+        return PortSignal(signal)
+    except ValueError:
+        return PortSignal.UNKNOWN
+
+
+def _orient_connection(source: Port, target: Port) -> tuple[Port, Port]:
+    """Return ports ordered as output/source then input/target when possible."""
+    if source.port_type == "output" and target.port_type == "input":
+        return source, target
+    if source.port_type == "input" and target.port_type == "output":
+        return target, source
+    return source, target
+
+
+def _signals_are_patch_compatible(
+    source_signal: PortSignal,
+    target_signal: PortSignal,
+) -> bool:
+    """Return whether a source signal can safely drive a target signal."""
+    if source_signal == PortSignal.UNKNOWN or target_signal == PortSignal.UNKNOWN:
+        return True
+    if source_signal == target_signal:
+        return True
+    if (
+        source_signal == PortSignal.FREQUENCY_HZ
+        or target_signal == PortSignal.FREQUENCY_HZ
+    ):
+        return False
+    return (
+        source_signal in _ANALOG_PATCH_SIGNALS
+        and target_signal in _ANALOG_PATCH_SIGNALS
+    )
+
+
+def port_signals_compatible(source: Port, target: Port) -> bool:
+    """Return whether two ports can be safely connected by signal kind."""
+    oriented_source, oriented_target = _orient_connection(source, target)
+    return _signals_are_patch_compatible(
+        oriented_source.signal,
+        oriented_target.signal,
+    )
 
 
 class Port:
@@ -54,6 +126,7 @@ class Port:
         index: int = 0,
         parent_module=None,  # Reference to the module that owns this port
         component=None,  # Reference to the engine component (e.g., SineOscillator)
+        signal: str | PortSignal | None = None,
     ):
         """Initialize a port model.
 
@@ -69,6 +142,7 @@ class Port:
         self.port_name: str = port_name
         self.parent_module = parent_module
         self.component = component  # Direct reference to engine component
+        self.signal = normalize_port_signal(signal)
 
         self.connected_to: list[Port] = []
 
@@ -102,6 +176,12 @@ class Port:
             )
         if other is self:
             raise ValueError("Cannot connect a port to itself")
+        if not port_signals_compatible(self, other):
+            raise ValueError(
+                "Cannot connect incompatible port signals: "
+                f"{self.port_name} ({self.signal}) to "
+                f"{other.port_name} ({other.signal})"
+            )
         if other in self.connected_to:
             return  # Already connected, no-op
 
@@ -421,7 +501,7 @@ class Port:
 
         return (
             f"PortModel(name='{self.port_name}', type='{self.port_type}', "
-            f"value={value_str}, {conn_status})"
+            f"signal='{self.signal}', value={value_str}, {conn_status})"
         )
 
     def __str__(self) -> str:

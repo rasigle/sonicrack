@@ -7,6 +7,7 @@ For pure logic tests without Qt, see tests/core/test_port_model.py
 """
 
 import math
+from typing import cast
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -14,7 +15,7 @@ import pytest
 
 from src.engine import SineOscillator, TriangleOscillator
 from src.gui.core.module import ModuleCategory
-from src.gui.core.port import Port
+from src.gui.core.port import Port, PortSignal
 
 
 # Mock parent module for tests
@@ -488,7 +489,7 @@ def test_port_invalid_connection():
     port = Port("input", "audio_in")
 
     with pytest.raises(TypeError, match="Can only connect to another Port"):
-        port.connect("not a port")
+        port.connect(cast(Port, "not a port"))
 
 
 def test_port_repr():
@@ -590,7 +591,7 @@ class TestPortModelConnection:
         port = Port("input", "test")
 
         with pytest.raises(TypeError, match="Can only connect to another Port"):
-            port.connect("not a port")
+            port.connect(cast(Port, "not a port"))
 
     def test_read_from_connected_port(self):
         """Test that reading from connected port returns its value."""
@@ -916,7 +917,7 @@ class TestPortMultipleConnections:
         port = Port("input", "audio_in")
 
         with pytest.raises(TypeError, match="Can only connect to another Port"):
-            port.connect("not_a_port")
+            port.connect(cast(Port, "not_a_port"))
 
     def test_connect_to_self(self):
         """Test that connecting to self raises ValueError."""
@@ -1550,6 +1551,36 @@ class TestPortComponentEdgeCases:
         # Component on input port (unusual but allowed)
         input_port = Port("input", "in", parent_module=MagicMock(), component=osc)
         assert input_port.component is osc
+
+
+class TestPortSignalCompatibility:
+    """Regression tests for signal-aware patch safety."""
+
+    def test_frequency_hz_cannot_drive_pitch_cv(self):
+        hz_source = Port("output", "Freq Hz", signal=PortSignal.FREQUENCY_HZ)
+        pitch_input = Port("input", "V/Oct", signal=PortSignal.PITCH_CV)
+
+        with pytest.raises(
+            ValueError,
+            match="Cannot connect incompatible port signals",
+        ):
+            pitch_input.connect(hz_source)
+
+    def test_control_cv_can_drive_pitch_cv(self):
+        cv_source = Port("output", "LFO", signal=PortSignal.CONTROL_CV)
+        pitch_input = Port("input", "V/Oct", signal=PortSignal.PITCH_CV)
+
+        pitch_input.connect(cv_source)
+
+        assert cv_source in pitch_input.connected_to
+
+    def test_audio_signal_can_drive_control_input(self):
+        audio_source = Port("output", "Sine", signal=PortSignal.AUDIO)
+        control_input = Port("input", "Mod", signal=PortSignal.CONTROL_CV)
+
+        control_input.connect(audio_source)
+
+        assert audio_source in control_input.connected_to
 
 
 if __name__ == "__main__":

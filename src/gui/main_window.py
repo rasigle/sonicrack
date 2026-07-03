@@ -480,7 +480,12 @@ class ModularSynthWindow(QMainWindow):
 
     def _on_cable_connected(self, start_port: PortWidget, target_port: PortWidget):
         """Handle cable connection."""
-        start_port.port.connect(target_port.port)
+        try:
+            start_port.port.connect(target_port.port)
+        except ValueError as exc:
+            logger.warning("Rejected cable connection: %s", exc)
+            return
+        self.audio_engine.mark_graph_changed()
         self._mark_patch_modified()
 
         # Check if this connection involves an Output module
@@ -502,11 +507,13 @@ class ModularSynthWindow(QMainWindow):
         if start_port is None or target_port is None:
             # Bulk deletion occurred, just trigger playback check
             logger.info("Bulk disconnection detected - checking playback state")
+            self.audio_engine.mark_graph_changed()
             self._start_output_playback()
             self._mark_patch_modified()
             return
 
         start_port.port.disconnect(target_port.port)
+        self.audio_engine.mark_graph_changed()
         self._mark_patch_modified()
 
         # Check if this disconnection involves an Output module
@@ -623,6 +630,7 @@ class ModularSynthWindow(QMainWindow):
 
         with contextlib.suppress(ValueError):
             self.audio_engine.modules.remove(module)
+        self.audio_engine.mark_graph_changed()
 
         from src.gui.modules.output.output import OutputModule
 
@@ -938,6 +946,7 @@ class ModularSynthWindow(QMainWindow):
         patch_canvas.clear_all()
         self.audio_engine.modules.clear()
         self.audio_engine.connections.clear()
+        self.audio_engine.mark_graph_changed()
         self._require_statusbar().showMessage("Canvas cleared")
 
     def _stop_all_output_modules(self, graceful: bool = True):
@@ -1020,6 +1029,7 @@ class ModularSynthWindow(QMainWindow):
         patch_canvas.clear_all()
         self.audio_engine.modules.clear()
         self.audio_engine.connections.clear()
+        self.audio_engine.mark_graph_changed()
 
         # Rebuild modules
         module_map = {}  # Maps old module IDs to new module instances

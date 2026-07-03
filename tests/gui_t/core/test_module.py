@@ -5,10 +5,16 @@ import logging
 import pytest
 
 from src.engine.generators.oscillators.oscillator import SineOscillator
-from src.gui.core.module import ModuleCategory
+from src.gui.core.module import ModuleCategory, infer_port_signal
+from src.gui.core.port import PortSignal
+from src.gui.modules.input.midi_keyboard import MIDIKeyboardModule
 from src.gui.modules.mixer import MixerModule
 from src.gui.modules.modifier.volume_mod import VolumeModule
+from src.gui.modules.sequencing.step_sequencer import StepSequencerModule
+from src.gui.modules.source.lfo import LFOModule
 from src.gui.modules.source.oscillator import OscillatorModule
+from src.gui.modules.source.vco import ModulatedOscillatorModule
+from src.gui.modules.voice.tb303_voice import TB303VoiceModule
 
 
 def test_oscillator_interface():
@@ -100,6 +106,28 @@ def test_mixer_interface():
         input_components=[osc1, osc2], modulation_components=None
     )
     assert component is not None
+
+
+def test_infer_port_signal_treats_ambiguous_freq_as_hz():
+    assert infer_port_signal("Freq", "input") == PortSignal.FREQUENCY_HZ
+    assert infer_port_signal("Freq", "output") == PortSignal.FREQUENCY_HZ
+    assert infer_port_signal("V/Oct", "input") == PortSignal.PITCH_CV
+
+
+def test_modules_explicitly_mark_pitch_cv_ports(qapp):
+    del qapp
+
+    vco = ModulatedOscillatorModule()
+    tb303 = TB303VoiceModule()
+    midi_keyboard = MIDIKeyboardModule()
+    sequencer = StepSequencerModule()
+    lfo = LFOModule()
+
+    assert vco.freq_input.signal == PortSignal.PITCH_CV
+    assert tb303.freq_input.signal == PortSignal.PITCH_CV
+    assert midi_keyboard.freq_port.signal == PortSignal.PITCH_CV
+    assert sequencer.freq_port.signal == PortSignal.PITCH_CV
+    assert lfo.sine_port.signal == PortSignal.CONTROL_CV
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QMessageBox
 
 from src.gui.core.module import ModuleCategory
+from src.gui.core.port import port_signals_compatible
 from src.gui.modules.output.output import OutputModule
 from src.gui.widgets.cable_widget import Cable
 from src.gui.widgets.module_widget import ModuleWidget
@@ -126,6 +127,13 @@ class PatchCanvas(QGraphicsView):
                             "Please check your connections and avoid creating cycles.",
                         )
                         # Remove the invalid cable
+                        self.dragging_cable.remove()
+                    elif not self._ports_are_compatible(start_port, item):
+                        QMessageBox.warning(
+                            self,
+                            "Invalid Connection",
+                            self._incompatible_connection_message(start_port, item),
+                        )
                         self.dragging_cable.remove()
                     else:
                         # Valid connection
@@ -341,6 +349,13 @@ class PatchCanvas(QGraphicsView):
             logger.warning("Cannot create self-connection")
             return None
 
+        if not self._ports_are_compatible(start_port, end_port):
+            logger.warning(
+                "Skipping incompatible connection: %s",
+                self._incompatible_connection_message(start_port, end_port),
+            )
+            return None
+
         # Create and add cable
         cable = Cable(start_port, end_port)
         self._scene.addItem(cable)
@@ -349,6 +364,23 @@ class PatchCanvas(QGraphicsView):
         self.cable_connected.emit(start_port, end_port)
 
         return cable
+
+    @staticmethod
+    def _ports_are_compatible(start_port: PortWidget, end_port: PortWidget) -> bool:
+        return port_signals_compatible(start_port.port, end_port.port)
+
+    @staticmethod
+    def _incompatible_connection_message(
+        start_port: PortWidget, end_port: PortWidget
+    ) -> str:
+        return (
+            "Cannot connect incompatible signal types:\n\n"
+            f"{start_port.parent_module.get_display_name()}:{start_port.port_name} "
+            f"outputs {start_port.port.signal}\n"
+            f"{end_port.parent_module.get_display_name()}:{end_port.port_name} "
+            f"expects {end_port.port.signal}\n\n"
+            "Use a matching pitch-CV, gate/CV, or audio port."
+        )
 
     def get_connections(self) -> list[tuple[PortWidget, PortWidget]]:
         """Get all cable connections in the canvas.

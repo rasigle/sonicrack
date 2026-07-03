@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEd
 from src.engine.sequencing import TB303StepEvent, TB303StepSequencer
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, str_parameter
 from src.gui.module_registry import register_module
@@ -38,12 +39,12 @@ class StepSequencerModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(width=340, height=335, color=QColor(120, 100, 170))
 
-        self.clock_input = self.add_input("Clock")
-        self.reset_input = self.add_input("Reset")
-        self.freq_port = self.add_output("Freq")
-        self.gate_port = self.add_output("Gate")
-        self.accent_port = self.add_output("Accent")
-        self.slide_port = self.add_output("Slide")
+        self.clock_input = self.add_input("Clock", signal=PortSignal.GATE)
+        self.reset_input = self.add_input("Reset", signal=PortSignal.GATE)
+        self.freq_port = self.add_output("Freq", signal=PortSignal.PITCH_CV)
+        self.gate_port = self.add_output("Gate", signal=PortSignal.GATE)
+        self.accent_port = self.add_output("Accent", signal=PortSignal.CONTROL_CV)
+        self.slide_port = self.add_output("Slide", signal=PortSignal.CONTROL_CV)
 
         self.component = TB303StepSequencer(sample_rate=audio_config.sample_rate)
         self._previous_pattern_key: tuple[str, str, str, str, float] | None = None

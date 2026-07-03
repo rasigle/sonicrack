@@ -152,8 +152,16 @@ def test_port_widgets_show_direction_tooltips(qapp: Any):
     del qapp
     modifier = _ModifierWidget()
 
-    assert modifier.input_ports[0].toolTip() == "Test Modifier Input: In"
-    assert modifier.output_ports[0].toolTip() == "Test Modifier Output: Out"
+    assert modifier.input_ports[0].toolTip() == (
+        "Test Modifier Input: In\n"
+        "Port Type: input\n"
+        "Signal: audio"
+    )
+    assert modifier.output_ports[0].toolTip() == (
+        "Test Modifier Output: Out\n"
+        "Port Type: output\n"
+        "Signal: audio"
+    )
 
 
 def test_module_header_tooltip_uses_module_description(qapp: Any):

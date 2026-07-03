@@ -25,6 +25,7 @@ from src.engine.generators.oscillators.oscillator_ramp import SawtoothMode
 from src.engine.generators.oscillators.oscillator_sine import SineWaveMode
 from src.engine.generators.oscillators.oscillator_square import SquareWaveMode
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import (
     float_parameter,
@@ -33,6 +34,7 @@ from src.gui.core.runtime_helpers import (
 )
 from src.gui.module_registry import register_module
 from src.gui.modules.source._oscillator_runtime import (
+    RuntimeOscillator,
     _frequency_slew_values,
     render_with_frequency_ramp,
     smooth_control_signal,
@@ -121,6 +123,11 @@ def apply_vcv_fm_offset(
     return apply_exponential_fm_offset(base_frequency, fm_signal, fm_amount_percent)
 
 
+def _as_frequency_buffer(values: float | np.ndarray) -> np.ndarray:
+    """Normalize scalar-or-array frequency results to a 1D float32 buffer."""
+    return np.asarray(values, dtype=np.float32).reshape(-1)
+
+
 @register_module()
 class ModulatedOscillatorModule(ModuleWidget):
     """Oscillator with 1V/oct pitch CV input.
@@ -169,10 +176,14 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Add ports with component reference
         # Note: Input ports don't have components (they receive signals)
         # Output port has the component reference
-        self.freq_input = self.add_input("V/Oct")
-        self.fm_input = self.add_input("FM")
-        self.gain_mod_input = self.add_input("Gain")
-        self.out_port = self.add_output("Out", component=self.component)
+        self.freq_input = self.add_input("V/Oct", signal=PortSignal.PITCH_CV)
+        self.fm_input = self.add_input("FM", signal=PortSignal.CONTROL_CV)
+        self.gain_mod_input = self.add_input("Gain", signal=PortSignal.CONTROL_CV)
+        self.out_port = self.add_output(
+            "Out",
+            component=self.component,
+            signal=PortSignal.AUDIO,
+        )
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -774,7 +785,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         else:
             self._last_pitch_cv = None
             samples, rendered_frequency = render_with_frequency_ramp(
-                self.component,
+                cast(RuntimeOscillator, self.component),
                 self._last_runtime_frequency,
                 frequency,
                 num_samples,
@@ -798,7 +809,10 @@ class ModulatedOscillatorModule(ModuleWidget):
         """Render a pitch-CV/FM buffer without resetting oscillator phase."""
         if pitch_cv_signal is None:
             self._last_pitch_cv = None
-            length = len(fm_signal) if fm_signal is not None else len(base_frequency)
+            if fm_signal is not None:
+                length = len(fm_signal)
+            else:
+                length = np.asarray(base_frequency).reshape(-1).size
             pitch_cv_signal = np.zeros(length, dtype=np.float32)
         else:
             pitch_cv_signal, self._last_pitch_cv = smooth_control_signal(
@@ -808,14 +822,25 @@ class ModulatedOscillatorModule(ModuleWidget):
                 VCO_PITCH_CV_SMOOTHING_MS,
             )
 
-        samples = np.empty(len(pitch_cv_signal), dtype=np.float32)
-        frequencies = apply_v_oct_offset(base_frequency, pitch_cv_signal)
+        assert isinstance(pitch_cv_signal, np.ndarray)
+        pitch_values = pitch_cv_signal.astype(np.float32, copy=False).reshape(-1)
+        fm_values = None
         if fm_signal is not None:
-            frequencies = apply_vcv_fm_offset(
-                frequencies,
-                fm_signal,
-                fm_amount,
-                fm_mode,
+            assert isinstance(fm_signal, np.ndarray)
+            fm_values = fm_signal.astype(np.float32, copy=False).reshape(-1)
+
+        samples = np.empty(len(pitch_values), dtype=np.float32)
+        frequencies = _as_frequency_buffer(
+            apply_v_oct_offset(base_frequency, pitch_values)
+        )
+        if fm_values is not None:
+            frequencies = _as_frequency_buffer(
+                apply_vcv_fm_offset(
+                    frequencies,
+                    fm_values,
+                    fm_amount,
+                    fm_mode,
+                )
             )
         for index, frequency in enumerate(frequencies):
             self.component.frequency = float(frequency)

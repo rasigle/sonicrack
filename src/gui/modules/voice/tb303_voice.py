@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import numpy as np
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel
@@ -10,6 +12,7 @@ from src.engine.utils.cv import pitch_cv_to_frequency
 from src.engine.voices import TB303Voice
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
 from src.gui.module_registry import register_module
@@ -32,11 +35,11 @@ class TB303VoiceModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(width=300, height=440, color=QColor(155, 145, 65))
 
-        self.freq_input = self.add_input("Freq")
-        self.gate_input = self.add_input("Gate")
-        self.accent_input = self.add_input("Accent")
-        self.slide_input = self.add_input("Slide")
-        self.out_port = self.add_output("Out")
+        self.freq_input = self.add_input("Freq", signal=PortSignal.PITCH_CV)
+        self.gate_input = self.add_input("Gate", signal=PortSignal.GATE)
+        self.accent_input = self.add_input("Accent", signal=PortSignal.CONTROL_CV)
+        self.slide_input = self.add_input("Slide", signal=PortSignal.CONTROL_CV)
+        self.out_port = self.add_output("Out", signal=PortSignal.AUDIO)
         self.component = TB303Voice(sample_rate=audio_config.sample_rate)
 
         self.controls_widget = self._create_controls_container()
@@ -57,9 +60,9 @@ class TB303VoiceModule(ModuleWidget):
         osc_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.tune_knob = Knob(
             label="Tune",
-            description="Adjusts the fine-tuning of the oscillator",
-            min_value=-1.0,
-            max_value=1.0,
+            description="Transposes the oscillator in semitones",
+            min_value=-24.0,
+            max_value=24.0,
             default_value=0.0,
         )
         self.tune_knob.value_changed.connect(
@@ -261,12 +264,14 @@ class TB303VoiceModule(ModuleWidget):
         self.component.volume = float_parameter(
             parameters, "volume", self.volume_knob.get_value
         )
+        frequency_signal = np.asarray(
+            pitch_cv_to_frequency(read_samples(self.freq_input, num_samples)),
+            dtype=np.float32,
+        ).reshape(-1)
 
         self.out_port.write(
             self.component.process(
-                frequency=pitch_cv_to_frequency(
-                    read_samples(self.freq_input, num_samples)
-                ),
+                frequency=frequency_signal,
                 gate=read_samples(self.gate_input, num_samples),
                 accent=(
                     read_samples(self.accent_input, num_samples)

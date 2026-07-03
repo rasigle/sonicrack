@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 from PyQt6.QtCore import Qt
@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLa
 
 from src.engine.dsp.modulators import ADSREnvelope, GateTriggeredADSR
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter
 from src.gui.module_registry import register_module
@@ -47,10 +48,10 @@ class ADSRModule(ModuleWidget):
         )
 
         # Add input port for gate signal (optional)
-        self.gate_input = self.add_input("Gate")
+        self.gate_input = self.add_input("Gate", signal=PortSignal.GATE)
 
         # Add output port
-        self.out_port = self.add_output("Out")
+        self.out_port = self.add_output("Out", signal=PortSignal.CONTROL_CV)
 
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
@@ -333,9 +334,10 @@ class ADSRModule(ModuleWidget):
             self._adsr_component = self.create_engine_component()
 
         component = self._adsr_component
+        assert component is not None
         if isinstance(component, GateTriggeredADSR):
-            return component.adsr
-        return component
+            return cast(ADSREnvelope, component.adsr)
+        return cast(ADSREnvelope, component)
 
     def _apply_runtime_parameters(
         self, adsr: ADSREnvelope, parameters: RuntimeParameters

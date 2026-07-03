@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 
 from src.engine.dsp.modulators import DecayEnvelope
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples
 from src.gui.module_registry import register_module
@@ -31,9 +32,9 @@ class DecayEnvelopeModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(width=220, height=265, color=QColor(140, 175, 75))
 
-        self.gate_input = self.add_input("Gate")
-        self.accent_input = self.add_input("Accent")
-        self.out_port = self.add_output("Out")
+        self.gate_input = self.add_input("Gate", signal=PortSignal.GATE)
+        self.accent_input = self.add_input("Accent", signal=PortSignal.CONTROL_CV)
+        self.out_port = self.add_output("Out", signal=PortSignal.CONTROL_CV)
 
         self.component = DecayEnvelope()
         self._previous_gate = 0.0

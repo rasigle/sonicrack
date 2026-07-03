@@ -146,7 +146,11 @@ class PortWidget(QGraphicsItem):
         """Return the tooltip shown when hovering over this port."""
         module_name = self.parent_module.get_display_name()
         direction = "Input" if self.port_type == "input" else "Output"
-        return f"{module_name} {direction}: {self.port_name}"
+        return (
+            f"{module_name} {direction}: {self.port_name}\n"
+            f"Port Type: {self.port_type}\n"
+            f"Signal: {self.port.signal}"
+        )
 
     # ========================================================================
     # UI Methods - Rendering and Interaction

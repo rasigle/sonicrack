@@ -13,6 +13,7 @@ from src.engine.generators.oscillators.oscillator import (
 )
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples
 from src.gui.module_registry import register_module
@@ -60,7 +61,7 @@ class LFOModule(ModuleWidget):
             color=QColor(100, 140, 200),
         )
 
-        self.clock_input: Port = self.add_input("Clock")
+        self.clock_input: Port = self.add_input("Clock", signal=PortSignal.GATE)
 
         # Create oscillator components FIRST (before creating ports)
         freq = LFO_DEFAULT_FREQUENCY
@@ -100,15 +101,25 @@ class LFOModule(ModuleWidget):
 
         # Add four output ports - one for each waveform
         # Pass component references so ports know their associated engine components
-        self.sine_port: Port = self.add_output("Sine", component=self._sine_oscillator)
+        self.sine_port: Port = self.add_output(
+            "Sine",
+            component=self._sine_oscillator,
+            signal=PortSignal.CONTROL_CV,
+        )
         self.triangle_port: Port = self.add_output(
-            "Triangle", component=self._triangle_oscillator
+            "Triangle",
+            component=self._triangle_oscillator,
+            signal=PortSignal.CONTROL_CV,
         )
         self.sawtooth_port: Port = self.add_output(
-            "Sawtooth", component=self._sawtooth_oscillator
+            "Sawtooth",
+            component=self._sawtooth_oscillator,
+            signal=PortSignal.CONTROL_CV,
         )
         self.square_port: Port = self.add_output(
-            "Square", component=self._square_oscillator
+            "Square",
+            component=self._square_oscillator,
+            signal=PortSignal.CONTROL_CV,
         )
 
         # Store ports for easy iteration
@@ -236,9 +247,10 @@ class LFOModule(ModuleWidget):
 
     @staticmethod
     def get_cv_output_range() -> tuple[float, float]:
-        """LFO outputs bipolar 1V/oct pitch CV in volts.
+        """LFO outputs bipolar control voltage in volts.
 
         Returns:
-            (-1.0, 1.0) - one octave down to one octave up
+            (-1.0, 1.0) - bipolar modulation range; when patched to pitch inputs,
+            each volt corresponds to one octave.
         """
         return -1.0, 1.0

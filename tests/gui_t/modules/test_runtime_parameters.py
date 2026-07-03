@@ -796,6 +796,8 @@ def test_spectrum_update_display_accepts_numpy_sample_buffer(qapp: Any):
 def test_tb303_voice_runtime_applies_parameters_and_renders(qapp: Any):
     del qapp
     module = TB303VoiceModule()
+    assert module.tune_knob.min_value == pytest.approx(-24.0)
+    assert module.tune_knob.max_value == pytest.approx(24.0)
     pitch_cv = frequency_to_pitch_cv(110.0)
     freq_source = _connect_constant_input(module.freq_input, pitch_cv)
     freq_source.write(np.full(32, pitch_cv, dtype=np.float32))

@@ -65,6 +65,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.module_registry import register_module
 from src.gui.modules.input.midi_worker_thread import MIDIWorkerThread
@@ -116,9 +117,9 @@ class MIDIInputModule(ModuleWidget):
         )
 
         # Add output ports
-        self.freq_port = self.add_output("1V/Oct")
-        self.gate_port = self.add_output("Gate")
-        self.vel_port = self.add_output("Vel")
+        self.freq_port = self.add_output("1V/Oct", signal=PortSignal.PITCH_CV)
+        self.gate_port = self.add_output("Gate", signal=PortSignal.GATE)
+        self.vel_port = self.add_output("Vel", signal=PortSignal.CONTROL_CV)
 
         # MIDI components
         self.midi_worker: MIDIWorkerThread | None = None
@@ -365,6 +366,7 @@ class MIDIInputModule(ModuleWidget):
             The specialized CV output component for that port
         """
         outputs = {
+            "1V/Oct": self.freq_output,
             "Freq": self.freq_output,
             "Gate": self.gate_output,
             "Vel": self.vel_output,

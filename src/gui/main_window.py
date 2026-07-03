@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src import __version__
-from src.constants import PRESET_FILE_EXTENSION
+from src.constants import PRESET_FILE_EXTENSION, resource, resource_path
 from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory
 from src.gui.core.preset_manager import PresetManager
@@ -34,7 +34,7 @@ from src.gui.dialogs.preset_library_dialog import (
 )
 from src.gui.module_registry import initialize_module_registry
 from src.gui.patch_canvas import PatchCanvas
-from src.gui.ui_constants import APP_ICON_PATH, APP_TITLE
+from src.gui.ui_constants import APP_ICON_RESOURCE, APP_TITLE
 
 if TYPE_CHECKING:
     from src.gui.module_registry import ModuleRegistry
@@ -130,11 +130,18 @@ class ModularSynthWindow(QMainWindow):
 
     def _setup_app_icon(self):
         """Set up the application icon in the title bar."""
-        if not APP_ICON_PATH.exists():
-            logger.warning(f"App icon not found at {APP_ICON_PATH}")
+        icon_resource = resource(*APP_ICON_RESOURCE)
+        if not icon_resource.is_file():
+            logger.warning("App icon not found at %s", icon_resource)
             return
 
-        self.setWindowIcon(QtGui.QIcon(str(APP_ICON_PATH)))
+        with resource_path(*APP_ICON_RESOURCE) as icon_path:
+            icon_pixmap = QtGui.QPixmap(str(icon_path))
+        if icon_pixmap.isNull():
+            logger.warning("App icon could not be loaded: %s", icon_resource)
+            return
+
+        self.setWindowIcon(QtGui.QIcon(icon_pixmap))
 
     def _create_module_library_panel(self) -> QWidget:
         """Create the module library panel.

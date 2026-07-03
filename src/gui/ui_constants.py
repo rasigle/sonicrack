@@ -1,11 +1,9 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from src.constants import RESOURCES_PATH
-
 APP_TITLE: str = "AudioPlayground - Modular Synthesizer"
 APP_ICON_NAME: str = "icon.png"
-APP_ICON_PATH: Path = RESOURCES_PATH / "icons" / APP_ICON_NAME
+APP_ICON_RESOURCE: tuple[str, str] = ("icons", APP_ICON_NAME)
 DEFAULT_PRESET_DIRECTORY = Path.home() / ".audioplayground" / "presets"
 
 # Pulsewidth modulation limits

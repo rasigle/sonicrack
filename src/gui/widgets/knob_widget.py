@@ -4,9 +4,11 @@ import math
 from collections.abc import Callable, Sequence
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import QWidget
+
+from src.gui.widgets.knob_style import KnobStyle, ProceduralKnobStyle
 
 
 class Knob(QWidget):
@@ -26,6 +28,7 @@ class Knob(QWidget):
         default_value: float | None = None,
         logarithmic: bool = False,
         curve_points: Sequence[tuple[float, float]] | None = None,
+        style: KnobStyle | None = None,
         callback: Callable[[float], None] | None = None,
         parent: QWidget | None = None,
     ):
@@ -39,6 +42,7 @@ class Knob(QWidget):
             default_value: Default value (defaults to min_value)
             logarithmic: If True, use logarithmic scaling (useful for frequency)
             curve_points: Optional normalized/value anchors for custom scaling.
+            style: Optional visual style controlling painting and size.
             callback: Optional callback function called with the new value when changed
             parent: Parent widget
         """
@@ -52,15 +56,17 @@ class Knob(QWidget):
         self.callback = callback
         self.default_value = default_value if default_value is not None else min_value
         self._value = self.default_value
+        self.style = style or ProceduralKnobStyle.medium()
 
         self._description = description
         if self._description:
             self.setToolTip(self._description)
 
         # Visual properties
-        self.knob_size = 44
-        self.setMinimumSize(82, 78)
-        self.setMaximumSize(96, 82)
+        geometry = self.style.geometry
+        self.knob_size = geometry.knob_size
+        self.setMinimumSize(geometry.min_width, geometry.min_height)
+        self.setMaximumSize(geometry.max_width, geometry.max_height)
 
         # Interaction state
         self.dragging = False
@@ -231,110 +237,7 @@ class Knob(QWidget):
         """Paint the knob."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # Calculate center position
-        center_x = self.width() / 2
-        center_y = 30
-        radius = self.knob_size / 2
-
-        # Draw outer track (background arc) - inverted with gap at bottom
-        painter.setPen(QPen(QColor(72, 78, 86), 4))
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        track_rect = QRectF(
-            center_x - radius - 2,
-            center_y - radius - 2,
-            (radius + 2) * 2,
-            (radius + 2) * 2,
-        )
-        # Draw 270-degree arc with gap at bottom (from -45° to 225°)
-        painter.drawArc(track_rect, int(-45 * 16), int(270 * 16))
-
-        # Draw knob body (solid circle)
-        painter.setBrush(QColor(58, 63, 70))
-        painter.setPen(QPen(QColor(18, 20, 23), 2))
-        painter.drawEllipse(QPointF(center_x, center_y), radius, radius)
-
-        # Draw value arc (fills counter-clockwise from bottom-right)
-        norm_value = self.get_normalized_value()
-        # Calculate angle: starts at 225° (right side), goes to -45° (left side)
-        current_angle = self.min_angle - norm_value * (self.min_angle - self.max_angle)
-
-        # Arc from min_angle (225°) to current position
-        painter.setPen(QPen(QColor(94, 196, 255), 4))
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        value_arc_rect = QRectF(
-            center_x - radius - 2,
-            center_y - radius - 2,
-            (radius + 2) * 2,
-            (radius + 2) * 2,
-        )
-        arc_span = -(self.min_angle - current_angle)  # Negative for counter-clockwise
-        painter.drawArc(value_arc_rect, int(self.min_angle * 16), int(arc_span * 16))
-
-        # Draw indicator pointer (from center to edge)
-
-        angle_rad = math.radians(current_angle)
-
-        # Pointer starts from center, points outward
-        pointer_start_radius = radius * 0.2
-        pointer_end_radius = radius * 0.85
-
-        start_x = center_x + math.cos(angle_rad) * pointer_start_radius
-        start_y = center_y - math.sin(angle_rad) * pointer_start_radius
-        end_x = center_x + math.cos(angle_rad) * pointer_end_radius
-        end_y = center_y - math.sin(angle_rad) * pointer_end_radius
-
-        painter.setPen(
-            QPen(
-                QColor(255, 207, 87), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap
-            )
-        )
-        painter.drawLine(QPointF(start_x, start_y), QPointF(end_x, end_y))
-
-        # Draw center dot for visual clarity
-        painter.setBrush(QColor(22, 24, 28))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(QPointF(center_x, center_y), 4, 4)
-
-        # Draw label
-        label_color = QColor(238, 241, 245)
-        painter.setPen(label_color)
-        font = QFont("Arial", 8, QFont.Weight.Bold)
-        painter.setFont(font)
-        label_metrics = QFontMetrics(font)
-        label_text = label_metrics.elidedText(
-            self.label,
-            Qt.TextElideMode.ElideRight,
-            max(10, self.width() - 6),
-        )
-        painter.drawText(
-            QRectF(3, 62, self.width() - 6, 14),
-            Qt.AlignmentFlag.AlignCenter,
-            label_text,
-        )
-
-        # Draw value text.
-        value_text = f"{self._value:.2f}"
-        if abs(self._value) >= 100:
-            value_text = f"{self._value:.1f}"
-        elif abs(self._value) < 0.01:
-            value_text = f"{self._value:.3f}"
-
-        font.setPointSize(7)
-        font.setWeight(QFont.Weight.Normal)
-        painter.setFont(font)
-        value_metrics = QFontMetrics(font)
-        value_text = value_metrics.elidedText(
-            value_text,
-            Qt.TextElideMode.ElideRight,
-            max(10, self.width() - 8),
-        )
-        painter.setPen(QColor(194, 229, 255))
-        painter.drawText(
-            QRectF(4, 48, self.width() - 8, 12),
-            Qt.AlignmentFlag.AlignCenter,
-            value_text,
-        )
+        self.style.paint(painter, self)
 
     def mousePressEvent(self, event):
         """Handle mouse press to start dragging."""

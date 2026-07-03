@@ -6,6 +6,7 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
 
+from src.gui.widgets.knob_style import ProceduralKnobStyle
 from src.gui.widgets.knob_widget import Knob
 
 AUDIO_FREQUENCY_CURVE = (
@@ -83,6 +84,39 @@ def test_knob_without_callback():
     # Should not raise any errors
     knob.set_value(75.0)
     assert knob.get_value() == 75.0
+
+
+def test_knob_uses_style_geometry():
+    """Test that visual styles control knob dimensions."""
+    knob = Knob(
+        label="Small",
+        min_value=0.0,
+        max_value=1.0,
+        default_value=0.5,
+        style=ProceduralKnobStyle.small(),
+    )
+
+    assert knob.knob_size == 34
+    assert knob.minimumWidth() == 64
+    assert knob.minimumHeight() == 66
+
+
+def test_styled_knob_preserves_value_behavior():
+    """Test that style changes do not affect value handling."""
+    callback = Mock()
+    knob = Knob(
+        label="Large",
+        min_value=0.0,
+        max_value=10.0,
+        default_value=5.0,
+        style=ProceduralKnobStyle.large(),
+        callback=callback,
+    )
+
+    knob.set_value(12.0)
+
+    assert knob.get_value() == 10.0
+    callback.assert_called_once_with(10.0)
 
 
 def test_knob_callback_with_clamping():

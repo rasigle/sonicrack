@@ -11,7 +11,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QPushButton,
 )
 
 from src.engine.sequencing import Behringer182Sequencer
@@ -20,7 +19,14 @@ from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, str_parameter
 from src.gui.module_registry import register_module
-from src.gui.widgets import Knob
+from src.gui.widgets import (
+    ImageButtonStyle,
+    ImagePushButton,
+    Knob,
+    LedIndicator,
+    LedStyle,
+    ProceduralKnobStyle,
+)
 from src.gui.widgets.module_widget import ModuleWidget
 
 
@@ -51,25 +57,39 @@ class Behringer182Module(ModuleWidget):
         self.component = Behringer182Sequencer(sample_rate=audio_config.sample_rate)
         self._previous_structure_key: tuple[int, str] | None = None
         self._previous_running = True
+        self.step_leds: list[LedIndicator] = []
 
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout(spacing=6)
 
         cv_grid = QGridLayout()
-        cv_grid.setHorizontalSpacing(4)
+        cv_grid.setHorizontalSpacing(3)
         cv_grid.setVerticalSpacing(2)
-        cv_grid.addWidget(QLabel("Step"), 0, 0, Qt.AlignmentFlag.AlignCenter)
-        cv_grid.addWidget(QLabel("CV A"), 0, 1, Qt.AlignmentFlag.AlignCenter)
-        cv_grid.addWidget(QLabel("CV B"), 0, 2, Qt.AlignmentFlag.AlignCenter)
+        cv_grid.addWidget(QLabel("CH-1"), 0, 0, Qt.AlignmentFlag.AlignCenter)
+        cv_grid.addWidget(QLabel("STEP"), 0, 1, Qt.AlignmentFlag.AlignCenter)
+        cv_grid.addWidget(QLabel("CH-2"), 0, 2, Qt.AlignmentFlag.AlignCenter)
 
         self.cv_a_knobs: list[Knob] = []
         self.cv_b_knobs: list[Knob] = []
+        row_knob_style = ProceduralKnobStyle.small()
+        step_led_style = LedStyle(
+            size=10,
+            off_color=QColor(50, 42, 42),
+            on_color=QColor(255, 64, 48),
+            border_color=QColor(24, 18, 18),
+        )
         default_cv_a = [0.0, 0.25, 0.5, 0.75, 1.0, 0.75, 0.5, 0.25]
         default_cv_b = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75]
         for step in range(8):
             step_label = QLabel(str(step + 1))
             step_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            cv_grid.addWidget(step_label, step + 1, 0)
+            step_led = LedIndicator(style=step_led_style)
+            step_cell = QHBoxLayout()
+            step_cell.setSpacing(3)
+            step_cell.addWidget(step_label)
+            step_cell.addWidget(step_led)
+            self.step_leds.append(step_led)
+            cv_grid.addLayout(step_cell, step + 1, 1)
 
             a_knob = Knob(
                 label=f"A{step + 1}",
@@ -77,6 +97,7 @@ class Behringer182Module(ModuleWidget):
                 min_value=0.0,
                 max_value=1.0,
                 default_value=default_cv_a[step],
+                style=row_knob_style,
             )
             a_name = f"cv_a_{step + 1}"
             a_knob.value_changed.connect(
@@ -85,7 +106,7 @@ class Behringer182Module(ModuleWidget):
                 )
             )
             self.cv_a_knobs.append(a_knob)
-            cv_grid.addWidget(a_knob, step + 1, 1)
+            cv_grid.addWidget(a_knob, step + 1, 0)
 
             b_knob = Knob(
                 label=f"B{step + 1}",
@@ -93,6 +114,7 @@ class Behringer182Module(ModuleWidget):
                 min_value=0.0,
                 max_value=1.0,
                 default_value=default_cv_b[step],
+                style=row_knob_style,
             )
             b_name = f"cv_b_{step + 1}"
             b_knob.value_changed.connect(
@@ -113,12 +135,39 @@ class Behringer182Module(ModuleWidget):
         layout.addWidget(QLabel("Gates:"))
         layout.addWidget(self.gates_edit)
 
-        self.run_button = QPushButton("Stop")
-        self.run_button.setCheckable(True)
+        control_label = QLabel("START/STOP")
+        control_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(control_label)
+        self.run_button = ImagePushButton(
+            "Stop",
+            style=ImageButtonStyle(size=54),
+            checkable=True,
+        )
         self.run_button.setChecked(True)
         self.run_button.setToolTip("Start or stop sequencer clock advancement.")
+        self.run_button.setStyleSheet(
+            """
+            QToolButton {
+                background: #d52a20;
+                border: 2px solid #3b1411;
+                border-radius: 27px;
+                color: white;
+                font-weight: bold;
+            }
+            QToolButton:checked {
+                background: #f04132;
+            }
+            QToolButton:!checked {
+                background: #7e1713;
+                color: #f4b0aa;
+            }
+            QToolButton:pressed {
+                background: #aa2119;
+            }
+            """
+        )
         self.run_button.toggled.connect(self._on_running_changed)
-        layout.addWidget(self.run_button)
+        layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
         top_row = QHBoxLayout()
         top_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -241,6 +290,8 @@ class Behringer182Module(ModuleWidget):
     def _on_running_changed(self, running: bool) -> None:
         self.run_button.setText("Stop" if running else "Start")
         self.parameter_changed.emit("running", running)
+        if not running:
+            self._update_step_leds(None, running=False)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         cv_a = self._cv_row_from_parameters(parameters, "cv_a", self.cv_a_knobs)
@@ -311,6 +362,8 @@ class Behringer182Module(ModuleWidget):
                 else np.zeros(num_samples, dtype=np.float32)
             ),
         )
+        active_step = int(frame.step[-1]) if len(frame.step) else None
+        self._update_step_leds(active_step, running=running)
         self.cv_a_port.write(frame.cv_a)
         self.cv_b_port.write(frame.cv_b)
         if running:
@@ -322,6 +375,10 @@ class Behringer182Module(ModuleWidget):
             self.gate_port.write(stopped)
             self.trigger_port.write(stopped)
             self.end_port.write(stopped)
+
+    def _update_step_leds(self, active_step: int | None, *, running: bool) -> None:
+        for index, led in enumerate(self.step_leds):
+            led.set_on(running and active_step == index)
 
     @staticmethod
     def _parse_cv_row(text: str) -> np.ndarray:

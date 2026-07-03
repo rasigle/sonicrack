@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit
+from PyQt6.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit
 
 from src.engine.sequencing import TB303StepEvent, TB303StepSequencer
 from src.gui.audio_config import audio_config
@@ -11,7 +11,14 @@ from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, str_parameter
 from src.gui.module_registry import register_module
-from src.gui.widgets import Knob
+from src.gui.widgets import (
+    ImageButtonStyle,
+    ImagePushButton,
+    Knob,
+    LedIndicator,
+    LedStyle,
+    ProceduralKnobStyle,
+)
 from src.gui.widgets.module_widget import ModuleWidget
 
 
@@ -20,6 +27,7 @@ class StepSequencerModule(ModuleWidget):
     """Compact monophonic sequencer for pitch, gate, accent, and slide CV."""
 
     runtime_kind = "step_sequencer"
+    step_toggle_count = 8
 
     metadata = ModuleMetadata(
         title="Step Sequencer",
@@ -40,6 +48,11 @@ class StepSequencerModule(ModuleWidget):
         self.component = TB303StepSequencer(sample_rate=audio_config.sample_rate)
         self._previous_pattern_key: tuple[str, str, str, str, float] | None = None
         self._previous_reset = 0.0
+        self._syncing_step_toggles = False
+        self.accent_buttons: list[ImagePushButton] = []
+        self.accent_leds: list[LedIndicator] = []
+        self.slide_buttons: list[ImagePushButton] = []
+        self.slide_leds: list[LedIndicator] = []
 
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout(spacing=6)
@@ -53,26 +66,26 @@ class StepSequencerModule(ModuleWidget):
         layout.addWidget(self.notes_edit)
 
         self.accent_edit = QLineEdit("1,0,0,1,0,0,1,0")
-        self.accent_edit.textChanged.connect(
-            lambda value: self.parameter_changed.emit("accents", value)
-        )
+        self.accent_edit.textChanged.connect(self._on_accents_text_changed)
         layout.addWidget(QLabel("Accents:"))
         layout.addWidget(self.accent_edit)
 
         self.slide_edit = QLineEdit("0,0,1,0,0,0,1,0")
-        self.slide_edit.textChanged.connect(
-            lambda value: self.parameter_changed.emit("slides", value)
-        )
+        self.slide_edit.textChanged.connect(self._on_slides_text_changed)
         layout.addWidget(QLabel("Slides:"))
         layout.addWidget(self.slide_edit)
+        layout.addLayout(self._create_step_toggle_grid())
+        self._sync_step_toggles_from_text()
 
         clock_layout = QHBoxLayout()
+        compact_knob_style = ProceduralKnobStyle.small()
         self.bpm_knob = Knob(
             label="BPM",
             description="Sets the tempo of the sequencer in beats per minute",
             min_value=20.0,
             max_value=300.0,
             default_value=120.0,
+            style=compact_knob_style,
         )
         self.bpm_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("bpm", self.bpm_knob.get_value())
@@ -85,6 +98,7 @@ class StepSequencerModule(ModuleWidget):
             min_value=0.1,
             max_value=1.0,
             default_value=0.8,
+            style=compact_knob_style,
         )
         self.gate_length_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -129,6 +143,98 @@ class StepSequencerModule(ModuleWidget):
         self._sample_rate_listener = self._on_global_sample_rate_changed
         audio_config.add_sample_rate_listener(self._sample_rate_listener)
         self.destroyed.connect(self._cleanup_audio_config_listeners)
+
+    def _create_step_toggle_grid(self) -> QGridLayout:
+        toggle_grid = QGridLayout()
+        toggle_grid.setHorizontalSpacing(3)
+        toggle_grid.setVerticalSpacing(2)
+
+        button_style = ImageButtonStyle(size=22)
+        accent_led_style = LedStyle(size=8)
+        slide_led_style = LedStyle(size=8)
+
+        toggle_grid.addWidget(QLabel("Acc"), 0, 0)
+        toggle_grid.addWidget(QLabel("Sld"), 1, 0)
+        for index in range(self.step_toggle_count):
+            accent_button = ImagePushButton(
+                str(index + 1),
+                style=button_style,
+                checkable=True,
+            )
+            accent_button.setToolTip(f"Toggle accent for step {index + 1}")
+            accent_button.toggled.connect(
+                lambda checked, step=index: self._on_step_toggle_changed(
+                    "accent", step, checked
+                )
+            )
+            accent_led = LedIndicator(style=accent_led_style)
+
+            slide_button = ImagePushButton(
+                str(index + 1),
+                style=button_style,
+                checkable=True,
+            )
+            slide_button.setToolTip(f"Toggle slide for step {index + 1}")
+            slide_button.toggled.connect(
+                lambda checked, step=index: self._on_step_toggle_changed(
+                    "slide", step, checked
+                )
+            )
+            slide_led = LedIndicator(style=slide_led_style)
+
+            self.accent_buttons.append(accent_button)
+            self.accent_leds.append(accent_led)
+            self.slide_buttons.append(slide_button)
+            self.slide_leds.append(slide_led)
+
+            accent_cell = QHBoxLayout()
+            accent_cell.setSpacing(1)
+            accent_cell.addWidget(accent_led)
+            accent_cell.addWidget(accent_button)
+            toggle_grid.addLayout(accent_cell, 0, index + 1)
+
+            slide_cell = QHBoxLayout()
+            slide_cell.setSpacing(1)
+            slide_cell.addWidget(slide_led)
+            slide_cell.addWidget(slide_button)
+            toggle_grid.addLayout(slide_cell, 1, index + 1)
+
+        return toggle_grid
+
+    def _on_accents_text_changed(self, value: str) -> None:
+        self.parameter_changed.emit("accents", value)
+        self._sync_step_toggles_from_text()
+
+    def _on_slides_text_changed(self, value: str) -> None:
+        self.parameter_changed.emit("slides", value)
+        self._sync_step_toggles_from_text()
+
+    def _on_step_toggle_changed(self, kind: str, step: int, checked: bool) -> None:
+        if self._syncing_step_toggles:
+            return
+        edit = self.accent_edit if kind == "accent" else self.slide_edit
+        values = self._parse_flags(edit.text(), self.step_toggle_count)
+        values[step] = checked
+        edit.setText(self._flags_to_text(values))
+
+    def _sync_step_toggles_from_text(self) -> None:
+        self._syncing_step_toggles = True
+        try:
+            accents = self._parse_flags(self.accent_edit.text(), self.step_toggle_count)
+            slides = self._parse_flags(self.slide_edit.text(), self.step_toggle_count)
+            for index in range(self.step_toggle_count):
+                accent_on = accents[index]
+                slide_on = slides[index]
+                self.accent_buttons[index].setChecked(accent_on)
+                self.accent_leds[index].set_on(accent_on)
+                self.slide_buttons[index].setChecked(slide_on)
+                self.slide_leds[index].set_on(slide_on)
+        finally:
+            self._syncing_step_toggles = False
+
+    @staticmethod
+    def _flags_to_text(flags: list[bool]) -> str:
+        return ",".join("1" if flag else "0" for flag in flags)
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component.sample_rate = new_sample_rate

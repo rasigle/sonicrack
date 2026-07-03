@@ -33,7 +33,7 @@ def _library_widgets(window: ModularSynthWindow) -> list[QtWidgets.QWidget]:
 
 def test_module_library_can_hide_and_show():
     """The module library can be hidden and restored from the view action."""
-    window = ModularSynthWindow()
+    window = ModularSynthWindow(restore_last_patch=False)
 
     assert window.module_library_panel is not None
     assert not window.module_library_panel.isHidden()
@@ -50,7 +50,7 @@ def test_module_library_can_hide_and_show():
 
 def test_full_screen_action_toggles_window_state(qapp):
     """The View menu action enters and exits full-screen mode."""
-    window = ModularSynthWindow()
+    window = ModularSynthWindow(restore_last_patch=False)
     assert window.full_screen_action is not None
 
     window.full_screen_action.trigger()
@@ -68,7 +68,7 @@ def test_full_screen_action_toggles_window_state(qapp):
 
 def test_escape_exits_full_screen(qapp):
     """Escape leaves full-screen mode without closing the window."""
-    window = ModularSynthWindow()
+    window = ModularSynthWindow(restore_last_patch=False)
     assert window.full_screen_action is not None
 
     window._set_full_screen(True)
@@ -85,7 +85,7 @@ def test_escape_exits_full_screen(qapp):
 
 def test_module_library_sorts_full_list_alphabetically():
     """Ungrouped module buttons are sorted alphabetically."""
-    window = ModularSynthWindow()
+    window = ModularSynthWindow(restore_last_patch=False)
     registry = ModuleRegistry()
     registry.register(_make_module("Zeta", "Beta"))
     registry.register(_make_module("alpha", "Alpha"))
@@ -106,7 +106,7 @@ def test_module_library_sorts_full_list_alphabetically():
 
 def test_module_library_groups_by_sorted_categories_with_sorted_modules():
     """Grouped mode sorts categories and the module buttons inside each category."""
-    window = ModularSynthWindow()
+    window = ModularSynthWindow(restore_last_patch=False)
     assert window.module_library_group_checkbox is not None
     assert window.module_library_group_checkbox.isChecked()
     registry = ModuleRegistry()

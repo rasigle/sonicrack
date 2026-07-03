@@ -6,6 +6,7 @@ import logging
 
 from PyQt6 import QtWidgets
 
+from src.gui.app_settings import app_settings
 from src.gui.audio_config import audio_config
 from src.gui.ui_constants import DEFAULT_BUFFER_SIZES, DEFAULT_SAMPLE_RATES
 
@@ -42,6 +43,11 @@ class AudioSettingsDialog(QtWidgets.QDialog):
             self.buffer_size_combo.addItem(f"{size} samples", size)
         form_layout.addRow("Buffer size", self.buffer_size_combo)
 
+        self.restore_last_patch_checkbox = QtWidgets.QCheckBox(
+            "Restore the last patch on startup"
+        )
+        layout.addWidget(self.restore_last_patch_checkbox)
+
         # Buttons
         button_box = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok
@@ -61,17 +67,24 @@ class AudioSettingsDialog(QtWidgets.QDialog):
         if buf_index != -1:
             self.buffer_size_combo.setCurrentIndex(buf_index)
 
+        self.restore_last_patch_checkbox.setChecked(app_settings.restore_last_patch)
+
     def _apply_and_close(self):
         new_sample_rate = self.sample_rate_combo.currentData()
         new_buffer_size = self.buffer_size_combo.currentData()
+        restore_last_patch = self.restore_last_patch_checkbox.isChecked()
 
         logger.info(
-            "Applying audio settings: sample_rate=%s, buffer_size=%s",
+            "Applying settings: sample_rate=%s, buffer_size=%s, "
+            "restore_last_patch=%s",
             new_sample_rate,
             new_buffer_size,
+            restore_last_patch,
         )
 
         audio_config.sample_rate = int(new_sample_rate)
         audio_config.buffer_size = int(new_buffer_size)
+        app_settings.restore_last_patch = restore_last_patch
+        app_settings.save()
 
         self.accept()

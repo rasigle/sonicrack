@@ -5,6 +5,8 @@ APP_TITLE: str = "AudioPlayground - Modular Synthesizer"
 APP_ICON_NAME: str = "icon.png"
 APP_ICON_RESOURCE: tuple[str, str] = ("icons", APP_ICON_NAME)
 DEFAULT_PRESET_DIRECTORY = Path.home() / ".audioplayground" / "presets"
+DEFAULT_AUTOSAVE_PATCH = Path.home() / ".audioplayground" / "last_session.apr"
+DEFAULT_SETTINGS_FILE = Path.home() / ".audioplayground" / "settings.json"
 
 # Pulsewidth modulation limits
 MIN_PW_PERCENTAGE_VALUE = 1

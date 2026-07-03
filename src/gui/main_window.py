@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -24,6 +25,7 @@ from PyQt6.QtWidgets import (
 
 from src import __version__
 from src.constants import PRESET_FILE_EXTENSION, resource, resource_path
+from src.gui.app_settings import app_settings
 from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory
 from src.gui.core.preset_manager import PresetManager
@@ -34,7 +36,7 @@ from src.gui.dialogs.preset_library_dialog import (
 )
 from src.gui.module_registry import initialize_module_registry
 from src.gui.patch_canvas import PatchCanvas
-from src.gui.ui_constants import APP_ICON_RESOURCE, APP_TITLE
+from src.gui.ui_constants import APP_ICON_RESOURCE, APP_TITLE, DEFAULT_AUTOSAVE_PATCH
 
 if TYPE_CHECKING:
     from src.gui.module_registry import ModuleRegistry
@@ -54,7 +56,12 @@ class ModularSynthWindow(QMainWindow):
     - Preset management
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        restore_last_patch: bool | None = None,
+        autosave_patch_path: str | Path | None = None,
+    ):
         """Initialize the main window."""
         super().__init__()
 
@@ -62,6 +69,7 @@ class ModularSynthWindow(QMainWindow):
         self.current_patch_path = None  # Path to currently loaded patch file
         self.patch_modified: bool = False  # Track if patch has unsaved changes
         self._is_shutting_down = False
+        self._autosave_patch_path = Path(autosave_patch_path or DEFAULT_AUTOSAVE_PATCH)
 
         # Initialize core components
         logger.debug("Initializing ModularSynthWindow core components")
@@ -88,6 +96,13 @@ class ModularSynthWindow(QMainWindow):
         self._setup_toolbar()
         self._setup_statusbar()
         self._connect_signals()
+        should_restore_last_patch = (
+            app_settings.restore_last_patch
+            if restore_last_patch is None
+            else restore_last_patch
+        )
+        if should_restore_last_patch:
+            self._restore_last_patch()
 
         logger.debug("Modular Synth Window initialized")
 
@@ -663,6 +678,76 @@ class ModularSynthWindow(QMainWindow):
             self.patch_modified = True
             self._update_window_title()
 
+    def _current_patch_data(self) -> dict[str, Any]:
+        """Return the current canvas serialized as patch data."""
+        patch_canvas = self._require_patch_canvas()
+        metadata: dict[str, Any] = {
+            "name": (
+                Path(self.current_patch_path).stem
+                if self.current_patch_path
+                else "Last Session"
+            )
+        }
+        patch_data = self.preset_manager._serialize_patch(
+            patch_canvas.get_modules(),
+            patch_canvas.get_connections(),
+            metadata,
+        )
+        patch_data["autosave"] = {
+            "current_patch_path": self.current_patch_path,
+            "patch_modified": self.patch_modified,
+        }
+        return patch_data
+
+    def _save_last_patch(self) -> bool:
+        """Persist the current in-memory patch for restoration on next launch."""
+        try:
+            self._autosave_patch_path.parent.mkdir(parents=True, exist_ok=True)
+            patch_data = self._current_patch_data()
+            with open(self._autosave_patch_path, "w", encoding="utf-8") as f:
+                json.dump(patch_data, f, indent=2)
+            logger.info("Autosaved last patch to %s", self._autosave_patch_path)
+            return True
+        except Exception as exc:
+            logger.warning(
+                "Failed to autosave last patch to %s: %s",
+                self._autosave_patch_path,
+                exc,
+                exc_info=True,
+            )
+            return False
+
+    def _restore_last_patch(self) -> bool:
+        """Restore the last autosaved patch, if one exists."""
+        if not self._autosave_patch_path.is_file():
+            return False
+
+        try:
+            with open(self._autosave_patch_path, encoding="utf-8") as f:
+                patch_data = json.load(f)
+
+            self._apply_preset(patch_data)
+
+            autosave_data = patch_data.get("autosave", {})
+            current_patch_path = autosave_data.get("current_patch_path")
+            self.current_patch_path = (
+                current_patch_path if isinstance(current_patch_path, str) else None
+            )
+            self.patch_modified = bool(autosave_data.get("patch_modified", False))
+            self._update_window_title()
+
+            self._require_statusbar().showMessage("Last patch restored")
+            logger.info("Restored last patch from %s", self._autosave_patch_path)
+            return True
+        except Exception as exc:
+            logger.warning(
+                "Failed to restore last patch from %s: %s",
+                self._autosave_patch_path,
+                exc,
+                exc_info=True,
+            )
+            return False
+
     def _save_patch(self):
         """Save the current patch into a file.
 
@@ -1062,5 +1147,6 @@ class ModularSynthWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event."""
+        self._save_last_patch()
         self.shutdown(graceful=True)
         event.accept()

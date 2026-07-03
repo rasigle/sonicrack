@@ -88,8 +88,11 @@ class TestPresetSaveLoad(unittest.TestCase):
             # Check structure
             self.assertIn("version", data)
             self.assertIn("components", data)
+            self.assertIn("graph", data)
             self.assertIsInstance(data["components"], list)
             self.assertEqual(data["version"], "1.0")
+            self.assertEqual(data["graph"]["schema_version"], 1)
+            self.assertEqual(len(data["graph"]["nodes"]), len(data["components"]))
 
     def test_load_nonexistent_preset_raises_error(self):
         """Test loading nonexistent preset raises error."""

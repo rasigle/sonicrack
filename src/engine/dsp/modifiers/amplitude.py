@@ -131,10 +131,10 @@ class Volume(Modifier):
         # Input validation
         if not isinstance(amplitude, (int, float, np.number)):
             raise TypeError(
-                f"amplitude must be a number, got {type(amplitude).__name__}"
+                f"Amplitude must be a number, got {type(amplitude).__name__}"
             )
         if amplitude < 0:
-            raise ValueError(f"amplitude must be non-negative, got {amplitude}")
+            raise ValueError(f"Amplitude must be non-negative, got {amplitude}")
 
         self._amplitude = _derive_amplitude_from_init(
             self._provided_args,

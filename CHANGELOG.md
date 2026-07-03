@@ -36,10 +36,6 @@ All notable changes to AudioPlayground will be documented in this file.
 - Parameter descriptors are useful for UI/presets but do not yet enforce a
   single source of truth for runtime validation, smoothing policy, units, or
   automation semantics.
-- The preset builder can serialize simple component parameters, but arbitrary
-  modulation callables and nested graph topology are not yet a robust portable
-  patch format.
-
 ### Planned Engine Work
 
 - Introduce a first-class engine render graph with typed mono/stereo/CV/audio
@@ -113,17 +109,8 @@ All notable changes to AudioPlayground will be documented in this file.
 
 ## Backlog
 
-- Rethink mono stereo channels
 - Display ADSR shape in module
-- Add Lowpass Filter with resonance module
-- Improve LFO shapes
-- Better Architecture with UI/Logic Separation
-- Fullscreen support
 - Undo / Redo system
-- Review the engine preset system (fluent API)
-- Make the ui look cooler and integrate a rack design
-- Do not pan the canvas when scroll with the mouse-wheel over a locked knob
-- Make module widgets debuggable without ui components
 
 
 ## Unreleased GUI / Runtime Work
@@ -291,6 +278,9 @@ First release of AudioPlayground!
   slewing for more natural sweeps.
 
 ### Fixed
+- Added a portable preset graph payload alongside legacy flat component presets,
+  including explicit node IDs, audio edges, output topology, and declarative
+  modulation edges so saved presets do not rely on serializing Python callables.
 - Fixed stereo block handling for stateful effects and smoothed volume paths:
   delay, reverb, compressor, volume, and modulated volume now preserve `(n, 2)`
   buffers without channel-state bleed.

@@ -15,6 +15,12 @@ Example:
     ...     .adsr(0.1, 0.2, 0.7, 0.3)
     ...     .volume(0.6))
     >>>
+    >>> # The saved config includes both a legacy flat component list and a
+    >>> # portable graph with explicit audio/modulation routing.
+    >>> graph = preset_builder.get_config()["graph"]
+    >>> graph["output"]["kind"]
+    'chain'
+    >>>
     >>> # Build the actual preset
     >>> preset = preset_builder.build()
     >>>
@@ -34,6 +40,21 @@ from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.core.registry import ComponentCategory, audio_registry
 
 logger = logging.getLogger(__name__)
+
+
+_MODULATION_OPERATIONS = {
+    "amplitude": "multiply",
+    "frequency": "multiply",
+    "phase": "add",
+}
+
+
+def _multiply_modulation(base, mod):
+    return base * mod
+
+
+def _add_modulation(base, mod):
+    return base + mod
 
 
 class PresetNode:
@@ -285,22 +306,44 @@ class PresetBuilder:
         # Create instance
         modulator = component_class(*args, **kwargs)
 
-        # Wrap source with ModulatedOscillator if we have an oscillator
-        if self._source and hasattr(self._source, "frequency"):
+        # Wrap source with ModulatedOscillator if we have an oscillator. For a
+        # mixed source list, modulation applies to the most recently added source.
+        source_to_modulate = None
+        source_index = None
+        if isinstance(self._source, list) and self._source:
+            source_to_modulate = self._source[-1]
+            source_index = len(self._source) - 1
+        elif self._source is not None:
+            source_to_modulate = self._source
+
+        if source_to_modulate is not None and hasattr(source_to_modulate, "frequency"):
             mod_osc_class = audio_registry.get("ModulatedOscillator", strict=True)
             assert mod_osc_class is not None
             if target == "amplitude":
-                self._source = mod_osc_class(
-                    self._source, modulator, amp_mod=lambda base, mod: base * mod
+                modulated_source = mod_osc_class(
+                    source_to_modulate,
+                    modulator,
+                    amp_mod=_multiply_modulation,
                 )
             elif target == "frequency":
-                self._source = mod_osc_class(
-                    self._source, modulator, freq_mod=lambda base, mod: base * mod
+                modulated_source = mod_osc_class(
+                    source_to_modulate,
+                    modulator,
+                    freq_mod=_multiply_modulation,
                 )
             elif target == "phase":
-                self._source = mod_osc_class(
-                    self._source, modulator, phase_mod=lambda base, mod: base + mod
+                modulated_source = mod_osc_class(
+                    source_to_modulate,
+                    modulator,
+                    phase_mod=_add_modulation,
                 )
+            else:
+                modulated_source = source_to_modulate
+
+            if source_index is None:
+                self._source = modulated_source
+            else:
+                self._source[source_index] = modulated_source
 
         # Build params dict for tree
         params = component_class.descriptor.to_config(*args, **kwargs)
@@ -364,11 +407,15 @@ class PresetBuilder:
         """
         # Check if source is a ModulatedOscillator and extract modulator
         modulators = {}
-        if self._source and hasattr(self._source, "modulators"):
-            # Try to extract modulators from ModulatedOscillator
-            for i, mod in enumerate(self._source.modulators):
-                key = "amplitude_mod" if i == 0 else f"modulator_{i}"
-                modulators[key] = mod
+        sources = self._source if isinstance(self._source, list) else [self._source]
+        for source_index, source in enumerate(source for source in sources if source):
+            if hasattr(source, "modulators"):
+                for mod_index, mod in enumerate(source.modulators):
+                    if source_index == 0 and mod_index == 0:
+                        key = "amplitude_mod"
+                    else:
+                        key = f"source_{source_index}_modulator_{mod_index}"
+                    modulators[key] = mod
         return modulators
 
     def get_components(self) -> dict[str, Any]:
@@ -453,7 +500,7 @@ class PresetBuilder:
                         self._source[0] = mod_osc_desc.create_instance(
                             self._source[0],
                             modulator,
-                            amp_mod=lambda base, mod: base * mod,
+                            amp_mod=_multiply_modulation,
                         )
                 else:
                     # Single oscillator
@@ -465,7 +512,7 @@ class PresetBuilder:
                         self._source = mod_osc_desc.create_instance(
                             self._source,
                             modulator,
-                            amp_mod=lambda base, mod: base * mod,
+                            amp_mod=_multiply_modulation,
                         )
         return self
 
@@ -513,7 +560,7 @@ class PresetBuilder:
                         self._source[0] = mod_osc_desc.create_instance(
                             self._source[0],
                             modulator,
-                            freq_mod=lambda base, mod: base * mod,
+                            freq_mod=_multiply_modulation,
                         )
                 else:
                     # Single oscillator
@@ -525,7 +572,7 @@ class PresetBuilder:
                         self._source = mod_osc_desc.create_instance(
                             self._source,
                             modulator,
-                            freq_mod=lambda base, mod: base * mod,
+                            freq_mod=_multiply_modulation,
                         )
         return self
 
@@ -706,6 +753,105 @@ class PresetBuilder:
         assert component_class is not None
         return component_class.descriptor.category
 
+    def _component_method_name(self, component_type: str) -> str:
+        component_class = audio_registry.get(component_type, strict=True)
+        assert component_class is not None
+        descriptor = component_class.descriptor
+        return descriptor.fluent_api_name or component_type
+
+    def _component_params_from_config(
+        self, component_type: str, component_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        component_class = audio_registry.get(component_type, strict=True)
+        assert component_class is not None
+        parameter_names = component_class.descriptor.parameter_names
+        return {
+            key: value
+            for key, value in component_config.items()
+            if key not in {"name", "category", "description", "id"}
+            and key in parameter_names
+        }
+
+    def _call_component_method(
+        self, component_type: str, params: dict[str, Any], **extra_kwargs: Any
+    ) -> None:
+        method = self._component_methods.get(self._component_method_name(component_type))
+        if method:
+            method(**params, **extra_kwargs)
+        else:
+            logger.warning(
+                f"Method '{self._component_method_name(component_type)}' not found "
+                f"for component '{component_type}'"
+            )
+
+    def _build_graph_config(self) -> dict[str, Any]:
+        """Build a portable graph view of the current builder topology."""
+        nodes = []
+        source_ids = []
+        modifier_ids = []
+        modulation_edges = []
+
+        for index, node in enumerate(self._component_tree.children, start=1):
+            node_id = f"n{index}"
+            component_config = {**node.params, "id": node_id}
+            nodes.append(component_config)
+
+            category = self._get_node_category(node.component_type)
+            if category == ComponentCategory.OSCILLATOR:
+                source_ids.append(node_id)
+            elif category == ComponentCategory.MODIFIER:
+                modifier_ids.append(node_id)
+            elif category == ComponentCategory.MODULATOR:
+                target = node.params.get("target", "amplitude")
+                if source_ids:
+                    modulation_edges.append(
+                        {
+                            "from": node_id,
+                            "to": source_ids[-1],
+                            "type": "modulation",
+                            "target": target,
+                            "operation": _MODULATION_OPERATIONS.get(target, "custom"),
+                        }
+                    )
+
+        audio_edges = []
+        output_source: str | dict[str, Any] | None
+        if len(source_ids) > 1:
+            output_source = {
+                "kind": "mixer",
+                "id": "mix1",
+                "sources": source_ids,
+                "mix_mode": "average",
+            }
+            for source_id in source_ids:
+                audio_edges.append({"from": source_id, "to": "mix1", "type": "audio"})
+            previous = "mix1"
+        elif source_ids:
+            output_source = source_ids[0]
+            previous = source_ids[0]
+        else:
+            output_source = None
+            previous = None
+
+        for modifier_id in modifier_ids:
+            if previous is not None:
+                audio_edges.append(
+                    {"from": previous, "to": modifier_id, "type": "audio"}
+                )
+            previous = modifier_id
+
+        output_kind = "chain" if modifier_ids else "source"
+        return {
+            "schema_version": 1,
+            "nodes": nodes,
+            "edges": audio_edges + modulation_edges,
+            "output": {
+                "kind": output_kind,
+                "source": output_source,
+                "modifiers": modifier_ids,
+            },
+        }
+
     # ========================================================================
     # Config Generation (On-Demand)
     # ========================================================================
@@ -731,6 +877,7 @@ class PresetBuilder:
             "description": self._description,
             "sample_rate": self._sample_rate,
             "components": components,
+            "graph": self._build_graph_config(),
         }
 
     # ========================================================================
@@ -873,38 +1020,7 @@ class PresetBuilder:
         Returns:
             New PresetBuilder instance with same configuration
         """
-        new_builder = PresetBuilder(name=self._name, description=self._description)
-        new_builder._sample_rate = self._sample_rate
-
-        # Rebuild from config
-        config = self.get_config()
-        for component in config.get("components", []):
-            comp_name = component["name"]
-            component_class = audio_registry.get(comp_name, strict=True)
-            assert component_class is not None
-            descriptor = component_class.descriptor
-            method_name = (
-                descriptor.fluent_api_name if descriptor.fluent_api_name else comp_name
-            )
-
-            # Extract only actual component parameters (exclude metadata)
-            parameter_names = descriptor.parameter_names
-            params = {
-                k: v
-                for k, v in component.items()
-                if k not in ["name", "category", "description"] and k in parameter_names
-            }
-
-            # Call method with keyword arguments
-            method = new_builder._component_methods.get(method_name)
-            if method:
-                method(**params)
-            else:
-                logger.warning(
-                    f"Method '{method_name}' not found for component '{comp_name}'"
-                )
-
-        return new_builder
+        return self.from_config(self.get_config())
 
     # ========================================================================
     # Preset Methods
@@ -926,6 +1042,93 @@ class PresetBuilder:
         logger.info(f"Saved preset to {filepath}")
 
     @classmethod
+    def from_config(cls, config: dict[str, Any]) -> PresetBuilder:
+        """Create a builder from a preset configuration dictionary."""
+        name = config.get("name", "Untitled Preset")
+        description = config.get("description", "")
+        builder = cls(name=name, description=description)
+        if "sample_rate" in config:
+            builder.set_sample_rate(config["sample_rate"])
+
+        graph = config.get("graph")
+        if isinstance(graph, dict):
+            builder._load_graph_config(graph)
+        else:
+            builder._load_legacy_components(config.get("components", []))
+
+        return builder
+
+    def _load_graph_config(self, graph: dict[str, Any]) -> None:
+        nodes = graph.get("nodes", [])
+        edges = graph.get("edges", [])
+        nodes_by_id = {node["id"]: node for node in nodes if "id" in node}
+        loaded_nodes: set[str] = set()
+        modulation_edges_by_target: dict[str, list[dict[str, Any]]] = {}
+        for edge in edges:
+            if edge.get("type") == "modulation":
+                modulation_edges_by_target.setdefault(edge.get("to"), []).append(edge)
+
+        output = graph.get("output", {})
+        source_ref = output.get("source")
+        if isinstance(source_ref, dict):
+            source_ids = list(source_ref.get("sources", []))
+        elif isinstance(source_ref, str):
+            source_ids = [source_ref]
+        else:
+            source_ids = []
+
+        for source_id in source_ids:
+            self._load_graph_node(source_id, nodes_by_id, loaded_nodes)
+            for edge in modulation_edges_by_target.get(source_id, []):
+                self._load_graph_node(
+                    edge.get("from"),
+                    nodes_by_id,
+                    loaded_nodes,
+                    target=edge.get("target", "amplitude"),
+                )
+
+        for modifier_id in output.get("modifiers", []):
+            self._load_graph_node(modifier_id, nodes_by_id, loaded_nodes)
+
+        # Load disconnected nodes last so partially edited preset files remain usable.
+        for component in nodes:
+            node_id = component.get("id")
+            if node_id not in loaded_nodes:
+                self._load_graph_node(node_id, nodes_by_id, loaded_nodes)
+
+    def _load_graph_node(
+        self,
+        node_id: str | None,
+        nodes_by_id: dict[str, dict[str, Any]],
+        loaded_nodes: set[str],
+        *,
+        target: str | None = None,
+    ) -> None:
+        if node_id is None or node_id in loaded_nodes or node_id not in nodes_by_id:
+            return
+
+        component = nodes_by_id[node_id]
+        comp_type = component["name"]
+        params = self._component_params_from_config(comp_type, component)
+        category = self._get_node_category(comp_type)
+
+        if category == ComponentCategory.MODULATOR:
+            target = target or component.get("target", "amplitude")
+            self._call_component_method(comp_type, params, target=target)
+        else:
+            self._call_component_method(comp_type, params)
+        loaded_nodes.add(node_id)
+
+    def _load_legacy_components(self, components: list[dict[str, Any]]) -> None:
+        for component in components:
+            comp_type = component["name"]
+            params = self._component_params_from_config(comp_type, component)
+            extra_kwargs = {}
+            if self._get_node_category(comp_type) == ComponentCategory.MODULATOR:
+                extra_kwargs["target"] = component.get("target", "amplitude")
+            self._call_component_method(comp_type, params, **extra_kwargs)
+
+    @classmethod
     def from_preset(cls, filepath: str | Path) -> PresetBuilder:
         """Load a preset configuration from a preset file.
 
@@ -940,41 +1143,6 @@ class PresetBuilder:
         with open(filepath) as f:
             config = json.load(f)
 
-        # Create builder
-        name = config.get("name", "Untitled Preset")
-        description = config.get("description", "")
-        builder = cls(name=name, description=description)
-
-        # Set sample rate
-        if "sample_rate" in config:
-            builder.set_sample_rate(config["sample_rate"])
-
-        # Reconstruct from components
-        for component in config.get("components", []):
-            comp_type = component["name"]
-            component_class = audio_registry.get(comp_type, strict=True)
-            assert component_class is not None
-            descriptor = component_class.descriptor
-            method_name = (
-                descriptor.fluent_api_name if descriptor.fluent_api_name else comp_type
-            )
-
-            # Extract only actual component parameters (exclude metadata)
-            parameter_names = descriptor.parameter_names
-            params = {
-                k: v
-                for k, v in component.items()
-                if k not in ["name", "category", "description"] and k in parameter_names
-            }
-
-            # Call method with keyword arguments
-            method = builder._component_methods.get(method_name)
-            if method:
-                method(**params)
-            else:
-                logger.warning(
-                    f"Method '{method_name}' not found for component '{comp_type}'"
-                )
-
+        builder = cls.from_config(config)
         logger.info(f"Loaded preset from {filepath}")
         return builder

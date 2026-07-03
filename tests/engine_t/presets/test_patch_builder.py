@@ -5,6 +5,7 @@ Tests cover:
 - Integration with existing components
 """
 
+import json
 import unittest
 
 import numpy as np
@@ -185,7 +186,59 @@ class TestPatchBuilder(unittest.TestCase):
         # Should have version and components
         self.assertIn("version", config)
         self.assertIn("components", config)
+        self.assertIn("graph", config)
         self.assertEqual(len(config["components"]), 3)  # sine, adsr, volume
+
+        graph = config["graph"]
+        self.assertEqual(graph["schema_version"], 1)
+        self.assertEqual(graph["output"]["kind"], "chain")
+        self.assertEqual(len(graph["nodes"]), 3)
+
+        modulation_edges = [
+            edge for edge in graph["edges"] if edge["type"] == "modulation"
+        ]
+        self.assertEqual(len(modulation_edges), 1)
+        self.assertEqual(modulation_edges[0]["target"], "amplitude")
+        self.assertEqual(modulation_edges[0]["operation"], "multiply")
+
+        audio_edges = [edge for edge in graph["edges"] if edge["type"] == "audio"]
+        self.assertEqual(len(audio_edges), 1)
+
+    def test_graph_config_round_trips_modulated_preset(self):
+        """Test portable graph config reconstructs modulation without callables."""
+        builder = (
+            PresetBuilder("Graph Preset")
+            .sine(440, amplitude=0.8)
+            .adsr(0.1, 0.2, 0.7, 0.3)
+            .volume(0.5)
+        )
+        graph_config = builder.get_config()
+
+        json_payload = json.loads(json.dumps(graph_config))
+        loaded = PresetBuilder.from_config(json_payload)
+
+        self.assertEqual(loaded.get_config(), graph_config)
+        patch = loaded.build()
+        self.assertTrue(hasattr(patch, "modifiers"))
+
+    def test_graph_loader_uses_topology_not_node_order(self):
+        """Test graph loading follows output/edge topology when nodes are shuffled."""
+        builder = (
+            PresetBuilder("Shuffled Graph")
+            .sine(220, amplitude=0.5)
+            .adsr(0.1, 0.2, 0.7, 0.3)
+            .sine(440, amplitude=0.25)
+            .volume(0.5)
+        )
+        config = json.loads(json.dumps(builder.get_config()))
+        config["graph"]["nodes"] = list(reversed(config["graph"]["nodes"]))
+
+        loaded = PresetBuilder.from_config(config)
+        patch = loaded.build()
+        samples = patch.get_samples(128)
+
+        self.assertEqual(len(samples), 128)
+        self.assertIn("amplitude_mod", loaded.get_modulators())
 
 
 class TestPatchBuilderIntegration(unittest.TestCase):

@@ -52,11 +52,20 @@ def example_1_basic_save_load():
     preset_path = Path("temp_presets/pure_sine.json")
     preset.save_preset(preset_path)
     print(f"   ✓ Saved to: {preset_path}")
+    graph = preset.get_config()["graph"]
+    print(
+        "   ✓ Portable graph: "
+        f"{len(graph['nodes'])} nodes, output={graph['output']['kind']}"
+    )
 
     # Load it back
     print("\n3. Loading preset from file...")
     loaded_preset = PresetBuilder.from_preset(preset_path)
     print("   ✓ Loaded successfully!")
+    print(
+        "   ✓ Loaded graph schema: "
+        f"v{loaded_preset.get_config()['graph']['schema_version']}"
+    )
     print(loaded_preset.describe())
 
     # Build and generate audio
@@ -87,6 +96,16 @@ def example_2_library_management():
     )
     library.save(bass_preset, category="bass")
     print("   ✓ Saved: Deep Bass (bass category)")
+    bass_graph = bass_preset.get_config()["graph"]
+    bass_modulation_edges = [
+        edge for edge in bass_graph["edges"] if edge["type"] == "modulation"
+    ]
+    if bass_modulation_edges:
+        edge = bass_modulation_edges[0]
+        print(
+            "   ✓ Modulation edge: "
+            f"{edge['target']} via declarative {edge['operation']} operation"
+        )
 
     # Lead sounds
     lead_preset = (
@@ -95,7 +114,7 @@ def example_2_library_management():
         .sawtooth(880, amplitude=0.8, gain_db=None)  # A5
         .adsr(0.05, 0.2, 0.6, 0.3)
         .volume(0.6)
-        .volume((-0.8, 0.8))
+        .clipper((-0.8, 0.8))
     )
     library.save(lead_preset, category="leads")
     print("   ✓ Saved: Bright Lead (leads category)")
@@ -215,7 +234,7 @@ def example_5_preset_inspection():
         .adsr(0.1, 0.3, 0.6, 0.5)
         .volume(0.6)
         .panner(0.2)
-        .volume((-0.7, 0.7))
+        .clipper((-0.7, 0.7))
     )
 
     # Get full description
@@ -265,7 +284,7 @@ def example_6_metadata_and_organization():
         .sine(440, amplitude=0.75, gain_db=None)
         .adsr(0.02, 0.5, 0.3, 0.8)
         .volume(0.65)
-        .volume((-0.85, 0.85))
+        .clipper((-0.85, 0.85))
     )
 
     # Save with additional metadata
@@ -375,7 +394,7 @@ def example_8_advanced_presetes():
         .set_description("Fundamental with added harmonics")
         .sawtooth(55, amplitude=0.8, gain_db=None)  # Rich in harmonics
         .adsr(0.01, 0.15, 0.7, 0.25)
-        .volume((-0.9, 0.9))
+        .clipper((-0.9, 0.9))
         .volume(0.65)
     )
 

@@ -22,7 +22,7 @@ class TB303Voice:
         self,
         *,
         waveform: str = "Sawtooth",
-        tuning: float = 1.0,
+        tuning: float = 0.0,
         pulsewidth: float = 0.5,
         cutoff: float = 700.0,
         resonance: float = 8.0,
@@ -49,7 +49,11 @@ class TB303Voice:
         self._previous_gate = 0.0
         self._oscillator = self._create_oscillator(110.0)
         self._slide = SlideProcessor(time=slide_time, sample_rate=sample_rate)
-        self._envelope = DecayEnvelope(decay_duration=decay, sample_rate=sample_rate)
+        self._envelope = DecayEnvelope(
+            attack_duration=0.001,
+            decay_duration=decay,
+            sample_rate=sample_rate,
+        )
         self._accent = AccentProcessor(
             amount=accent,
             amp_depth=0.35,
@@ -83,7 +87,8 @@ class TB303Voice:
         slides = self._fit_signal(slide, num_samples)
 
         self._sync_parameters()
-        pitch = self._slide.process(frequencies * self.tuning, slides)
+        tuned_frequencies = frequencies * (2.0 ** (self.tuning / 12.0))
+        pitch = self._slide.process(tuned_frequencies, slides)
         oscillator = self._render_oscillator(pitch)
         envelope = self._render_envelope(gates)
         accent_frame = self._accent.process(accents)
@@ -112,9 +117,19 @@ class TB303Voice:
         self._filter.drive_db = self.drive_db
 
     def _render_oscillator(self, frequencies: np.ndarray) -> np.ndarray:
-        output = np.empty(len(frequencies), dtype=np.float32)
-        for index, frequency in enumerate(frequencies):
-            self._oscillator.frequency = float(np.clip(frequency, 1.0, 20000.0))
+        clipped = np.clip(frequencies, 1.0, 20000.0).astype(np.float32, copy=False)
+        render_modulated = getattr(self._oscillator, "render_modulated_waveform", None)
+        commit_state = getattr(self._oscillator, "commit_modulated_phase_state", None)
+        if callable(render_modulated) and callable(commit_state):
+            if len(clipped):
+                self._oscillator.frequency = float(clipped[0])
+            waveform, state = render_modulated(clipped)
+            commit_state(state)
+            return self._oscillator._apply_amplitude_to_buffer(waveform)
+
+        output = np.empty(len(clipped), dtype=np.float32)
+        for index, frequency in enumerate(clipped):
+            self._oscillator.frequency = float(frequency)
             output[index] = next(self._oscillator)
         return output
 

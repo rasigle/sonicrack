@@ -629,13 +629,14 @@ class BiquadResonantFilter(Modifier):
         z1 = self._filter_state[0]
         z2 = self._filter_state[1]
         output = np.empty_like(samples, dtype=np.float32)
+        b0, b1, b2, a1, a2 = self._design_filter_values(
+            cutoff_values,
+            resonance_values,
+        )
         for index, sample in enumerate(samples):
-            b, a = self._design_filter(
-                float(cutoff_values[index]), float(resonance_values[index])
-            )
-            y = b[0] * sample + z1
-            z1 = b[1] * sample - a[1] * y + z2
-            z2 = b[2] * sample - a[2] * y
+            y = b0[index] * sample + z1
+            z1 = b1[index] * sample - a1[index] * y + z2
+            z2 = b2[index] * sample - a2[index] * y
             output[index] = y
 
         self._filter_state = np.stack((z1, z2)).astype(np.float64, copy=False)
@@ -727,6 +728,47 @@ class BiquadResonantFilter(Modifier):
         b = np.asarray([b0 / a0, b1 / a0, b2 / a0], dtype=np.float64)
         a = np.asarray([1.0, a1 / a0, a2 / a0], dtype=np.float64)
         return b, a
+
+    def _design_filter_values(
+        self,
+        cutoff_values: np.ndarray,
+        resonance_values: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        nyq = self.sample_rate * 0.5
+        safe_cutoff = np.clip(cutoff_values, 1.0, nyq * 0.95).astype(np.float64)
+        q = np.clip(resonance_values, 0.1, 30.0).astype(np.float64)
+        omega = 2.0 * np.pi * safe_cutoff / self.sample_rate
+        sin_omega = np.sin(omega)
+        cos_omega = np.cos(omega)
+        alpha = sin_omega / (2.0 * q)
+
+        if self._filter_type == "low":
+            b0 = (1.0 - cos_omega) * 0.5
+            b1 = 1.0 - cos_omega
+            b2 = (1.0 - cos_omega) * 0.5
+        elif self._filter_type == "high":
+            b0 = (1.0 + cos_omega) * 0.5
+            b1 = -(1.0 + cos_omega)
+            b2 = (1.0 + cos_omega) * 0.5
+        elif self._filter_type == "band":
+            b0 = alpha
+            b1 = np.zeros_like(alpha)
+            b2 = -alpha
+        else:
+            b0 = np.ones_like(alpha)
+            b1 = -2.0 * cos_omega
+            b2 = np.ones_like(alpha)
+
+        a0 = 1.0 + alpha
+        a1 = -2.0 * cos_omega
+        a2 = 1.0 - alpha
+        return (
+            b0 / a0,
+            b1 / a0,
+            b2 / a0,
+            a1 / a0,
+            a2 / a0,
+        )
 
     def _apply_drive(
         self,

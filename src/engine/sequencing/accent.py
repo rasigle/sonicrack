@@ -56,7 +56,7 @@ class AccentProcessor:
 
         for index, accent in enumerate(accents):
             current = float(accent)
-            if self._previous_accent <= 0.5 and current > 0.5:
+            if self._previous_accent <= 0.5 < current:
                 self._level = amount
             elif current > 0.5:
                 self._level = max(self._level, amount)

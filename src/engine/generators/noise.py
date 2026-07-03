@@ -73,7 +73,7 @@ from src.engine.core.component import (
     make_parameter_descriptors,
 )
 from src.engine.core.registry import ComponentCategory, register_component
-from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
+from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.generators.oscillators.oscillator import _derive_amplitude_from_init
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.math import db_to_linear, linear_to_db

@@ -12,7 +12,7 @@ from src.engine.core.component import (
     make_parameter_descriptors,
 )
 from src.engine.core.registry import register_component
-from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
+from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.dsp.modulators.base import Modulator
 from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 

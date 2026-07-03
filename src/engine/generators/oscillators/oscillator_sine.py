@@ -111,10 +111,12 @@ class SineOscillator(Oscillator):
             return self._generate_bright_sine(phase)
         return self._generate_analog_sine(phase, sample_indices)
 
-    def _generate_pure_sine(self, phase: float | np.ndarray) -> float | np.ndarray:
+    @staticmethod
+    def _generate_pure_sine(phase: float | np.ndarray) -> float | np.ndarray:
         return np.sin(phase)
 
-    def _generate_warm_sine(self, phase: float | np.ndarray) -> float | np.ndarray:
+    @staticmethod
+    def _generate_warm_sine(phase: float | np.ndarray) -> float | np.ndarray:
         fundamental = np.sin(phase)
         harmonic_2 = np.sin(2 * phase) * 0.30
         harmonic_4 = np.sin(4 * phase) * 0.15
@@ -123,7 +125,8 @@ class SineOscillator(Oscillator):
         warm = np.tanh(warm * 0.95)
         return warm * 0.90
 
-    def _generate_bright_sine(self, phase: float | np.ndarray) -> float | np.ndarray:
+    @staticmethod
+    def _generate_bright_sine(phase: float | np.ndarray) -> float | np.ndarray:
         fundamental = np.sin(phase)
         harmonic_2 = np.sin(2 * phase) * 0.18
         harmonic_3 = np.sin(3 * phase) * 0.25
@@ -136,8 +139,8 @@ class SineOscillator(Oscillator):
         bright = bright + (bright**3) * 0.08
         return bright * 0.75
 
+    @staticmethod
     def _generate_analog_sine(
-        self,
         phase: float | np.ndarray,
         sample_indices: float | np.ndarray | None = None,
     ) -> float | np.ndarray:

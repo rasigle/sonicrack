@@ -145,8 +145,7 @@ class Behringer182Module(ModuleWidget):
         )
         self.run_button.setChecked(True)
         self.run_button.setToolTip("Start or stop sequencer clock advancement.")
-        self.run_button.setStyleSheet(
-            """
+        self.run_button.setStyleSheet("""
             QToolButton {
                 background: #d52a20;
                 border: 2px solid #3b1411;
@@ -164,8 +163,7 @@ class Behringer182Module(ModuleWidget):
             QToolButton:pressed {
                 background: #aa2119;
             }
-            """
-        )
+            """)
         self.run_button.toggled.connect(self._on_running_changed)
         layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -356,11 +354,7 @@ class Behringer182Module(ModuleWidget):
             clock_pulses=clock_pulses,
             reset_pulses=reset_pulses,
             hold_signal=hold_signal,
-            run_signal=(
-                None
-                if running
-                else np.zeros(num_samples, dtype=np.float32)
-            ),
+            run_signal=(None if running else np.zeros(num_samples, dtype=np.float32)),
         )
         active_step = int(frame.step[-1]) if len(frame.step) else None
         self._update_step_leds(active_step, running=running)

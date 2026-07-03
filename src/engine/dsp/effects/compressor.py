@@ -40,7 +40,7 @@ from src.engine.core.component import (
     ParameterDescriptor,
 )
 from src.engine.core.registry import register_component
-from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
+from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.dsp.modifiers.base import Modifier
 from src.engine.utils.validation import (
     validate_numeric_range,

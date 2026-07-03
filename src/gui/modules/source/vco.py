@@ -86,9 +86,7 @@ def apply_linear_fm_offset(
     """Apply VCV-style linear FM as a C4-scaled signed Hz offset."""
     amount = float(fm_amount_percent) / 100.0
     frequencies = np.asarray(base_frequency, dtype=np.float64) + (
-        np.asarray(fm_signal, dtype=np.float64)
-        * amount
-        * PITCH_CV_REFERENCE_FREQUENCY
+        np.asarray(fm_signal, dtype=np.float64) * amount * PITCH_CV_REFERENCE_FREQUENCY
     )
     frequencies = np.maximum(frequencies, 0.0)
     if np.isscalar(base_frequency) and np.isscalar(fm_signal):
@@ -547,9 +545,7 @@ class ModulatedOscillatorModule(ModuleWidget):
             logger.debug("VCO: Gain knob ENABLED")
 
         if has_fm:
-            self.fm_amount_knob.setToolTip(
-                "Signed FM depth for the connected FM input"
-            )
+            self.fm_amount_knob.setToolTip("Signed FM depth for the connected FM input")
         else:
             self.fm_amount_knob.setToolTip(
                 "Signed FM depth. In 1V/octave mode this scales pitch CV; "

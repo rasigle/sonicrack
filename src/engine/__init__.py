@@ -96,7 +96,7 @@ from src.engine.core.registry import (
     audio_registry,
     register_component,
 )
-from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
+from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.dsp.effects.compressor import Compressor
 from src.engine.dsp.effects.delay import Delay
 from src.engine.dsp.effects.distortion import Distortion

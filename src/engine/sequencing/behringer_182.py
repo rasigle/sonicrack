@@ -233,7 +233,9 @@ class Behringer182Sequencer(AudioComponent):
 
     def _advance_step(self) -> bool:
         if self.direction == "reverse":
-            next_step = self.steps - 1 if self._active_step < 0 else self._active_step - 1
+            next_step = (
+                self.steps - 1 if self._active_step < 0 else self._active_step - 1
+            )
             wrapped = next_step < 0
             self._set_step(self.steps - 1 if wrapped else next_step)
             return wrapped
@@ -265,7 +267,9 @@ class Behringer182Sequencer(AudioComponent):
         self._samples_in_step = 0
 
     @staticmethod
-    def _fit_steps(values: list[float] | np.ndarray | None, default: float) -> np.ndarray:
+    def _fit_steps(
+        values: list[float] | np.ndarray | None, default: float
+    ) -> np.ndarray:
         if values is None:
             values = [default] * 8
         raw = np.asarray(values, dtype=np.float32).reshape(-1)

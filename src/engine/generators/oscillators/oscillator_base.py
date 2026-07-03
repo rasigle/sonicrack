@@ -7,7 +7,7 @@ import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.core.component import Generator
-from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
+from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.math import db_to_linear, linear_to_db
 from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples

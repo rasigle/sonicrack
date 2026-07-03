@@ -71,9 +71,10 @@ from src.engine.core.component import (
     ParameterDescriptor,
 )
 from src.engine.core.registry import ComponentCategory, register_component
-from src.engine.core.sample_mode import SampleMode, VALID_SAMPLE_MODES
+from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.generators.oscillators.oscillator import Oscillator
 from src.engine.utils.validation import validate_sample_count
+
 
 class ModulationLane(StrEnum):
     """Internal modulation lanes supported by ModulatedOscillator."""
@@ -389,9 +390,11 @@ class ModulatedOscillator(Generator):
             n=n,
             base_value=0.0,
             mod_arrays=mod_arrays,
-            mod_func=None
-            if self.fm_mod is None
-            else lambda _base, mod_val: self.fm_mod(freqs, mod_val),
+            mod_func=(
+                None
+                if self.fm_mod is None
+                else lambda _base, mod_val: self.fm_mod(freqs, mod_val)
+            ),
             mod_index=self._get_modulation_index(ModulationLane.FM),
         )
         if fm_freqs is not None:

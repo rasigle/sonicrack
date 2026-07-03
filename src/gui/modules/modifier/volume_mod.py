@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from src.constants import DEFAULT_GAIN_DB
-from src.engine import ModulatedVolume, Volume
+from src.engine import ModulatedVolume, Volume, apply_vectorized_gain
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
@@ -122,12 +122,23 @@ class VolumeModule(ModulatedModuleBase):
         input_signal = read_samples(self.in_port, num_samples)
 
         if self.mod_port.is_connected:
-            gain = read_samples(self.mod_port, num_samples)
-            gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)
-            base_gain = 10.0 ** (gain_db / 20.0)
-            self.out_port.write(input_signal * base_gain * gain)
+            # Read modulation signal (linear gain multiplier, typically 0-1)
+            mod_gain = read_samples(self.mod_port, num_samples)
+            base_gain_db = float_parameter(
+                parameters, "gain_db", self.gain_knob.get_value
+            )
+
+            # Use engine's utility function to apply base gain + modulation
+            # First apply base gain in dB
+            signal_with_base_gain = apply_vectorized_gain(
+                input_signal, base_gain_db, is_db=True
+            )
+            # Then apply modulation (linear multiplier)
+            result = apply_vectorized_gain(signal_with_base_gain, mod_gain, is_db=False)
+            self.out_port.write(result)
             return
 
+        # Unmodulated path: use Volume component
         if self.component is None or isinstance(self.component, ModulatedVolume):
             self.component = Volume(
                 gain_db=float_parameter(parameters, "gain_db", self.gain_knob.get_value)

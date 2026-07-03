@@ -36,13 +36,21 @@ def test_oscillator_has_smoothing_state(osc_class, name):
         f"{name} missing _smoothing_samples_duration_total!"
     )
 
-    # Note: After construction, __iter__() is called which sets amplitude,
-    # triggering initial smoothing. This is expected behavior.
-    assert osc._smoothing_samples_remaining > 0, (
-        f"{name} should have initial smoothing active"
+    # After construction with RuntimeParameter, there's no smoothing needed
+    # since current value equals target value (no change occurred)
+    assert osc._smoothing_samples_remaining == 0, (
+        f"{name} should have no smoothing active initially (no value change)"
     )
 
-    # Complete initial smoothing
+    # Now change the amplitude to trigger smoothing
+    osc.gain_db = -6
+
+    # Smoothing should now be active
+    assert osc._smoothing_samples_remaining > 0, (
+        f"{name} should have smoothing active after amplitude change"
+    )
+
+    # Complete the smoothing
     osc.get_samples_vectorized(osc._smoothing_samples_remaining)
 
     # Now smoothing should be complete

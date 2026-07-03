@@ -39,12 +39,13 @@ class TestPanner(unittest.TestCase):
         self.assertEqual(panner.position, 0.7)
 
     def test_initialization_rejects_out_of_range(self) -> None:
-        """Test panner rejects position values outside valid range."""
-        with self.assertRaises(ValueError):
-            Panner(-2.0)
+        """Test panner clamps position values to valid range."""
+        # Panner clips position to [-1, 1] rather than raising
+        panner1 = Panner(-2.0)
+        self.assertEqual(panner1.position, -1.0)
 
-        with self.assertRaises(ValueError):
-            Panner(2.0)
+        panner2 = Panner(2.0)
+        self.assertEqual(panner2.position, 1.0)
 
     def test_center_pan(self) -> None:
         """Test center panning produces equal left/right with constant power."""
@@ -201,15 +202,17 @@ class TestPanner(unittest.TestCase):
     def test_position_property_setter(self):
         """Test position property setter updates gains."""
         panner = Panner(0.0)
-        old_left = panner._left_gain
-        old_right = panner._right_gain
+        old_left = panner._target_left_gain
+        old_right = panner._target_right_gain
 
         panner.position = 1.0  # Full right
-        self.assertNotEqual(panner._left_gain, old_left)
-        self.assertNotEqual(panner._right_gain, old_right)
+        # Check target gains changed (smoothing will interpolate to these)
+        self.assertNotEqual(panner._target_left_gain, old_left)
+        self.assertNotEqual(panner._target_right_gain, old_right)
 
-        with self.assertRaises(ValueError):
-            panner.position = 2.0
+        # Out of range values are clipped, not rejected
+        panner.position = 2.0
+        self.assertEqual(panner.position, 1.0)
 
     def test_call_with_scalar(self):
         """Test panner with scalar input."""

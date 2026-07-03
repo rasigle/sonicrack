@@ -12,6 +12,7 @@ from src.engine.core.component import (
     ComponentDescriptor,
     ParameterDescriptor,
 )
+from src.engine.core.parameter import RuntimeParameter, SmoothingPolicy
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.dsp.modifiers.base import (
     Modifier,
@@ -19,8 +20,7 @@ from src.engine.dsp.modifiers.base import (
     _get_next_modulation_value,
     _validate_modulator,
 )
-from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples
-from src.engine.utils.validation import validate_numeric_range, validate_sample_rate
+from src.engine.utils.validation import validate_sample_rate
 
 logger = logging.getLogger(__name__)
 
@@ -92,22 +92,35 @@ class Panner(Modifier):
         self.sample_rate = validate_sample_rate(sample_rate)
         self.smoothing_time_ms = smoothing_time_ms
 
-        self._position = validate_numeric_range(position, -1.0, 1.0, name="position")
+        # Calculate initial gains from position
+        position = float(np.clip(position, -1.0, 1.0))
+        angle = (position + 1.0) * np.pi / 4.0
+        initial_left = float(np.cos(angle))
+        initial_right = float(np.sin(angle))
 
-        # Precompute gains
-        self._left_gain: float = 0.0
-        self._right_gain: float = 0.0
-        self._update_gains()
-
-        # Pan smoothing to prevent clicks when changing pan position
-        self._target_left_gain = self._left_gain
-        self._target_right_gain = self._right_gain
-        self._current_left_gain = self._left_gain  # Start at current position
-        self._current_right_gain = self._right_gain  # Start at current position
-        self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = duration_ms_to_samples(
-            self.sample_rate, self.smoothing_time_ms, name="smoothing_time_ms"
+        # Create RuntimeParameters for left/right gains with smoothing
+        left_gain_descriptor = ParameterDescriptor(
+            name="left_gain",
+            default=initial_left,
+            minimum=0.0,
+            maximum=1.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=smoothing_time_ms,
         )
+        self._left_gain_param = RuntimeParameter(left_gain_descriptor, sample_rate)
+
+        right_gain_descriptor = ParameterDescriptor(
+            name="right_gain",
+            default=initial_right,
+            minimum=0.0,
+            maximum=1.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=smoothing_time_ms,
+        )
+        self._right_gain_param = RuntimeParameter(right_gain_descriptor, sample_rate)
+
+        # Store the position value (for property getter)
+        self._position = position
 
     @property
     def position(self) -> float:
@@ -117,21 +130,28 @@ class Panner(Modifier):
     @position.setter
     def position(self, value: float):
         """Set pan position and update gains with smoothing."""
-        self._position = validate_numeric_range(value, -1.0, 1.0, name="position")
-        self._update_gains()
+        # Validate and clip position
+        value = float(np.clip(value, -1.0, 1.0))
+        self._position = value
 
-        # Initiate smooth transition (prevents clicks)
-        self._target_left_gain = self._left_gain
-        self._target_right_gain = self._right_gain
-        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        # Calculate new gains using constant-power law
+        angle = (value + 1.0) * np.pi / 4.0
+        new_left = float(np.cos(angle))
+        new_right = float(np.sin(angle))
+
+        # Update RuntimeParameters - they will handle smoothing
+        self._left_gain_param.value = new_left
+        self._right_gain_param.value = new_right
 
     def _update_gains(self) -> None:
         """Update left/right gains based on position using constant-power law."""
-        # Convert position from [-1, 1] to angle [0, π/2]
-        # -1.0 -> 0 (all left), 0.0 -> π/4 (center), 1.0 -> π/2 (all right)
+        # This method is now replaced by the position setter
+        # Kept for backward compatibility but not used internally
         angle = (self._position + 1.0) * np.pi / 4.0
-        self._left_gain = np.cos(angle)
-        self._right_gain = np.sin(angle)
+        new_left = float(np.cos(angle))
+        new_right = float(np.sin(angle))
+        self._left_gain_param.value = new_left
+        self._right_gain_param.value = new_right
 
     def __call__(
         self, val: float | np.ndarray
@@ -144,10 +164,15 @@ class Panner(Modifier):
         Returns:
             Tuple of (left, right) stereo values or arrays.
         """
-        if isinstance(val, np.ndarray):
-            return self._left_gain * val, self._right_gain * val
+        # For scalar calls, use target value for instant response (no smoothing)
+        # This is important for modulated panning where rapid changes are expected
+        left_gain = self._left_gain_param._target_value
+        right_gain = self._right_gain_param._target_value
 
-        return self._left_gain * val, self._right_gain * val
+        if isinstance(val, np.ndarray):
+            return left_gain * val, right_gain * val
+
+        return left_gain * val, right_gain * val
 
     def pan_vectorized(self, samples: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Apply panning to an array of samples (vectorized with smoothing).
@@ -160,36 +185,58 @@ class Panner(Modifier):
         """
         n = len(samples)
 
-        if self._smoothing_samples_remaining > 0:
-            remaining = self._smoothing_samples_remaining
-            left_envelope, self._current_left_gain, new_remaining = consume_linear_ramp(
-                self._current_left_gain,
-                self._target_left_gain,
-                remaining,
-                n,
-            )
-            right_envelope, self._current_right_gain, _ = consume_linear_ramp(
-                self._current_right_gain,
-                self._target_right_gain,
-                remaining,
-                n,
-            )
-            self._smoothing_samples_remaining = new_remaining
+        # Get smoothed gain envelopes from RuntimeParameters
+        left_envelope = self._left_gain_param.get_interpolated_buffer(n)
+        right_envelope = self._right_gain_param.get_interpolated_buffer(n)
 
-            if self._smoothing_samples_remaining <= 0:
-                self._current_left_gain = self._target_left_gain
-                self._current_right_gain = self._target_right_gain
+        return (
+            (samples * left_envelope).astype(np.float32),
+            (samples * right_envelope).astype(np.float32),
+        )
 
-            return (
-                (samples * left_envelope).astype(np.float32),
-                (samples * right_envelope).astype(np.float32),
-            )
+    # Backward-compatible properties for tests and legacy code
+    @property
+    def _left_gain(self) -> float:
+        """Backward compatibility: current left gain."""
+        return self._left_gain_param.value
 
-        # No smoothing needed - use target gains (which match
-        # _left_gain/_right_gain)
-        left = (self._target_left_gain * samples).astype(np.float32)
-        right = (self._target_right_gain * samples).astype(np.float32)
-        return left, right
+    @property
+    def _right_gain(self) -> float:
+        """Backward compatibility: current right gain."""
+        return self._right_gain_param.value
+
+    @property
+    def _target_left_gain(self) -> float:
+        """Backward compatibility: delegate to RuntimeParameter."""
+        return self._left_gain_param._target_value
+
+    @property
+    def _target_right_gain(self) -> float:
+        """Backward compatibility: delegate to RuntimeParameter."""
+        return self._right_gain_param._target_value
+
+    @property
+    def _current_left_gain(self) -> float:
+        """Backward compatibility: delegate to RuntimeParameter."""
+        return self._left_gain_param._current_value
+
+    @property
+    def _current_right_gain(self) -> float:
+        """Backward compatibility: delegate to RuntimeParameter."""
+        return self._right_gain_param._current_value
+
+    @property
+    def _smoothing_samples_remaining(self) -> int:
+        """Backward compatibility: return max of left/right smoothing remaining."""
+        return max(
+            self._left_gain_param._smoothing_samples_remaining,
+            self._right_gain_param._smoothing_samples_remaining,
+        )
+
+    @property
+    def _smoothing_duration_samples(self) -> int:
+        """Backward compatibility: delegate to RuntimeParameter."""
+        return self._left_gain_param._smoothing_duration_samples
 
 
 @register_component()
@@ -364,20 +411,32 @@ class ModulatedPanner(Panner):
         return np.clip(mod_values, -1.0, 1.0)
 
 
-def _apply_vectorized_panning(
-    samples: np.ndarray, mod_values: np.ndarray
+def apply_vectorized_panning(
+    samples: np.ndarray, 
+    positions: np.ndarray | float
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply constant-power panning using vectorized operations.
 
+    This is a public utility function that can be used by GUI modules
+    to apply panning without creating a Panner component instance.
+
     Args:
         samples: Mono input samples.
-        mod_values: Pan positions in range [-1, 1].
+        positions: Pan positions in range [-1, 1]. Can be a single float
+            or an array matching the length of samples.
 
     Returns:
         Tuple of (left, right) stereo arrays.
     """
+    # Ensure positions is an array
+    if isinstance(positions, (int, float)):
+        positions = np.full(len(samples), positions, dtype=np.float32)
+    
+    # Clip to valid range
+    positions = np.clip(positions, -1.0, 1.0)
+    
     # Convert to angles [0, π/2] - fully vectorized
-    angles = (mod_values + 1.0) * np.pi / 4.0
+    angles = (positions + 1.0) * np.pi / 4.0
 
     # Calculate gains using constant-power panning law
     left_gains = np.cos(angles)
@@ -388,3 +447,18 @@ def _apply_vectorized_panning(
     right = right_gains * samples
 
     return left.astype(np.float32), right.astype(np.float32)
+
+
+def _apply_vectorized_panning(
+    samples: np.ndarray, mod_values: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Legacy wrapper for apply_vectorized_panning (deprecated).
+
+    Args:
+        samples: Mono input samples.
+        mod_values: Pan positions in range [-1, 1].
+
+    Returns:
+        Tuple of (left, right) stereo arrays.
+    """
+    return apply_vectorized_panning(samples, mod_values)

@@ -13,6 +13,7 @@ from src.engine.core.component import (
     ComponentDescriptor,
     ParameterDescriptor,
 )
+from src.engine.core.parameter import AutomationMode, RuntimeParameter, SmoothingPolicy
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.dsp.modifiers.base import (
     Modifier,
@@ -23,10 +24,76 @@ from src.engine.dsp.modifiers.base import (
 from src.engine.generators.oscillators.oscillator import _derive_amplitude_from_init
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.math import db_to_linear, linear_to_db
-from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.utils.validation import validate_sample_rate
 
 logger = logging.getLogger(__name__)
+
+
+def apply_vectorized_gain(
+    samples: np.ndarray,
+    gain_values: np.ndarray | float,
+    is_db: bool = False
+) -> np.ndarray:
+    """Apply gain to samples using vectorized operations.
+
+    This is a public utility function that can be used by GUI modules
+    to apply gain without creating a Volume component instance.
+
+    Args:
+        samples: Input samples (mono or stereo).
+        gain_values: Gain values to apply. Can be a single float or an array
+            matching the length of samples.
+        is_db: If True, gain_values are in dB and will be converted to linear.
+            If False, gain_values are linear multipliers.
+
+    Returns:
+        Samples with gain applied (float32).
+    """
+    # Convert dB to linear if needed
+    if is_db:
+        if isinstance(gain_values, (int, float)):
+            gain_values = db_to_linear(gain_values)
+        else:
+            gain_values = db_to_linear(gain_values)
+
+    # Ensure gain_values is an array
+    if isinstance(gain_values, (int, float)):
+        result = samples * gain_values
+    else:
+        # Handle multi-dimensional samples (e.g., stereo)
+        if samples.ndim > 1:
+            gain_values = gain_values.reshape(-1, *([1] * (samples.ndim - 1)))
+        result = samples * gain_values
+
+    return result.astype(np.float32)
+
+
+def apply_vectorized_clip(
+    samples: np.ndarray,
+    threshold_values: np.ndarray | float
+) -> np.ndarray:
+    """Apply clipping to samples using vectorized operations.
+
+    This is a public utility function that can be used by GUI modules
+    to apply clipping without creating a Clipper component instance.
+
+    Args:
+        samples: Input samples (mono or stereo).
+        threshold_values: Threshold values (positive). Can be a single float
+            or an array matching the length of samples. Samples will be
+            clipped to [-threshold, +threshold].
+
+    Returns:
+        Clipped samples (float32).
+    """
+    # Ensure threshold is positive
+    if isinstance(threshold_values, (int, float)):
+        threshold_values = abs(threshold_values)
+        return np.clip(samples, -threshold_values, threshold_values).astype(np.float32)
+    else:
+        threshold_values = np.abs(threshold_values)
+        # For array thresholds, clip each sample independently
+        return np.clip(samples, -threshold_values, threshold_values).astype(np.float32)
 
 
 @register_component()
@@ -79,12 +146,18 @@ class Volume(Modifier):
                 default=1.0,
                 minimum=0.0,
                 description="Linear gain multiplier.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=10.0,
+                automation_mode=AutomationMode.AUDIO_RATE,
             ),
             "gain_db": ParameterDescriptor(
                 name="gain_db",
                 default=DEFAULT_GAIN_DB,
                 unit="dB",
                 description="Gain in decibels.",
+                smoothing_policy=SmoothingPolicy.LOGARITHMIC,
+                smoothing_duration_ms=10.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
             ),
             "sample_rate": ParameterDescriptor(
                 name="sample_rate",
@@ -92,6 +165,8 @@ class Volume(Modifier):
                 minimum=1.0,
                 unit="Hz",
                 description="Processing sample rate.",
+                smoothing_policy=SmoothingPolicy.NONE,
+                automation_mode=AutomationMode.NONE,
             ),
             "smoothing_time_ms": ParameterDescriptor(
                 name="smoothing_time_ms",
@@ -99,6 +174,8 @@ class Volume(Modifier):
                 minimum=0.0,
                 unit="ms",
                 description="Gain smoothing duration.",
+                smoothing_policy=SmoothingPolicy.NONE,
+                automation_mode=AutomationMode.CONTROL_RATE,
             ),
         },
         tags=["modifier", "gain_db", "volume", "amplitude", "gain", "db"],
@@ -126,9 +203,8 @@ class Volume(Modifier):
         """
         super().__init__()
         self.sample_rate = validate_sample_rate(sample_rate)
-        self.smoothing_time_ms = smoothing_time_ms
 
-        # Input validation
+        # Determine initial amplitude
         if not isinstance(amplitude, (int, float, np.number)):
             raise TypeError(
                 f"Amplitude must be a number, got {type(amplitude).__name__}"
@@ -136,21 +212,73 @@ class Volume(Modifier):
         if amplitude < 0:
             raise ValueError(f"Amplitude must be non-negative, got {amplitude}")
 
-        self._amplitude = _derive_amplitude_from_init(
+        initial_amplitude = _derive_amplitude_from_init(
             self._provided_args,
             amplitude,
-            gain_db,  # noqa
+            gain_db,
         )
 
-        # Amplitude smoothing to prevent clicks when changing gain
-        self._target_amplitude = self._amplitude
-        self._current_amplitude = self._amplitude
-        self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = duration_ms_to_samples(
-            self.sample_rate, self.smoothing_time_ms, name="smoothing_time_ms"
+        # Create RuntimeParameters with appropriate smoothing policies
+        # amplitude: LINEAR smoothing in amplitude space
+        amplitude_descriptor = ParameterDescriptor(
+            name="amplitude",
+            default=initial_amplitude,
+            minimum=0.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=smoothing_time_ms,
+            automation_mode=AutomationMode.AUDIO_RATE,
         )
+        self._amplitude_param = RuntimeParameter(amplitude_descriptor, sample_rate)
 
-        logger.debug(f"Volume initialized with amplitude: {self._amplitude}")
+        # gain_db: LOGARITHMIC smoothing in dB space
+        gain_db_descriptor = ParameterDescriptor(
+            name="gain_db",
+            default=linear_to_db(initial_amplitude),
+            smoothing_policy=SmoothingPolicy.LOGARITHMIC,
+            smoothing_duration_ms=smoothing_time_ms,
+            automation_mode=AutomationMode.CONTROL_RATE,
+        )
+        self._gain_db_param = RuntimeParameter(gain_db_descriptor, sample_rate)
+
+        # Track which parameter is active for smoothing
+        self._active_param = "amplitude"  # or 'gain_db'
+
+        # Store smoothing_time_ms for backward compatibility
+        self.smoothing_time_ms = smoothing_time_ms
+
+        logger.debug(f"Volume initialized with amplitude: {initial_amplitude}")
+
+    @property
+    def _smoothing_samples_remaining(self) -> int:
+        """Backward compatibility: return smoothing samples from active parameter."""
+        if self._active_param == "amplitude":
+            return self._amplitude_param._smoothing_samples_remaining
+        else:
+            return self._gain_db_param._smoothing_samples_remaining
+
+    @property
+    def _smoothing_duration_samples(self) -> int:
+        """Backward compatibility: return smoothing duration in samples."""
+        if self._active_param == "amplitude":
+            return self._amplitude_param._smoothing_duration_samples
+        else:
+            return self._gain_db_param._smoothing_duration_samples
+
+    @property
+    def _target_amplitude(self) -> float:
+        """Backward compatibility: return target amplitude."""
+        if self._active_param == "amplitude":
+            return self._amplitude_param.target
+        else:
+            return db_to_linear(self._gain_db_param.target)
+
+    @property
+    def _current_amplitude(self) -> float:
+        """Backward compatibility: return current amplitude."""
+        if self._active_param == "amplitude":
+            return self._amplitude_param.value
+        else:
+            return db_to_linear(self._gain_db_param.value)
 
     @property
     def amplitude(self) -> float:
@@ -160,17 +288,19 @@ class Volume(Modifier):
 
         Returns the target amplitude (the value you set), not the smoothed value.
         """
-        return self._target_amplitude
+        return self._amplitude_param.target
 
     @amplitude.setter
     def amplitude(self, value: float):
         if value < 0:
             raise ValueError(f"amplitude must be non-negative, got {value}")
 
-        #  Don't update _amplitude immediately. Initiate smooth transition to
-        #  prevent clicks.
-        self._target_amplitude = float(value)
-        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        # Set amplitude parameter (triggers LINEAR smoothing)
+        self._amplitude_param.value = value
+        # Update gain_db to stay in sync (no smoothing trigger)
+        self._gain_db_param._target_value = linear_to_db(value)
+        self._gain_db_param._current_value = linear_to_db(self._amplitude_param.value)
+        self._active_param = "amplitude"
 
     @property
     def gain_db(self) -> float:
@@ -184,16 +314,17 @@ class Volume(Modifier):
 
         Returns the target gain (the value you set), not the smoothed value.
         """
-        return linear_to_db(self._target_amplitude)
+        return self._gain_db_param.target
 
     @gain_db.setter
     def gain_db(self, value: float):
-        new_amplitude = float(db_to_linear(value))
-
-        #  Don't update _amplitude immediately. Initiate smooth transition to
-        #  prevent clicks.
-        self._target_amplitude = new_amplitude
-        self._smoothing_samples_remaining = self._smoothing_duration_samples
+        # Set gain_db parameter (triggers LOGARITHMIC smoothing in dB space)
+        self._gain_db_param.value = value
+        # Update amplitude to stay in sync (no smoothing trigger)
+        new_amplitude = db_to_linear(value)
+        self._amplitude_param._target_value = new_amplitude
+        self._amplitude_param._current_value = db_to_linear(self._gain_db_param.value)
+        self._active_param = "gain_db"
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray
@@ -211,27 +342,9 @@ class Volume(Modifier):
         """
         # Scalar input
         if isinstance(val, (float, int, np.number)):
-            if self._smoothing_samples_remaining > 0:
-                (
-                    amp_envelope,
-                    self._current_amplitude,
-                    self._smoothing_samples_remaining,
-                ) = consume_linear_ramp(
-                    self._current_amplitude,
-                    self._target_amplitude,
-                    self._smoothing_samples_remaining,
-                    1,
-                )
-                result = val * amp_envelope[0]
-
-                if self._smoothing_samples_remaining <= 0:
-                    self._current_amplitude = self._target_amplitude
-                    self._amplitude = self._target_amplitude  # Update _amplitude too!
-
-                return float(result)
-
-            # No smoothing needed - direct multiplication
-            return float(val * self._amplitude)
+            # Get current amplitude (with smoothing if active)
+            amp = self._get_current_amplitude()
+            return float(val * amp)
 
         # Vectorized input
         if isinstance(val, (tuple, np.ndarray, Iterable)):
@@ -242,6 +355,13 @@ class Volume(Modifier):
             f"Input value must be an int, float, numpy number, array, or Iterable. "
             f"Got {type(val)}"
         )
+
+    def _get_current_amplitude(self) -> float:
+        """Get current amplitude value, handling smoothing."""
+        if self._active_param == "amplitude":
+            return self._amplitude_param.value
+        else:  # gain_db
+            return db_to_linear(self._gain_db_param.value)
 
     def _scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
         """Apply volume scaling to array of samples (vectorized).
@@ -254,29 +374,25 @@ class Volume(Modifier):
         """
         n = len(samples)
 
-        if self._smoothing_samples_remaining > 0:
-            amp_envelope, self._current_amplitude, self._smoothing_samples_remaining = (
-                consume_linear_ramp(
-                    self._current_amplitude,
-                    self._target_amplitude,
-                    self._smoothing_samples_remaining,
-                    n,
-                )
-            )
-            if samples.ndim > 1:
-                amp_envelope = amp_envelope.reshape(
-                    -1, *([1] * (samples.ndim - 1))
-                )
-            result = samples * amp_envelope
-
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
-                self._amplitude = self._target_amplitude  # Update _amplitude too!
-
-            return result.astype(np.float32)
+        # Check if smoothing is active
+        if self._active_param == "amplitude" and self._amplitude_param.is_smoothing:
+            # Get amplitude envelope (LINEAR smoothing)
+            amp_envelope = self._amplitude_param.get_interpolated_buffer(n)
+        elif self._active_param == "gain_db" and self._gain_db_param.is_smoothing:
+            # Get gain_db envelope (LOGARITHMIC smoothing) and convert to amplitude
+            gain_db_envelope = self._gain_db_param.get_interpolated_buffer(n)
+            amp_envelope = db_to_linear(gain_db_envelope)
         else:
-            # No smoothing needed - direct multiplication
-            return (samples * self._amplitude).astype(np.float32)
+            # No smoothing - use constant value
+            amp = self._get_current_amplitude()
+            return (samples * amp).astype(np.float32)
+
+        # Apply envelope
+        if samples.ndim > 1:
+            amp_envelope = amp_envelope.reshape(-1, *([1] * (samples.ndim - 1)))
+
+        result = samples * amp_envelope
+        return result.astype(np.float32)
 
 
 @register_component()

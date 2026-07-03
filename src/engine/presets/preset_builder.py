@@ -775,7 +775,9 @@ class PresetBuilder:
     def _call_component_method(
         self, component_type: str, params: dict[str, Any], **extra_kwargs: Any
     ) -> None:
-        method = self._component_methods.get(self._component_method_name(component_type))
+        method = self._component_methods.get(
+            self._component_method_name(component_type)
+        )
         if method:
             method(**params, **extra_kwargs)
         else:

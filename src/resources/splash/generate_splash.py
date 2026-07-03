@@ -287,12 +287,12 @@ if __name__ == "__main__":
     from PyQt6.QtWidgets import QSplashScreen
     from PyQt6.QtGui import QPixmap
     from PyQt6.QtCore import Qt
-    
+
     splash = QSplashScreen(QPixmap('resources/splash.png'))
     splash.show()
     app.processEvents()
-    
+
     # ... load modules ...
-    
+
     splash.finish(main_window)
     """)

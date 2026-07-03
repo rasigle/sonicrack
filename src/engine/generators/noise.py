@@ -72,12 +72,12 @@ from src.engine.core.component import (
     ParameterDescriptor,
     make_parameter_descriptors,
 )
+from src.engine.core.parameter import RuntimeParameter, SmoothingPolicy
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.generators.oscillators.oscillator import _derive_amplitude_from_init
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.math import db_to_linear, linear_to_db
-from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
 
@@ -794,40 +794,49 @@ class NoiseGenerator(Generator):
         self.noise_type: str = noise_type
 
         # Handle amplitude vs gain_db priority (same as oscillators)
-        self._amplitude = _derive_amplitude_from_init(
+        initial_amplitude = _derive_amplitude_from_init(
             self._provided_args,
             amplitude,
             gain_db,  # noqa
         )
 
         # Amplitude smoothing to prevent clicks when changing gain
-        self._target_amplitude = self._amplitude
-        self._current_amplitude = self._amplitude
-        self._smoothing_samples_remaining = 0
-        self._smoothing_duration_samples = duration_ms_to_samples(
-            self.sample_rate, 10.0, min_samples=1
+        amplitude_descriptor = ParameterDescriptor(
+            name="amplitude",
+            default=initial_amplitude,
+            minimum=0.0,
+            maximum=10.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=10.0,
         )
+        self._amplitude_param = RuntimeParameter(amplitude_descriptor, self.sample_rate)
 
         self._buffer: np.ndarray | None = None
         self._buffer_index: int = 0
         self._buffer_size: int = 1024  # Generate in chunks for efficiency
 
     @property
+    def _smoothing_duration_samples(self) -> int:
+        """Backward-compatible property for smoothing duration in samples."""
+        return self._amplitude_param._smoothing_duration_samples
+
+    @property
     def amplitude(self) -> float:
         """float: Current amplitude multiplier (linear scale).
 
         For audio work, consider using the gain_db property instead.
+
+        Returns the target amplitude value (what was set), not the current
+        smoothed value. Smoothing is an internal implementation detail.
         """
-        return self._amplitude
+        return self._amplitude_param._target_value
 
     @amplitude.setter
     def amplitude(self, value: float):
         if value < 0:
             raise ValueError(f"amplitude must be non-negative, got {value}")
-        # Initiate smooth transition (prevents clicks)
-        self._target_amplitude = float(value)
-        self._smoothing_samples_remaining = self._smoothing_duration_samples
-        self._amplitude = float(value)
+        # Parameter handles smooth transition automatically
+        self._amplitude_param.value = float(value)
 
     @property
     def gain_db(self) -> float:
@@ -838,16 +847,17 @@ class NoiseGenerator(Generator):
             -6 dB = half amplitude
             -20 dB = 1/10 amplitude
             -∞ dB = silence
+
+        Returns the target gain value (what was set), not the current
+        smoothed value. Smoothing is an internal implementation detail.
         """
-        return linear_to_db(self._amplitude)
+        return linear_to_db(self._amplitude_param._target_value)
 
     @gain_db.setter
     def gain_db(self, value: float):
         new_amplitude = float(db_to_linear(value))
-        # Initiate smooth transition (prevents clicks)
-        self._target_amplitude = new_amplitude
-        self._smoothing_samples_remaining = self._smoothing_duration_samples
-        self._amplitude = new_amplitude
+        # Parameter handles smooth transition automatically
+        self._amplitude_param.value = new_amplitude
 
     def __iter__(self):
         """Initialize iterator (required for iterator protocol)."""
@@ -913,21 +923,9 @@ class NoiseGenerator(Generator):
         if len(samples) == 0:
             return np.empty(0, dtype=np.float32)
 
-        if self._smoothing_samples_remaining > 0:
-            envelope, self._current_amplitude, self._smoothing_samples_remaining = (
-                consume_linear_ramp(
-                    self._current_amplitude,
-                    self._target_amplitude,
-                    self._smoothing_samples_remaining,
-                    len(samples),
-                )
-            )
-            if self._smoothing_samples_remaining <= 0:
-                self._amplitude = self._target_amplitude
-            return (samples * envelope).astype(np.float32)
-
-        self._current_amplitude = self._amplitude
-        return (samples * self._amplitude).astype(np.float32)
+        # Get smoothed amplitude envelope from RuntimeParameter
+        envelope = self._amplitude_param.get_interpolated_buffer(len(samples))
+        return (samples * envelope).astype(np.float32)
 
     def get_samples(
         self, num_samples: int, reset: bool = True, mode: SampleMode = "auto"

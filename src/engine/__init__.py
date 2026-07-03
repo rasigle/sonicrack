@@ -91,6 +91,12 @@ from src.engine.core.component import (
     make_parameter_descriptors,
 )
 from src.engine.core.composer import Chain, Composer, WaveAdder
+from src.engine.core.parameter import (
+    AutomationMode,
+    ParameterRegistry,
+    RuntimeParameter,
+    SmoothingPolicy,
+)
 from src.engine.core.registry import (
     AudioComponentRegistry,
     audio_registry,
@@ -113,10 +119,16 @@ from src.engine.dsp.modifiers.amplitude import (
     ModulatedClipper,
     ModulatedVolume,
     Volume,
+    apply_vectorized_clip,
+    apply_vectorized_gain,
 )
 from src.engine.dsp.modifiers.base import Modifier
 from src.engine.dsp.modifiers.frequency import Frequency
-from src.engine.dsp.modifiers.panning import ModulatedPanner, Panner
+from src.engine.dsp.modifiers.panning import (
+    ModulatedPanner,
+    Panner,
+    apply_vectorized_panning,
+)
 from src.engine.dsp.modulators.base import Modulator
 from src.engine.dsp.modulators.envelopes import (
     ADSREnvelope,
@@ -182,6 +194,10 @@ __all__ = [
     "ComponentDescriptor",
     "ParameterDescriptor",
     "make_parameter_descriptors",
+    "AutomationMode",
+    "SmoothingPolicy",
+    "RuntimeParameter",
+    "ParameterRegistry",
     "AudioComponentRegistry",
     "register_component",
     "audio_registry",
@@ -204,12 +220,15 @@ __all__ = [
     "Modifier",
     "Panner",
     "ModulatedPanner",
+    "apply_vectorized_panning",
     "Volume",
     "ModulatedVolume",
+    "apply_vectorized_gain",
     "Frequency",
     "ModulatedFrequency",
     "Clipper",
     "ModulatedClipper",
+    "apply_vectorized_clip",
     "CVScaler",
     "PITCH_CV_REFERENCE_NOTE",
     "PITCH_CV_REFERENCE_FREQUENCY",

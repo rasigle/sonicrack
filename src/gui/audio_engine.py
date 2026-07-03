@@ -222,7 +222,9 @@ class RenderContext:
         if len(value) == self.num_samples:
             return value.copy()
         if len(value) < self.num_samples:
-            padded = np.zeros(self.num_samples, dtype=value.dtype)
+            # Preserve shape for multi-dimensional arrays (e.g., stereo)
+            target_shape = (self.num_samples,) + value.shape[1:]
+            padded = np.zeros(target_shape, dtype=value.dtype)
             padded[: len(value)] = value
             return padded
         return value[: self.num_samples].copy()

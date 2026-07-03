@@ -4,7 +4,7 @@ import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from src.engine import ModulatedPanner, Panner
+from src.engine import ModulatedPanner, Panner, apply_vectorized_panning
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
@@ -62,6 +62,9 @@ class PannerModule(ModulatedModuleBase):
         # Set control_knob for base class functionality
         self.control_knob = self.pan_knob
 
+        # Create initial unmodulated component
+        self.component = self.create_unmodulated_component()
+
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
         """Panner requires the In port to be connected."""
@@ -92,17 +95,32 @@ class PannerModule(ModulatedModuleBase):
             return
 
         samples = read_samples(self.in_port, num_samples)
-        position = float_parameter(parameters, "position", self.pan_knob.get_value)
 
-        if samples.ndim == 1:
-            left_gain = np.sqrt(0.5 * (1.0 - position))
-            right_gain = np.sqrt(0.5 * (1.0 + position))
-            self.out_port.write(
-                np.column_stack((samples * left_gain, samples * right_gain))
+        # Handle modulation if connected
+        if self.mod_port.is_connected:
+            # Read modulation signal (expected range -1 to 1 for pan position)
+            mod_values = read_samples(self.mod_port, num_samples)
+            base_position = float_parameter(
+                parameters, "position", self.pan_knob.get_value
             )
+
+            # Combine base position with modulation
+            positions = base_position + mod_values
+
+            # Use engine's vectorized panning function (handles clamping internally)
+            left, right = apply_vectorized_panning(samples, positions)
+            self.out_port.write(np.column_stack((left, right)))
             return
 
-        panned = samples.copy()
-        panned[:, 0] *= np.sqrt(0.5 * (1.0 - position))
-        panned[:, 1] *= np.sqrt(0.5 * (1.0 + position))
-        self.out_port.write(panned)
+        # Unmodulated path: use Panner component
+        if self.component is None or isinstance(self.component, ModulatedPanner):
+            self.component = Panner(
+                float_parameter(parameters, "position", self.pan_knob.get_value)
+            )
+        else:
+            self.component.position = float_parameter(
+                parameters, "position", self.pan_knob.get_value
+            )
+
+        left, right = self.component.pan_vectorized(samples)
+        self.out_port.write(np.column_stack((left, right)))

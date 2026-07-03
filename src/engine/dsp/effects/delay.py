@@ -12,6 +12,7 @@ from src.engine.core.component import (
     ComponentDescriptor,
     ParameterDescriptor,
 )
+from src.engine.core.parameter import AutomationMode, RuntimeParameter, SmoothingPolicy
 from src.engine.core.registry import register_component
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.dsp.modifiers.base import Modifier
@@ -54,6 +55,9 @@ class Delay(Modifier):
                 maximum=2.0,
                 unit="s",
                 description="Delay time.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=100.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
             ),
             "feedback": ParameterDescriptor(
                 name="feedback",
@@ -61,6 +65,9 @@ class Delay(Modifier):
                 minimum=0.0,
                 maximum=0.95,
                 description="Delay feedback amount.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=50.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
             ),
             "mix": ParameterDescriptor(
                 name="mix",
@@ -68,6 +75,9 @@ class Delay(Modifier):
                 minimum=0.0,
                 maximum=1.0,
                 description="Dry/wet mix.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=20.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
             ),
             "sample_rate": ParameterDescriptor(
                 name="sample_rate",
@@ -75,6 +85,8 @@ class Delay(Modifier):
                 minimum=1.0,
                 unit="Hz",
                 description="Processing sample rate.",
+                smoothing_policy=SmoothingPolicy.NONE,
+                automation_mode=AutomationMode.NONE,
             ),
         },
         fluent_api_name="delay",
@@ -107,11 +119,42 @@ class Delay(Modifier):
         super().__init__(*args, **kwargs)
         self.source = source  # Optional!
         self._sample_rate = validate_sample_rate(sample_rate)
+
+        # Create RuntimeParameters with validation and smoothing from descriptors
+        # Get descriptor from class for proper smoothing settings
+        feedback_descriptor = self.descriptor.parameters["feedback"]
+        self._feedback_param = RuntimeParameter(
+            ParameterDescriptor(
+                name="feedback",
+                default=feedback,
+                minimum=feedback_descriptor.minimum,
+                maximum=feedback_descriptor.maximum,
+                smoothing_policy=feedback_descriptor.smoothing_policy,
+                smoothing_duration_ms=feedback_descriptor.smoothing_duration_ms,
+                automation_mode=feedback_descriptor.automation_mode,
+            ),
+            sample_rate,
+        )
+
+        mix_descriptor = self.descriptor.parameters["mix"]
+        self._mix_param = RuntimeParameter(
+            ParameterDescriptor(
+                name="mix",
+                default=mix,
+                minimum=mix_descriptor.minimum,
+                maximum=mix_descriptor.maximum,
+                smoothing_policy=mix_descriptor.smoothing_policy,
+                smoothing_duration_ms=mix_descriptor.smoothing_duration_ms,
+                automation_mode=mix_descriptor.automation_mode,
+            ),
+            sample_rate,
+        )
+
+        # Delay time changes require buffer recalculation, so no smoothing via
+        # RuntimeParameter
         self._delay_time = validate_numeric_range(
             delay_time, 0.001, 2.0, name="delay_time"
         )
-        self._feedback = validate_numeric_range(feedback, 0.0, 0.95, name="feedback")
-        self._mix = validate_numeric_range(mix, 0.0, 1.0, name="mix")
 
         # Create delay buffer (circular buffer)
         max_delay_samples = int(2.0 * self._sample_rate)  # Max 2 seconds
@@ -122,7 +165,7 @@ class Delay(Modifier):
 
         # Calculate delay in samples
         self._delay_samples = int(self._delay_time * self._sample_rate)
-        self._prev_feedback: float = self._feedback
+        self._prev_feedback: float = feedback
 
     def reset_buffer(self):
         """Clear the delay buffer to prevent clicks when reusing the delay."""
@@ -134,21 +177,23 @@ class Delay(Modifier):
         if sample_shape == self._sample_shape:
             return
         self._sample_shape = sample_shape
-        self._buffer = np.zeros(
-            (self._buffer_size, *sample_shape), dtype=np.float32
-        )
+        self._buffer = np.zeros((self._buffer_size, *sample_shape), dtype=np.float32)
         self._write_pos = 0
 
     def _process_frame(self, input_sample: float | np.ndarray) -> float | np.ndarray:
         sample = np.asarray(input_sample, dtype=np.float32)
         self._ensure_buffer_shape(sample.shape)
 
+        # Get current parameter values (no smoothing for single frame)
+        feedback = self._feedback_param.value
+        mix = self._mix_param.value
+
         read_pos = (self._write_pos - self._delay_samples) % self._buffer_size
         delayed_sample = self._buffer[read_pos].copy()
-        self._buffer[self._write_pos] = sample + delayed_sample * self._feedback
+        self._buffer[self._write_pos] = sample + delayed_sample * feedback
         self._write_pos = (self._write_pos + 1) % self._buffer_size
 
-        output = sample * (1.0 - self._mix) + delayed_sample * self._mix
+        output = sample * (1.0 - mix) + delayed_sample * mix
         if output.shape == ():
             return float(output)
         return output.astype(np.float32, copy=False)
@@ -161,14 +206,20 @@ class Delay(Modifier):
         self._ensure_buffer_shape(input_samples.shape[1:])
         output_samples = np.empty_like(input_samples, dtype=np.float32)
 
+        # Get smoothed parameter envelopes for the buffer
+        n = len(input_samples)
+        feedback_envelope = self._feedback_param.get_interpolated_buffer(n)
+        mix_envelope = self._mix_param.get_interpolated_buffer(n)
+
         for index, input_sample in enumerate(input_samples):
             read_pos = (self._write_pos - self._delay_samples) % self._buffer_size
             delayed_sample = self._buffer[read_pos].copy()
             output_samples[index] = (
-                input_sample * (1.0 - self._mix) + delayed_sample * self._mix
+                input_sample * (1.0 - mix_envelope[index])
+                + delayed_sample * mix_envelope[index]
             )
             self._buffer[self._write_pos] = (
-                input_sample + delayed_sample * self._feedback
+                input_sample + delayed_sample * feedback_envelope[index]
             )
             self._write_pos = (self._write_pos + 1) % self._buffer_size
 
@@ -195,31 +246,33 @@ class Delay(Modifier):
     @property
     def feedback(self) -> float:
         """float: Feedback amount (0.0-0.95)."""
-        return self._feedback
+        return self._feedback_param.value
 
     @feedback.setter
     def feedback(self, value: float):
-        """Set feedback amount."""
-        self._feedback = validate_numeric_range(value, 0.0, 0.95, name="feedback")
-        previous_feedback = getattr(self, "_prev_feedback", self._feedback)
+        """Set feedback amount with validation and smoothing."""
+        previous_feedback = getattr(self, "_prev_feedback", self._feedback_param.value)
+
+        # Set the new value (RuntimeParameter handles validation and smoothing)
+        self._feedback_param.value = value
 
         # If feedback is being reduced significantly, optionally reduce buffer content
         # to prevent lingering echoes that might sound like clicks
-        if previous_feedback > 0.7 and self._feedback < 0.3:
+        if previous_feedback > 0.7 and value < 0.3:
             # Fade out buffer content to prevent sudden silence
             self._buffer *= 0.5
 
-        self._prev_feedback = self._feedback
+        self._prev_feedback = value
 
     @property
     def mix(self) -> float:
         """float: Dry/wet mix (0.0-1.0)."""
-        return self._mix
+        return self._mix_param.value
 
     @mix.setter
     def mix(self, value: float):
-        """Set mix amount."""
-        self._mix = validate_numeric_range(value, 0.0, 1.0, name="mix")
+        """Set mix amount with validation and smoothing."""
+        self._mix_param.value = value
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray

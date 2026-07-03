@@ -6,11 +6,11 @@ from abc import abstractmethod
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.core.component import Generator
+from src.engine.core.component import Generator, ParameterDescriptor
+from src.engine.core.parameter import RuntimeParameter, SmoothingPolicy
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.math import db_to_linear, linear_to_db
-from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
 DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS = 10
@@ -53,12 +53,15 @@ class Oscillator(Generator):
         self._a = self._initial_amp
         self._p = self._phase
 
-        self._target_amplitude = self._initial_amp
-        self._current_amplitude = self._initial_amp
-        self._smoothing_samples_remaining = 0
-        self._smoothing_samples_duration_total = duration_ms_to_samples(
-            sample_rate, DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS
+        # Create RuntimeParameter for amplitude with LINEAR smoothing
+        amplitude_descriptor = ParameterDescriptor(
+            name="amplitude",
+            default=self._initial_amp,
+            minimum=0.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS,
         )
+        self._amplitude_param = RuntimeParameter(amplitude_descriptor, sample_rate)
 
         self._needs_range_conversion: bool = False
         self._range_scale: float = 1.0
@@ -112,8 +115,7 @@ class Oscillator(Generator):
 
     @amplitude.setter
     def amplitude(self, value):
-        self._target_amplitude = value
-        self._smoothing_samples_remaining = self._smoothing_samples_duration_total
+        self._amplitude_param.value = value
         self._a = value
         self._post_amp_set()
 
@@ -124,8 +126,7 @@ class Oscillator(Generator):
     @gain_db.setter
     def gain_db(self, value: float):
         new_amplitude = float(db_to_linear(value))
-        self._target_amplitude = new_amplitude
-        self._smoothing_samples_remaining = self._smoothing_samples_duration_total
+        self._amplitude_param.value = new_amplitude
         self._a = new_amplitude
         self._post_amp_set()
 
@@ -147,9 +148,7 @@ class Oscillator(Generator):
         value = validate_sample_rate(value)
         if value != self._sample_rate:
             self._sample_rate = value
-            self._smoothing_samples_duration_total = duration_ms_to_samples(
-                value, DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS
-            )
+            self._amplitude_param.sample_rate = value
             self._post_sample_rate_set()
 
     def _post_freq_set(self):
@@ -184,30 +183,50 @@ class Oscillator(Generator):
         if n == 0:
             return np.empty(0, dtype=np.float32)
 
-        if self._smoothing_samples_remaining > 0:
-            smooth_count = min(n, self._smoothing_samples_remaining)
-            amp_envelope, self._current_amplitude, self._smoothing_samples_remaining = (
-                consume_linear_ramp(
-                    self._current_amplitude,
-                    self._target_amplitude,
-                    self._smoothing_samples_remaining,
-                    smooth_count,
-                )
-            )
+        # Get smoothed amplitude envelope from RuntimeParameter
+        amp_envelope = self._amplitude_param.get_interpolated_buffer(n)
+        return (values * amp_envelope).astype(np.float32)
 
-            samples = np.empty(n, dtype=np.float32)
-            samples[:smooth_count] = values[:smooth_count] * amp_envelope
+    # Backward-compatible properties for tests and legacy code
+    @property
+    def _target_amplitude(self) -> float:
+        """Backward compatibility: delegate to RuntimeParameter."""
+        return self._amplitude_param._target_value
 
-            if smooth_count < n:
-                samples[smooth_count:] = values[smooth_count:] * self._target_amplitude
+    @_target_amplitude.setter
+    def _target_amplitude(self, value: float):
+        """Backward compatibility: delegate to RuntimeParameter."""
+        self._amplitude_param.value = value
 
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
+    @property
+    def _current_amplitude(self) -> float:
+        """Backward compatibility: delegate to RuntimeParameter."""
+        return self._amplitude_param._current_value
 
-            return samples.astype(np.float32)
+    @_current_amplitude.setter
+    def _current_amplitude(self, value: float):
+        """Backward compatibility: delegate to RuntimeParameter."""
+        self._amplitude_param._current_value = value
 
-        self._current_amplitude = self._a
-        return np.asarray(values * self._a, dtype=np.float32)
+    @property
+    def _smoothing_samples_remaining(self) -> int:
+        """Backward compatibility: delegate to RuntimeParameter."""
+        return self._amplitude_param._smoothing_samples_remaining
+
+    @_smoothing_samples_remaining.setter
+    def _smoothing_samples_remaining(self, value: int):
+        """Backward compatibility: delegate to RuntimeParameter."""
+        self._amplitude_param._smoothing_samples_remaining = value
+
+    @property
+    def _smoothing_samples_duration_total(self) -> int:
+        """Backward compatibility: delegate to RuntimeParameter."""
+        return self._amplitude_param._smoothing_duration_samples
+
+    @_smoothing_samples_duration_total.setter
+    def _smoothing_samples_duration_total(self, value: int):
+        """Backward compatibility: delegate to RuntimeParameter."""
+        self._amplitude_param._smoothing_duration_samples = value
 
     def __next__(self):
         return None

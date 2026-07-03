@@ -5,7 +5,7 @@ import logging
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from src.engine import Clipper, ModulatedClipper
+from src.engine import Clipper, ModulatedClipper, apply_vectorized_clip
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
@@ -51,7 +51,7 @@ class ClipperModulatedModule(ModulatedModuleBase):
             description="Sets the clipping threshold",
             min_value=0.0,
             max_value=1.0,
-            default_value=1.0,
+            default_value=0.5,
         )
         self.threshold_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -97,11 +97,26 @@ class ClipperModulatedModule(ModulatedModuleBase):
             return
 
         samples = read_samples(self.in_port, num_samples)
-        threshold = float_parameter(
+        base_threshold = float_parameter(
             parameters, "threshold", self.threshold_knob.get_value
         )
+
+        # Handle modulation if connected
+        if self.mod_port.is_connected:
+            # Read modulation signal (0-1 range, modulates threshold)
+            mod_values = read_samples(self.mod_port, num_samples)
+            # Combine base threshold with modulation
+            threshold_values = base_threshold * mod_values
+            # Use engine's utility function for vectorized clipping
+            result = apply_vectorized_clip(samples, threshold_values)
+            self.out_port.write(result)
+            return
+
+        # Unmodulated path: use engine utility function with constant threshold
+        result = apply_vectorized_clip(samples, base_threshold)
+        self.out_port.write(result)
+        
+        # Update component for compatibility (though we don't use it in process_runtime)
         if self.component is None:
             self.component = self.create_unmodulated_component()
-        self.component.wave_range = (-threshold, threshold)
-
-        self.out_port.write(samples.clip(-threshold, threshold))
+        self.component.wave_range = (-base_threshold, base_threshold)

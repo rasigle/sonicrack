@@ -49,6 +49,7 @@ from src.engine.core.component import (
     ParameterDescriptor,
     make_parameter_descriptors,
 )
+from src.engine.core.parameter import RuntimeParameter, SmoothingPolicy
 from src.engine.core.registry import register_component
 from src.engine.dsp.modifiers.base import Modifier
 from src.engine.utils.math import db_to_linear
@@ -334,6 +335,8 @@ class BiquadResonantFilter(Modifier):
                 minimum=20.0,
                 unit="Hz",
                 description="Cutoff or center frequency.",
+                smoothing_policy=SmoothingPolicy.EXPONENTIAL,
+                smoothing_duration_ms=50.0,
             ),
             resonance=ParameterDescriptor(
                 name="resonance",
@@ -341,6 +344,8 @@ class BiquadResonantFilter(Modifier):
                 minimum=0.1,
                 maximum=30.0,
                 description="Filter Q/resonance.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=50.0,
             ),
             filter_type=ParameterDescriptor(
                 name="filter_type",
@@ -353,12 +358,16 @@ class BiquadResonantFilter(Modifier):
                 default=0.0,
                 unit="dB",
                 description="Pre-filter saturation drive.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=50.0,
             ),
             output_gain_db=ParameterDescriptor(
                 name="output_gain_db",
                 default=0.0,
                 unit="dB",
                 description="Post-filter output gain.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=50.0,
             ),
         ),
         description="Resonant RBJ biquad synth filter with drive",
@@ -377,11 +386,7 @@ class BiquadResonantFilter(Modifier):
         """Initialize resonant biquad filter."""
         super().__init__()
         self.sample_rate = validate_sample_rate(sample_rate)
-        self._cutoff = float(cutoff)
-        self._resonance = float(resonance)
         self._filter_type: BiquadResonantFilter.FilterType = filter_type
-        self._drive_db = float(drive_db)
-        self._output_gain_db = float(output_gain_db)
         self._filter_state: np.ndarray | None = None
 
         if filter_type not in ("low", "high", "band", "notch"):
@@ -390,25 +395,75 @@ class BiquadResonantFilter(Modifier):
                 f"got '{filter_type}'"
             )
 
-        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+        # Create RuntimeParameters for smoothed parameters
+        cutoff_descriptor = ParameterDescriptor(
+            name="cutoff",
+            default=cutoff,
+            minimum=20.0,
+            unit="Hz",
+            smoothing_policy=SmoothingPolicy.EXPONENTIAL,
+            smoothing_duration_ms=50.0,
+        )
+        self._cutoff_param = RuntimeParameter(cutoff_descriptor, self.sample_rate)
+
+        resonance_descriptor = ParameterDescriptor(
+            name="resonance",
+            default=resonance,
+            minimum=0.1,
+            maximum=30.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=50.0,
+        )
+        self._resonance_param = RuntimeParameter(resonance_descriptor, self.sample_rate)
+
+        drive_db_descriptor = ParameterDescriptor(
+            name="drive_db",
+            default=drive_db,
+            unit="dB",
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=50.0,
+        )
+        self._drive_db_param = RuntimeParameter(drive_db_descriptor, self.sample_rate)
+
+        output_gain_db_descriptor = ParameterDescriptor(
+            name="output_gain_db",
+            default=output_gain_db,
+            unit="dB",
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=50.0,
+        )
+        self._output_gain_db_param = RuntimeParameter(
+            output_gain_db_descriptor, self.sample_rate
+        )
+
+        # Design initial filter coefficients
+        self._b, self._a = self._design_filter(
+            self._cutoff_param.value, self._resonance_param.value
+        )
 
     @property
     def cutoff(self) -> float:
-        return self._cutoff
+        return self._cutoff_param._target_value
 
     @cutoff.setter
     def cutoff(self, value: float) -> None:
-        self._cutoff = float(value)
-        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+        self._cutoff_param.value = float(value)
+        # Update static coefficients for non-modulated processing
+        self._b, self._a = self._design_filter(
+            self._cutoff_param._target_value, self._resonance_param._target_value
+        )
 
     @property
     def resonance(self) -> float:
-        return self._resonance
+        return self._resonance_param._target_value
 
     @resonance.setter
     def resonance(self, value: float) -> None:
-        self._resonance = float(value)
-        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+        self._resonance_param.value = float(value)
+        # Update static coefficients for non-modulated processing
+        self._b, self._a = self._design_filter(
+            self._cutoff_param._target_value, self._resonance_param._target_value
+        )
 
     @property
     def filter_type(self) -> str:
@@ -421,24 +476,26 @@ class BiquadResonantFilter(Modifier):
                 f"filter_type must be 'low', 'high', 'band', or 'notch', got '{value}'"
             )
         self._filter_type = value
-        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+        self._b, self._a = self._design_filter(
+            self._cutoff_param._target_value, self._resonance_param._target_value
+        )
         self.reset_state()
 
     @property
     def drive_db(self) -> float:
-        return self._drive_db
+        return self._drive_db_param._target_value
 
     @drive_db.setter
     def drive_db(self, value: float) -> None:
-        self._drive_db = float(value)
+        self._drive_db_param.value = float(value)
 
     @property
     def output_gain_db(self) -> float:
-        return self._output_gain_db
+        return self._output_gain_db_param._target_value
 
     @output_gain_db.setter
     def output_gain_db(self, value: float) -> None:
-        self._output_gain_db = float(value)
+        self._output_gain_db_param.value = float(value)
 
     def reset_state(self) -> None:
         """Reset filter delay memory."""
@@ -469,7 +526,35 @@ class BiquadResonantFilter(Modifier):
         if samples.size == 0:
             return samples
 
-        shaped = self._apply_drive(np.asarray(samples, dtype=np.float32))
+        # Check if any parameters are smoothing
+        num_samples = len(samples)
+        cutoff_smoothing = self._cutoff_param._smoothing_samples_remaining > 0
+        resonance_smoothing = self._resonance_param._smoothing_samples_remaining > 0
+
+        # If parameters are smoothing, use per-sample modulation for smooth transitions
+        if cutoff_smoothing or resonance_smoothing:
+            cutoff_envelope = self._cutoff_param.get_interpolated_buffer(num_samples)
+            resonance_envelope = self._resonance_param.get_interpolated_buffer(
+                num_samples
+            )
+            drive_envelope = self._drive_db_param.get_interpolated_buffer(num_samples)
+            output_gain_envelope = self._output_gain_db_param.get_interpolated_buffer(
+                num_samples
+            )
+
+            return self.process_modulated(
+                samples,
+                cutoff_values=cutoff_envelope,
+                resonance_values=resonance_envelope,
+                drive_db_values=drive_envelope,
+                output_gain_db_values=output_gain_envelope,
+            )
+
+        # Use static filtering with current RuntimeParameter values
+        shaped = self._apply_drive(
+            np.asarray(samples, dtype=np.float32),
+            drive_db_value=self._drive_db_param.value,
+        )
         zi = self._filter_state_for(shaped)
         filtered, self._filter_state = lfilter(
             self._b,
@@ -478,7 +563,9 @@ class BiquadResonantFilter(Modifier):
             axis=0,
             zi=zi,
         )
-        return self._apply_output_gain(filtered).astype(np.float32)
+        return self._apply_output_gain(
+            filtered, output_gain_db_value=self._output_gain_db_param.value
+        ).astype(np.float32)
 
     def process_modulated(
         self,
@@ -517,12 +604,14 @@ class BiquadResonantFilter(Modifier):
     ) -> None:
         """Update runtime parameters while preserving delay state when possible."""
         reset_state = filter_type != self._filter_type
-        self._cutoff = float(cutoff)
-        self._resonance = float(resonance)
+        self._cutoff_param.value = float(cutoff)
+        self._resonance_param.value = float(resonance)
         self._filter_type = filter_type
-        self._drive_db = float(drive_db)
-        self._output_gain_db = float(output_gain_db)
-        self._b, self._a = self._design_filter(self._cutoff, self._resonance)
+        self._drive_db_param.value = float(drive_db)
+        self._output_gain_db_param.value = float(output_gain_db)
+        self._b, self._a = self._design_filter(
+            self._cutoff_param._target_value, self._resonance_param._target_value
+        )
         if reset_state:
             self.reset_state()
 
@@ -588,7 +677,7 @@ class BiquadResonantFilter(Modifier):
         return self._fit_parameter_values(
             cutoff_values,
             num_samples,
-            self._cutoff,
+            self._cutoff_param.value,
             minimum=1.0,
             maximum=self.sample_rate * 0.475,
         )
@@ -599,7 +688,7 @@ class BiquadResonantFilter(Modifier):
         return self._fit_parameter_values(
             resonance_values,
             num_samples,
-            self._resonance,
+            self._resonance_param.value,
             minimum=0.1,
             maximum=30.0,
         )
@@ -640,11 +729,20 @@ class BiquadResonantFilter(Modifier):
         return b, a
 
     def _apply_drive(
-        self, samples: np.ndarray, drive_db_values: np.ndarray | None = None
+        self,
+        samples: np.ndarray,
+        drive_db_values: np.ndarray | None = None,
+        drive_db_value: float | None = None,
     ) -> np.ndarray:
         drive: float | np.ndarray
         if drive_db_values is None:
-            drive = float(db_to_linear(self._drive_db))
+            # Use scalar value (from RuntimeParameter or direct parameter)
+            drive_value = (
+                drive_db_value
+                if drive_db_value is not None
+                else self._drive_db_param.value
+            )
+            drive = float(db_to_linear(drive_value))
         else:
             drive = np.asarray(db_to_linear(drive_db_values), dtype=np.float32)
 
@@ -654,10 +752,19 @@ class BiquadResonantFilter(Modifier):
         return np.where(drive <= 1.0001, samples, driven).astype(np.float32)
 
     def _apply_output_gain(
-        self, samples: np.ndarray, output_gain_db_values: np.ndarray | None = None
+        self,
+        samples: np.ndarray,
+        output_gain_db_values: np.ndarray | None = None,
+        output_gain_db_value: float | None = None,
     ) -> np.ndarray:
         if output_gain_db_values is None:
-            return samples * db_to_linear(self._output_gain_db)
+            # Use scalar value (from RuntimeParameter or direct parameter)
+            gain_value = (
+                output_gain_db_value
+                if output_gain_db_value is not None
+                else self._output_gain_db_param.value
+            )
+            return samples * db_to_linear(gain_value)
         return samples * db_to_linear(output_gain_db_values)
 
 

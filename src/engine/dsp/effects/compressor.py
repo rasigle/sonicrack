@@ -39,11 +39,11 @@ from src.engine.core.component import (
     ComponentDescriptor,
     ParameterDescriptor,
 )
+from src.engine.core.parameter import RuntimeParameter, SmoothingPolicy
 from src.engine.core.registry import register_component
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.dsp.modifiers.base import Modifier
 from src.engine.utils.validation import (
-    validate_numeric_range,
     validate_sample_count,
     validate_sample_rate,
 )
@@ -143,77 +143,125 @@ class Compressor(Modifier):
         super().__init__(*args, **kwargs)
         self.source = source
         self._sample_rate = validate_sample_rate(sample_rate)
-        self._threshold_db = validate_numeric_range(
-            threshold_db, -60.0, 0.0, name="threshold_db"
+
+        # Create RuntimeParameters with validation and smoothing
+        threshold_descriptor = ParameterDescriptor(
+            name="threshold_db",
+            default=threshold_db,
+            minimum=-60.0,
+            maximum=0.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=10.0,
         )
-        self._ratio = validate_numeric_range(ratio, 1.0, 20.0, name="ratio")
-        self._attack_ms = validate_numeric_range(
-            attack_ms, 0.1, 200.0, name="attack_ms"
+        self._threshold_param = RuntimeParameter(
+            threshold_descriptor, self._sample_rate
         )
-        self._release_ms = validate_numeric_range(
-            release_ms, 1.0, 1000.0, name="release_ms"
+
+        ratio_descriptor = ParameterDescriptor(
+            name="ratio",
+            default=ratio,
+            minimum=1.0,
+            maximum=20.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=10.0,
         )
-        self._makeup_gain_db = validate_numeric_range(
-            makeup_gain_db, -24.0, 24.0, name="makeup_gain_db"
+        self._ratio_param = RuntimeParameter(ratio_descriptor, self._sample_rate)
+
+        attack_descriptor = ParameterDescriptor(
+            name="attack_ms",
+            default=attack_ms,
+            minimum=0.1,
+            maximum=200.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=10.0,
         )
-        self._mix = validate_numeric_range(mix, 0.0, 1.0, name="mix")
+        self._attack_ms_param = RuntimeParameter(attack_descriptor, self._sample_rate)
+
+        release_descriptor = ParameterDescriptor(
+            name="release_ms",
+            default=release_ms,
+            minimum=1.0,
+            maximum=1000.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=10.0,
+        )
+        self._release_ms_param = RuntimeParameter(release_descriptor, self._sample_rate)
+
+        makeup_gain_descriptor = ParameterDescriptor(
+            name="makeup_gain_db",
+            default=makeup_gain_db,
+            minimum=-24.0,
+            maximum=24.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=10.0,
+        )
+        self._makeup_gain_param = RuntimeParameter(
+            makeup_gain_descriptor, self._sample_rate
+        )
+
+        mix_descriptor = ParameterDescriptor(
+            name="mix",
+            default=mix,
+            minimum=0.0,
+            maximum=1.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=10.0,
+        )
+        self._mix_param = RuntimeParameter(mix_descriptor, self._sample_rate)
+
         self._gain_reduction_db: float | np.ndarray = 0.0
         self._sample_shape: tuple[int, ...] = ()
         self._update_coefficients()
 
     @property
     def threshold_db(self) -> float:
-        return self._threshold_db
+        return self._threshold_param._target_value
 
     @threshold_db.setter
     def threshold_db(self, value: float) -> None:
-        self._threshold_db = validate_numeric_range(
-            value, -60.0, 0.0, name="threshold_db"
-        )
+        self._threshold_param.value = value
 
     @property
     def ratio(self) -> float:
-        return self._ratio
+        return self._ratio_param._target_value
 
     @ratio.setter
     def ratio(self, value: float) -> None:
-        self._ratio = validate_numeric_range(value, 1.0, 20.0, name="ratio")
+        self._ratio_param.value = value
 
     @property
     def attack_ms(self) -> float:
-        return self._attack_ms
+        return self._attack_ms_param._target_value
 
     @attack_ms.setter
     def attack_ms(self, value: float) -> None:
-        self._attack_ms = validate_numeric_range(value, 0.1, 200.0, name="attack_ms")
+        self._attack_ms_param.value = value
         self._update_coefficients()
 
     @property
     def release_ms(self) -> float:
-        return self._release_ms
+        return self._release_ms_param._target_value
 
     @release_ms.setter
     def release_ms(self, value: float) -> None:
-        self._release_ms = validate_numeric_range(value, 1.0, 1000.0, name="release_ms")
+        self._release_ms_param.value = value
         self._update_coefficients()
 
     @property
     def makeup_gain_db(self) -> float:
-        return self._makeup_gain_db
+        return self._makeup_gain_param._target_value
 
     @makeup_gain_db.setter
     def makeup_gain_db(self, value: float) -> None:
-        self._makeup_gain_db = validate_numeric_range(
-            value, -24.0, 24.0, name="makeup_gain_db"
-        )
+        self._makeup_gain_param.value = value
 
     @property
     def mix(self) -> float:
-        return self._mix
+        return self._mix_param._target_value
 
     @mix.setter
     def mix(self, value: float) -> None:
-        self._mix = validate_numeric_range(value, 0.0, 1.0, name="mix")
+        self._mix_param.value = value
 
     @property
     def sample_rate(self) -> float:
@@ -230,8 +278,8 @@ class Compressor(Modifier):
         self._sample_shape = ()
 
     def _update_coefficients(self) -> None:
-        attack_seconds = self._attack_ms / 1000.0
-        release_seconds = self._release_ms / 1000.0
+        attack_seconds = self._attack_ms_param.value / 1000.0
+        release_seconds = self._release_ms_param.value / 1000.0
         self._attack_coeff = float(np.exp(-1.0 / (attack_seconds * self._sample_rate)))
         self._release_coeff = float(
             np.exp(-1.0 / (release_seconds * self._sample_rate))
@@ -242,21 +290,21 @@ class Compressor(Modifier):
             return
         self._sample_shape = sample_shape
         self._gain_reduction_db = (
-            0.0
-            if sample_shape == ()
-            else np.zeros(sample_shape, dtype=np.float32)
+            0.0 if sample_shape == () else np.zeros(sample_shape, dtype=np.float32)
         )
 
     def _target_gain_reduction_db(self, sample: np.ndarray) -> np.ndarray:
         level_db = 20.0 * np.log10(np.maximum(np.abs(sample), 1.0e-12))
-        if self._ratio <= 1.0:
+        ratio = self._ratio_param.value
+        threshold = self._threshold_param.value
+
+        if ratio <= 1.0:
             return np.zeros_like(level_db, dtype=np.float32)
 
-        compressed_level = self._threshold_db + (
-            (level_db - self._threshold_db) / self._ratio
-        )
+        compressed_level = threshold + ((level_db - threshold) / ratio)
         target = compressed_level - level_db
-        return np.where(level_db <= self._threshold_db, 0.0, target).astype(
+
+        return np.where(level_db <= threshold, 0.0, target).astype(
             np.float32,
             copy=False,
         )
@@ -275,9 +323,11 @@ class Compressor(Modifier):
         self._gain_reduction_db = (
             coeff * self._gain_reduction_db + (1.0 - coeff) * target_reduction
         )
-        gain = 10.0 ** ((self._gain_reduction_db + self._makeup_gain_db) / 20.0)
+        makeup_gain = self._makeup_gain_param.value
+        mix = self._mix_param.value
+        gain = 10.0 ** ((self._gain_reduction_db + makeup_gain) / 20.0)
         wet = sample * gain
-        return (sample * (1.0 - self._mix) + wet * self._mix).astype(
+        return (sample * (1.0 - mix) + wet * mix).astype(
             np.float32,
             copy=False,
         )

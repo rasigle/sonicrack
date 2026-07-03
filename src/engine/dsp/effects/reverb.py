@@ -12,11 +12,11 @@ from src.engine.core.component import (
     ComponentDescriptor,
     ParameterDescriptor,
 )
+from src.engine.core.parameter import AutomationMode, RuntimeParameter, SmoothingPolicy
 from src.engine.core.registry import register_component
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.dsp.modifiers.base import Modifier
 from src.engine.utils.validation import (
-    validate_numeric_range,
     validate_sample_count,
     validate_sample_rate,
 )
@@ -53,6 +53,9 @@ class Reverb(Modifier):
                 minimum=0.0,
                 maximum=1.0,
                 description="Room size control.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=50.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
             ),
             "damping": ParameterDescriptor(
                 name="damping",
@@ -60,6 +63,9 @@ class Reverb(Modifier):
                 minimum=0.0,
                 maximum=1.0,
                 description="High-frequency damping amount.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=50.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
             ),
             "mix": ParameterDescriptor(
                 name="mix",
@@ -67,6 +73,9 @@ class Reverb(Modifier):
                 minimum=0.0,
                 maximum=1.0,
                 description="Dry/wet mix.",
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=20.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
             ),
             "sample_rate": ParameterDescriptor(
                 name="sample_rate",
@@ -74,6 +83,8 @@ class Reverb(Modifier):
                 minimum=1.0,
                 unit="Hz",
                 description="Processing sample rate.",
+                smoothing_policy=SmoothingPolicy.NONE,
+                automation_mode=AutomationMode.NONE,
             ),
         },
         fluent_api_name="reverb",
@@ -101,9 +112,42 @@ class Reverb(Modifier):
         super().__init__(*args, **kwargs)
         self.source = source  # Optional!
         self._sample_rate = validate_sample_rate(sample_rate)
-        self._room_size = validate_numeric_range(room_size, 0.0, 1.0, name="room_size")
-        self._damping = validate_numeric_range(damping, 0.0, 1.0, name="damping")
-        self._mix = validate_numeric_range(mix, 0.0, 1.0, name="mix")
+
+        # Create RuntimeParameters for smoothed parameters with custom initial values
+        room_size_descriptor = ParameterDescriptor(
+            name="room_size",
+            default=room_size,  # Use passed value as default
+            minimum=0.0,
+            maximum=1.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=50.0,
+            automation_mode=AutomationMode.CONTROL_RATE,
+        )
+        self._room_size_param = RuntimeParameter(
+            room_size_descriptor, self._sample_rate
+        )
+
+        damping_descriptor = ParameterDescriptor(
+            name="damping",
+            default=damping,  # Use passed value as default
+            minimum=0.0,
+            maximum=1.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=50.0,
+            automation_mode=AutomationMode.CONTROL_RATE,
+        )
+        self._damping_param = RuntimeParameter(damping_descriptor, self._sample_rate)
+
+        mix_descriptor = ParameterDescriptor(
+            name="mix",
+            default=mix,  # Use passed value as default
+            minimum=0.0,
+            maximum=1.0,
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=20.0,
+            automation_mode=AutomationMode.CONTROL_RATE,
+        )
+        self._mix_param = RuntimeParameter(mix_descriptor, self._sample_rate)
 
         # Freeverb-inspired delay line lengths (in samples at 44.1kHz)
         # Scaled to current sample rate
@@ -147,9 +191,6 @@ class Reverb(Modifier):
         self._allpass_buffer_lengths = [len(buffer) for buffer in self._allpass_buffers]
         self._sample_shape: tuple[int, ...] = ()
 
-        # Update feedback coefficients
-        self._update_coefficients()
-
     def _ensure_buffer_shape(self, sample_shape: tuple[int, ...]) -> None:
         """Resize reverb memory for mono or multi-channel frames."""
         if sample_shape == self._sample_shape:
@@ -173,46 +214,35 @@ class Reverb(Modifier):
         self._allpass_positions = [0] * len(self._allpass_delays)
         self._allpass_buffer_lengths = [len(buffer) for buffer in self._allpass_buffers]
 
-    def _update_coefficients(self):
-        """Update filter coefficients based on room size and damping."""
-        # Room size affects feedback amount
-        self._feedback = 0.84 + self._room_size * 0.14
-
-        # Damping coefficients for lowpass in comb filters
-        self._damp1 = self._damping * 0.4
-        self._damp2 = 1.0 - self._damp1
-
     @property
     def room_size(self) -> float:
         """float: Room size (0.0-1.0)."""
-        return self._room_size
+        return self._room_size_param._target_value
 
     @room_size.setter
     def room_size(self, value: float):
         """Set room size."""
-        self._room_size = validate_numeric_range(value, 0.0, 1.0, name="room_size")
-        self._update_coefficients()
+        self._room_size_param.value = value
 
     @property
     def damping(self) -> float:
         """float: Damping amount (0.0-1.0)."""
-        return self._damping
+        return self._damping_param._target_value
 
     @damping.setter
     def damping(self, value: float):
         """Set damping amount."""
-        self._damping = validate_numeric_range(value, 0.0, 1.0, name="damping")
-        self._update_coefficients()
+        self._damping_param.value = value
 
     @property
     def mix(self) -> float:
         """float: Dry/wet mix (0.0-1.0)."""
-        return self._mix
+        return self._mix_param._target_value
 
     @mix.setter
     def mix(self, value: float):
         """Set mix amount."""
-        self._mix = validate_numeric_range(value, 0.0, 1.0, name="mix")
+        self._mix_param.value = value
 
     def _process_comb(self, input_val: float, index: int) -> float:
         """Process one comb filter.
@@ -271,17 +301,25 @@ class Reverb(Modifier):
         """Process one mono sample through all reverb delay lines."""
         input_value = np.asarray(input_sample, dtype=np.float32)
         self._ensure_buffer_shape(input_value.shape)
+
+        # Use current parameter values for single sample processing
+        room_size = self._room_size_param.value
+        damping = self._damping_param.value
+        mix = self._mix_param.value
+
+        feedback = 0.84 + room_size * 0.14
+        damp1 = damping * 0.4
+        damp2 = 1.0 - damp1
+
         comb_sum = np.zeros(input_value.shape, dtype=np.float32)
         for index in range(self._comb_count):
             buffer = self._comb_buffers[index]
             pos = self._comb_positions[index]
 
             output = buffer[pos]
-            filtered = (
-                output * self._damp2 + self._comb_filter_states[index] * self._damp1
-            )
+            filtered = output * damp2 + self._comb_filter_states[index] * damp1
             self._comb_filter_states[index] = filtered
-            buffer[pos] = input_value + filtered * self._feedback
+            buffer[pos] = input_value + filtered * feedback
             self._comb_positions[index] = (pos + 1) % self._comb_buffer_lengths[index]
 
             comb_sum += output
@@ -300,7 +338,7 @@ class Reverb(Modifier):
             ]
             wet = output
 
-        output_value = input_value * (1.0 - self._mix) + wet * self._mix
+        output_value = input_value * (1.0 - mix) + wet * mix
         if output_value.shape == ():
             return float(output_value)
         return output_value.astype(np.float32, copy=False)
@@ -314,6 +352,12 @@ class Reverb(Modifier):
         self._ensure_buffer_shape(input_samples.shape[1:])
         output_samples = np.empty_like(input_samples, dtype=np.float32)
 
+        # Get smoothed parameter envelopes
+        num_samples = len(input_samples)
+        room_size_envelope = self._room_size_param.get_interpolated_buffer(num_samples)
+        damping_envelope = self._damping_param.get_interpolated_buffer(num_samples)
+        mix_envelope = self._mix_param.get_interpolated_buffer(num_samples)
+
         comb_buffers = self._comb_buffers
         comb_positions = self._comb_positions
         comb_states = self._comb_filter_states
@@ -325,13 +369,17 @@ class Reverb(Modifier):
         allpass_lengths = self._allpass_buffer_lengths
         allpass_count = self._allpass_count
 
-        damp1 = self._damp1
-        damp2 = self._damp2
-        feedback = self._feedback
-        mix = self._mix
-        dry_mix = 1.0 - mix
-
         for sample_index, input_sample in enumerate(input_samples):
+            # Update coefficients per sample for smooth transitions
+            room_size = room_size_envelope[sample_index]
+            damping = damping_envelope[sample_index]
+            mix = mix_envelope[sample_index]
+
+            feedback = 0.84 + room_size * 0.14
+            damp1 = damping * 0.4
+            damp2 = 1.0 - damp1
+            dry_mix = 1.0 - mix
+
             input_value = input_sample
             comb_sum = np.zeros(input_samples.shape[1:], dtype=np.float32)
 
@@ -444,3 +492,36 @@ class Reverb(Modifier):
 
         n = validate_sample_count(n)
         return np.array([next(self) for _ in range(n)], dtype=np.float32)
+
+    # Backward-compatible properties for internal state access
+    @property
+    def _room_size(self) -> float:
+        """Backward compatibility: current room size."""
+        return self._room_size_param.value
+
+    @property
+    def _damping(self) -> float:
+        """Backward compatibility: current damping."""
+        return self._damping_param.value
+
+    @property
+    def _mix(self) -> float:
+        """Backward compatibility: current mix."""
+        return self._mix_param.value
+
+    @property
+    def _feedback(self) -> float:
+        """Backward compatibility: current feedback coefficient."""
+        room_size = self._room_size_param.value
+        return 0.84 + room_size * 0.14
+
+    @property
+    def _damp1(self) -> float:
+        """Backward compatibility: damping coefficient 1."""
+        damping = self._damping_param.value
+        return damping * 0.4
+
+    @property
+    def _damp2(self) -> float:
+        """Backward compatibility: damping coefficient 2."""
+        return 1.0 - self._damp1

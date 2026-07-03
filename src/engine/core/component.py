@@ -9,6 +9,11 @@ from typing import Any, TypeVar
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
+from src.engine.core.parameter import (
+    AutomationMode,
+    ParameterDescriptor,
+    SmoothingPolicy,
+)
 from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
 T = TypeVar("T", bound="AudioComponent")
@@ -25,20 +30,6 @@ class ComponentCategory(Enum):
     EFFECT = "effect"
 
 
-@dataclass(frozen=True)
-class ParameterDescriptor:
-    """Metadata describing a component parameter."""
-
-    name: str
-    default: Any
-    minimum: float | None = None
-    maximum: float | None = None
-    unit: str | None = None
-    clamp: bool = False
-    choices: tuple[Any, ...] | None = None
-    description: str = ""
-
-
 COMMON_PARAMETER_DESCRIPTORS: dict[str, ParameterDescriptor] = {
     "frequency": ParameterDescriptor(
         name="frequency",
@@ -46,24 +37,35 @@ COMMON_PARAMETER_DESCRIPTORS: dict[str, ParameterDescriptor] = {
         minimum=0.0,
         unit="Hz",
         description="Oscillator frequency.",
+        smoothing_policy=SmoothingPolicy.EXPONENTIAL,
+        smoothing_duration_ms=10.0,
+        automation_mode=AutomationMode.AUDIO_RATE,
     ),
     "amplitude": ParameterDescriptor(
         name="amplitude",
         default=1.0,
         minimum=0.0,
         description="Linear gain multiplier.",
+        smoothing_policy=SmoothingPolicy.LINEAR,
+        smoothing_duration_ms=10.0,
+        automation_mode=AutomationMode.AUDIO_RATE,
     ),
     "gain_db": ParameterDescriptor(
         name="gain_db",
         default=DEFAULT_GAIN_DB,
         unit="dB",
         description="Gain in decibels.",
+        smoothing_policy=SmoothingPolicy.LOGARITHMIC,
+        smoothing_duration_ms=10.0,
+        automation_mode=AutomationMode.CONTROL_RATE,
     ),
     "phase": ParameterDescriptor(
         name="phase",
         default=0.0,
         unit="deg",
         description="Initial phase offset.",
+        smoothing_policy=SmoothingPolicy.NONE,
+        automation_mode=AutomationMode.NONE,
     ),
     "sample_rate": ParameterDescriptor(
         name="sample_rate",
@@ -71,11 +73,15 @@ COMMON_PARAMETER_DESCRIPTORS: dict[str, ParameterDescriptor] = {
         minimum=1.0,
         unit="Hz",
         description="Processing sample rate.",
+        smoothing_policy=SmoothingPolicy.NONE,
+        automation_mode=AutomationMode.NONE,
     ),
     "wave_range": ParameterDescriptor(
         name="wave_range",
         default=(-1, 1),
         description="Output range as minimum and maximum values.",
+        smoothing_policy=SmoothingPolicy.NONE,
+        automation_mode=AutomationMode.NONE,
     ),
 }
 

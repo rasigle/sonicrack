@@ -3,40 +3,24 @@
 All notable changes to AudioPlayground will be documented in this file.
 
 
-## Engine Package Review - 2026-07-03
+## Backlog
 
-### Implemented Engine Features
-
-- Core DSP package is separated under `src.engine`, with optional audio-device
-  and MIDI concerns kept outside the base engine import surface.
-- Component model includes descriptors, parameter metadata, fluent-builder names,
-  global registration, config serialization helpers, and sample-mode contracts.
-- Generator support includes sine, square, sawtooth, triangle, PolyBLEP
-  oscillator utilities, minBLEP helpers, VCV-style square/saw behavior, gain-dB
-  handling, amplitude smoothing, and oscillator/vectorized continuity coverage.
-- Noise support includes white, pink, brownian, blue, grey, velvet,
-  sample-and-hold, and Perlin-style generators.
-- Modulation support includes ADSR, decay and gate-triggered envelopes,
-  amplitude/frequency/linear-FM/phase lanes, retrigger modes, CV scaling, and
-  pitch-CV conversion helpers.
-- Modifier/effect support includes volume, panning, clipping, modulated volume,
-  modulated panning, modulated clipping, distortion, compressor, delay, reverb,
-  Butterworth filters, resonant RBJ biquad filters, and an acid/303-style
-  resonant low-pass filter.
-- Composition and voice support includes `Chain`, `WaveAdder`, preset builder
-  and library helpers, sample-accurate step clocking, TB-303-style sequencing,
-  accent/slide processing, Behringer 182-style sequencing, and a composable
-  `TB303Voice`.
-- Realtime-oriented test coverage now exercises render contracts, buffer
-  continuity, oscillator edge strategies, smoothing, filters, effects,
-  sequencers, presets, and GUI runtime integration paths.
+- Display ADSR shape in module
+- Undo / Redo system
 
 ### Review Findings
 
-- Parameter descriptors are useful for UI/presets but do not yet enforce a
-  single source of truth for runtime validation, smoothing policy, units, or
-  automation semantics.
-### Planned Engine Work
+**✅ RESOLVED**: Parameter descriptors now enforce a single source of truth for runtime 
+validation, smoothing policy, units, and automation semantics. All parameter behavior 
+is centralized in `ParameterDescriptor` with:
+  - Runtime validation (type, range, choices, clamping)
+  - Smoothing policies (none/linear/exponential/logarithmic)
+  - Automation modes (none/control-rate/audio-rate)
+  - Automatic enforcement via `RuntimeParameter` and `ParameterRegistry`
+  - See `docs/architecture/PARAMETER_SYSTEM.md` for details
+
+
+## Planned Engine Work
 
 - Introduce a first-class engine render graph with typed mono/stereo/CV/audio
   ports, topological scheduling, cycle diagnostics, graph validation, and a
@@ -68,6 +52,60 @@ All notable changes to AudioPlayground will be documented in this file.
 - Audit wheel contents before release to confirm generated cache artifacts and
   other local-only files are excluded.
 
+  
+## Unreleased
+
+### Added
+
+- **Enhanced Parameter System**: Complete single-source-of-truth parameter management
+  - `ParameterDescriptor` now includes smoothing policies (none/linear/exponential/logarithmic)
+  - `ParameterDescriptor` now includes automation modes (none/control-rate/audio-rate)
+  - New `RuntimeParameter` class provides automatic validation and smoothing
+  - New `ParameterRegistry` for component-level parameter management
+  - Common parameter descriptors updated with appropriate smoothing policies
+  - Validation methods enforce descriptor constraints at runtime
+  - Sample-accurate parameter automation support
+  - Integration with `ramping.py` for efficient vectorized smoothing
+  - Comprehensive documentation in `docs/architecture/PARAMETER_SYSTEM.md`
+  - Full test coverage in `tests/engine_t/test_parameter_system.py`
+
+### Changed
+
+- **Volume Component Migration**: Now uses `RuntimeParameter` system
+  - `amplitude` property: LINEAR smoothing in amplitude space (unchanged behavior)
+  - `gain_db` property: LOGARITHMIC smoothing in dB space (enhanced perceptual linearity)
+  - Eliminated manual smoothing code, uses centralized parameter system
+  - Backward-compatible properties maintained for existing code
+  - More efficient vectorized buffer generation
+  - Smoothing behavior now enforced by descriptors
+
+### Fixed
+
+- Fixed missing `self.` prefix in RuntimeParameter initialization
+- Core DSP package is separated under `src.engine`, with optional audio-device
+  and MIDI concerns kept outside the base engine import surface.
+- Component model includes descriptors, parameter metadata, fluent-builder names,
+  global registration, config serialization helpers, and sample-mode contracts.
+- Generator support includes sine, square, sawtooth, triangle, PolyBLEP
+  oscillator utilities, minBLEP helpers, VCV-style square/saw behavior, gain-dB
+  handling, amplitude smoothing, and oscillator/vectorized continuity coverage.
+- Noise support includes white, pink, brownian, blue, grey, velvet,
+  sample-and-hold, and Perlin-style generators.
+- Modulation support includes ADSR, decay and gate-triggered envelopes,
+  amplitude/frequency/linear-FM/phase lanes, retrigger modes, CV scaling, and
+  pitch-CV conversion helpers.
+- Modifier/effect support includes volume, panning, clipping, modulated volume,
+  modulated panning, modulated clipping, distortion, compressor, delay, reverb,
+  Butterworth filters, resonant RBJ biquad filters, and an acid/303-style
+  resonant low-pass filter.
+- Composition and voice support includes `Chain`, `WaveAdder`, preset builder
+  and library helpers, sample-accurate step clocking, TB-303-style sequencing,
+  accent/slide processing, Behringer 182-style sequencing, and a composable
+  `TB303Voice`.
+- Realtime-oriented test coverage now exercises render contracts, buffer
+  continuity, oscillator edge strategies, smoothing, filters, effects,
+  sequencers, presets, and GUI runtime integration paths.
+
 ### Fixed
 
 - Removed generated cache artifacts from `src/engine`, including the engine-local
@@ -83,12 +121,6 @@ All notable changes to AudioPlayground will be documented in this file.
 - Fixed VCO waveform changes so dependent mode parameters are normalized and
   cached together; changing waveform no longer leaves the runtime with an
   invalid stale mode that can mute output until the mode selector is changed.
-
-
-## Repository Review Fixes - 2026-06-30
-
-### Fixed
-
 - Restored saved module parameters during patch loading by using the module
   `set_parameters()` API.
 - Allowed Output playback to start from a right-only patch connection.
@@ -107,13 +139,7 @@ All notable changes to AudioPlayground will be documented in this file.
   unreleased changes.
 
 
-## Backlog
-
-- Display ADSR shape in module
-- Undo / Redo system
-
-
-## Unreleased GUI / Runtime Work
+## V2026.1.0
 
 ### Added
 

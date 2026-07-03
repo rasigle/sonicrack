@@ -289,7 +289,7 @@ class Compressor(Modifier):
             raise ValueError("source is required for get_samples_vectorized()")
 
         source = cast(Any, self.source)
-        return self(source.get_samples_vectorized(n))
+        return np.asarray(self(source.get_samples_vectorized(n)), dtype=np.float32)
 
     def get_samples(
         self, n: int, mode: SampleMode = "vectorized", **kwargs

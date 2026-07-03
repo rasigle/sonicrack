@@ -642,8 +642,9 @@ class BiquadResonantFilter(Modifier):
     def _apply_drive(
         self, samples: np.ndarray, drive_db_values: np.ndarray | None = None
     ) -> np.ndarray:
+        drive: float | np.ndarray
         if drive_db_values is None:
-            drive = db_to_linear(self._drive_db)
+            drive = float(db_to_linear(self._drive_db))
         else:
             drive = np.asarray(db_to_linear(drive_db_values), dtype=np.float32)
 

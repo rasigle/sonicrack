@@ -301,7 +301,10 @@ class SawtoothOscillator(Oscillator):
 
         if self.mode == "analog":
             sample_indices = self._i + np.arange(len(freqs), dtype=np.float64)
-            waveform = self._apply_analog_character(waveform, sample_indices)
+            waveform = np.asarray(
+                self._apply_analog_character(waveform, sample_indices),
+                dtype=np.float64,
+            )
 
         waveform = np.asarray(self._apply_wave_range_values(waveform), dtype=np.float64)
         return waveform, {"carrier_cycle": carrier_end}
@@ -425,7 +428,10 @@ class TriangleOscillator(SawtoothOscillator):
         waveform = (np.abs(waveform) - 0.5) * 2
         if self.mode == "analog":
             sample_indices = self._i + np.arange(len(freqs), dtype=np.float64)
-            waveform = self._apply_analog_character_triangle(waveform, sample_indices)
+            waveform = np.asarray(
+                self._apply_analog_character_triangle(waveform, sample_indices),
+                dtype=np.float64,
+            )
 
         waveform = np.asarray(self._apply_wave_range_values(waveform), dtype=np.float64)
         return waveform, {"carrier_cycle": carrier_end}

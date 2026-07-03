@@ -86,7 +86,7 @@ class MIDIToCV(AudioComponent):
 
         # Current state
         self.gate: float = 0.0
-        self.pitch_cv: float = midi_note_to_pitch_cv(69)  # A4 default
+        self.pitch_cv: float = float(midi_note_to_pitch_cv(69))  # A4 default
         self.velocity: float = 0.0
         self.mod_wheel: float = 0.0
         self.expression: float = 1.0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import faulthandler
 import logging
 import sys
@@ -20,6 +21,12 @@ from src.constants import LOG_DIRECTORY
 logger = logging.getLogger(__name__)
 
 _fault_trace_file: TextIO | None = None
+_hooks_installed = False
+
+_original_excepthook = sys.excepthook
+_original_threading_excepthook = threading.excepthook
+_original_unraisablehook = sys.unraisablehook
+_previous_qt_message_handler: Callable[..., None] | None = None
 
 
 def activate_crash_diagnostics(
@@ -27,6 +34,7 @@ def activate_crash_diagnostics(
     get_window: Callable[[], Any | None],
     *,
     trace_file: str | Path,
+    exit_on_thread_exception: bool = False,
 ) -> None:
     """Install crash hooks that leave useful traces on failure.
 
@@ -34,78 +42,133 @@ def activate_crash_diagnostics(
         app: QApplication to request a controlled exit from on fatal Python errors.
         get_window: Callback returning the main window when available.
         trace_file: Path to the file receiving faulthandler stack dumps.
+        exit_on_thread_exception: Whether unhandled worker-thread exceptions should
+            request application exit.
     """
-    trace_path = Path(trace_file)
-    if not trace_path.is_absolute():
-        trace_path = LOG_DIRECTORY / trace_path
-    _enable_fault_trace_file(trace_path)
+    global _hooks_installed, _previous_qt_message_handler
 
-    previous_excepthook = sys.excepthook
-    previous_threading_excepthook = threading.excepthook
-    previous_unraisablehook = sys.unraisablehook
+    trace_path = _resolve_trace_path(trace_file)
+    _enable_fault_trace_file(trace_path)
 
     def exception_hook(
         exc_type: type[BaseException],
         exc_value: BaseException,
         exc_traceback: TracebackType | None,
     ) -> None:
-        if issubclass(exc_type, KeyboardInterrupt):
-            previous_excepthook(exc_type, exc_value, exc_traceback)
-            app.exit(130)
-            return
+        try:
+            if issubclass(exc_type, KeyboardInterrupt):
+                _original_excepthook(exc_type, exc_value, exc_traceback)
+                app.exit(130)
+                return
 
-        logger.critical(
-            "Unhandled exception in UI thread",
-            exc_info=(exc_type, exc_value, exc_traceback),
-        )
-        dump_current_tracebacks("Unhandled exception in UI thread")
-        _shutdown_window(get_window, graceful=False)
-        app.exit(1)
+            logger.critical(
+                "Unhandled exception in UI thread",
+                exc_info=(exc_type, exc_value, exc_traceback),
+            )
+            dump_current_tracebacks("Unhandled exception in UI thread")
+            _shutdown_window(get_window, graceful=False)
+            _flush_logging()
+            app.exit(1)
+        except Exception:
+            _last_resort_log("Exception inside sys.excepthook")
+            with contextlib.suppress(Exception):
+                app.exit(1)
+
 
     def threading_exception_hook(args: threading.ExceptHookArgs) -> None:
-        logger.critical(
-            "Unhandled exception in thread %s",
-            getattr(args.thread, "name", "<unknown>"),
-            exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
-        )
-        dump_current_tracebacks("Unhandled exception in worker thread")
-        previous_threading_excepthook(args)
+        try:
+            logger.critical(
+                "Unhandled exception in thread %s",
+                getattr(args.thread, "name", "<unknown>"),
+                exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+            )
+            dump_current_tracebacks("Unhandled exception in worker thread")
+
+            if exit_on_thread_exception:
+                _shutdown_window(get_window, graceful=False)
+                _flush_logging()
+                app.exit(1)
+                return
+
+            _original_threading_excepthook(args)
+        except Exception:
+            _last_resort_log("Exception inside threading.excepthook")
 
     def unraisable_hook(unraisable: sys.UnraisableHookArgs) -> None:
-        logger.critical(
-            "Unraisable exception from %r: %s",
-            unraisable.object,
-            unraisable.err_msg,
-            exc_info=(
-                type(unraisable.exc_value),
-                unraisable.exc_value,
-                unraisable.exc_traceback,
-            ),
-        )
-        dump_current_tracebacks("Unraisable exception")
-        previous_unraisablehook(unraisable)
+        try:
+            exc_value = unraisable.exc_value
+            exc_type = type(exc_value) if exc_value is not None else RuntimeError
+
+            logger.critical(
+                "Unraisable exception from %r: %s",
+                unraisable.object,
+                unraisable.err_msg,
+                exc_info=(exc_type, exc_value, unraisable.exc_traceback),
+            )
+            dump_current_tracebacks("Unraisable exception")
+            _original_unraisablehook(unraisable)
+        except Exception:
+            _last_resort_log("Exception inside sys.unraisablehook")
 
     sys.excepthook = exception_hook
     threading.excepthook = threading_exception_hook
     sys.unraisablehook = unraisable_hook
-    qInstallMessageHandler(_qt_message_handler)
+
+    if not _hooks_installed:
+        _previous_qt_message_handler = qInstallMessageHandler(_qt_message_handler)
+        _hooks_installed = True
 
     logger.info("Crash diagnostics enabled: trace_file=%s", trace_path)
 
 
+def deactivate_crash_diagnostics() -> None:
+    """Restore Python crash hooks and close the faulthandler trace file."""
+    global _fault_trace_file, _hooks_installed, _previous_qt_message_handler
+
+    sys.excepthook = _original_excepthook
+    threading.excepthook = _original_threading_excepthook
+    sys.unraisablehook = _original_unraisablehook
+
+    if _hooks_installed:
+        qInstallMessageHandler(_previous_qt_message_handler)
+        _previous_qt_message_handler = None
+        _hooks_installed = False
+
+    try:
+        faulthandler.disable()
+    except Exception:
+        logger.exception("Failed to disable faulthandler")
+
+    if _fault_trace_file is not None:
+        try:
+            _fault_trace_file.close()
+        except Exception:
+            logger.exception("Failed to close crash trace file")
+        finally:
+            _fault_trace_file = None
+
+
 def dump_current_tracebacks(reason: str) -> None:
     """Write stack traces for all Python threads to the crash trace file."""
-    if _fault_trace_file is None:
+    trace_file = _fault_trace_file
+    if trace_file is None:
         logger.warning("Cannot dump tracebacks for %s: trace file is not open", reason)
         return
 
     try:
-        _fault_trace_file.write(f"\n=== {reason} ===\n")
-        _fault_trace_file.flush()
-        faulthandler.dump_traceback(file=_fault_trace_file, all_threads=True)
-        _fault_trace_file.flush()
+        trace_file.write(f"\n=== {reason} ===\n")
+        trace_file.flush()
+        faulthandler.dump_traceback(file=trace_file, all_threads=True)
+        trace_file.flush()
     except Exception:
         logger.exception("Failed to dump crash tracebacks")
+
+
+def _resolve_trace_path(trace_file: str | Path) -> Path:
+    trace_path = Path(trace_file)
+    if not trace_path.is_absolute():
+        trace_path = LOG_DIRECTORY / trace_path
+    return trace_path
 
 
 def _enable_fault_trace_file(trace_path: Path) -> None:
@@ -117,16 +180,26 @@ def _enable_fault_trace_file(trace_path: Path) -> None:
     if _fault_trace_file is not None:
         try:
             faulthandler.disable()
+        except Exception:
+            logger.exception("Failed to disable previous faulthandler")
+
+        try:
             _fault_trace_file.close()
         except Exception:
             logger.exception("Failed to close previous crash trace file")
 
-    _fault_trace_file = open(trace_path, "a", encoding="utf-8")
+    _fault_trace_file = open(
+        trace_path,
+        "a",
+        encoding="utf-8",
+        buffering=1,
+    )
     _fault_trace_file.write(
         "\n=== AudioPlayground crash diagnostics session "
         f"{datetime.now().isoformat(timespec='seconds')} ===\n"
     )
     _fault_trace_file.flush()
+
     faulthandler.enable(file=_fault_trace_file, all_threads=True)
 
 
@@ -136,24 +209,32 @@ def _qt_message_handler(
     message: str,
 ) -> None:
     """Forward Qt diagnostic messages into the Python log."""
-    source = getattr(context, "file", None) or "<unknown>"
-    line = getattr(context, "line", 0)
-    function = getattr(context, "function", None) or "<unknown>"
-    formatted = "Qt: %s (%s:%s, %s)" % (message, source, line, function)
+    try:
+        source = getattr(context, "file", None) or "<unknown>"
+        line = getattr(context, "line", 0)
+        function = getattr(context, "function", None) or "<unknown>"
+        formatted = "Qt: %s (%s:%s, %s)" % (message, source, line, function)
 
-    if msg_type == QtMsgType.QtDebugMsg:
-        logger.debug(formatted)
-    elif msg_type == QtMsgType.QtInfoMsg:
-        logger.info(formatted)
-    elif msg_type == QtMsgType.QtWarningMsg:
-        logger.warning(formatted)
-    elif msg_type == QtMsgType.QtCriticalMsg:
-        logger.error(formatted)
-    elif msg_type == QtMsgType.QtFatalMsg:
-        logger.critical(formatted)
-        dump_current_tracebacks("Qt fatal message")
-    else:
-        logger.warning(formatted)
+        if msg_type == QtMsgType.QtDebugMsg:
+            logger.debug(formatted)
+        elif msg_type == QtMsgType.QtInfoMsg:
+            logger.info(formatted)
+        elif msg_type == QtMsgType.QtWarningMsg:
+            logger.warning(formatted)
+        elif msg_type == QtMsgType.QtCriticalMsg:
+            logger.error(formatted)
+        elif msg_type == QtMsgType.QtFatalMsg:
+            logger.critical(formatted)
+            dump_current_tracebacks("Qt fatal message")
+            _flush_logging()
+        else:
+            logger.warning(formatted)
+
+        if _previous_qt_message_handler is not None:
+            _previous_qt_message_handler(msg_type, context, message)
+
+    except Exception:
+        _last_resort_log("Exception inside Qt message handler")
 
 
 def _shutdown_window(
@@ -162,7 +243,12 @@ def _shutdown_window(
     graceful: bool,
 ) -> None:
     """Best-effort window shutdown from a crash hook."""
-    window = get_window()
+    try:
+        window = get_window()
+    except Exception:
+        logger.exception("Could not retrieve window during crash shutdown")
+        return
+
     if window is None:
         return
 
@@ -172,3 +258,19 @@ def _shutdown_window(
             shutdown(graceful=graceful)
     except Exception:
         logger.exception("Error during crash shutdown")
+
+
+def _flush_logging() -> None:
+    """Best-effort flush of all logging handlers."""
+    with contextlib.suppress(Exception):
+        for handler in logging.getLogger().handlers:
+            handler.flush()
+
+
+def _last_resort_log(message: str) -> None:
+    """Write diagnostics when normal logging may be broken."""
+    try:
+        sys.__stderr__.write(f"{message}\n")
+        sys.__stderr__.flush()
+    except Exception:
+        pass

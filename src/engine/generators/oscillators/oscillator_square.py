@@ -2,6 +2,7 @@
 
 import logging
 import math
+import threading
 from abc import ABC, abstractmethod
 from typing import Literal, Protocol, runtime_checkable
 
@@ -391,9 +392,14 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
             self._buffer[index] += magnitude * value
 
     def _shift_buffer(self) -> float:
-        value = float(self._buffer[0])
-        self._buffer[:-1] = self._buffer[1:]
-        self._buffer[-1] = 0.0
+        # Use local reference to prevent race condition if buffer is replaced
+        buffer = self._buffer
+        if len(buffer) == 0:
+            return 0.0
+        value = float(buffer[0])
+        # Use np.roll for safer in-place shift
+        buffer[:-1] = buffer[1:].copy()
+        buffer[-1] = 0.0
         return value
 
     def _process_dc_filter(self, value: float) -> float:
@@ -664,6 +670,7 @@ class SquareOscillator(Oscillator):
             )
         self._pulsewidth_threshold = pulsewidth * TWO_PI
         self._pulsewidth = pulsewidth
+        self._strategy_lock = threading.Lock()
         self._apply_mode(mode, initial=True, **mode_kwargs)
 
     @property
@@ -718,8 +725,10 @@ class SquareOscillator(Oscillator):
     ) -> None:
         self._mode = mode
         self._mode_kwargs = mode_kwargs
-        self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)
-        self._sync_strategy_runtime()
+        # Create new strategy with lock to prevent access during replacement
+        with self._strategy_lock:
+            self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)
+            self._sync_strategy_runtime()
         self._sync_smoothing_strategy(initial=initial)
 
     @classmethod
@@ -756,12 +765,14 @@ class SquareOscillator(Oscillator):
 
     def __next__(self) -> float:
         current_phase = (self._i + self._p) % TWO_PI
-        val = self._strategy.generate_sample(
-            phase=current_phase,
-            pulsewidth_threshold=self._pulsewidth_threshold,
-            low_value=self._wave_range[0],
-            high_value=self._wave_range[1],
-        )
+        # Use lock to prevent strategy replacement during generation
+        with self._strategy_lock:
+            val = self._strategy.generate_sample(
+                phase=current_phase,
+                pulsewidth_threshold=self._pulsewidth_threshold,
+                low_value=self._wave_range[0],
+                high_value=self._wave_range[1],
+            )
         self._i += self._step
         if self._i >= TWO_PI:
             self._i -= TWO_PI
@@ -773,12 +784,14 @@ class SquareOscillator(Oscillator):
         n = validate_sample_count(n)
         phases = (self._i + self._p) + self._step * np.arange(n)
         wrapped_phases = phases % TWO_PI
-        val = self._strategy.generate_samples(
-            phases=wrapped_phases,
-            pulsewidth_threshold=self._pulsewidth_threshold,
-            low_value=self._wave_range[0],
-            high_value=self._wave_range[1],
-        )
+        # Use lock to prevent strategy replacement during generation
+        with self._strategy_lock:
+            val = self._strategy.generate_samples(
+                phases=wrapped_phases,
+                pulsewidth_threshold=self._pulsewidth_threshold,
+                low_value=self._wave_range[0],
+                high_value=self._wave_range[1],
+            )
         if self._strategy_handles_amplitude():
             samples = val
         else:
@@ -804,12 +817,14 @@ class SquareOscillator(Oscillator):
         else:
             offset_phases = np.deg2rad(phase_offsets_deg)
 
-        waveform = self._strategy.generate_samples(
-            phases=(carrier_phases + offset_phases) % TWO_PI,
-            pulsewidth_threshold=self._pulsewidth_threshold,
-            low_value=self._wave_range[0],
-            high_value=self._wave_range[1],
-        )
+        # Use lock to prevent strategy replacement during generation
+        with self._strategy_lock:
+            waveform = self._strategy.generate_samples(
+                phases=(carrier_phases + offset_phases) % TWO_PI,
+                pulsewidth_threshold=self._pulsewidth_threshold,
+                low_value=self._wave_range[0],
+                high_value=self._wave_range[1],
+            )
         return np.asarray(waveform, dtype=np.float64), {"carrier_phase": carrier_end}
 
     def commit_modulated_phase_state(self, state: dict[str, float]) -> None:

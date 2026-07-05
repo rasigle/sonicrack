@@ -65,19 +65,19 @@ class OscillatorModule(ModuleWidget):
             freq,
             gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
             sample_rate=sample_rate,
-            mode="analog",
+            mode="pure",
         )
         self._triangle_oscillator = TriangleOscillator(
             freq,
             gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
             sample_rate=sample_rate,
-            mode="analog",
+            mode="pure",
         )
         self._sawtooth_oscillator = SawtoothOscillator(
             freq,
             gain_db=OSCILLATOR_DEFAULT_GAIN_DB,
             sample_rate=sample_rate,
-            mode="analog",
+            mode="vcv",
         )
         self._square_oscillator = SquareOscillator(
             freq,

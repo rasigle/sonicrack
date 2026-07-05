@@ -208,7 +208,9 @@ class LFOModule(ModuleWidget):
 
     def _on_pulsewidth_changed(self):
         """Handle pulse width changes - only update square oscillator."""
-        self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
+        pulsewidth = self.pulsewidth_knob.get_value()
+        self._square_oscillator.pulsewidth = pulsewidth
+        self.parameter_changed.emit("pulsewidth", pulsewidth)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render each LFO output for the current engine cycle."""

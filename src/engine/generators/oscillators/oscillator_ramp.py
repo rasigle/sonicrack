@@ -23,6 +23,7 @@ from src.engine.utils.decorators import filter_provided_args, track_provided_arg
 from src.engine.utils.validation import validate_sample_count
 
 SawtoothMode = Literal["pure", "analog", "vcv"]
+TriangleMode = Literal["pure", "analog"]
 
 
 @register_component()
@@ -71,6 +72,7 @@ class SawtoothOscillator(Oscillator):
         self._vcv_prev_phase: float | None = None
         self._dc_lowpass_state = 0.0
         self.set_mode(mode)
+
         kwargs = filter_provided_args(
             self._provided_args,  # noqa
             frequency=frequency,
@@ -81,6 +83,9 @@ class SawtoothOscillator(Oscillator):
             wave_range=wave_range,
         )
         super().__init__(**kwargs)
+
+        self._mode: SawtoothMode = "pure"
+        self.set_mode(mode)
         self._phase_degrees = self._p
         self._update_dc_alpha()
 
@@ -342,7 +347,46 @@ class TriangleOscillator(SawtoothOscillator):
         ),
     )
 
-    def set_mode(self, mode: SawtoothMode) -> None:
+    @track_provided_args
+    def __init__(
+        self,
+        frequency: float = 440,
+        amplitude: float = 1.0,
+        gain_db: float | None = DEFAULT_GAIN_DB,
+        phase: float = 0.0,
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
+        wave_range: tuple[float, float] = (-1, 1),
+        mode: TriangleMode = "pure",
+    ):
+        self.set_mode(mode)
+
+        kwargs = filter_provided_args(
+            self._provided_args,  # noqa
+            frequency=frequency,
+            amplitude=amplitude,
+            gain_db=gain_db,
+            phase=phase,
+            sample_rate=sample_rate,
+            wave_range=wave_range,
+        )
+        Oscillator.__init__(self, **kwargs)
+
+        self._mode: TriangleMode = "pure"
+        self.set_mode(mode)
+        self._phase_degrees = self._p
+
+    def _initialize_osc(self):
+        self._i = 0
+
+    @property
+    def mode(self) -> TriangleMode:
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: TriangleMode):
+        self.set_mode(value)
+
+    def set_mode(self, mode: TriangleMode) -> None:
         if mode not in self.get_available_modes():
             raise ValueError(f"Invalid mode '{mode}'. Must be 'pure' or 'analog'")
         self._mode = mode
@@ -350,6 +394,9 @@ class TriangleOscillator(SawtoothOscillator):
     @classmethod
     def get_available_modes(cls) -> list[str]:
         return ["pure", "analog"]
+
+    def _post_sample_rate_set(self):
+        self._post_freq_set()
 
     def _apply_analog_character_triangle(
         self, val: float | np.ndarray, sample_indices: np.ndarray | None = None

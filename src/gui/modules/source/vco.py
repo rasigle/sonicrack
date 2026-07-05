@@ -21,17 +21,13 @@ from src.engine import (
     TriangleOscillator,
 )
 from src.engine.generators.oscillators.oscillator_modulated import ModulatedOscillator
-from src.engine.generators.oscillators.oscillator_ramp import SawtoothMode
+from src.engine.generators.oscillators.oscillator_ramp import SawtoothMode, TriangleMode
 from src.engine.generators.oscillators.oscillator_sine import SineWaveMode
 from src.engine.generators.oscillators.oscillator_square import SquareWaveMode
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
-from src.gui.core.runtime_helpers import (
-    float_parameter,
-    read_samples,
-    str_parameter,
-)
+from src.gui.core.runtime_helpers import float_parameter, read_samples, str_parameter
 from src.gui.module_registry import register_module
 from src.gui.modules.source._oscillator_runtime import (
     RuntimeOscillator,
@@ -66,6 +62,10 @@ def _as_square_mode(mode: str) -> SquareWaveMode:
 
 def _as_sawtooth_mode(mode: str) -> SawtoothMode:
     return cast(SawtoothMode, mode)
+
+
+def _as_triangle_mode(mode: str) -> TriangleMode:
+    return cast(TriangleMode, mode)
 
 
 def apply_v_oct_offset(
@@ -388,7 +388,7 @@ class ModulatedOscillatorModule(ModuleWidget):
                 self._base_frequency,
                 gain_db=self._gain_db,
                 phase=self._phase,
-                mode=_as_sawtooth_mode(self._mode),
+                mode=_as_triangle_mode(self._mode),
             )
         else:
             # Default to sine
@@ -614,11 +614,14 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Create the base oscillator
         if wave_type == "Sine":
             osc = SineOscillator(
-                base_freq, gain_db=gain_db, phase=phase, mode=_as_sine_mode(mode)
+                frequency=base_freq,
+                gain_db=gain_db,
+                phase=phase,
+                mode=_as_sine_mode(mode),
             )
         elif wave_type == "Square":
             osc = SquareOscillator(
-                base_freq,
+                frequency=base_freq,
                 gain_db=gain_db,
                 phase=phase,
                 pulsewidth=pulsewidth,
@@ -626,11 +629,17 @@ class ModulatedOscillatorModule(ModuleWidget):
             )
         elif wave_type == "Sawtooth":
             osc = SawtoothOscillator(
-                base_freq, gain_db=gain_db, phase=phase, mode=_as_sawtooth_mode(mode)
+                frequency=base_freq,
+                gain_db=gain_db,
+                phase=phase,
+                mode=_as_sawtooth_mode(mode),
             )
         elif wave_type == "Triangle":
             osc = TriangleOscillator(
-                base_freq, gain_db=gain_db, phase=phase, mode=_as_sawtooth_mode(mode)
+                frequency=base_freq,
+                gain_db=gain_db,
+                phase=phase,
+                mode=_as_triangle_mode(mode),
             )
         else:
             raise ValueError(f"Unknown waveform type: {wave_type}")
@@ -903,6 +912,6 @@ class ModulatedOscillatorModule(ModuleWidget):
                 frequency,
                 gain_db=gain_db,
                 phase=phase,
-                mode=_as_sawtooth_mode(mode),
+                mode=_as_triangle_mode(mode),
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")

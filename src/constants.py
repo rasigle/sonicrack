@@ -68,7 +68,7 @@ MAX_AMPLITUDE = 1.0
 # Volume range in decibels
 MIN_GAIN_DB = -96.0  # Near silence
 MAX_GAIN_DB = 12.0  # Boost
-DEFAULT_GAIN_DB = -20.0  # Default starting gain
+DEFAULT_GAIN_DB = 0.0  # Default starting gain
 
 
 # 🎵 Note mapping (keyboard keys → frequencies)

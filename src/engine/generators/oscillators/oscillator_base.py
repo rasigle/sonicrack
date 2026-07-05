@@ -43,7 +43,7 @@ class Oscillator(Generator):
         self._initial_amp = _derive_amplitude_from_init(
             self._provided_args,
             amplitude,
-            gain_db,  # noqa
+            gain_db,
         )
 
         self._i: float = 0.0

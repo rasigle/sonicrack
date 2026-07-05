@@ -1,11 +1,12 @@
 """Spectrum analyzer module for visualizing audio frequency content."""
 
 import logging
-import threading
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPainter, QPen
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from src.gui.audio_config import audio_config
@@ -14,25 +15,59 @@ from src.gui.module_registry import register_module
 from src.gui.modules.visualization.visualizer_utils import (
     get_visualizer_samples,
     stop_visualizer_timer,
-    validate_samples,
 )
 from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)
 
 
+def _as_mono_float32(samples: Any) -> np.ndarray | None:
+    """Convert mono/stereo samples to a finite mono float32 array.
+
+    QWidget work stays on the UI thread. This function only sanitizes already
+    rendered tap-history samples.
+    """
+    if samples is None:
+        return None
+
+    arr = np.asarray(samples, dtype=np.float32)
+
+    if arr.size == 0:
+        return None
+
+    arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=-1.0)
+
+    # Common stereo layouts:
+    #   (N, 2): frame-major stereo
+    #   (2, N): channel-major stereo
+    if arr.ndim == 2:
+        if arr.shape[1] == 2:
+            arr = arr.mean(axis=1)
+        elif arr.shape[0] == 2:
+            arr = arr.mean(axis=0)
+        else:
+            arr = arr.ravel()
+    else:
+        arr = arr.ravel()
+
+    if arr.size == 0:
+        return None
+
+    return np.clip(arr.astype(np.float32, copy=False), -1.0, 1.0)
+
+
+@dataclass
+class SpectrumResult:
+    """Prepared spectrum data and stats for display."""
+
+    bars: np.ndarray
+    peak_frequency_hz: float | None
+    level_db: float
+
+
 @register_module()
 class SpectrumModule(ModuleWidget):
     """Spectrum analyzer module for real-time frequency visualization.
-
-    This is a visualization module that displays the frequency spectrum
-    of the input signal. Connect it after your audio processing chain
-    to see the frequency content.
-
-    **Usage:**
-    - Connect audio signal to the "In" port
-    - The display shows the frequency spectrum of the input signal
-    - Great for analyzing frequency content and monitoring mix
 
     Runtime behavior:
     - Passive sink in the render graph; it does not process upstream modules.
@@ -50,7 +85,6 @@ class SpectrumModule(ModuleWidget):
         description="Real-time frequency spectrum display (FFT analyzer)",
     )
 
-    # Passive sink: receives rendered buffers without running as a processor.
     is_processing_module = False
 
     def __init__(self):
@@ -61,28 +95,21 @@ class SpectrumModule(ModuleWidget):
             color=QColor(100, 80, 120),
         )
 
-        # Add input port
         self.in_port = self.add_input("In")
 
-        # Thread-safe buffer for audio samples
-        self._sample_buffer = None
-        self._buffer_lock = None
-        try:
-            self._buffer_lock = threading.Lock()
-        except ImportError:
-            self._buffer_lock = None
-            logger.warning("Threading not available - spectrum may have issues")
+        self._sample_rate = int(audio_config.sample_rate)
+        self._fft_size = 2048
 
-        # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
-        # Create spectrum analyzer widget
-        self.spectrum_display = SpectrumAnalyzer()
+        self.spectrum_display = SpectrumAnalyzer(
+            sample_rate=self._sample_rate,
+            fft_size=self._fft_size,
+        )
         self.spectrum_display.setMinimumSize(400, 150)
         layout.addWidget(self.spectrum_display)
 
-        # Add peak frequency display
         stats_layout = QHBoxLayout()
 
         self.peak_freq_label = QLabel("Peak: -- Hz")
@@ -100,267 +127,465 @@ class SpectrumModule(ModuleWidget):
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
-        # Sample rate for frequency calculation
-        self._sample_rate = audio_config.sample_rate
-
-        # Register for sample rate updates
         audio_config.add_sample_rate_listener(self._on_sample_rate_changed)
 
-        # Visualization timer (20 Hz = 50ms, on UI thread)
-        # Using QTimer is simpler and works correctly with Qt event loop
-        from PyQt6.QtCore import QTimer
-
-        self._viz_timer = QTimer()
-        self._viz_timer.setInterval(50)  # 50ms = 20 Hz
+        # 20 Hz is a good analyzer refresh rate and should not fight the audio
+        # thread. CoarseTimer lets Qt coalesce UI work more efficiently.
+        self._viz_timer = QTimer(self)
+        self._viz_timer.setTimerType(Qt.TimerType.CoarseTimer)
+        self._viz_timer.setInterval(50)
         self._viz_timer.timeout.connect(self._update_display)
         self._viz_timer.start()
-        logger.info("Spectrum visualization timer started (20 Hz / 50ms)")
 
-    def _on_sample_rate_changed(self, new_sample_rate: int):
-        """Handle sample rate changes.
+        logger.info("Spectrum visualization timer started")
 
-        Args:
-            new_sample_rate: New sample rate in Hz
-        """
-        self._sample_rate = new_sample_rate
+    def _on_sample_rate_changed(self, new_sample_rate: int) -> None:
+        """Handle sample-rate changes."""
+        self._sample_rate = int(new_sample_rate)
+        self.spectrum_display.set_sample_rate(self._sample_rate)
 
-    def _update_samples(self, samples: np.ndarray):
-        """Update the display with new audio samples.
-
-        Args:
-            samples: Audio samples (mono or stereo)
-        """
+    def _update_display(self) -> None:
+        """Update the spectrum display from rendered port tap history."""
         try:
-            logger.debug(
-                f"Spectrum: Updating with {len(samples)} samples, shape={samples.shape}"
-            )
-
-            # Convert stereo to mono for FFT
-            if len(samples.shape) == 2:
-                samples = np.mean(samples, axis=1)
-
-            # Update spectrum display
-            self.spectrum_display.set_samples(samples)
-
-            # Calculate and display peak frequency
-            if len(samples) > 0:
-                self._update_peak_frequency(samples)
-
-        except Exception as e:
-            logger.warning(f"Error updating spectrum: {e}")
-
-    def _update_peak_frequency(self, samples: np.ndarray):
-        """Calculate and display the peak frequency and level.
-
-        Args:
-            samples: Audio samples
-        """
-        try:
-            # Calculate level in dB from time-domain peak amplitude (to match waveform)
-            peak_amplitude = np.max(np.abs(samples))
-            peak_level = (
-                20 * np.log10(peak_amplitude + 1e-10) if peak_amplitude > 0 else -100.0
-            )
-
-            # Compute FFT
-            n = min(len(samples), 4096)
-            if n < 256:
-                self.level_label.setText(f"Level: {peak_level:.1f} dB")
+            if not self.in_port.is_connected:
+                self._show_no_signal()
                 return
 
-            # Apply window
-            window = np.hanning(n)
-            windowed = samples[:n] * window
+            # Ask for enough samples to get useful bass resolution, but keep
+            # this bounded so the UI thread cost stays predictable.
+            samples = get_visualizer_samples(self.in_port, num_samples=self._fft_size)
 
-            # FFT
-            fft = np.fft.rfft(windowed)
-            magnitude = np.abs(fft)
+            mono = _as_mono_float32(samples)
+            if mono is None or mono.size < 256:
+                self._show_no_signal()
+                return
 
-            # Find peak
-            peak_idx = np.argmax(magnitude)
+            result = self.spectrum_display.set_samples(mono)
 
-            # Convert to frequency
-            freq_resolution = self._sample_rate / (2 * len(magnitude))
-            peak_freq = peak_idx * freq_resolution
+            if result is None:
+                self._show_no_signal()
+                return
 
-            # Update labels
-            if peak_freq < 1000:
-                self.peak_freq_label.setText(f"Peak: {peak_freq:.1f} Hz")
-            else:
-                self.peak_freq_label.setText(f"Peak: {peak_freq / 1000:.2f} kHz")
+            self._update_labels(result)
 
-            self.level_label.setText(f"Level: {peak_level:.1f} dB")
+        except Exception:
+            logger.exception("Error in SpectrumModule._update_display")
 
-        except Exception as e:
-            logger.debug(f"Error calculating peak frequency: {e}")
+    def _show_no_signal(self) -> None:
+        """Clear display and labels without redundant UI churn."""
+        self.spectrum_display.clear()
+        self._set_label_text(self.peak_freq_label, "Peak: -- Hz")
+        self._set_label_text(self.level_label, "Level: -- dB")
 
-    # AudioModuleInterface implementation
+    def _update_labels(self, result: SpectrumResult) -> None:
+        """Update peak and level labels."""
+        if result.peak_frequency_hz is None:
+            peak_text = "Peak: -- Hz"
+        elif result.peak_frequency_hz < 1000.0:
+            peak_text = f"Peak: {result.peak_frequency_hz:.1f} Hz"
+        else:
+            peak_text = f"Peak: {result.peak_frequency_hz / 1000.0:.2f} kHz"
+
+        self._set_label_text(self.peak_freq_label, peak_text)
+        self._set_label_text(self.level_label, f"Level: {result.level_db:.1f} dB")
+
+    @staticmethod
+    def _set_label_text(label: QLabel, text: str) -> None:
+        """Avoid extra layout/paint work when text is unchanged."""
+        if label.text() != text:
+            label.setText(text)
+
     def get_required_inputs(self) -> list[str]:
-        """Spectrum analyzer requires input to visualize.
-
-        Returns:
-            List of required input port names
-        """
-        return []  # Optional input - show "No Signal" if not connected
-
-    def _update_display(self):
-        """Update the spectrum display from rendered port tap history."""
-        # Check if input is connected
-        if not self.in_port.is_connected:
-            # No input - clear display
-            self.spectrum_display.clear()
-            self.peak_freq_label.setText("Peak: -- Hz")
-            self.level_label.setText("Level: -- dB")
-            return
-
-        # FFT needs at least 1024 samples for good frequency resolution
-        samples = get_visualizer_samples(self.in_port, num_samples=1024)
-
-        # Validate and display samples
-        if not validate_samples(samples):
-            self.spectrum_display.clear()
-            self.peak_freq_label.setText("Peak: -- Hz")
-            self.level_label.setText("Level: -- dB")
-            return
-
-        # Update display with samples
-        if samples is not None and np.asarray(samples).size > 0:
-            self._update_samples(samples)
+        """Spectrum has optional input and shows 'No Signal' when disconnected."""
+        return []
 
     def shutdown(self, graceful: bool = True) -> None:
         """Stop visualization updates before the module is deleted."""
         del graceful
         stop_visualizer_timer(self, self._update_display)
-        audio_config.remove_sample_rate_listener(self._on_sample_rate_changed)
+
+        try:
+            audio_config.remove_sample_rate_listener(self._on_sample_rate_changed)
+        except Exception:
+            logger.debug(
+                "Could not remove spectrum sample-rate listener",
+                exc_info=True,
+            )
 
 
 class SpectrumAnalyzer(QWidget):
-    """Widget for displaying audio spectrum in real-time.
+    """Widget for displaying real-time frequency spectrum.
 
-    Shows the frequency-domain representation of audio signals using FFT.
+    FFT and bucket preparation happen in set_samples(). paintEvent() only draws
+    cached bars and cached grid/background.
     """
 
-    def __init__(self, parent: QWidget | None = None):
-        """Initialize the spectrum analyzer.
+    MIN_FREQ_HZ = 20.0
+    FLOOR_DB = -80.0
+    CEILING_DB = 0.0
 
-        Args:
-            parent: Parent widget
-        """
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        sample_rate: int = 44100,
+        fft_size: int = 2048,
+    ):
+        """Initialize the spectrum analyzer."""
         super().__init__(parent)
 
         self.setMinimumSize(400, 150)
-        self.fft_data: np.ndarray | None = None
-        self.fft_bins = 256
 
-        # Visual properties
-        self.bg_color = QColor(20, 20, 25)
+        self.sample_rate = int(sample_rate)
+        self.fft_size = int(fft_size)
+
+        self.fft_bins = 96
+        self.bars: np.ndarray | None = None
+
+        self.bg_color_top = QColor(20, 20, 25)
+        self.bg_color_bottom = QColor(14, 14, 18)
+
         self.grid_color = QColor(40, 40, 45)
+        self.text_color = QColor(110, 110, 115)
         self.bar_color = QColor(255, 150, 0)
+        self.bar_hot_color = QColor(255, 200, 0)
         self.peak_color = QColor(255, 0, 0)
 
-    def set_samples(self, samples: np.ndarray):
-        """Set the audio samples and compute FFT.
+        self._window: np.ndarray | None = None
+        self._window_size: int | None = None
+        self._freqs: np.ndarray | None = None
 
-        Args:
-            samples: Audio samples array
-        """
-        if samples is None or len(samples) == 0:
-            self.fft_data = None
-            self.update()
+        self._bucket_indices: list[np.ndarray] = []
+        self._bucket_key: tuple[int, int, int] | None = None
+
+        self._grid_pixmap: QPixmap | None = None
+        self._grid_key: tuple[int, int] | None = None
+
+        self._prepare_fft_cache()
+
+    def set_sample_rate(self, sample_rate: int) -> None:
+        """Update sample rate and invalidate frequency-dependent caches."""
+        sample_rate = int(sample_rate)
+        if sample_rate == self.sample_rate:
             return
 
-        # Handle stereo by taking first channel
-        if len(samples.shape) > 1 and samples.shape[1] == 2:
-            samples = samples[:, 0]
+        self.sample_rate = sample_rate
+        self._freqs = None
+        self._bucket_indices = []
+        self._bucket_key = None
+        self._grid_pixmap = None
+        self._grid_key = None
+        self._prepare_fft_cache()
+        self.update()
 
-        # Compute FFT
-        n = min(len(samples), 4096)
+    def set_fft_size(self, fft_size: int) -> None:
+        """Set FFT size and invalidate related caches."""
+        fft_size = max(256, int(fft_size))
+        if fft_size == self.fft_size:
+            return
+
+        self.fft_size = fft_size
+        self._window = None
+        self._window_size = None
+        self._freqs = None
+        self._bucket_indices = []
+        self._bucket_key = None
+        self._prepare_fft_cache()
+        self.update()
+
+    def set_samples(self, samples: np.ndarray | None) -> SpectrumResult | None:
+        """Set audio samples, compute one FFT, and cache display bars."""
+        mono = _as_mono_float32(samples)
+
+        if mono is None or mono.size < 256:
+            self.clear()
+            return None
+
+        n = min(mono.size, self.fft_size)
         if n < 256:
-            self.fft_data = None
-            self.update()
+            self.clear()
+            return None
+
+        # Use the most recent n samples so the analyzer tracks current signal.
+        mono = mono[-n:]
+
+        self._ensure_window(n)
+        self._ensure_freqs(n)
+        self._ensure_bucket_indices(n)
+
+        assert self._window is not None
+
+        level_db = self._time_domain_level_db(mono)
+
+        windowed = mono * self._window
+
+        fft = np.fft.rfft(windowed)
+        magnitude = np.abs(fft).astype(np.float32, copy=False)
+
+        # Normalize roughly against Hann window gain so dB is stable and does
+        # not constantly pin to 0 dB just because FFT length changed.
+        window_gain = max(float(np.sum(self._window)) * 0.5, 1e-12)
+        magnitude = magnitude / window_gain
+
+        magnitude = np.maximum(magnitude, 1e-10)
+        db = 20.0 * np.log10(magnitude)
+
+        # Ignore DC for peak-frequency reporting. A DC offset should not become
+        # the musical/audio peak.
+        peak_frequency_hz = self._find_peak_frequency(db)
+
+        normalized = np.clip(
+            (db - self.FLOOR_DB) / (self.CEILING_DB - self.FLOOR_DB),
+            0.0,
+            1.0,
+        ).astype(np.float32, copy=False)
+
+        self.bars = self._bucketize(normalized)
+        self.update()
+
+        return SpectrumResult(
+            bars=self.bars,
+            peak_frequency_hz=peak_frequency_hz,
+            level_db=level_db,
+        )
+
+    def clear(self) -> None:
+        """Clear the display."""
+        if self.bars is None:
             return
 
-        # Apply window function
-        window = np.hanning(n)
-        windowed = samples[:n] * window
-
-        # Compute FFT
-        fft = np.fft.rfft(windowed)
-        magnitude = np.abs(fft)
-
-        # Convert to dB
-        magnitude = np.maximum(magnitude, 1e-10)  # Avoid log(0)
-        db = 20 * np.log10(magnitude)
-
-        # Normalize to 0-1 range (assuming -80 dB to 0 dB)
-        db = np.clip(db, -80, 0)
-        normalized = (db + 80) / 80
-
-        # Downsample to display bins
-        bins_per_bucket = len(normalized) // self.fft_bins
-        if bins_per_bucket > 0:
-            buckets = []
-            for i in range(self.fft_bins):
-                start = i * bins_per_bucket
-                end = start + bins_per_bucket
-                if end <= len(normalized):
-                    buckets.append(np.max(normalized[start:end]))
-            self.fft_data = np.array(buckets)
-        else:
-            self.fft_data = normalized[: self.fft_bins]
-
+        self.bars = None
         self.update()
 
-    def clear(self):
-        """Clear the display."""
-        self.fft_data = None
-        self.update()
+    def _prepare_fft_cache(self) -> None:
+        """Prepare caches for the current FFT size/sample rate."""
+        self._ensure_window(self.fft_size)
+        self._ensure_freqs(self.fft_size)
+        self._ensure_bucket_indices(self.fft_size)
 
-    def paintEvent(self, event):
-        """Paint the spectrum."""
+    def _ensure_window(self, n: int) -> None:
+        """Cache Hann window for a given FFT length."""
+        if self._window is not None and self._window_size == n:
+            return
+
+        self._window = np.hanning(n).astype(np.float32)
+        self._window_size = n
+
+    def _ensure_freqs(self, n: int) -> None:
+        """Cache rFFT frequency bins."""
+        if self._freqs is not None and self._freqs.size == (n // 2 + 1):
+            return
+
+        self._freqs = np.fft.rfftfreq(n, d=1.0 / float(self.sample_rate)).astype(
+            np.float32
+        )
+
+    def _ensure_bucket_indices(self, n: int) -> None:
+        """Build cached logarithmic bucket indices."""
+        key = (n, self.sample_rate, self.fft_bins)
+        if self._bucket_key == key and self._bucket_indices:
+            return
+
+        self._ensure_freqs(n)
+        assert self._freqs is not None
+
+        nyquist = max(float(self.sample_rate) * 0.5, self.MIN_FREQ_HZ * 2.0)
+        max_freq = max(self.MIN_FREQ_HZ * 2.0, nyquist)
+
+        edges = np.geomspace(self.MIN_FREQ_HZ, max_freq, self.fft_bins + 1)
+
+        bucket_indices: list[np.ndarray] = []
+        for i in range(self.fft_bins):
+            low = edges[i]
+            high = edges[i + 1]
+
+            idx = np.where((self._freqs >= low) & (self._freqs < high))[0]
+
+            # Low-frequency buckets can be empty when FFT size is small. Use the
+            # nearest bin so every visual bucket has a defined value.
+            if idx.size == 0:
+                nearest = int(np.argmin(np.abs(self._freqs - ((low + high) * 0.5))))
+                idx = np.array([nearest], dtype=np.int64)
+
+            bucket_indices.append(idx)
+
+        self._bucket_indices = bucket_indices
+        self._bucket_key = key
+
+    def _bucketize(self, normalized: np.ndarray) -> np.ndarray:
+        """Convert FFT-bin magnitudes to log-spaced display bars."""
+        if not self._bucket_indices:
+            return normalized[: self.fft_bins].astype(np.float32, copy=False)
+
+        bars = np.empty(len(self._bucket_indices), dtype=np.float32)
+
+        for i, idx in enumerate(self._bucket_indices):
+            safe_idx = idx[idx < normalized.size]
+            if safe_idx.size == 0:
+                bars[i] = 0.0
+            else:
+                bars[i] = float(np.max(normalized[safe_idx]))
+
+        return bars
+
+    def _find_peak_frequency(self, db: np.ndarray) -> float | None:
+        """Find peak frequency, ignoring DC and very-low-frequency bins."""
+        if db.size <= 1:
+            return None
+
+        self._ensure_freqs((db.size - 1) * 2)
+        assert self._freqs is not None
+
+        valid = np.where(self._freqs >= self.MIN_FREQ_HZ)[0]
+        valid = valid[valid < db.size]
+
+        if valid.size == 0:
+            return None
+
+        peak_idx = int(valid[np.argmax(db[valid])])
+        return float(self._freqs[peak_idx])
+
+    @staticmethod
+    def _time_domain_level_db(samples: np.ndarray) -> float:
+        """Return peak level from time-domain samples."""
+        if samples.size == 0:
+            return -100.0
+
+        peak = float(np.max(np.abs(samples)))
+        if peak <= 0.0:
+            return -100.0
+
+        return float(20.0 * np.log10(max(peak, 1e-10)))
+
+    def resizeEvent(self, event) -> None:
+        """Invalidate cached background when resized."""
+        self._grid_pixmap = None
+        self._grid_key = None
+        super().resizeEvent(event)
+
+    def _ensure_grid_pixmap(self) -> QPixmap:
+        """Return cached background/grid pixmap."""
+        width = max(1, self.width())
+        height = max(1, self.height())
+        key = (width, height)
+
+        if self._grid_pixmap is not None and self._grid_key == key:
+            return self._grid_pixmap
+
+        pixmap = QPixmap(width, height)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+
+        gradient = QLinearGradient(0, 0, 0, height)
+        gradient.setColorAt(0, self.bg_color_top)
+        gradient.setColorAt(1, self.bg_color_bottom)
+        painter.fillRect(0, 0, width, height, gradient)
+
+        self._draw_grid(painter, width, height)
+
+        painter.end()
+
+        self._grid_pixmap = pixmap
+        self._grid_key = key
+        return pixmap
+
+    def _draw_grid(self, painter: QPainter, width: int, height: int) -> None:
+        """Draw cached spectrum grid and labels."""
+        painter.setPen(QPen(self.grid_color, 1))
+
+        # Horizontal dB grid.
+        for i in range(5):
+            y = int(height * i / 4)
+            painter.drawLine(0, y, width, y)
+
+        # Vertical log-frequency guide lines.
+        freqs = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+        nyquist = max(float(self.sample_rate) * 0.5, self.MIN_FREQ_HZ * 2.0)
+        max_freq = min(20000.0, nyquist)
+
+        for freq in freqs:
+            if freq < self.MIN_FREQ_HZ or freq > max_freq:
+                continue
+
+            x = self._freq_to_x(freq, width, max_freq)
+            painter.drawLine(int(x), 0, int(x), height)
+
+        painter.setPen(self.text_color)
+        painter.setFont(QFont("Arial", 8))
+
+        labels = [20, 200, 1000, 2000, 10000, 20000]
+        for freq in labels:
+            if freq > max_freq:
+                continue
+
+            x = self._freq_to_x(freq, width, max_freq)
+
+            if freq < 1000:
+                label = f"{freq}Hz"
+            elif freq == 1000:
+                label = "1k"
+            else:
+                label = f"{int(freq / 1000)}k"
+
+            painter.drawText(int(x) - 14, height - 5, label)
+
+    def _freq_to_x(self, freq: float, width: int, max_freq: float) -> float:
+        """Map frequency to x coordinate using logarithmic scale."""
+        min_f = self.MIN_FREQ_HZ
+        max_f = max(max_freq, min_f * 2.0)
+
+        pos = np.log(freq / min_f) / np.log(max_f / min_f)
+        return float(np.clip(pos, 0.0, 1.0) * width)
+
+    def paintEvent(self, event) -> None:
+        """Paint the spectrum from cached bars."""
+        del event
+
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # Draw background
-        painter.fillRect(self.rect(), self.bg_color)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
 
         width = self.width()
         height = self.height()
 
-        # Draw grid lines (horizontal)
-        painter.setPen(QPen(self.grid_color, 1))
-        for i in range(5):
-            y = height * i / 4
-            painter.drawLine(0, int(y), width, int(y))
+        painter.drawPixmap(0, 0, self._ensure_grid_pixmap())
 
-        # Draw frequency scale labels
-        painter.setPen(QColor(100, 100, 100))
-        freq_labels = ["20Hz", "200Hz", "2kHz", "20kHz"]
-        for i, label in enumerate(freq_labels):
-            x = width * i / (len(freq_labels) - 1)
-            painter.drawText(int(x) - 20, height - 5, label)
-
-        # Draw spectrum bars
-        if self.fft_data is not None and len(self.fft_data) > 0:
-            bar_width = width / len(self.fft_data)
-
-            for i, magnitude in enumerate(self.fft_data):
-                x = i * bar_width
-                bar_height = magnitude * (height - 20)
-                y = height - bar_height - 15
-
-                # Color gradient based on level
-                if magnitude > 0.9:
-                    color = self.peak_color
-                elif magnitude > 0.7:
-                    color = QColor(255, 200, 0)
-                else:
-                    color = self.bar_color
-
-                painter.fillRect(
-                    int(x), int(y), max(1, int(bar_width) - 1), int(bar_height), color
-                )
-        else:
-            # Draw "No Signal" text
-            painter.setPen(QColor(100, 100, 100))
+        if self.bars is None or self.bars.size == 0:
+            painter.setPen(self.text_color)
+            painter.setFont(QFont("Arial", 12))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No Signal")
+            painter.end()
+            return
+
+        self._draw_bars(painter, width, height)
+        painter.end()
+
+    def _draw_bars(self, painter: QPainter, width: int, height: int) -> None:
+        """Draw cached spectrum bars."""
+        assert self.bars is not None
+
+        usable_height = max(1, height - 20)
+        bar_count = int(self.bars.size)
+        bar_width = width / max(1, bar_count)
+
+        for i, magnitude in enumerate(self.bars):
+            mag = float(np.clip(magnitude, 0.0, 1.0))
+
+            x = int(i * bar_width)
+            bar_h = int(mag * usable_height)
+            y = height - bar_h - 15
+
+            if mag > 0.9:
+                color = self.peak_color
+            elif mag > 0.7:
+                color = self.bar_hot_color
+            else:
+                color = self.bar_color
+
+            painter.fillRect(
+                x,
+                int(y),
+                max(1, int(bar_width) - 1),
+                max(1, bar_h),
+                color,
+            )

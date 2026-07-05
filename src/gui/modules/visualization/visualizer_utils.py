@@ -7,11 +7,18 @@ oscillator, envelope, or effect state while still allowing silent patches such
 as ``Oscillator -> Waveform`` to animate without an Output module.
 """
 
+from __future__ import annotations
+
+import contextlib
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+from PyQt6.QtCore import QTimer
+
+if TYPE_CHECKING:
+    from gui.core import Port
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +29,18 @@ def stop_visualizer_timer(module: Any, callback: Callable[[], None]) -> None:
     if timer is None:
         return
 
+    timer = cast(QTimer, timer)
     if timer.isActive():
         timer.stop()
-    try:
+
+    with contextlib.suppress(TypeError):
         timer.timeout.disconnect(callback)
-    except TypeError:
-        pass
+
+    module._viz_timer = None
 
 
 def get_visualizer_samples(
-    input_port, num_samples: int | None = None
+    input_port: Port, num_samples: int | None = None
 ) -> np.ndarray | None:
     """Read cached port tap history.
 
@@ -52,44 +61,35 @@ def get_visualizer_samples(
     try:
         for connected_port in input_port.connected_to:
             samples = connected_port.peek_recent(num_samples)
-            if samples is not None:
-                if isinstance(samples, np.ndarray) and samples.size > 0:
-                    logger.debug(
-                        f"PASSIVE: Got {len(samples)} samples from port "
-                        f"{connected_port.port_name}"
-                    )
-                    return samples
-                elif isinstance(samples, (int, float)):
-                    # Scalar value - convert to small array for visualization
-                    scalar_samples = np.array([samples], dtype=np.float32)
-                    logger.debug(
-                        f"PASSIVE: Got scalar {samples} "
-                        f"from port {connected_port.port_name}"
-                    )
-                    return scalar_samples
+
+            if samples is None:
+                continue
+
+            if isinstance(samples, (int, float)):
+                return np.array([samples], dtype=np.float32)
+
+            arr = np.asarray(samples, dtype=np.float32)
+
+            if arr.size > 0:
+                return arr
+
         logger.debug("No valid tap samples found in connected ports")
-    except Exception as e:
-        logger.debug(f"Error reading cached visualizer samples: {e}")
+
+    except Exception:
+        logger.debug("Error reading cached visualizer samples", exc_info=True)
 
     return None
 
 
-def validate_samples(samples) -> bool:
-    """Check if samples are valid for visualization.
-
-    Args:
-        samples: The samples to validate
-
-    Returns:
-        True if samples are valid and non-empty, False otherwise
-    """
+def validate_samples(samples: Any) -> bool:
+    """Check if samples are valid for visualization."""
     if samples is None:
         return False
 
     if isinstance(samples, (int, float)):
-        return samples != 0.0
+        return np.isfinite(samples)
 
     if isinstance(samples, np.ndarray):
-        return samples.size > 0
+        return samples.size > 0 and np.any(np.isfinite(samples))
 
     return False

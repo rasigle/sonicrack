@@ -1,7 +1,8 @@
 """Waveform display module for visualizing audio signals."""
 
 import logging
-import threading
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from PyQt6 import QtCore, QtWidgets
@@ -14,6 +15,7 @@ from PyQt6.QtGui import (
     QPainter,
     QPainterPath,
     QPen,
+    QPixmap,
 )
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
@@ -29,28 +31,83 @@ from src.gui.widgets.module_widget import ModuleWidget
 logger = logging.getLogger(__name__)
 
 
+def _as_float32_1d(samples: Any) -> np.ndarray | None:
+    """Convert input samples to a finite float32 1D array.
+
+    Silence is valid. NaN and infinities are sanitized so the painter never
+    receives invalid coordinates.
+    """
+    if samples is None:
+        return None
+
+    arr = np.asarray(samples, dtype=np.float32)
+
+    if arr.size == 0:
+        return None
+
+    arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=-1.0)
+    arr = np.clip(arr.ravel(), -1.0, 1.0)
+
+    if arr.size == 0:
+        return None
+
+    return arr
+
+
+def _downsample_minmax(samples: np.ndarray, max_points: int) -> np.ndarray:
+    """Downsample audio for display while preserving visible peaks.
+
+    Simple decimation can miss short transients. Min/max envelope downsampling
+    preserves peaks and gives a stable oscilloscope-style display.
+    """
+    samples = np.asarray(samples, dtype=np.float32).ravel()
+
+    if samples.size == 0:
+        return samples
+
+    max_points = max(2, int(max_points))
+
+    if samples.size <= max_points:
+        return samples
+
+    # We output two points per bucket: min and max.
+    bucket_count = max(1, max_points // 2)
+    bucket_size = max(1, samples.size // bucket_count)
+    usable = bucket_count * bucket_size
+
+    if usable <= 0:
+        return samples[-max_points:]
+
+    trimmed = samples[-usable:]
+    buckets = trimmed.reshape(bucket_count, bucket_size)
+
+    mins = buckets.min(axis=1)
+    maxs = buckets.max(axis=1)
+
+    envelope = np.empty(bucket_count * 2, dtype=np.float32)
+    envelope[0::2] = mins
+    envelope[1::2] = maxs
+
+    return envelope[:max_points]
+
+
+@dataclass
+class WaveformStats:
+    """Small immutable-ish container for display stats."""
+
+    min_value: float = 0.0
+    max_value: float = 0.0
+    peak_db: float = -100.0
+    sample_text: str = "Samples: 0"
+
+
 @register_module()
 class WaveformModule(ModuleWidget):
     """Professional waveform display module for real-time audio visualization.
 
-    This is an enhanced visualization module that displays audio waveforms with:
-    - Dual inputs: L/Mono and R channels
-    - Adjustable timerange (samples displayed)
-    - Freeze trigger to capture and hold waveforms
-    - Professional gradient visuals with grid overlay
-
-    **Usage:**
-    - Connect audio to "L/Mono" port for mono, or both "L/Mono" and "R" for stereo
-    - Adjust "Time" knob to change the number of samples displayed
-    - Click "Freeze" button to capture current waveform
-    - Great for oscilloscope-style monitoring and debugging
-
-    Runtime behavior:
-    - Passive sink in the render graph; it does not process upstream modules.
-    - When audio output is playing, it displays samples tapped from the shared
-      render path.
-    - Without active audio output, AudioEngine's monitor timer renders only the
-      connected visualizer sink ports so sources still animate silently.
+    This is a passive visualizer. It never renders upstream modules itself.
+    Audio output and AudioEngine's monitor timer render the graph and write tap
+    history to ports; this widget only reads recent cached tap samples.
     """
 
     runtime_kind = "passive_sink"
@@ -72,38 +129,28 @@ class WaveformModule(ModuleWidget):
             color=QColor(60, 70, 90),
         )
 
-        # Add dual input ports for Left/Mono and Right channels
         self.in_port_l = self.add_input("L/Mono")
         self.in_port_r = self.add_input("R")
 
-        # Freeze state
         self._is_frozen = False
-        self._frozen_samples = None
+        self._frozen_samples: np.ndarray | None = None
+        self._last_display_samples: np.ndarray | None = None
 
-        # Thread-safe buffer for audio samples
-        self._sample_buffer = None
-        self._buffer_lock = None
-        try:
-            self._buffer_lock = threading.Lock()
-        except ImportError:
-            self._buffer_lock = None
-            logger.warning("Threading not available - waveform may have issues")
-
-        # Visualization timer (12 Hz). Scopes should never compete with audio.
-        self._viz_timer = QtCore.QTimer()
-        self._viz_timer.setInterval(83)
+        # Visualization timer.
+        #
+        # 50 ms = 20 Hz, responsive enough for a scope, but still bounded so it
+        # should not compete with audio processing. Since paintEvent is now cheap
+        # and cached, this can be adjusted safely if needed.
+        self._viz_timer = QtCore.QTimer(self)
+        self._viz_timer.setTimerType(Qt.TimerType.CoarseTimer)
+        self._viz_timer.setInterval(50)
         self._viz_timer.timeout.connect(self._update_display)
-        self._viz_timer.start()
-        logger.info("Waveform visualization timer started (12 Hz / 83ms)")
 
-        # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
-        # Create controls row with timerange knob and freeze button
         controls_row = QHBoxLayout()
 
-        # Timerange knob (64 to 8192 samples)
         self.timerange_knob = Knob(
             label="Time",
             min_value=64,
@@ -117,7 +164,6 @@ class WaveformModule(ModuleWidget):
 
         controls_row.addStretch()
 
-        # Freeze trigger button
         self.freeze_button = QtWidgets.QPushButton("Freeze")
         self.freeze_button.setCheckable(True)
         self.freeze_button.setFixedSize(80, 30)
@@ -147,12 +193,10 @@ class WaveformModule(ModuleWidget):
 
         layout.addLayout(controls_row)
 
-        # Create waveform display widget
         self.waveform_display = WaveformDisplay()
         self.waveform_display.setMinimumSize(480, 200)
         layout.addWidget(self.waveform_display)
 
-        # Add statistics display
         stats_layout = QHBoxLayout()
 
         self.min_label = QLabel("Min: 0.000")
@@ -161,7 +205,7 @@ class WaveformModule(ModuleWidget):
         )
         stats_layout.addWidget(self.min_label)
 
-        self.peak_label = QLabel("Peak: 0.0 dB")
+        self.peak_label = QLabel("Peak: -100.0 dB")
         self.peak_label.setStyleSheet(
             "color: #ffd93d; font-weight: bold; font-size: 11px;"
         )
@@ -186,149 +230,155 @@ class WaveformModule(ModuleWidget):
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
-    def _on_timerange_changed(self, value: float):
-        """Handle timerange knob change.
+        self._viz_timer.start()
+        logger.info("Waveform visualization timer started")
 
-        Args:
-            value: New timerange value (number of samples to display)
-        """
+    def _on_timerange_changed(self, value: float) -> None:
+        """Handle timerange knob change."""
         samples = int(value)
         self.waveform_display.set_display_samples(samples)
-        logger.debug(f"Waveform timerange changed to {samples} samples")
+        logger.debug("Waveform timerange changed to %s samples", samples)
 
-    def _on_freeze_toggled(self, checked: bool):
-        """Handle freeze button toggle.
-
-        Args:
-            checked: True if freeze is enabled
-        """
+    def _on_freeze_toggled(self, checked: bool) -> None:
+        """Handle freeze button toggle."""
         self._is_frozen = checked
+
         if checked:
-            logger.info("Waveform frozen - capturing current display")
+            # Capture the current visible/prepared samples once.
+            if self._last_display_samples is not None:
+                self._frozen_samples = self._last_display_samples.copy()
+            else:
+                self._frozen_samples = None
+
             self.freeze_button.setText("Frozen")
+            logger.info("Waveform frozen")
         else:
-            logger.info("Waveform unfrozen - resuming live display")
-            self.freeze_button.setText("Freeze")
             self._frozen_samples = None
+            self.freeze_button.setText("Freeze")
+            logger.info("Waveform unfrozen")
 
     def _update_samples(
-        self, samples_l: np.ndarray | None, samples_r: np.ndarray | None
-    ):
-        """Update the display with new audio samples.
+        self,
+        samples_l: np.ndarray | None,
+        samples_r: np.ndarray | None,
+    ) -> None:
+        """Update the display with new audio samples."""
+        if self._is_frozen:
+            if self._frozen_samples is not None:
+                self.waveform_display.set_samples(self._frozen_samples)
+                self._update_stats(self._frozen_samples)
+            return
 
-        Args:
-            samples_l: Left/Mono channel samples
-            samples_r: Right channel samples (optional)
-        """
-        try:
-            # If frozen, keep displaying frozen samples
-            if self._is_frozen:
-                if self._frozen_samples is not None:
-                    self.waveform_display.set_samples(self._frozen_samples)
-                return
+        left = _as_float32_1d(samples_l)
+        right = _as_float32_1d(samples_r)
 
-            # Handle empty/None inputs
-            if samples_l is None and samples_r is None:
+        if left is None and right is None:
+            self._last_display_samples = None
+            self.waveform_display.clear()
+            self._update_stats(None)
+            return
+
+        if left is not None and right is not None:
+            min_len = min(left.size, right.size)
+            if min_len == 0:
+                self._last_display_samples = None
                 self.waveform_display.clear()
                 self._update_stats(None)
                 return
 
-            # Convert to numpy arrays
-            if samples_l is not None:
-                samples_l = np.asarray(samples_l).ravel().astype(np.float32)
-            if samples_r is not None:
-                samples_r = np.asarray(samples_r).ravel().astype(np.float32)
+            display_samples = np.column_stack(
+                (left[-min_len:], right[-min_len:])
+            ).astype(np.float32, copy=False)
 
-            # Combine into stereo if both channels present
-            if samples_l is not None and samples_r is not None:
-                # Make sure both have same length
-                min_len = min(len(samples_l), len(samples_r))
-                samples_l = samples_l[:min_len]
-                samples_r = samples_r[:min_len]
-                display_samples = np.stack([samples_l, samples_r], axis=1)
-            elif samples_l is not None:
-                # Only left channel - treat as mono
-                display_samples = samples_l
-            elif samples_r is not None:
-                # Only right channel - treat as mono
-                display_samples = samples_r
-            else:
-                return
+        elif left is not None:
+            display_samples = left
 
-            # Store frozen samples if not frozen yet
-            if not self._is_frozen:
-                self._frozen_samples = display_samples
+        elif right is not None:
+            display_samples = right
 
-            # Update display
-            self.waveform_display.set_samples(display_samples)
-            self._update_stats(display_samples)
-
-        except Exception as e:
-            logger.warning(f"Error updating waveform: {e}")
-
-    def _update_stats(self, samples: np.ndarray | None):
-        """Update statistics labels.
-
-        Args:
-            samples: Audio samples to analyze
-        """
-        if samples is None or samples.size == 0:
-            self.min_label.setText("Min: 0.000")
-            self.max_label.setText("Max: 0.000")
-            self.peak_label.setText("Peak: -inf dB")
-            self.samples_label.setText("Samples: 0")
+        else:
+            self._last_display_samples = None
+            self.waveform_display.clear()
+            self._update_stats(None)
             return
 
-        # Calculate statistics
-        min_val = float(np.min(samples))
-        max_val = float(np.max(samples))
-        peak_amplitude = np.max(np.abs(samples))
-        peak_db = (
-            20 * np.log10(peak_amplitude + 1e-10) if peak_amplitude > 0 else -100.0
+        self._last_display_samples = display_samples
+        self.waveform_display.set_samples(display_samples)
+        self._update_stats(display_samples)
+
+    def _update_stats(self, samples: np.ndarray | None) -> None:
+        """Update statistics labels, avoiding redundant setText calls."""
+        stats = self._calculate_stats(samples)
+
+        self._set_label_text(self.min_label, f"Min: {stats.min_value:.3f}")
+        self._set_label_text(self.max_label, f"Max: {stats.max_value:.3f}")
+        self._set_label_text(self.peak_label, f"Peak: {stats.peak_db:.1f} dB")
+        self._set_label_text(self.samples_label, stats.sample_text)
+
+    @staticmethod
+    def _calculate_stats(samples: np.ndarray | None) -> WaveformStats:
+        """Calculate safe display statistics."""
+        if samples is None:
+            return WaveformStats()
+
+        arr = np.asarray(samples, dtype=np.float32)
+
+        if arr.size == 0:
+            return WaveformStats()
+
+        arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=-1.0)
+
+        min_val = float(np.min(arr))
+        max_val = float(np.max(arr))
+
+        peak_amplitude = float(np.max(np.abs(arr)))
+        if peak_amplitude <= 0.0:
+            peak_db = -100.0
+        else:
+            peak_db = float(20.0 * np.log10(max(peak_amplitude, 1e-10)))
+
+        if arr.ndim == 1:
+            sample_text = f"Samples: {arr.shape[0]}"
+        elif arr.ndim == 2:
+            sample_text = f"Samples: {arr.shape[0]} x {arr.shape[1]}"
+        else:
+            sample_text = f"Samples: {arr.size}"
+
+        return WaveformStats(
+            min_value=min_val,
+            max_value=max_val,
+            peak_db=peak_db,
+            sample_text=sample_text,
         )
 
-        # Update labels
-        self.min_label.setText(f"Min: {min_val:.3f}")
-        self.max_label.setText(f"Max: {max_val:.3f}")
-        self.peak_label.setText(f"Peak: {peak_db:.1f} dB")
-
-        # Show sample count
-        if samples.ndim == 1:
-            self.samples_label.setText(f"Samples: {len(samples)}")
-        else:
-            self.samples_label.setText(
-                f"Samples: {samples.shape[0]} x {samples.shape[1]}"
-            )
+    @staticmethod
+    def _set_label_text(label: QLabel, text: str) -> None:
+        """Avoid triggering layout/paint work if the label text is unchanged."""
+        if label.text() != text:
+            label.setText(text)
 
     def get_required_inputs(self) -> list[str]:
-        """Waveform requires at least one input to visualize.
+        """Waveform has optional inputs and shows 'No Signal' when disconnected."""
+        return []
 
-        Returns:
-            List of required input port names
-        """
-        return []  # Optional inputs - show "No Signal" if not connected
-
-    def _update_display(self):
-        """Update the waveform display from rendered port tap history."""
+    def _update_display(self) -> None:
+        """Update waveform from rendered port tap history."""
         try:
-            # If frozen, keep showing frozen samples but still update display
             if self._is_frozen:
                 if self._frozen_samples is not None:
                     self.waveform_display.set_samples(self._frozen_samples)
                     self._update_stats(self._frozen_samples)
                 return
 
-            # Check if at least one input is connected
             l_connected = self.in_port_l.is_connected
             r_connected = self.in_port_r.is_connected
 
             if not l_connected and not r_connected:
-                # No input - clear display
+                self._last_display_samples = None
                 self.waveform_display.clear()
                 self._update_stats(None)
                 return
 
-            # Get current timerange
             num_samples = int(self.timerange_knob.get_value())
 
             samples_l = (
@@ -342,16 +392,16 @@ class WaveformModule(ModuleWidget):
                 else None
             )
 
-            # Update display with samples
-            if samples_l is not None or samples_r is not None:
-                self._update_samples(samples_l, samples_r)
-            else:
-                # No samples received - show "No Signal"
+            if samples_l is None and samples_r is None:
+                self._last_display_samples = None
                 self.waveform_display.clear()
                 self._update_stats(None)
+                return
 
-        except Exception as e:
-            logger.error(f"Error in _update_display: {e}", exc_info=True)
+            self._update_samples(samples_l, samples_r)
+
+        except Exception:
+            logger.exception("Error in WaveformModule._update_display")
 
     def shutdown(self, graceful: bool = True) -> None:
         """Stop visualization updates before the module is deleted."""
@@ -360,31 +410,43 @@ class WaveformModule(ModuleWidget):
 
 
 class WaveformDisplay(QWidget):
-    """Professional widget for displaying audio waveforms in real-time.
+    """Widget for displaying real-time waveform data.
 
-    Features gradient fills, precise grid overlay, and oscilloscope-style rendering.
+    Expensive work is done when samples change. paintEvent only draws cached
+    background/grid and cached waveform paths.
     """
 
     def __init__(self, parent: QWidget | None = None):
-        """Initialize the waveform display.
-
-        Args:
-            parent: Parent widget
-        """
+        """Initialize the waveform display."""
         super().__init__(parent)
 
         self.setMinimumSize(480, 200)
-        self.samples: np.ndarray | None = None
-        self.display_samples = 2048  # Number of samples to display (adjustable)
-        self.is_stereo = False
 
-        # Professional visual properties
-        self.bg_color = QColor(15, 18, 22)
+        self.display_samples = 2048
+        self.is_stereo = False
+        self._has_signal = False
+
+        self._mono_path: QPainterPath | None = None
+        self._mono_fill_path: QPainterPath | None = None
+
+        self._left_path: QPainterPath | None = None
+        self._left_fill_path: QPainterPath | None = None
+        self._right_path: QPainterPath | None = None
+        self._right_fill_path: QPainterPath | None = None
+
+        self._grid_pixmap: QPixmap | None = None
+        self._grid_key: tuple[int, int, bool] | None = None
+
+        self._last_prepared_key: tuple[int, int, bool, int] | None = None
+        self._prepared_samples: np.ndarray | None = None
+
+        self.bg_color_top = QColor(15, 18, 22)
+        self.bg_color_bottom = QColor(20, 23, 28)
+
         self.grid_color = QColor(30, 35, 40)
         self.grid_highlight_color = QColor(45, 52, 60)
         self.center_line_color = QColor(60, 70, 80)
 
-        # Waveform colors with alpha for gradient effect
         self.wave_color_mono = QColor(80, 180, 255)
         self.wave_fill_mono = QColor(80, 180, 255, 60)
 
@@ -395,263 +457,351 @@ class WaveformDisplay(QWidget):
         self.wave_fill_right = QColor(255, 120, 100, 50)
 
         self.text_color = QColor(120, 130, 140)
-        self.label_color = QColor(200, 210, 220)
 
-    def set_display_samples(self, num_samples: int):
-        """Set the number of samples to display.
-
-        Args:
-            num_samples: Number of samples for the timerange
-        """
-        self.display_samples = max(128, min(num_samples, 16384))
-        self.update()
-
-    def set_samples(self, samples: np.ndarray):
-        """Set the audio samples to display.
-
-        Args:
-            samples: Audio samples array (can be mono or stereo)
-        """
-        # Accept None or empty
-        if samples is None or samples.size == 0:
-            self.samples = None
-            self.is_stereo = False
-            self.update()
+    def set_display_samples(self, num_samples: int) -> None:
+        """Set the number of source samples represented in the display."""
+        new_value = max(128, min(int(num_samples), 16384))
+        if self.display_samples == new_value:
             return
 
-        samples = np.asarray(samples)
+        self.display_samples = new_value
 
-        # If channel-major (2, N) convert to (N, 2)
-        if samples.ndim == 2 and samples.shape[0] == 2 and samples.shape[1] > 2:
-            samples = samples.T
-
-        # Determine stereo vs mono: expect (N,2) for stereo
-        if samples.ndim == 2 and samples.shape[1] == 2:
-            self.is_stereo = True
+        # Reprepare from the last source sample buffer, if present.
+        if self._prepared_samples is not None:
+            self.set_samples(self._prepared_samples)
         else:
-            # If 2D but second dimension isn't 2, flatten to 1D
-            if samples.ndim == 2:
-                samples = samples.ravel()
-            self.is_stereo = False
+            self.update()
 
-        # Downsample if needed (preserve columns for stereo)
-        target_samples = min(
-            self.display_samples,
-            max(128, min(2048, self.width() * 2)),
-        )
-        if not self.is_stereo:
-            if samples.size > target_samples:
-                step = max(1, samples.size // target_samples)
-                self.samples = samples[::step][:target_samples]
-            else:
-                self.samples = samples
+    def set_samples(self, samples: np.ndarray | None) -> None:
+        """Set audio samples and prepare cached painter paths."""
+        if samples is None:
+            self.clear()
+            return
+
+        arr = np.asarray(samples, dtype=np.float32)
+
+        if arr.size == 0:
+            self.clear()
+            return
+
+        arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=-1.0)
+        arr = np.clip(arr, -1.0, 1.0)
+
+        # Normalize channel-major stereo, if needed.
+        if arr.ndim == 2 and arr.shape[0] == 2 and arr.shape[1] > 2:
+            arr = arr.T
+
+        if arr.ndim == 2 and arr.shape[1] == 2:
+            is_stereo = True
         else:
-            # stereo: samples shape is (N,2)
-            if samples.shape[0] > target_samples:
-                step = max(1, samples.shape[0] // target_samples)
-                self.samples = samples[::step][:target_samples, :]
-            else:
-                self.samples = samples
+            is_stereo = False
+            arr = arr.ravel()
 
+        self.is_stereo = is_stereo
+        self._has_signal = True
+        self._prepared_samples = arr
+
+        self._prepare_paths(arr)
         self.update()
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear the display."""
-        self.samples = None
+        if not self._has_signal and self._mono_path is None:
+            return
+
+        self._has_signal = False
+        self.is_stereo = False
+        self._prepared_samples = None
+        self._last_prepared_key = None
+
+        self._mono_path = None
+        self._mono_fill_path = None
+        self._left_path = None
+        self._left_fill_path = None
+        self._right_path = None
+        self._right_fill_path = None
+
         self.update()
 
-    def _draw_professional_grid(self, painter: QPainter, width: int, height: int):
-        """Draw professional oscilloscope-style grid.
+    def resizeEvent(self, event) -> None:
+        """Invalidate cached geometry when the widget size changes."""
+        self._grid_pixmap = None
+        self._grid_key = None
+        self._last_prepared_key = None
 
-        Args:
-            painter: QPainter instance
-            width: Widget width
-            height: Widget height
-        """
-        # Draw vertical grid lines (time divisions)
-        painter.setPen(QPen(self.grid_color, 1))
-        num_v_lines = 10
-        for i in range(num_v_lines + 1):
-            x = width * i / num_v_lines
-            painter.drawLine(int(x), 0, int(x), height)
+        if self._prepared_samples is not None:
+            self._prepare_paths(self._prepared_samples)
 
-        # Highlight center vertical line
-        painter.setPen(QPen(self.grid_highlight_color, 1))
-        center_x = width / 2
-        painter.drawLine(int(center_x), 0, int(center_x), height)
+        super().resizeEvent(event)
 
-        # Draw horizontal grid lines (amplitude divisions)
-        painter.setPen(QPen(self.grid_color, 1))
+    def _target_point_count(self) -> int:
+        """Return a bounded point count based on current widget width."""
+        return max(128, min(self.display_samples, max(128, self.width() * 2)))
+
+    def _prepare_paths(self, samples: np.ndarray) -> None:
+        """Prepare cached QPainterPaths for the current samples."""
+        width = max(1, self.width())
+        height = max(1, self.height())
+        target = self._target_point_count()
+
+        key = (width, height, self.is_stereo, target)
+
+        # Always reprepare when new samples arrive. The key is mostly useful for
+        # resize/display changes and future extension with versioned buffers.
+        self._last_prepared_key = key
+
+        self._mono_path = None
+        self._mono_fill_path = None
+        self._left_path = None
+        self._left_fill_path = None
+        self._right_path = None
+        self._right_fill_path = None
+
         if self.is_stereo:
-            # Stereo: divide into two sections
-            num_h_lines = 8
-            for i in range(num_h_lines + 1):
-                y = height * i / num_h_lines
-                painter.drawLine(0, int(y), width, int(y))
+            stereo = np.asarray(samples, dtype=np.float32)
+            if stereo.ndim != 2 or stereo.shape[1] != 2 or stereo.shape[0] == 0:
+                self._has_signal = False
+                return
 
-            # Highlight center lines for each channel
-            painter.setPen(QPen(self.center_line_color, 2))
-            quarter_y = height / 4
-            three_quarter_y = 3 * height / 4
-            painter.drawLine(0, int(quarter_y), width, int(quarter_y))
-            painter.drawLine(0, int(three_quarter_y), width, int(three_quarter_y))
+            left = _downsample_minmax(stereo[:, 0], target)
+            right = _downsample_minmax(stereo[:, 1], target)
 
-            # Draw separator between channels
-            painter.setPen(QPen(self.grid_highlight_color, 2))
-            center_y = height / 2
-            painter.drawLine(0, int(center_y), width, int(center_y))
+            left_center = height / 4.0
+            right_center = 3.0 * height / 4.0
+            y_scale = (height / 4.0) * 0.85
+
+            self._left_path, self._left_fill_path = self._build_wave_paths(
+                left,
+                left_center,
+                y_scale,
+                width,
+            )
+            self._right_path, self._right_fill_path = self._build_wave_paths(
+                right,
+                right_center,
+                y_scale,
+                width,
+            )
+
         else:
-            # Mono: standard grid
-            num_h_lines = 8
-            for i in range(num_h_lines + 1):
-                y = height * i / num_h_lines
-                painter.drawLine(0, int(y), width, int(y))
+            mono = np.asarray(samples, dtype=np.float32).ravel()
+            if mono.size == 0:
+                self._has_signal = False
+                return
 
-            # Highlight center line
-            painter.setPen(QPen(self.center_line_color, 2))
-            center_y = height / 2
-            painter.drawLine(0, int(center_y), width, int(center_y))
+            mono = _downsample_minmax(mono, target)
 
-    def _draw_waveform_with_fill(
-        self,
-        painter: QPainter,
+            center_y = height / 2.0
+            y_scale = (height / 2.0) * 0.85
+
+            self._mono_path, self._mono_fill_path = self._build_wave_paths(
+                mono,
+                center_y,
+                y_scale,
+                width,
+            )
+
+    @staticmethod
+    def _build_wave_paths(
         samples: np.ndarray,
         center_y: float,
         y_scale: float,
         width: int,
-        wave_color: QColor,
-        fill_color: QColor,
-    ):
-        """Draw waveform with gradient fill effect.
+    ) -> tuple[QPainterPath, QPainterPath]:
+        """Build line and fill paths for a waveform."""
+        samples = np.asarray(samples, dtype=np.float32).ravel()
 
-        Args:
-            painter: QPainter instance
-            samples: Sample data to draw
-            center_y: Center Y position
-            y_scale: Y scaling factor
-            width: Widget width
-            wave_color: Color for waveform line
-            fill_color: Color for fill gradient
-        """
-        if len(samples) == 0:
-            return
-
-        x_scale = width / max(1, len(samples) - 1)
-
-        # Create waveform path
         path = QPainterPath()
-        first_sample = np.clip(samples[0], -1, 1)
-        path.moveTo(0, center_y - first_sample * y_scale)
+        fill_path = QPainterPath()
 
-        for i, sample in enumerate(samples):
-            x = i * x_scale
-            sample = np.clip(sample, -1, 1)
-            y = center_y - sample * y_scale
+        if samples.size == 0:
+            return path, fill_path
+
+        x_scale = width / max(1, samples.size - 1)
+
+        first_y = center_y - float(samples[0]) * y_scale
+        path.moveTo(0.0, first_y)
+
+        for i in range(1, samples.size):
+            x = float(i) * x_scale
+            y = center_y - float(samples[i]) * y_scale
             path.lineTo(x, y)
 
-        # Draw filled area under waveform
         fill_path = QPainterPath(path)
-        fill_path.lineTo(width, center_y)
-        fill_path.lineTo(0, center_y)
+        fill_path.lineTo(float(width), center_y)
+        fill_path.lineTo(0.0, center_y)
         fill_path.closeSubpath()
 
-        painter.fillPath(fill_path, QBrush(fill_color))
+        return path, fill_path
 
-        # Draw waveform line with glow effect
+    def _ensure_grid_pixmap(self) -> QPixmap:
+        """Return cached background/grid pixmap, rebuilding only when needed."""
+        width = max(1, self.width())
+        height = max(1, self.height())
+        key = (width, height, self.is_stereo)
+
+        if self._grid_pixmap is not None and self._grid_key == key:
+            return self._grid_pixmap
+
+        pixmap = QPixmap(width, height)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+
+        gradient = QLinearGradient(0, 0, 0, height)
+        gradient.setColorAt(0, self.bg_color_top)
+        gradient.setColorAt(1, self.bg_color_bottom)
+        painter.fillRect(0, 0, width, height, QBrush(gradient))
+
+        self._draw_grid(painter, width, height)
+
+        painter.end()
+
+        self._grid_pixmap = pixmap
+        self._grid_key = key
+
+        return pixmap
+
+    def _draw_grid(self, painter: QPainter, width: int, height: int) -> None:
+        """Draw oscilloscope-style grid into the cached pixmap."""
+        painter.setPen(QPen(self.grid_color, 1))
+
+        num_v_lines = 10
+        for i in range(num_v_lines + 1):
+            x = int(width * i / num_v_lines)
+            painter.drawLine(x, 0, x, height)
+
+        painter.setPen(QPen(self.grid_highlight_color, 1))
+        center_x = int(width / 2)
+        painter.drawLine(center_x, 0, center_x, height)
+
+        painter.setPen(QPen(self.grid_color, 1))
+        num_h_lines = 8
+        for i in range(num_h_lines + 1):
+            y = int(height * i / num_h_lines)
+            painter.drawLine(0, y, width, y)
+
+        if self.is_stereo:
+            painter.setPen(QPen(self.center_line_color, 2))
+            quarter_y = int(height / 4)
+            three_quarter_y = int(3 * height / 4)
+            painter.drawLine(0, quarter_y, width, quarter_y)
+            painter.drawLine(0, three_quarter_y, width, three_quarter_y)
+
+            painter.setPen(QPen(self.grid_highlight_color, 2))
+            center_y = int(height / 2)
+            painter.drawLine(0, center_y, width, center_y)
+        else:
+            painter.setPen(QPen(self.center_line_color, 2))
+            center_y = int(height / 2)
+            painter.drawLine(0, center_y, width, center_y)
+
+    def paintEvent(self, event) -> None:
+        """Paint the cached waveform display."""
+        del event
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+
+        painter.drawPixmap(0, 0, self._ensure_grid_pixmap())
+
+        width = self.width()
+        height = self.height()
+        center_y = height / 2.0
+
+        if not self._has_signal:
+            painter.setPen(self.text_color)
+            painter.setFont(QFont("Arial", 12))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No Signal")
+            painter.end()
+            return
+
+        if self.is_stereo:
+            self._paint_stereo(painter, width, height, center_y)
+        else:
+            self._paint_mono(painter, width, height, center_y)
+
+        painter.end()
+
+    def _paint_mono(
+        self,
+        painter: QPainter,
+        width: int,
+        height: int,
+        center_y: float,
+    ) -> None:
+        """Paint cached mono waveform paths."""
+        if self._mono_path is None or self._mono_fill_path is None:
+            return
+
+        y_scale = (height / 2.0) * 0.85
+
+        painter.fillPath(self._mono_fill_path, QBrush(self.wave_fill_mono))
+
         painter.setPen(
             QPen(
-                wave_color,
-                2.5,
+                self.wave_color_mono,
+                2.0,
                 Qt.PenStyle.SolidLine,
                 Qt.PenCapStyle.RoundCap,
                 Qt.PenJoinStyle.RoundJoin,
             )
         )
-        painter.drawPath(path)
+        painter.drawPath(self._mono_path)
 
-    def paintEvent(self, event):
-        """Paint the professional waveform display."""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        painter.setPen(self.text_color)
+        painter.setFont(QFont("Arial", 8))
+        painter.drawText(width - 30, int(center_y - y_scale) + 12, "+1.0")
+        painter.drawText(width - 30, int(center_y) + 4, "0.0")
+        painter.drawText(width - 30, int(center_y + y_scale) + 12, "-1.0")
 
-        # Draw background with gradient
-        gradient = QLinearGradient(0, 0, 0, self.height())
-        gradient.setColorAt(0, QColor(15, 18, 22))
-        gradient.setColorAt(1, QColor(20, 23, 28))
-        painter.fillRect(self.rect(), QBrush(gradient))
+    def _paint_stereo(
+        self,
+        painter: QPainter,
+        width: int,
+        height: int,
+        center_y: float,
+    ) -> None:
+        """Paint cached stereo waveform paths."""
+        left_center = height / 4.0
+        y_scale = (height / 4.0) * 0.85
 
-        width = self.width()
-        height = self.height()
-        center_y = height / 2
-
-        # Draw professional grid
-        self._draw_professional_grid(painter, width, height)
-
-        # Draw waveform
-        if self.samples is not None and len(self.samples) > 0:
-            if self.is_stereo:
-                # Draw stereo waveforms with fills
-                left_center = height / 4
-                right_center = 3 * height / 4
-                y_scale = (height / 4) * 0.85
-
-                # Left channel
-                self._draw_waveform_with_fill(
-                    painter,
-                    self.samples[:, 0],
-                    left_center,
-                    y_scale,
-                    width,
+        if self._left_path is not None and self._left_fill_path is not None:
+            painter.fillPath(self._left_fill_path, QBrush(self.wave_fill_left))
+            painter.setPen(
+                QPen(
                     self.wave_color_left,
-                    self.wave_fill_left,
+                    2.0,
+                    Qt.PenStyle.SolidLine,
+                    Qt.PenCapStyle.RoundCap,
+                    Qt.PenJoinStyle.RoundJoin,
                 )
+            )
+            painter.drawPath(self._left_path)
 
-                # Right channel
-                self._draw_waveform_with_fill(
-                    painter,
-                    self.samples[:, 1],
-                    right_center,
-                    y_scale,
-                    width,
+        if self._right_path is not None and self._right_fill_path is not None:
+            painter.fillPath(self._right_fill_path, QBrush(self.wave_fill_right))
+            painter.setPen(
+                QPen(
                     self.wave_color_right,
-                    self.wave_fill_right,
+                    2.0,
+                    Qt.PenStyle.SolidLine,
+                    Qt.PenCapStyle.RoundCap,
+                    Qt.PenJoinStyle.RoundJoin,
                 )
+            )
+            painter.drawPath(self._right_path)
 
-                # Draw channel labels with better styling
-                painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                painter.setPen(self.wave_color_left)
-                painter.drawText(10, 20, "L")
-                painter.setPen(self.wave_color_right)
-                painter.drawText(10, int(center_y) + 20, "R")
+        painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        painter.setPen(self.wave_color_left)
+        painter.drawText(10, 20, "L")
 
-                # Draw scale markers
-                painter.setPen(self.text_color)
-                painter.setFont(QFont("Arial", 8))
-                painter.drawText(width - 30, int(left_center - y_scale) + 12, "+1.0")
-                painter.drawText(width - 30, int(left_center) + 4, "0.0")
-                painter.drawText(width - 30, int(left_center + y_scale) + 12, "-1.0")
-            else:
-                # Draw mono waveform with fill
-                y_scale = (height / 2) * 0.85
+        painter.setPen(self.wave_color_right)
+        painter.drawText(10, int(center_y) + 20, "R")
 
-                self._draw_waveform_with_fill(
-                    painter,
-                    self.samples,
-                    center_y,
-                    y_scale,
-                    width,
-                    self.wave_color_mono,
-                    self.wave_fill_mono,
-                )
-
-                # Draw scale markers
-                painter.setPen(self.text_color)
-                painter.setFont(QFont("Arial", 8))
-                painter.drawText(width - 30, int(center_y - y_scale) + 12, "+1.0")
-                painter.drawText(width - 30, int(center_y) + 4, "0.0")
-                painter.drawText(width - 30, int(center_y + y_scale) + 12, "-1.0")
-        else:
-            # Draw "No Signal" with better styling
-            painter.setPen(self.text_color)
-            painter.setFont(QFont("Arial", 12))
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No Signal")
+        painter.setPen(self.text_color)
+        painter.setFont(QFont("Arial", 8))
+        painter.drawText(width - 30, int(left_center - y_scale) + 12, "+1.0")
+        painter.drawText(width - 30, int(left_center) + 4, "0.0")
+        painter.drawText(width - 30, int(left_center + y_scale) + 12, "-1.0")

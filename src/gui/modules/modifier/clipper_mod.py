@@ -115,7 +115,7 @@ class ClipperModulatedModule(ModulatedModuleBase):
         # Unmodulated path: use engine utility function with constant threshold
         result = apply_vectorized_clip(samples, base_threshold)
         self.out_port.write(result)
-        
+
         # Update component for compatibility (though we don't use it in process_runtime)
         if self.component is None:
             self.component = self.create_unmodulated_component()

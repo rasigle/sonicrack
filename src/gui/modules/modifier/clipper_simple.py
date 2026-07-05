@@ -7,7 +7,7 @@ from PyQt6.QtGui import QColor
 from src.engine import Clipper
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
-from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from src.gui.core.runtime_helpers import read_samples, silence
 from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
@@ -49,7 +49,7 @@ class ClipperModule(ModuleWidget):
             description="Sets the clipping threshold",
             min_value=0.0,
             max_value=1.0,
-            default_value=0.5
+            default_value=0.5,
         )
         self.threshold_knob.value_changed.connect(self._on_threshold_changed)
         layout.addWidget(self.threshold_knob, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -96,11 +96,8 @@ class ClipperModule(ModuleWidget):
             self.out_port.write(silence(num_samples))
             return
 
-        samples = read_samples(self.in_port, num_samples)
-        threshold = float_parameter(
-            parameters, "threshold", self.threshold_knob.get_value
-        )
-        if self.component is not None:
-            self.component.wave_range = (-threshold, threshold)
+        if self.component is None:
+            self.component = self.create_engine_component()
 
-        self.out_port.write(samples.clip(-threshold, threshold))
+        samples = read_samples(self.in_port, num_samples)
+        self.out_port.write(self.component(samples))

@@ -21,10 +21,17 @@ from src.engine.utils.validation import (
     validate_sample_rate,
 )
 
+# Pre-computed constants for the feedback/damping curves
+_FEEDBACK_MIN = 0.28
+_FEEDBACK_RANGE = 0.70
+_DAMPING_SCALE = 0.4
+_COMB_COUNT = 8
+_ALLPASS_COUNT = 4
+
 
 @register_component()
 class Reverb(Modifier):
-    """Simple reverb effect using multiple comb and allpass filters.
+    """Reverb effect using multiple comb and allpass filters.
 
     Creates a sense of space by simulating sound reflections in a room.
     Uses a simplified Freeverb-style algorithm with comb filters and allpass filters.
@@ -110,109 +117,107 @@ class Reverb(Modifier):
             sample_rate: Sample rate
         """
         super().__init__(*args, **kwargs)
-        self.source = source  # Optional!
+        self.source = source
         self._sample_rate = validate_sample_rate(sample_rate)
 
-        # Create RuntimeParameters for smoothed parameters with custom initial values
-        room_size_descriptor = ParameterDescriptor(
-            name="room_size",
-            default=room_size,  # Use passed value as default
-            minimum=0.0,
-            maximum=1.0,
-            smoothing_policy=SmoothingPolicy.LINEAR,
-            smoothing_duration_ms=50.0,
-            automation_mode=AutomationMode.CONTROL_RATE,
-        )
+        # RuntimeParameters with custom initial values
         self._room_size_param = RuntimeParameter(
-            room_size_descriptor, self._sample_rate
+            ParameterDescriptor(
+                name="room_size",
+                default=room_size,
+                minimum=0.0,
+                maximum=1.0,
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=50.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
+            ),
+            self._sample_rate,
         )
 
-        damping_descriptor = ParameterDescriptor(
-            name="damping",
-            default=damping,  # Use passed value as default
-            minimum=0.0,
-            maximum=1.0,
-            smoothing_policy=SmoothingPolicy.LINEAR,
-            smoothing_duration_ms=50.0,
-            automation_mode=AutomationMode.CONTROL_RATE,
+        self._damping_param = RuntimeParameter(
+            ParameterDescriptor(
+                name="damping",
+                default=damping,
+                minimum=0.0,
+                maximum=1.0,
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=50.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
+            ),
+            self._sample_rate,
         )
-        self._damping_param = RuntimeParameter(damping_descriptor, self._sample_rate)
 
-        mix_descriptor = ParameterDescriptor(
-            name="mix",
-            default=mix,  # Use passed value as default
-            minimum=0.0,
-            maximum=1.0,
-            smoothing_policy=SmoothingPolicy.LINEAR,
-            smoothing_duration_ms=20.0,
-            automation_mode=AutomationMode.CONTROL_RATE,
+        self._mix_param = RuntimeParameter(
+            ParameterDescriptor(
+                name="mix",
+                default=mix,
+                minimum=0.0,
+                maximum=1.0,
+                smoothing_policy=SmoothingPolicy.LINEAR,
+                smoothing_duration_ms=20.0,
+                automation_mode=AutomationMode.CONTROL_RATE,
+            ),
+            self._sample_rate,
         )
-        self._mix_param = RuntimeParameter(mix_descriptor, self._sample_rate)
 
         # Freeverb-inspired delay line lengths (in samples at 44.1kHz)
-        # Scaled to current sample rate
         scale = self._sample_rate / 44100.0
 
-        # Comb filter delay lengths (prime numbers for density)
         self._comb_delays = [
-            int(1557 * scale),
-            int(1617 * scale),
-            int(1491 * scale),
-            int(1422 * scale),
-            int(1277 * scale),
-            int(1356 * scale),
-            int(1188 * scale),
-            int(1116 * scale),
+            int(d * scale)
+            for d in (1557, 1617, 1491, 1422, 1277, 1356, 1188, 1116)
         ]
+        self._allpass_delays = [int(d * scale) for d in (225, 556, 441, 341)]
 
-        # Allpass filter delay lengths
-        self._allpass_delays = [
-            int(225 * scale),
-            int(556 * scale),
-            int(441 * scale),
-            int(341 * scale),
-        ]
-
-        # Create buffers for comb filters
-        self._comb_buffers = [
-            np.zeros(delay, dtype=np.float32) for delay in self._comb_delays
-        ]
-        self._comb_positions = [0] * len(self._comb_delays)
-        self._comb_filter_states = [0.0] * len(self._comb_delays)
-        self._comb_count = len(self._comb_buffers)
-        self._comb_buffer_lengths = [len(buffer) for buffer in self._comb_buffers]
-
-        # Create buffers for allpass filters
-        self._allpass_buffers = [
-            np.zeros(delay, dtype=np.float32) for delay in self._allpass_delays
-        ]
-        self._allpass_positions = [0] * len(self._allpass_delays)
-        self._allpass_count = len(self._allpass_buffers)
-        self._allpass_buffer_lengths = [len(buffer) for buffer in self._allpass_buffers]
         self._sample_shape: tuple[int, ...] = ()
+        self._comb_buffers: list[np.ndarray] = []
+        self._comb_positions: list[int] = []
+        self._comb_filter_states: list[np.ndarray] = []
+        self._comb_buffer_lengths: list[int] = []
+        self._allpass_buffers: list[np.ndarray] = []
+        self._allpass_positions: list[int] = []
+        self._allpass_buffer_lengths: list[int] = []
 
-    def _ensure_buffer_shape(self, sample_shape: tuple[int, ...]) -> None:
-        """Resize reverb memory for mono or multi-channel frames."""
-        if sample_shape == self._sample_shape:
-            return
+        self._init_buffers(())
 
+    def _init_buffers(self, sample_shape: tuple[int, ...]) -> None:
+        """Allocate delay line buffers and reset all filter state."""
         self._sample_shape = sample_shape
+
         self._comb_buffers = [
             np.zeros((delay, *sample_shape), dtype=np.float32)
             for delay in self._comb_delays
         ]
-        self._comb_positions = [0] * len(self._comb_delays)
+        self._comb_positions = [0] * _COMB_COUNT
         self._comb_filter_states = [
             np.zeros(sample_shape, dtype=np.float32) for _ in self._comb_delays
         ]
-        self._comb_buffer_lengths = [len(buffer) for buffer in self._comb_buffers]
+        self._comb_buffer_lengths = [len(b) for b in self._comb_buffers]
 
         self._allpass_buffers = [
             np.zeros((delay, *sample_shape), dtype=np.float32)
             for delay in self._allpass_delays
         ]
-        self._allpass_positions = [0] * len(self._allpass_delays)
-        self._allpass_buffer_lengths = [len(buffer) for buffer in self._allpass_buffers]
+        self._allpass_positions = [0] * _ALLPASS_COUNT
+        self._allpass_buffer_lengths = [len(b) for b in self._allpass_buffers]
+
+    def _ensure_buffer_shape(self, sample_shape: tuple[int, ...]) -> None:
+        """Resize reverb memory only when the audio shape actually changes."""
+        if sample_shape != self._sample_shape:
+            self._init_buffers(sample_shape)
+
+    def _reset_state(self) -> None:
+        """Zero all delay lines and filter states (preserves buffer shape)."""
+        for i in range(_COMB_COUNT):
+            self._comb_buffers[i].fill(0.0)
+            self._comb_positions[i] = 0
+            self._comb_filter_states[i].fill(0.0)
+
+        for i in range(_ALLPASS_COUNT):
+            self._allpass_buffers[i].fill(0.0)
+            self._allpass_positions[i] = 0
+
+    # -- public properties ---------------------------------------------------
 
     @property
     def room_size(self) -> float:
@@ -244,51 +249,62 @@ class Reverb(Modifier):
         """Set mix amount."""
         self._mix_param.value = value
 
-    def _process_sample(self, input_sample: float) -> float:
-        """Process one mono sample through all reverb delay lines."""
-        input_value = np.asarray(input_sample, dtype=np.float32)
-        self._ensure_buffer_shape(input_value.shape)
+    # -- scalar processing (zero-allocation iterator path) -------------------
 
-        # Use current parameter values for single sample processing
+    def _process_sample(self, input_sample: float) -> float:
+        """Process one mono sample. Pure-Python, no numpy allocation."""
+        # Read current smoothed parameter values
         room_size = self._room_size_param.value
         damping = self._damping_param.value
         mix = self._mix_param.value
 
-        feedback = 0.84 + room_size * 0.14
-        damp1 = damping * 0.4
+        feedback = _FEEDBACK_MIN + room_size * _FEEDBACK_RANGE
+        damp1 = damping * _DAMPING_SCALE
         damp2 = 1.0 - damp1
 
-        comb_sum = np.zeros(input_value.shape, dtype=np.float32)
-        for index in range(self._comb_count):
-            buffer = self._comb_buffers[index]
-            pos = self._comb_positions[index]
+        # Comb filters
+        comb_sum = 0.0
+        cb = self._comb_buffers
+        cp = self._comb_positions
+        cs = self._comb_filter_states
+        cl = self._comb_buffer_lengths
 
-            output = buffer[pos]
-            filtered = output * damp2 + self._comb_filter_states[index] * damp1
-            self._comb_filter_states[index] = filtered
-            buffer[pos] = input_value + filtered * feedback
-            self._comb_positions[index] = (pos + 1) % self._comb_buffer_lengths[index]
+        for i in range(_COMB_COUNT):
+            pos = cp[i]
+            output = cb[i][pos]
+            filtered = output * damp2 + cs[i] * damp1
+            cs[i] = filtered
+            cb[i][pos] = input_sample + filtered * feedback
+
+            pos += 1
+            if pos == cl[i]:
+                pos = 0
+            cp[i] = pos
 
             comb_sum += output
 
-        wet = comb_sum / self._comb_count
+        wet = comb_sum * (1.0 / _COMB_COUNT)
 
-        for index in range(self._allpass_count):
-            buffer = self._allpass_buffers[index]
-            pos = self._allpass_positions[index]
+        # Allpass filters
+        ap = self._allpass_buffers
+        app = self._allpass_positions
+        apl = self._allpass_buffer_lengths
 
-            delayed = buffer[pos]
+        for i in range(_ALLPASS_COUNT):
+            pos = app[i]
+            delayed = ap[i][pos]
             output = -wet + delayed
-            buffer[pos] = wet + delayed * 0.5
-            self._allpass_positions[index] = (pos + 1) % self._allpass_buffer_lengths[
-                index
-            ]
+            ap[i][pos] = wet + delayed * 0.5
+
+            pos += 1
+            if pos == apl[i]:
+                pos = 0
+            app[i] = pos
             wet = output
 
-        output_value = input_value * (1.0 - mix) + wet * mix
-        if output_value.shape == ():
-            return float(output_value)
-        return output_value.astype(np.float32, copy=False)
+        return input_sample * (1.0 - mix) + wet * mix
+
+    # -- buffer processing ---------------------------------------------------
 
     def _process_buffer(self, input_samples: np.ndarray) -> np.ndarray:
         """Process a mono or multi-channel sample buffer through the reverb."""
@@ -299,72 +315,67 @@ class Reverb(Modifier):
         self._ensure_buffer_shape(input_samples.shape[1:])
         output_samples = np.empty_like(input_samples, dtype=np.float32)
 
-        # Get smoothed parameter envelopes
         num_samples = len(input_samples)
-        room_size_envelope = self._room_size_param.get_interpolated_buffer(num_samples)
-        damping_envelope = self._damping_param.get_interpolated_buffer(num_samples)
-        mix_envelope = self._mix_param.get_interpolated_buffer(num_samples)
+        room_size_env = self._room_size_param.get_interpolated_buffer(num_samples)
+        damping_env = self._damping_param.get_interpolated_buffer(num_samples)
+        mix_env = self._mix_param.get_interpolated_buffer(num_samples)
 
-        comb_buffers = self._comb_buffers
-        comb_positions = self._comb_positions
-        comb_states = self._comb_filter_states
-        comb_lengths = self._comb_buffer_lengths
-        comb_count = self._comb_count
+        # Cache locals for inner loop speed
+        cb = self._comb_buffers
+        cp = self._comb_positions
+        cs = self._comb_filter_states
+        cl = self._comb_buffer_lengths
+        ap = self._allpass_buffers
+        app = self._allpass_positions
+        apl = self._allpass_buffer_lengths
+        sample_shape = input_samples.shape[1:]
 
-        allpass_buffers = self._allpass_buffers
-        allpass_positions = self._allpass_positions
-        allpass_lengths = self._allpass_buffer_lengths
-        allpass_count = self._allpass_count
+        for si in range(num_samples):
+            input_value = input_samples[si]
+            room_size = room_size_env[si]
+            damping = damping_env[si]
+            mix = mix_env[si]
 
-        for sample_index, input_sample in enumerate(input_samples):
-            # Update coefficients per sample for smooth transitions
-            room_size = room_size_envelope[sample_index]
-            damping = damping_envelope[sample_index]
-            mix = mix_envelope[sample_index]
-
-            feedback = 0.84 + room_size * 0.14
-            damp1 = damping * 0.4
+            feedback = _FEEDBACK_MIN + room_size * _FEEDBACK_RANGE
+            damp1 = damping * _DAMPING_SCALE
             damp2 = 1.0 - damp1
             dry_mix = 1.0 - mix
 
-            input_value = input_sample
-            comb_sum = np.zeros(input_samples.shape[1:], dtype=np.float32)
+            comb_sum = np.zeros(sample_shape, dtype=np.float32)
 
-            for index in range(comb_count):
-                buffer = comb_buffers[index]
-                pos = comb_positions[index]
-
-                output = buffer[pos]
-                filtered = output * damp2 + comb_states[index] * damp1
-                comb_states[index] = filtered
-                buffer[pos] = input_value + filtered * feedback
+            for i in range(_COMB_COUNT):
+                pos = cp[i]
+                output = cb[i][pos]
+                filtered = output * damp2 + cs[i] * damp1
+                cs[i] = filtered
+                cb[i][pos] = input_value + filtered * feedback
 
                 pos += 1
-                if pos == comb_lengths[index]:
+                if pos == cl[i]:
                     pos = 0
-                comb_positions[index] = pos
+                cp[i] = pos
 
                 comb_sum += output
 
-            wet = comb_sum / comb_count
+            wet = comb_sum * (1.0 / _COMB_COUNT)
 
-            for index in range(allpass_count):
-                buffer = allpass_buffers[index]
-                pos = allpass_positions[index]
-
-                delayed = buffer[pos]
+            for i in range(_ALLPASS_COUNT):
+                pos = app[i]
+                delayed = ap[i][pos]
                 output = -wet + delayed
-                buffer[pos] = wet + delayed * 0.5
+                ap[i][pos] = wet + delayed * 0.5
 
                 pos += 1
-                if pos == allpass_lengths[index]:
+                if pos == apl[i]:
                     pos = 0
-                allpass_positions[index] = pos
+                app[i] = pos
                 wet = output
 
-            output_samples[sample_index] = input_value * dry_mix + wet * mix
+            output_samples[si] = input_value * dry_mix + wet * mix
 
         return output_samples
+
+    # -- Modifier interface --------------------------------------------------
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray
@@ -372,42 +383,40 @@ class Reverb(Modifier):
         """Apply reverb to value(s) - Modifier interface.
 
         Args:
-            val: Input value (scalar or array)
+            val: Input value (scalar, stereo tuple, or array)
 
         Returns:
             Reverbed value (same type as input)
         """
-        # Handle scalar
         if isinstance(val, (float, int, np.number)):
             return self._process_sample(float(val))
 
         if isinstance(val, tuple):
-            result = self._process_sample(np.asarray(val, dtype=np.float32))
-            return tuple(float(sample) for sample in np.asarray(result))
+            arr = np.asarray(val, dtype=np.float32)
+            result = self._process_buffer(arr.reshape(len(arr), 1))
+            return tuple(float(x) for x in result.ravel())
 
-        input_samples = np.asarray(val)
-        return self._process_buffer(input_samples)
+        return self._process_buffer(np.asarray(val))
+
+    # -- Iterator interface --------------------------------------------------
 
     def __iter__(self):
-        """Initialize iterator."""
+        """Initialize iterator and reset reverb state."""
+        self._reset_state()
         if self.source is not None:
-            source = cast(Any, self.source)
-            iter(source)
+            iter(cast(Any, self.source))
         return self
 
     def __next__(self) -> float:
         """Get next sample with reverb applied."""
         if self.source is None:
             raise ValueError("source is required for iterator usage")
+        return self._process_sample(next(cast(Any, self.source)))
 
-        source = cast(Any, self.source)
-        return self(next(source))
+    # -- Vectorized interface ------------------------------------------------
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         """Generate n reverb samples.
-
-        Note: Due to the sequential nature of the filters, this processes
-        samples one at a time but returns them as a vectorized array.
 
         Args:
             n: Number of samples to generate
@@ -418,11 +427,8 @@ class Reverb(Modifier):
         n = validate_sample_count(n)
         if self.source is None:
             raise ValueError("source is required for get_samples_vectorized()")
-
-        # Get input samples
         source = cast(Any, self.source)
-        input_samples = source.get_samples_vectorized(n)
-        return self._process_buffer(input_samples)
+        return self._process_buffer(source.get_samples_vectorized(n))
 
     def get_samples(
         self, n: int, mode: SampleMode = "vectorized", **kwargs
@@ -440,7 +446,8 @@ class Reverb(Modifier):
         n = validate_sample_count(n)
         return np.array([next(self) for _ in range(n)], dtype=np.float32)
 
-    # Backward-compatible properties for internal state access
+    # -- Backward-compatible internal state accessors ------------------------
+
     @property
     def _room_size(self) -> float:
         """Backward compatibility: current room size."""

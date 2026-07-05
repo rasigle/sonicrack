@@ -51,13 +51,14 @@ class TestLFOClickFreeFrequency:
 
     def test_lfo_tracks_last_frequency(self, lfo_module):
         """Test that LFO tracks the last rendered frequency for continuity."""
-        assert hasattr(lfo_module, '_last_runtime_frequencies')
+        assert hasattr(lfo_module, "_last_runtime_frequencies")
         assert isinstance(lfo_module._last_runtime_frequencies, list)
         assert len(lfo_module._last_runtime_frequencies) == 4  # One per waveform
 
 
 class TestOscillatorClickFreeFrequency:
-    """Test that regular Oscillator uses frequency slewing for click-free transitions."""
+    """Test that regular Oscillator uses frequency slewing for click-free
+    transitions."""
 
     def test_oscillator_uses_frequency_slewing(self, osc_module):
         """Test that Oscillator uses the render_with_frequency_ramp function."""
@@ -86,7 +87,7 @@ class TestOscillatorClickFreeFrequency:
 
     def test_oscillator_tracks_last_frequency(self, osc_module):
         """Test that Oscillator tracks the last rendered frequency for continuity."""
-        assert hasattr(osc_module, '_last_runtime_frequency')
+        assert hasattr(osc_module, "_last_runtime_frequency")
         assert isinstance(osc_module._last_runtime_frequency, (int, float))
 
 
@@ -154,6 +155,3 @@ class TestFrequencySlewingMechanism:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-
-
-

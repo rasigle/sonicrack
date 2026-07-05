@@ -9,10 +9,7 @@ from typing import Any
 import numpy as np
 
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
-from src.engine.core.component import (
-    ComponentDescriptor,
-    ParameterDescriptor,
-)
+from src.engine.core.component import ComponentDescriptor, ParameterDescriptor
 from src.engine.core.parameter import AutomationMode, RuntimeParameter, SmoothingPolicy
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.dsp.modifiers.base import (
@@ -24,9 +21,42 @@ from src.engine.dsp.modifiers.base import (
 from src.engine.generators.oscillators.oscillator import _derive_amplitude_from_init
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.math import db_to_linear, linear_to_db
-from src.engine.utils.validation import validate_sample_rate
+from src.engine.utils.validation import (
+    _is_number,
+    validate_numeric,
+    validate_sample_rate,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _reshape_per_sample_values(values: np.ndarray, samples: np.ndarray) -> np.ndarray:
+    """Reshape a per-sample 1D vector so it broadcasts over sample channels."""
+    if samples.ndim > 1 and values.ndim == 1:
+        return values.reshape(-1, *([1] * (samples.ndim - 1)))
+    return values
+
+
+def _validate_wave_range(
+    value: tuple[float, float] | list[float],
+) -> tuple[float, float]:
+    """Validate a clipping range and return it as a float tuple."""
+    if not isinstance(value, (tuple, list)):
+        raise TypeError(
+            f"wave_range must be a tuple or list, got {type(value).__name__}"
+        )
+    if len(value) != 2:
+        raise ValueError(f"wave_range must have exactly 2 elements, got {len(value)}")
+
+    min_val = validate_numeric(value[0], "wave_range min")
+    max_val = validate_numeric(value[1], "wave_range max")
+
+    if min_val > max_val:
+        raise ValueError(
+            f"wave_range min ({min_val}) must be less than max ({max_val})"
+        )
+
+    return min_val, max_val
 
 
 def apply_vectorized_gain(
@@ -49,16 +79,16 @@ def apply_vectorized_gain(
     """
     # Convert dB to linear if needed
     if is_db:
-        if isinstance(gain_values, (int, float)):
+        if _is_number(gain_values):
             gain_values = db_to_linear(gain_values)
         else:
             gain_values = db_to_linear(gain_values)
 
     # Ensure gain_values is an array
-    if isinstance(gain_values, (int, float)):
+    if _is_number(gain_values):
         result = samples * gain_values
     else:
-        # Handle multi-dimensional samples (e.g., stereo)
+        # Handle multidimensional samples (e.g., stereo)
         if samples.ndim > 1:
             gain_values = gain_values.reshape(-1, *([1] * (samples.ndim - 1)))
         result = samples * gain_values
@@ -84,12 +114,14 @@ def apply_vectorized_clip(
         Clipped samples (float32).
     """
     # Ensure threshold is positive
-    if isinstance(threshold_values, (int, float)):
+    if _is_number(threshold_values):
         threshold_values = abs(threshold_values)
         return np.clip(samples, -threshold_values, threshold_values).astype(np.float32)
     else:
-        threshold_values = np.abs(threshold_values)
-        # For array thresholds, clip each sample independently
+        threshold_values = np.abs(np.asarray(threshold_values))
+        # For array thresholds, clip each sample independently. For multichannel
+        # audio, a 1D threshold vector is treated as one value per frame.
+        threshold_values = _reshape_per_sample_values(threshold_values, samples)
         return np.clip(samples, -threshold_values, threshold_values).astype(np.float32)
 
 
@@ -202,10 +234,7 @@ class Volume(Modifier):
         self.sample_rate = validate_sample_rate(sample_rate)
 
         # Determine initial amplitude
-        if not isinstance(amplitude, (int, float, np.number)):
-            raise TypeError(
-                f"Amplitude must be a number, got {type(amplitude).__name__}"
-            )
+        amplitude = validate_numeric(amplitude, "Amplitude")
         if amplitude < 0:
             raise ValueError(f"Amplitude must be non-negative, got {amplitude}")
 
@@ -289,11 +318,13 @@ class Volume(Modifier):
 
     @amplitude.setter
     def amplitude(self, value: float):
+        value = validate_numeric(value, "amplitude")
         if value < 0:
             raise ValueError(f"amplitude must be non-negative, got {value}")
 
         # Set amplitude parameter (triggers LINEAR smoothing)
         self._amplitude_param.value = value
+
         # Update gain_db to stay in sync (no smoothing trigger)
         self._gain_db_param._target_value = linear_to_db(value)
         self._gain_db_param._current_value = linear_to_db(self._amplitude_param.value)
@@ -315,8 +346,11 @@ class Volume(Modifier):
 
     @gain_db.setter
     def gain_db(self, value: float):
+        value = validate_numeric(value, "gain_db")
+
         # Set gain_db parameter (triggers LOGARITHMIC smoothing in dB space)
         self._gain_db_param.value = value
+
         # Update amplitude to stay in sync (no smoothing trigger)
         new_amplitude = db_to_linear(value)
         self._amplitude_param._target_value = new_amplitude
@@ -357,8 +391,9 @@ class Volume(Modifier):
         """Get current amplitude value, handling smoothing."""
         if self._active_param == "amplitude":
             return self._amplitude_param.value
-        else:  # gain_db
-            return db_to_linear(self._gain_db_param.value)
+
+        # gain_db
+        return db_to_linear(self._gain_db_param.value)
 
     def _scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
         """Apply volume scaling to array of samples (vectorized).
@@ -536,8 +571,8 @@ class ModulatedVolume(Volume):
 
     def trigger_release(self):
         """Trigger release on modulator if supported."""
-        if hasattr(self.modulator, "trigger_release"):
-            self.modulator.trigger_release()
+        if hasattr(self._modulator_source, "trigger_release"):
+            self._modulator_source.trigger_release()
 
     @property
     def ended(self):
@@ -647,9 +682,11 @@ class Clipper(Modifier):
     )
 
     def __init__(
-        self, wave_range: tuple[float, float] = (-1.0, 1.0),
+        self,
+        wave_range: tuple[float, float] = (-1.0, 1.0),
         sample_rate: float = DEFAULT_SAMPLE_RATE,
-        *args: Any, **kwargs: Any
+        *args: Any,
+        **kwargs: Any,
     ):
         """Initialize clipper with wave range.
 
@@ -666,29 +703,7 @@ class Clipper(Modifier):
         super().__init__(*args, **kwargs)
         self.sample_rate = validate_sample_rate(sample_rate)
 
-        if not isinstance(wave_range, (tuple, list)):
-            raise TypeError(
-                f"wave_range must be a tuple or list, got {type(wave_range).__name__}"
-            )
-        if len(wave_range) != 2:
-            raise ValueError(
-                f"wave_range must have exactly 2 elements, got {len(wave_range)}"
-            )
-
-        min_val, max_val = wave_range
-
-        if not isinstance(min_val, (int, float, np.number)):
-            raise TypeError(
-                f"wave_range min must be a number, got {type(min_val).__name__}"
-            )
-        if not isinstance(max_val, (int, float, np.number)):
-            raise TypeError(
-                f"wave_range max must be a number, got {type(max_val).__name__}"
-            )
-        if min_val >= max_val:
-            raise ValueError(
-                f"wave_range min ({min_val}) must be less than max ({max_val})"
-            )
+        min_val, max_val = _validate_wave_range(wave_range)
 
         # Create smoothed parameters for min and max to prevent clicks
         min_descriptor = ParameterDescriptor(
@@ -718,9 +733,9 @@ class Clipper(Modifier):
     @wave_range.setter
     def wave_range(self, value: tuple[float, float]):
         """Set clipping range and update min/max values with smoothing."""
-        min_val, max_val = value
-        self._min_param.value = float(min_val)
-        self._max_param.value = float(max_val)
+        min_val, max_val = _validate_wave_range(value)
+        self._min_param.value = min_val
+        self._max_param.value = max_val
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray
@@ -740,11 +755,16 @@ class Clipper(Modifier):
                 # Get per-sample threshold values during smoothing
                 min_envelope = self._min_param.get_interpolated_buffer(n)
                 max_envelope = self._max_param.get_interpolated_buffer(n)
+                min_envelope = _reshape_per_sample_values(min_envelope, val)
+                max_envelope = _reshape_per_sample_values(max_envelope, val)
                 # Clip each sample with its corresponding threshold
-                return np.minimum(np.maximum(val, min_envelope), max_envelope)
+                return np.minimum(np.maximum(val, min_envelope), max_envelope).astype(
+                    np.float32, copy=False
+                )
             else:
                 # No smoothing - use constant values
-                return np.clip(val, self._min_param.value, self._max_param.value)
+                clipped = np.clip(val, self._min_param.value, self._max_param.value)
+                return clipped.astype(np.float32, copy=False)
 
         if isinstance(val, Iterable):
             # Advance smoothing once per call
@@ -753,13 +773,13 @@ class Clipper(Modifier):
             # Tuple clipping
             min_val = self._min_param.value
             max_val = self._max_param.value
-            return tuple(np.clip(v, min_val, max_val) for v in val)
+            return tuple(float(np.clip(v, min_val, max_val)) for v in val)
 
         # Advance smoothing once for scalar
         self._min_param.advance_smoothing(1)
         self._max_param.advance_smoothing(1)
         # Scalar clipping
-        return np.clip(val, self._min_param.value, self._max_param.value)
+        return float(np.clip(val, self._min_param.value, self._max_param.value))
 
     def clip_vectorized(self, samples: np.ndarray) -> np.ndarray:
         """Clip array of samples (vectorized) with smoothing.
@@ -776,6 +796,8 @@ class Clipper(Modifier):
             # Get per-sample threshold values during smoothing
             min_envelope = self._min_param.get_interpolated_buffer(n)
             max_envelope = self._max_param.get_interpolated_buffer(n)
+            min_envelope = _reshape_per_sample_values(min_envelope, samples)
+            max_envelope = _reshape_per_sample_values(max_envelope, samples)
             # Clip each sample with its corresponding threshold
             clipped = np.minimum(np.maximum(samples, min_envelope), max_envelope)
             return clipped.astype(np.float32)
@@ -849,14 +871,14 @@ class ModulatedClipper(Modifier):
             to properly scale your CV source.
         """
         super().__init__(*args, **kwargs)
-        if not (hasattr(modulator, "__iter__") and hasattr(modulator, "__next__")):
+        try:
+            self.modulator = iter(modulator)
+        except TypeError as exc:
             raise TypeError(
-                f"modulator must be iterable or have __next__, "
-                f"got {type(modulator).__name__}"
-            )
+                f"modulator must be iterable, got {type(modulator).__name__}"
+            ) from exc
 
         self._modulator_source = modulator
-        self.modulator = iter(modulator)
 
         logger.debug("ModulatedClipper initialized (CV range: [0, 1])")
 

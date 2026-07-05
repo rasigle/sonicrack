@@ -22,11 +22,11 @@ class TestOutputClickFreeGain:
 
     def test_uses_volume_component(self, output_module):
         """Test that output module has Volume component for gain control."""
-        assert hasattr(output_module, 'volume_component')
+        assert hasattr(output_module, "volume_component")
         assert output_module.volume_component is not None
 
         # Volume component should have smoothing
-        assert hasattr(output_module.volume_component, 'smoothing_time_ms')
+        assert hasattr(output_module.volume_component, "smoothing_time_ms")
         assert output_module.volume_component.smoothing_time_ms > 0
 
     def test_gain_updates_volume_component(self, output_module):
@@ -43,6 +43,7 @@ class TestOutputClickFreeGain:
 
     def test_volume_component_processes_audio(self, output_module):
         """Test that Volume component is used to process audio samples."""
+
         class FakeEngine:
             def render_ports(self, ports, num_samples):
                 # Return a test signal
@@ -69,13 +70,11 @@ class TestOutputClickFreeGain:
         assert output_module.volume_component.smoothing_time_ms == pytest.approx(10.0)
 
         # The Volume component has internal smoothing parameters
-        assert hasattr(output_module.volume_component, '_amplitude_param')
-        assert hasattr(output_module.volume_component, '_gain_db_param')
+        assert hasattr(output_module.volume_component, "_amplitude_param")
+        assert hasattr(output_module.volume_component, "_gain_db_param")
 
     def test_sample_rate_updates_volume_component(self, output_module):
         """Test that sample rate changes update Volume component."""
-        initial_sample_rate = output_module.volume_component.sample_rate
-
         # Simulate sample rate change
         new_sample_rate = 96000
         output_module._on_global_sample_rate_changed(new_sample_rate)
@@ -85,6 +84,7 @@ class TestOutputClickFreeGain:
 
     def test_mute_at_minus_80db(self, output_module):
         """Test that -80 dB effectively mutes output."""
+
         class FakeEngine:
             def render_ports(self, ports, num_samples):
                 return [np.full(num_samples, 0.5, dtype=np.float32)]
@@ -101,9 +101,10 @@ class TestOutputClickFreeGain:
 
         # Check the last samples where smoothing has settled
         # Volume component uses ~10ms smoothing, so by the end it should be very quiet
-        assert np.max(np.abs(samples[-100:])) < 0.001  # Last 100 samples should be very quiet
+        assert (
+            np.max(np.abs(samples[-100:])) < 0.001
+        )  # Last 100 samples should be very quiet
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

@@ -77,7 +77,7 @@ class OutputModule(ModuleWidget):
         self.volume_component = Volume(
             gain_db=0.0,
             sample_rate=audio_config.sample_rate,
-            smoothing_time_ms=10.0  # 10ms smoothing prevents clicks
+            smoothing_time_ms=10.0,  # 10ms smoothing prevents clicks
         )
 
         self.master_gain_knob = Knob(

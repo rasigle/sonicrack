@@ -74,7 +74,6 @@ def activate_crash_diagnostics(
             with contextlib.suppress(Exception):
                 app.exit(1)
 
-
     def threading_exception_hook(args: threading.ExceptHookArgs) -> None:
         try:
             logger.critical(

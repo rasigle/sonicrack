@@ -460,8 +460,8 @@ class TestNoiseGenerator(unittest.TestCase):
         from src.engine.generators.noise import NoiseGenerator
 
         gen = NoiseGenerator(noise_type="White")
-        self.assertEqual(gen.gain_db, -20)
-        self.assertEqual(gen.amplitude, 0.1)
+        self.assertEqual(gen.gain_db, 0)
+        self.assertEqual(gen.amplitude, 1.0)
 
     def test_iterator_protocol(self):
         """Test NoiseGenerator supports iterator protocol."""

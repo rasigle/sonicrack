@@ -24,17 +24,17 @@ def test_panner_smoothing():
     panner.position = 1.0  # Hard right
     print("After setting to hard right:")
     print(
-        f"  Target gains: L={panner._target_left_gain:.3f}, "
-        f"R={panner._target_right_gain:.3f}"
+        f"  Target gains: L={panner._left_gain_param.target:.3f}, "
+        f"R={panner._right_gain_param.target:.3f}"
     )
     print(
-        f"  Current gains: L={panner._current_left_gain:.3f}, "
-        f"R={panner._current_right_gain:.3f}"
+        f"  Current gains: L={panner._left_gain_param.value:.3f}, "
+        f"R={panner._right_gain_param.value:.3f}"
     )
 
     # Verify smoothing state is active
     assert panner._smoothing_samples_remaining > 0
-    assert panner._target_left_gain != panner._current_left_gain
+    assert panner._left_gain_param.target != panner._left_gain_param.value
 
     # Generate samples - should smooth over 10ms (441 samples @ 44.1kHz)
     left2, right2 = panner.pan_vectorized(mono_samples[100:541])
@@ -49,8 +49,8 @@ def test_panner_smoothing():
     left3, right3 = panner.pan_vectorized(mono_samples[541:641])
     print(f"After smoothing - L={left3[-1]:.3f}, R={right3[-1]:.3f}")
     print(
-        f"  Final gains: L={panner._target_left_gain:.3f}, "
-        f"R={panner._target_right_gain:.3f}"
+        f"  Final gains: L={panner._left_gain_param.target:.3f}, "
+        f"R={panner._right_gain_param.target:.3f}"
     )
 
     # Now should be at target (hard right: low left, high right)

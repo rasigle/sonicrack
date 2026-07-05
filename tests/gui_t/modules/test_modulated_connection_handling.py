@@ -148,7 +148,6 @@ def test_knob_disabled_when_modulation_connected(qapp: Any):
 
     # Initially, knob is enabled
     assert panner.pan_knob.isEnabled()
-    initial_tooltip = panner.pan_knob.toolTip()
 
     # Connect modulation
     lfo.sine_port.connect(panner.mod_port)
@@ -157,7 +156,9 @@ def test_knob_disabled_when_modulation_connected(qapp: Any):
     # Knob should remain enabled but tooltip changes to indicate depth control
     assert panner.pan_knob.isEnabled(), "Knob should remain enabled when modulated"
     modulated_tooltip = panner.pan_knob.toolTip()
-    assert "Modulation Depth" in modulated_tooltip, "Tooltip should indicate depth control"
+    assert "Modulation Depth" in modulated_tooltip, (
+        "Tooltip should indicate depth control"
+    )
 
     # Disconnect modulation
     lfo.sine_port.disconnect(panner.mod_port)
@@ -189,4 +190,3 @@ def test_on_port_connection_changed_ignores_other_ports(qapp: Any):
     # Should still not change component or state
     assert panner.component is initial_component
     assert panner._is_modulated == initial_modulated_state
-

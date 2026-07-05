@@ -24,7 +24,8 @@ class PortModulatorAdapter:
     from GUI ports as if they were generator components.
 
     Automatically handles CV range conversion when source and destination ranges differ.
-    Supports modulation amount/depth control for blending between base value and modulation.
+    Supports modulation amount/depth control for blending between base value and
+    modulation.
     """
 
     def __init__(
@@ -64,7 +65,7 @@ class PortModulatorAdapter:
 
         # Get source output range if available
         source_module = self._get_source_module()
-        if source_module and hasattr(source_module, 'get_cv_output_range'):
+        if source_module and hasattr(source_module, "get_cv_output_range"):
             source_range = source_module.get_cv_output_range()
             if source_range != expected_range:
                 self._needs_scaling = True
@@ -87,19 +88,22 @@ class PortModulatorAdapter:
             return None
 
         # Try cables first (for GUI PortWidget or mocks)
-        if hasattr(self.port, 'cables') and self.port.cables:
+        if hasattr(self.port, "cables") and self.port.cables:
             for cable in self.port.cables:
                 # The port is an input, so we want the start_port's parent (source)
-                if (hasattr(cable, 'start_port') and cable.start_port
-                        and hasattr(cable.start_port, 'parent_module')):
+                if (
+                    hasattr(cable, "start_port")
+                    and cable.start_port
+                    and hasattr(cable.start_port, "parent_module")
+                ):
                     return cable.start_port.parent_module
 
         # Try connected_to (for direct Port API)
-        if hasattr(self.port, 'connected_to') and self.port.connected_to:
+        if hasattr(self.port, "connected_to") and self.port.connected_to:
             # Get the first connected port
             for connected_port in self.port.connected_to:
                 # Return the parent module of the connected port
-                if hasattr(connected_port, 'parent_module'):
+                if hasattr(connected_port, "parent_module"):
                     return connected_port.parent_module
 
         return None
@@ -118,6 +122,7 @@ class PortModulatorAdapter:
         if self._buffer is None or self._index >= len(self._buffer):
             # Read new buffer from port
             from src.gui.core.runtime_helpers import read_samples
+
             self._buffer = read_samples(self.port, self.num_samples)
             self._index = 0
 
@@ -151,6 +156,7 @@ class PortModulatorAdapter:
             Array of samples scaled by modulation amount
         """
         from src.gui.core.runtime_helpers import read_samples
+
         samples = read_samples(self.port, n)
 
         # Apply CV scaling if needed
@@ -200,7 +206,9 @@ class ModulatedModuleBase(ModuleWidget):
         super().__init__(*args, **kwargs)
         self.control_knob = None  # Subclass must set this
         self.modulator_component = None
-        self.port_adapter = None  # Store adapter reference for updating modulation_amount
+        self.port_adapter = (
+            None  # Store adapter reference for updating modulation_amount
+        )
         self._is_modulated = False  # Track current modulation state
 
     def on_port_connection_changed(self, port_name: str, is_connected: bool):
@@ -239,10 +247,10 @@ class ModulatedModuleBase(ModuleWidget):
 
     def prepare_modulated_component(self, num_samples: int):
         """Prepare the modulated component with port adapter.
-        
+
         This creates the modulated component using a PortModulatorAdapter
         to bridge port-based signal flow with component-based processing.
-        
+
         Args:
             num_samples: Buffer size for the adapter
         """
@@ -252,11 +260,11 @@ class ModulatedModuleBase(ModuleWidget):
             if port.port_name == "Mod":
                 mod_port = port
                 break
-        
+
         if mod_port is None:
             logger.warning(f"{self.__class__.__name__}: Mod port not found!")
             return
-        
+
         # Get expected CV range for this module
         expected_range = self.get_cv_range("Mod")
 
@@ -295,24 +303,24 @@ class ModulatedModuleBase(ModuleWidget):
         if mod_port:
             # Check GUI cables (PortWidget)
             cables_connected = (
-                hasattr(mod_port, 'cables')
+                hasattr(mod_port, "cables")
                 and mod_port.cables
                 and len(mod_port.cables) > 0
             )
             # Check direct port connections (Port.connected_to)
             port_connected = (
-                hasattr(mod_port, 'port')
-                and hasattr(mod_port.port, 'connected_to')
+                hasattr(mod_port, "port")
+                and hasattr(mod_port.port, "connected_to")
                 and mod_port.port.connected_to
                 and len(mod_port.port.connected_to) > 0
             )
             # If mod_port is a Port directly (not PortWidget)
             direct_connected = False
-            if hasattr(mod_port, 'connected_to'):
-                connected_to = getattr(mod_port, 'connected_to', None)
+            if hasattr(mod_port, "connected_to"):
+                connected_to = getattr(mod_port, "connected_to", None)
                 direct_connected = (
                     connected_to is not None
-                    and hasattr(connected_to, '__len__')
+                    and hasattr(connected_to, "__len__")
                     and len(connected_to) > 0
                 )
 

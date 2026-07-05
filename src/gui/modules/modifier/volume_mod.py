@@ -74,7 +74,6 @@ class VolumeModule(ModulatedModuleBase):
         # Set control_knob for base class functionality
         self.control_knob = self.gain_knob
 
-
         # Create initial unmodulated component
         self.component = self.create_unmodulated_component()
 

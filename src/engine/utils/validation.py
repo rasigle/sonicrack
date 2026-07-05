@@ -7,6 +7,8 @@ import operator
 from numbers import Real
 from typing import Any
 
+import numpy as np
+
 
 def validate_sample_rate(value: Any, *, name: str = "sample_rate") -> float:
     """Return a finite, positive sample rate as ``float``."""
@@ -59,3 +61,15 @@ def validate_numeric_range(
         )
 
     return result
+
+
+def _is_number(value: Any) -> bool:
+    """Return True for Python and NumPy scalar numbers."""
+    return isinstance(value, (int, float, np.number))
+
+
+def validate_numeric(value: Any, name: str) -> float:
+    """Validate and normalize a numeric scalar to float."""
+    if not _is_number(value):
+        raise TypeError(f"{name} must be a number, got {type(value).__name__}")
+    return float(value)

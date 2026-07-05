@@ -38,7 +38,7 @@ class TestPatchBuilder(unittest.TestCase):
         # Should be a SineOscillator, by default gain_db=-20 maps to amplitude ~0.1
         self.assertIsInstance(patch, SineOscillator)
         self.assertEqual(patch.gain_db, DEFAULT_GAIN_DB)
-        self.assertEqual(patch.amplitude, 0.1)
+        self.assertEqual(patch.amplitude, 1.0)
 
         patch = PresetBuilder().sine(440, gain_db=-6.0).build()
         self.assertAlmostEqual(float(patch.gain_db), -6.0, 8)
@@ -52,10 +52,10 @@ class TestPatchBuilder(unittest.TestCase):
     def test_oscillator_amplitude(self):
         patch = PresetBuilder().sine(440, amplitude=0.1).build()
         self.assertEqual(patch.amplitude, 0.1)
-        self.assertAlmostEqual(patch.gain_db, DEFAULT_GAIN_DB)
 
         patch = PresetBuilder().sine(440, amplitude=1.0).build()
         self.assertEqual(patch.amplitude, 1.0)
+        self.assertEqual(patch.gain_db, DEFAULT_GAIN_DB)
         self.assertAlmostEqual(patch.gain_db, 0.0)
 
     def test_oscillator_types(self):

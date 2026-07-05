@@ -296,7 +296,7 @@ def test_adapter_multiple_get_samples_calls(
     assert np.allclose(samples2, expected1, rtol=1e-5), (
         f"Second read failed: expected {expected1}, got {samples2}"
     )
-    
+
     # Verify scaling is consistent across multiple calls
     assert adapter._needs_scaling, "Scaling should remain enabled"
     assert adapter._scale == 0.5, "Scale should remain 0.5"
@@ -319,7 +319,10 @@ def test_modulation_amount_control(
 
     # Test with full modulation (amount = 1.0)
     adapter = PortModulatorAdapter(
-        clipper_mod_port, num_samples=5, expected_range=(0.0, 1.0), modulation_amount=1.0
+        clipper_mod_port,
+        num_samples=5,
+        expected_range=(0.0, 1.0),
+        modulation_amount=1.0,
     )
     samples_full = adapter.get_samples(5)
     expected_full = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float32)
@@ -332,7 +335,8 @@ def test_modulation_amount_control(
     adapter.modulation_amount = 0.5
     samples_half = adapter.get_samples(5)
     # Expected: [0.0, 0.25, 0.5, 0.75, 1.0] scaled around 0.5 by 0.5
-    # = [0.5 + (0.0-0.5)*0.5, 0.5 + (0.25-0.5)*0.5, 0.5, 0.5 + (0.75-0.5)*0.5, 0.5 + (1.0-0.5)*0.5]
+    # = [0.5 + (0.0-0.5)*0.5, 0.5 + (0.25-0.5)*0.5, 0.5, 0.5 + (0.75-0.5)*0.5, 0.5 +
+    # (1.0-0.5)*0.5]
     # = [0.25, 0.375, 0.5, 0.625, 0.75]
     expected_half = np.array([0.25, 0.375, 0.5, 0.625, 0.75], dtype=np.float32)
     assert np.allclose(samples_half, expected_half, rtol=1e-5), (
@@ -347,5 +351,3 @@ def test_modulation_amount_control(
     assert np.allclose(samples_none, expected_none, rtol=1e-5), (
         f"No modulation failed: expected {expected_none}, got {samples_none}"
     )
-
-

@@ -101,8 +101,16 @@ class PannerModule(ModulatedModuleBase):
         samples = read_samples(self.in_port, num_samples)
 
         # Lazy initialization if component wasn't prepared (e.g., in tests)
-        if self.component is None and self.mod_port.is_connected:
+        # Check if we need to switch to modulated component
+        if self.mod_port.is_connected and not isinstance(
+            self.component, ModulatedPanner
+        ):
             self.prepare_modulated_component(num_samples)
+        elif not self.mod_port.is_connected and isinstance(
+            self.component, ModulatedPanner
+        ):
+            # Switch back to unmodulated
+            self.component = self.create_unmodulated_component()
 
         # Get position from knob
         position = float_parameter(parameters, "position", self.pan_knob.get_value)

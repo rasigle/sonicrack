@@ -3,22 +3,19 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 import numpy as np
 
-from src.engine.core.component import (
-    ComponentDescriptor,
-    ParameterDescriptor,
-)
-from src.engine.core.registry import ComponentCategory
-from src.engine.dsp.modifiers.base import (
-    Modifier,
-)
+from src.engine.core.component import ComponentDescriptor, ParameterDescriptor
+from src.engine.core.registry import ComponentCategory, register_component
+from src.engine.dsp.modifiers.base import Modifier
+from src.engine.utils.validation import validate_numeric
 
 logger = logging.getLogger(__name__)
 
 
+@register_component()
 class Frequency(Modifier):
     """Scales the input values by frequency multiplier.
 
@@ -60,16 +57,20 @@ class Frequency(Modifier):
         """
         super().__init__()
 
-        # Input validation
-        if not isinstance(frequency, (int, float, np.number)):
-            raise TypeError(
-                f"frequency must be a number, got {type(frequency).__name__}"
-            )
-        if frequency < 0:
-            raise ValueError(f"frequency must be non-negative, got {frequency}")
-
         self.frequency = frequency
-        logger.debug(f"Frequency initialized with multiplier: {frequency}")
+        logger.debug("Frequency initialized with multiplier: %s", self.frequency)
+
+    @property
+    def frequency(self) -> float:
+        """Current frequency multiplier."""
+        return self._frequency
+
+    @frequency.setter
+    def frequency(self, value: float) -> None:
+        value = validate_numeric(value, "frequency")
+        if value < 0:
+            raise ValueError(f"frequency must be non-negative, got {value}")
+        self._frequency = float(value)
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray
@@ -77,7 +78,7 @@ class Frequency(Modifier):
         """Apply frequency scaling to input.
 
         Args:
-            val: Input value (float, tuple, or array).
+            val: Input value (float, numeric iterable, or array).
 
         Returns:
             Scaled value (same type as input).
@@ -85,17 +86,34 @@ class Frequency(Modifier):
         Raises:
             TypeError: If input is not int, float, array, or Iterable.
         """
-        # Optimize: check array first
+        # Scalar input
+        if isinstance(val, (float, int, np.number)):
+            return float(val * self.frequency)
+
+        # Vectorized input
         if isinstance(val, np.ndarray):
             return val * self.frequency
 
+        if isinstance(val, (str, bytes, Mapping)):
+            logger.error("Invalid input type for Frequency: %s", type(val))
+            raise TypeError(
+                "Input value must be an int, float, numpy number, array, "
+                f"or numeric Iterable. Got {type(val)}"
+            )
+
         if isinstance(val, Iterable):
-            return tuple(v * self.frequency for v in val)
+            try:
+                return tuple(
+                    float(validate_numeric(v, "val item")) * self.frequency for v in val
+                )
+            except (TypeError, ValueError) as exc:
+                raise TypeError("All Iterable input values must be numeric.") from exc
 
-        if isinstance(val, (int, float, np.number)):
-            return val * self.frequency
-
-        raise TypeError("Input value must be an int, float, numpy array, or Iterable.")
+        logger.error("Invalid input type for Frequency: %s", type(val))
+        raise TypeError(
+            f"Input value must be an int, float, numpy number, array, or Iterable. "
+            f"Got {type(val)}"
+        )
 
     def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
         """Apply frequency scaling to array of samples (vectorized).

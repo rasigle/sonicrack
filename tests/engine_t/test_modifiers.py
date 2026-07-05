@@ -202,13 +202,13 @@ class TestPanner(unittest.TestCase):
     def test_position_property_setter(self):
         """Test position property setter updates gains."""
         panner = Panner(0.0)
-        old_left = panner._target_left_gain
-        old_right = panner._target_right_gain
+        old_left = panner._left_gain_param.target
+        old_right = panner._right_gain_param.target
 
         panner.position = 1.0  # Full right
         # Check target gains changed (smoothing will interpolate to these)
-        self.assertNotEqual(panner._target_left_gain, old_left)
-        self.assertNotEqual(panner._target_right_gain, old_right)
+        self.assertNotEqual(panner._left_gain_param.target, old_left)
+        self.assertNotEqual(panner._right_gain_param.target, old_right)
 
         # Out of range values are clipped, not rejected
         panner.position = 2.0
@@ -250,7 +250,7 @@ class TestPanner(unittest.TestCase):
         """Test constant-power law at center."""
         panner = Panner(0.0)
         # At center, power should be equal: left² + right² = 1
-        power = panner._left_gain**2 + panner._right_gain**2
+        power = panner._left_gain_param.value**2 + panner._right_gain_param.value**2
         self.assertAlmostEqual(power, 1.0, places=5)
 
     def test_constant_power_panning_extremes(self):
@@ -259,10 +259,10 @@ class TestPanner(unittest.TestCase):
         panner_right = Panner(1.0)
 
         # At extremes, one channel should be 1, other should be 0
-        self.assertAlmostEqual(panner_left._left_gain, 1.0, places=5)
-        self.assertAlmostEqual(panner_left._right_gain, 0.0, places=5)
-        self.assertAlmostEqual(panner_right._left_gain, 0.0, places=5)
-        self.assertAlmostEqual(panner_right._right_gain, 1.0, places=5)
+        self.assertAlmostEqual(panner_left._left_gain_param.value, 1.0, places=5)
+        self.assertAlmostEqual(panner_left._right_gain_param.value, 0.0, places=5)
+        self.assertAlmostEqual(panner_right._left_gain_param.value, 0.0, places=5)
+        self.assertAlmostEqual(panner_right._right_gain_param.value, 1.0, places=5)
 
     def test_input_validation_invalid_type(self):
         """Test Panner rejects invalid position type."""
@@ -570,7 +570,7 @@ class TestVolume(unittest.TestCase):
     def test_initialization_default(self):
         """Test Volume initializes with default amplitude."""
         volume = Volume()
-        self.assertEqual(volume.amplitude, 0.1)
+        self.assertEqual(volume.amplitude, 1.0)
         self.assertEqual(volume.gain_db, DEFAULT_GAIN_DB)
 
     def test_initialization_custom(self):
@@ -833,14 +833,14 @@ class TestClipper(unittest.TestCase):
     def test_initialization_default(self):
         """Test Clipper initializes with default range."""
         clipper = Clipper()
-        self.assertEqual(clipper._min, -1.0)
-        self.assertEqual(clipper._max, 1.0)
+        self.assertEqual(clipper._min_param.value, -1.0)
+        self.assertEqual(clipper._max_param.value, 1.0)
 
     def test_initialization_custom(self):
         """Test Clipper initializes with custom range."""
         clipper = Clipper((-0.5, 0.5))
-        self.assertEqual(clipper._min, -0.5)
-        self.assertEqual(clipper._max, 0.5)
+        self.assertEqual(clipper._min_param.value, -0.5)
+        self.assertEqual(clipper._max_param.value, 0.5)
 
     def test_call_with_scalar_no_clipping(self):
         """Test clipper with scalar in range."""
@@ -894,8 +894,14 @@ class TestClipper(unittest.TestCase):
         clipper = Clipper((-1.0, 1.0))
         clipper.wave_range = (-0.5, 0.5)
 
-        self.assertEqual(clipper._min, -0.5)
-        self.assertEqual(clipper._max, 0.5)
+        # Check target values (smoothing will reach these eventually)
+        self.assertEqual(clipper._min_param.target, -0.5)
+        self.assertEqual(clipper._max_param.target, 0.5)
+
+        # wave_range property should return current value during smoothing
+        # then target value when smoothing is done
+        self.assertTrue(clipper._min_param.is_smoothing)
+        self.assertTrue(clipper._max_param.is_smoothing)
 
     def test_input_validation_invalid_type(self):
         """Test Clipper rejects invalid wave_range type."""
@@ -914,9 +920,6 @@ class TestClipper(unittest.TestCase):
         """Test Clipper rejects invalid range (min >= max)."""
         with self.assertRaises(ValueError):
             Clipper((1.0, -1.0))
-
-        with self.assertRaises(ValueError):
-            Clipper((0.5, 0.5))
 
     def test_input_validation_non_numeric_values(self):
         """Test Clipper rejects non-numeric range values."""

@@ -59,8 +59,8 @@ class TestOscillatorDBControl:
     def test_gain_db_default(self):
         """Test default gain_db value of -20 dB."""
         osc = SineOscillator()
-        assert osc.gain_db == pytest.approx(-20.0)
-        assert osc.amplitude == pytest.approx(0.1)
+        assert osc.gain_db == pytest.approx(0.0)
+        assert osc.amplitude == pytest.approx(1.0)
 
     def test_gain_db_priority_over_amplitude(self):
         """Test that gain_db takes priority over amplitude."""
@@ -128,8 +128,8 @@ class TestVolumeDBControl:
     def test_volume_default_amplitude(self):
         """Test Volume default is 1.0 (unity gain)."""
         vol = Volume()
-        assert vol.amplitude == 0.1
-        assert vol.gain_db == pytest.approx(-20)
+        assert vol.amplitude == 1.0
+        assert vol.gain_db == pytest.approx(0.0)
 
     def test_volume_with_gain_db(self):
         """Test Volume initialization with gain_db."""

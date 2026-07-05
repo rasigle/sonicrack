@@ -151,6 +151,23 @@ class Oscillator(Generator):
             self._amplitude_param.sample_rate = value
             self._post_sample_rate_set()
 
+    def reset(self):
+        """Reset oscillator to its initial constructor state."""
+        self.frequency = self._freq
+        self.phase = self._phase
+        self.amplitude = self._initial_amp
+
+        # Important: avoid a smoothed ramp after reset.
+        self._amplitude_param._current_value = self._initial_amp
+        self._amplitude_param._target_value = self._initial_amp
+        self._amplitude_param._smoothing_samples_remaining = 0
+
+        self._i = 0.0
+        self.ended = False
+
+        self._initialize_osc()
+        return self
+
     def _post_freq_set(self):
         pass
 
@@ -232,18 +249,14 @@ class Oscillator(Generator):
         return None
 
     def __iter__(self):
-        self.frequency = self._freq
-        self.phase = self._phase
-        self.amplitude = self._initial_amp
-        self._initialize_osc()
-        return self
+        return self.reset()
 
     def get_samples_iterator(
         self, n: int = DEFAULT_SAMPLE_RATE, reset: bool = False
     ) -> np.ndarray:
         n = validate_sample_count(n)
         if reset:
-            iter(self)
+            self.reset()
         return np.array([next(self) for _ in range(n)], dtype=np.float32)
 
     @abstractmethod
@@ -270,7 +283,7 @@ class Oscillator(Generator):
             return np.array(samples_list, dtype=np.float32)
 
         if reset:
-            iter(self)
+            self.reset()
         return self.get_samples_vectorized(n)
 
 

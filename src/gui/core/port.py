@@ -14,7 +14,16 @@ from enum import StrEnum
 
 import numpy as np
 
+from src.utils.common_utils import enum_from_value
+
 logger = logging.getLogger(__name__)
+
+
+class PortType(StrEnum):
+    """Enum describing port type."""
+
+    INPUT = "input"
+    OUTPUT = "output"
 
 
 class PortSignal(StrEnum):
@@ -42,8 +51,10 @@ def normalize_port_signal(signal: str | PortSignal | None) -> PortSignal:
     """Normalize a signal-kind value to a PortSignal enum."""
     if signal is None:
         return PortSignal.UNKNOWN
+
     if isinstance(signal, PortSignal):
         return signal
+
     try:
         return PortSignal(signal)
     except ValueError:
@@ -52,9 +63,9 @@ def normalize_port_signal(signal: str | PortSignal | None) -> PortSignal:
 
 def _orient_connection(source: Port, target: Port) -> tuple[Port, Port]:
     """Return ports ordered as output/source then input/target when possible."""
-    if source.port_type == "output" and target.port_type == "input":
+    if source.port_type == PortType.OUTPUT and target.port_type == PortType.INPUT:
         return source, target
-    if source.port_type == "input" and target.port_type == "output":
+    if source.port_type == PortType.INPUT and target.port_type == PortType.OUTPUT:
         return target, source
     return source, target
 
@@ -64,9 +75,9 @@ def _signals_are_patch_compatible(
     target_signal: PortSignal,
 ) -> bool:
     """Return whether a source signal can safely drive a target signal."""
-    if source_signal == PortSignal.UNKNOWN or target_signal == PortSignal.UNKNOWN:
-        return True
     if source_signal == target_signal:
+        return True
+    if source_signal == PortSignal.UNKNOWN or target_signal == PortSignal.UNKNOWN:
         return True
     if (
         source_signal == PortSignal.FREQUENCY_HZ
@@ -121,7 +132,7 @@ class Port:
 
     def __init__(
         self,
-        port_type: str,  # "input" or "output"
+        port_type: str | PortType,  # "input" or "output"
         port_name: str,
         index: int = 0,
         parent_module=None,  # Reference to the module that owns this port
@@ -138,7 +149,7 @@ class Port:
             component: Optional reference to the engine component associated with this
                 port (e.g., SineOscillator for a "Sine" output port)
         """
-        self.port_type: str = port_type
+        self.port_type: PortType = enum_from_value(PortType, port_type)
         self.port_name: str = port_name
         self.parent_module = parent_module
         self.component = component  # Direct reference to engine component
@@ -519,8 +530,9 @@ class Port:
 
 def _is_visualization_input(port: Port) -> bool:
     """Return True when a port belongs to a visualization sink input."""
-    if port.port_type != "input":
+    if port.port_type != PortType.INPUT:
         return False
+
     module = port.parent_module
     metadata = getattr(module, "metadata", None)
     category = getattr(metadata, "category", None)

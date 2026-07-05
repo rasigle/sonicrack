@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import Any
 
 from src.engine.core.component import AudioComponent
-from src.gui.core.port import Port, PortSignal, normalize_port_signal
+from src.gui.core.port import Port, PortSignal, PortType, normalize_port_signal
 
 
 class ModuleCategory(StrEnum):
@@ -247,7 +247,7 @@ class AudioModule(ABC):
             The created Port instance
         """
         port = Port(
-            "input",
+            PortType.INPUT,
             name,
             parent_module=self,
             component=component,
@@ -274,7 +274,7 @@ class AudioModule(ABC):
             The created Port instance
         """
         port = Port(
-            "output",
+            PortType.OUTPUT,
             name,
             parent_module=self,
             component=component,

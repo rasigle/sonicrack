@@ -13,7 +13,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import QGraphicsItem
 
-from src.gui.core.port import Port
+from src.gui.core.port import Port, PortType
 
 if TYPE_CHECKING:
     from src.gui.widgets.cable_widget import Cable
@@ -145,7 +145,7 @@ class PortWidget(QGraphicsItem):
     def _tooltip_text(self) -> str:
         """Return the tooltip shown when hovering over this port."""
         module_name = self.parent_module.get_display_name()
-        direction = "Input" if self.port_type == "input" else "Output"
+        direction = "Input" if self.port_type == PortType.INPUT else "Output"
         return (
             f"{module_name} {direction}: {self.port_name}\n"
             f"Port Type: {self.port_type}\n"
@@ -178,7 +178,7 @@ class PortWidget(QGraphicsItem):
             return
 
         # Port color based on type
-        if self.port_type == "input":
+        if self.port_type == PortType.INPUT:
             color = QColor(100, 200, 100) if self.hovered else QColor(80, 180, 80)
         else:
             color = QColor(200, 100, 100) if self.hovered else QColor(180, 80, 80)

@@ -15,7 +15,7 @@ import pytest
 
 from src.engine import SineOscillator, TriangleOscillator
 from src.gui.core.module import ModuleCategory
-from src.gui.core.port import Port, PortSignal
+from src.gui.core.port import Port, PortSignal, PortType
 
 
 # Mock parent module for tests
@@ -29,9 +29,9 @@ class TestPortBasics:
 
     def test_port_creation(self):
         """Test that a port can be created with a name."""
-        port = Port("input", "test_port", mock_parent())
+        port = Port(PortType.INPUT, "test_port", mock_parent())
         assert port.port_name == "test_port"
-        assert port.port_type == "input"
+        assert port.port_type == PortType.INPUT
         assert port.value == 0.0
         assert not port.is_connected
 

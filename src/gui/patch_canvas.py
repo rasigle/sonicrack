@@ -12,7 +12,7 @@ from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QMessageBox
 
 from src.gui.core.module import ModuleCategory
-from src.gui.core.port import port_signals_compatible
+from src.gui.core.port import PortType, port_signals_compatible
 from src.gui.modules.output.output import OutputModule
 from src.gui.widgets.cable_widget import Cable
 from src.gui.widgets.module_widget import ModuleWidget
@@ -102,7 +102,7 @@ class PatchCanvas(QGraphicsView):
                 event.accept()
                 return
 
-            if isinstance(item, PortWidget) and item.port_type == "input":
+            if isinstance(item, PortWidget) and item.port_type == PortType.INPUT:
                 # Check if trying to connect to the same module
                 if item.parent_module == start_port.parent_module:
                     # Self-connection not allowed - show error
@@ -340,7 +340,7 @@ class PatchCanvas(QGraphicsView):
             The created Cable object, or None if connection is invalid
         """
         # Validate ports
-        if start_port.port_type != "output" or end_port.port_type != "input":
+        if start_port.port_type != "output" or end_port.port_type != PortType.INPUT:
             logger.warning("Invalid port types for cable creation")
             return None
 

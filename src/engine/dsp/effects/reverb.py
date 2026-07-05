@@ -244,59 +244,6 @@ class Reverb(Modifier):
         """Set mix amount."""
         self._mix_param.value = value
 
-    def _process_comb(self, input_val: float, index: int) -> float:
-        """Process one comb filter.
-
-        Args:
-            input_val: Input sample
-            index: Comb filter index
-
-        Returns:
-            Filtered sample
-        """
-        buffer = self._comb_buffers[index]
-        pos = self._comb_positions[index]
-
-        # Read from delay line
-        output = buffer[pos]
-
-        # Apply damping (one-pole lowpass)
-        filtered = output * self._damp2 + self._comb_filter_states[index] * self._damp1
-        self._comb_filter_states[index] = filtered
-
-        # Write input + feedback to buffer
-        buffer[pos] = input_val + filtered * self._feedback
-
-        # Update position
-        self._comb_positions[index] = (pos + 1) % self._comb_buffer_lengths[index]
-
-        return output
-
-    def _process_allpass(self, input_val: float, index: int) -> float:
-        """Process one allpass filter.
-
-        Args:
-            input_val: Input sample
-            index: Allpass filter index
-
-        Returns:
-            Filtered sample
-        """
-        buffer = self._allpass_buffers[index]
-        pos = self._allpass_positions[index]
-
-        # Read from delay line
-        delayed = buffer[pos]
-
-        # Allpass calculation
-        output = -input_val + delayed
-        buffer[pos] = input_val + delayed * 0.5
-
-        # Update position
-        self._allpass_positions[index] = (pos + 1) % self._allpass_buffer_lengths[index]
-
-        return output
-
     def _process_sample(self, input_sample: float) -> float:
         """Process one mono sample through all reverb delay lines."""
         input_value = np.asarray(input_sample, dtype=np.float32)
@@ -508,20 +455,3 @@ class Reverb(Modifier):
     def _mix(self) -> float:
         """Backward compatibility: current mix."""
         return self._mix_param.value
-
-    @property
-    def _feedback(self) -> float:
-        """Backward compatibility: current feedback coefficient."""
-        room_size = self._room_size_param.value
-        return 0.84 + room_size * 0.14
-
-    @property
-    def _damp1(self) -> float:
-        """Backward compatibility: damping coefficient 1."""
-        damping = self._damping_param.value
-        return damping * 0.4
-
-    @property
-    def _damp2(self) -> float:
-        """Backward compatibility: damping coefficient 2."""
-        return 1.0 - self._damp1

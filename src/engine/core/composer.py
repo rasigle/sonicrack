@@ -416,6 +416,24 @@ class WaveAdder(Composer):
             return sum(_val) / len(_val)
         return _val
 
+    def _mix_stereo(self, vals):
+        """Mix generator outputs into a stereo (left, right) tuple."""
+        left_values, right_values = zip(*vals, strict=False)
+        if self.mix_mode == "sum":
+            return sum(left_values), sum(right_values)
+        # average
+        return (
+            sum(left_values) / len(left_values),
+            sum(right_values) / len(right_values),
+        )
+
+    def _mix_mono(self, vals):
+        """Mix generator outputs into a single scalar."""
+        if self.mix_mode == "sum":
+            return sum(vals)
+        # average
+        return sum(vals) / len(vals)
+
     def trigger_release(self):
         for gen in self.generators:
             if hasattr(gen, "trigger_release"):
@@ -431,25 +449,15 @@ class WaveAdder(Composer):
         self._ended = value
 
     def __iter__(self):
-        [iter(gen) for gen in self.generators]
+        for gen in self.generators:
+            iter(gen)
         return self
 
     def __next__(self):
         vals = [self._mod_channels(next(gen)) for gen in self.generators]
         if self.stereo:
-            left_values, right_values = zip(*vals, strict=False)
-            if self.mix_mode == "sum":
-                return sum(left_values), sum(right_values)
-            # average
-            return (
-                sum(left_values) / len(left_values),
-                sum(right_values) / len(right_values),
-            )
-
-        if self.mix_mode == "sum":
-            return sum(vals)
-        # average
-        return sum(vals) / len(vals)
+            return self._mix_stereo(vals)
+        return self._mix_mono(vals)
 
     def get_samples_vectorized(self, n: int = DEFAULT_SAMPLE_RATE) -> np.ndarray:
         """Generate n samples using fully vectorized operations.

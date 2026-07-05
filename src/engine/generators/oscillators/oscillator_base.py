@@ -246,7 +246,7 @@ class Oscillator(Generator):
         self._amplitude_param._smoothing_duration_samples = value
 
     def __next__(self):
-        return None
+        raise StopIteration
 
     def __iter__(self):
         return self.reset()

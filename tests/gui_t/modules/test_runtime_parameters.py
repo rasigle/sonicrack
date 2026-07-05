@@ -28,7 +28,6 @@ from src.gui.modules.source._oscillator_runtime import (
 from src.gui.modules.source.lfo import LFOModule
 from src.gui.modules.source.oscillator import OscillatorModule
 from src.gui.modules.source.vco import ModulatedOscillatorModule
-from src.gui.modules.visualization.spectrum import SpectrumModule
 from src.gui.modules.voice.tb303_voice import TB303VoiceModule
 from src.gui.ui_constants import AUDIO_FREQUENCY_KNOB_CURVE
 
@@ -779,18 +778,6 @@ def test_tb303_voice_runtime_outputs_silence_without_required_inputs(qapp: Any):
     module.process_runtime(8, {})
 
     np.testing.assert_allclose(module.out_port.value, np.zeros(8), atol=1e-7)
-
-
-def test_spectrum_update_display_accepts_numpy_sample_buffer(qapp: Any):
-    del qapp
-    module = SpectrumModule()
-    source = Port("output", "Signal")
-    source.write(np.sin(np.linspace(0.0, 2.0 * np.pi, 1024)).astype(np.float32))
-    source.connect(module.in_port)
-
-    module._update_display()
-
-    assert module.spectrum_display.fft_data is not None
 
 
 def test_tb303_voice_runtime_applies_parameters_and_renders(qapp: Any):

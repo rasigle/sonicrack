@@ -45,9 +45,7 @@ class _SourceModule:
     def process_runtime(self, num_samples: int, parameters: object) -> None:
         self.render_count += 1
         gain = float(parameters["gain"])
-        self.out.write(
-            np.full(num_samples, self.render_count * gain, dtype=np.float32)
-        )
+        self.out.write(np.full(num_samples, self.render_count * gain, dtype=np.float32))
 
     def get_parameters(self) -> dict[str, object]:
         return {"gain": self.gain}

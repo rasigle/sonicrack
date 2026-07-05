@@ -42,7 +42,7 @@ def test_biquad_modulated_coefficients_match_scalar_design():
 
     b0, b1, b2, a1, a2 = filt._design_filter_values(cutoffs, resonances)
 
-    for index, (cutoff, resonance) in enumerate(zip(cutoffs, resonances)):
+    for index, (cutoff, resonance) in enumerate(zip(cutoffs, resonances, strict=True)):
         b, a = filt._design_filter(float(cutoff), float(resonance))
         np.testing.assert_allclose([b0[index], b1[index], b2[index]], b)
         np.testing.assert_allclose([1.0, a1[index], a2[index]], a)

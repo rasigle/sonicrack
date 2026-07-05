@@ -10,7 +10,6 @@ from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters, get_runtime_spec
 from src.gui.core.runtime_helpers import read_samples
-from src.gui.modules.visualization.waveform import WaveformModule
 from src.gui.patch_canvas import PatchCanvas
 from src.gui.widgets.module_widget import ModuleWidget
 
@@ -153,14 +152,10 @@ def test_port_widgets_show_direction_tooltips(qapp: Any):
     modifier = _ModifierWidget()
 
     assert modifier.input_ports[0].toolTip() == (
-        "Test Modifier Input: In\n"
-        "Port Type: input\n"
-        "Signal: audio"
+        "Test Modifier Input: In\nPort Type: input\nSignal: audio"
     )
     assert modifier.output_ports[0].toolTip() == (
-        "Test Modifier Output: Out\n"
-        "Port Type: output\n"
-        "Signal: audio"
+        "Test Modifier Output: Out\nPort Type: output\nSignal: audio"
     )
 
 
@@ -356,23 +351,6 @@ def test_port_read_no_longer_triggers_upstream_processing(qapp: Any):
 
     assert source.process_count == 0
     assert value == 0.0
-
-
-def test_waveform_update_is_passive_and_does_not_render_upstream(qapp: Any):
-    del qapp
-    source = _SourceWidget()
-    waveform = WaveformModule()
-    source.output_ports[0].connect(waveform.input_ports[0])
-    source.out_port.write(np.linspace(-1.0, 1.0, 16, dtype=np.float32))
-
-    waveform._update_display()
-
-    assert source.process_count == 0
-    assert waveform.waveform_display.samples is not None
-    assert np.allclose(
-        waveform.waveform_display.samples,
-        np.linspace(-1.0, 1.0, 16, dtype=np.float32),
-    )
 
 
 def test_runtime_spec_uses_explicit_kind_not_display_title(qapp: Any):

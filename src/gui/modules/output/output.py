@@ -15,7 +15,6 @@ from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
 from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
-from src.utils.audio_utils import combine_lr_to_stereo, mono_to_stereo
 
 if TYPE_CHECKING:
     from src.gui.audio_engine import AudioEngine
@@ -72,6 +71,9 @@ class OutputModule(ModuleWidget):
 
         # Master gain control
         self.gain_db = 0.0  # Initialize at 0 dB
+        self._linear_gain = np.float32(1.0)
+        self._muted = False
+
         self.master_gain_knob = Knob(
             label="Master",
             description="Controls the master output gain",
@@ -106,8 +108,17 @@ class OutputModule(ModuleWidget):
         self.audio_output.set_buffer_size(buffer_size)
 
     def _on_gain_changed(self, value: float):
-        """Update master gain when knob changes."""
         self.gain_db = value
+
+        if value <= -80.0:
+            self._muted = True
+            self._linear_gain = np.float32(0.0)
+        else:
+            self._muted = False
+            self._linear_gain = np.float32(
+                1.0 if value == 0.0 else 10.0 ** (value / 20.0)
+            )
+
         logger.debug(f"Master gain changed to {value:.1f} dB")
 
     def get_output_component(self, port_name: str):
@@ -203,12 +214,52 @@ class OutputModule(ModuleWidget):
     def closeEvent(self, event):
         """Handle module close/deletion - ensure audio stops first."""
         logger.debug("OutputModule closing - stopping audio")
+
         # Stop audio output before Qt deletes the module
         try:
             self.shutdown(graceful=True)
         except Exception as e:
             logger.debug(f"Error stopping audio on close: {e}")
         super().closeEvent(event)
+
+    @staticmethod
+    def _copy_samples_to_channel(
+        samples,
+        out: np.ndarray,
+        channel: int,
+        num_frames: int,
+    ) -> bool:
+        if samples is None:
+            return False
+
+        x = np.asarray(samples)
+        if x.size == 0:
+            return False
+
+        if x.ndim == 1:
+            n = min(x.shape[0], num_frames)
+            out[:n, channel] = x[:n]
+            return n > 0
+
+        if x.ndim == 2 and x.shape[1] == 2:
+            n = min(x.shape[0], num_frames)
+            out[:n, channel] = x[:n, channel]
+            return n > 0
+
+        if x.ndim == 2 and x.shape[1] == 1:
+            n = min(x.shape[0], num_frames)
+            out[:n, channel] = x[:n, 0]
+            return n > 0
+
+        if x.ndim == 2 and x.shape[0] == 2:
+            n = min(x.shape[1], num_frames)
+            out[:n, channel] = x[channel, :n]
+            return n > 0
+
+        x = x.ravel()
+        n = min(x.shape[0], num_frames)
+        out[:n, channel] = x[:n]
+        return n > 0
 
     def _generate_samples(self, num_frames: int) -> np.ndarray:
         """Generate stereo audio samples through the engine-owned graph.
@@ -225,69 +276,39 @@ class OutputModule(ModuleWidget):
         Returns:
             Stereo audio samples as (N, 2) numpy array
         """
+        out = np.zeros((num_frames, 2), dtype=np.float32)
 
-        def silence() -> np.ndarray:
-            return np.zeros((num_frames, 2), dtype=np.float32)
-
-        if not self.is_active:
-            return silence()
-
-        def normalize_samples(samples):
-            if samples is None:
-                return None
-            samples = np.asarray(samples)
-            return None if samples.size == 0 else samples
+        if not self.is_active or self._muted:
+            return out
 
         l_connected = self.inp_port_l.is_connected
         r_connected = self.inp_port_r.is_connected
 
         if not l_connected and not r_connected:
-            return silence()
+            return out
 
-        ports_to_render = []
-        if l_connected:
-            ports_to_render.append(self.inp_port_l)
-        if r_connected:
-            ports_to_render.append(self.inp_port_r)
-
-        if self.audio_engine is None:
+        engine = self.audio_engine
+        if engine is None:
             logger.error("Output module has no AudioEngine; returning silence")
-            return silence()
+            return out
 
-        rendered = self.audio_engine.render_ports(ports_to_render, num_frames)
-
-        rendered_index = 0
-        left_samples = None
-        right_samples = None
-        if l_connected:
-            left_samples = normalize_samples(rendered[rendered_index])
-            rendered_index += 1
-        if r_connected:
-            right_samples = normalize_samples(rendered[rendered_index])
-
-        if left_samples is None and right_samples is None:
-            return silence()
-
-        if left_samples is not None and right_samples is not None:
-            stereo_samples = combine_lr_to_stereo(left_samples, right_samples)
+        if l_connected and r_connected:
+            left, right = engine.render_ports(
+                [self.inp_port_l, self.inp_port_r],
+                num_frames,
+            )
+            out[:, 0] = left
+            out[:, 1] = right
+        elif l_connected:
+            left = engine.render_ports([self.inp_port_l], num_frames)[0]
+            out[:, 0] = left
+            out[:, 1] = left
         else:
-            mono_samples = left_samples if left_samples is not None else right_samples
-            if mono_samples is None:
-                return silence()
-            stereo_samples = mono_to_stereo(mono_samples)
+            right = engine.render_ports([self.inp_port_r], num_frames)[0]
+            out[:, 0] = right
+            out[:, 1] = right
 
-        # Apply master gain
-        if self.gain_db <= -80.0:
-            return silence()
+        if self._linear_gain != 1.0:
+            out *= self._linear_gain
 
-        if self.gain_db != 0.0:
-            stereo_samples = stereo_samples * (10.0 ** (self.gain_db / 20.0))
-
-        # Ensure correct length
-        if stereo_samples.shape[0] != num_frames:
-            result = silence()
-            length = min(stereo_samples.shape[0], num_frames)
-            result[:length] = stereo_samples[:length]
-            return result
-
-        return stereo_samples.astype(np.float32)
+        return out

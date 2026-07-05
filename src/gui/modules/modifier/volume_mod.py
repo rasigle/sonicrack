@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from src.constants import DEFAULT_GAIN_DB
-from src.engine import ModulatedVolume, Volume, apply_vectorized_gain
+from src.engine import ModulatedVolume, Volume
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
@@ -74,8 +74,6 @@ class VolumeModule(ModulatedModuleBase):
         # Set control_knob for base class functionality
         self.control_knob = self.gain_knob
 
-        # Track modulation state to detect changes
-        self._was_modulated = False
 
         # Create initial unmodulated component
         self.component = self.create_unmodulated_component()
@@ -114,38 +112,35 @@ class VolumeModule(ModulatedModuleBase):
         return Volume(gain_db=gain_db)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        """Apply static or modulated gain for one render cycle."""
+        """Apply gain for one render cycle.
+
+        The component (Volume or ModulatedVolume) is prepared by the connection
+        handler, so we just call it directly without branching.
+        """
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))
             return
 
         input_signal = read_samples(self.in_port, num_samples)
 
+        # Lazy initialization if component wasn't prepared (e.g., in tests)
+        if self.component is None and self.mod_port.is_connected:
+            self.prepare_modulated_component(num_samples)
+
+        # Get gain from knob
+        gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)
+
         if self.mod_port.is_connected:
-            # Read modulation signal (linear gain multiplier, typically 0-1)
-            mod_gain = read_samples(self.mod_port, num_samples)
-            base_gain_db = float_parameter(
-                parameters, "gain_db", self.gain_knob.get_value
-            )
-
-            # Use engine's utility function to apply base gain + modulation
-            # First apply base gain in dB
-            signal_with_base_gain = apply_vectorized_gain(
-                input_signal, base_gain_db, is_db=True
-            )
-            # Then apply modulation (linear multiplier)
-            result = apply_vectorized_gain(signal_with_base_gain, mod_gain, is_db=False)
-            self.out_port.write(result)
-            return
-
-        # Unmodulated path: use Volume component
-        if self.component is None or isinstance(self.component, ModulatedVolume):
-            self.component = Volume(
-                gain_db=float_parameter(parameters, "gain_db", self.gain_knob.get_value)
-            )
+            # When modulated: knob controls modulation depth (0.0 to 1.0)
+            # Map gain_db range [-60, 12] to modulation amount [0.0, 1.0]
+            # Use a simple linear mapping for now
+            modulation_amount = (gain_db + 60) / 72  # Maps [-60, 12] to [0, 1]
+            modulation_amount = max(0.0, min(1.0, modulation_amount))
+            if self.port_adapter is not None:
+                self.port_adapter.modulation_amount = modulation_amount
         else:
-            self.component.gain_db = float_parameter(
-                parameters, "gain_db", self.gain_knob.get_value
-            )
+            # When unmodulated: knob controls gain directly
+            self.component.gain_db = gain_db
 
+        # Call component directly - works for both Volume and ModulatedVolume
         self.out_port.write(self.component(input_signal))

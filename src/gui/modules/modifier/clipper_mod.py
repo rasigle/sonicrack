@@ -5,7 +5,7 @@ import logging
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from src.engine import Clipper, ModulatedClipper, apply_vectorized_clip
+from src.engine import Clipper, ModulatedClipper
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
@@ -45,7 +45,7 @@ class ClipperModulatedModule(ModulatedModuleBase):
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout()
 
-        # Threshold knob (0.1 to 1.0, default 1.0 = no clipping)
+        # Threshold knob (0.0 to 1.0, default 0.5)
         self.threshold_knob = Knob(
             label="Threshold",
             description="Sets the clipping threshold",
@@ -55,8 +55,7 @@ class ClipperModulatedModule(ModulatedModuleBase):
         )
         self.threshold_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
-                "wave_range",
-                (-self.threshold_knob.get_value(), self.threshold_knob.get_value()),
+                "threshold", self.threshold_knob.get_value()
             )
         )
         layout.addWidget(self.threshold_knob, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -67,10 +66,11 @@ class ClipperModulatedModule(ModulatedModuleBase):
         # Register parameters for automatic get/set
         self.register_parameter("threshold", self.threshold_knob)
 
-        self.component: Clipper | None = None
-
         # Set control_knob for base class functionality
         self.control_knob = self.threshold_knob
+
+        # Create initial unmodulated component
+        self.component = self.create_unmodulated_component()
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -91,32 +91,33 @@ class ClipperModulatedModule(ModulatedModuleBase):
         return Clipper((-threshold, threshold))
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        """Clip the connected input for one render cycle."""
+        """Clip the connected input for one render cycle.
+
+        The component (Clipper or ModulatedClipper) is prepared by the connection
+        handler, so we just call it directly without branching.
+        """
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))
             return
 
         samples = read_samples(self.in_port, num_samples)
-        base_threshold = float_parameter(
+
+        # Lazy initialization if component wasn't prepared (e.g., in tests)
+        if self.component is None and self.mod_port.is_connected:
+            self.prepare_modulated_component(num_samples)
+
+        # Get threshold/amount from knob
+        threshold_value = float_parameter(
             parameters, "threshold", self.threshold_knob.get_value
         )
 
-        # Handle modulation if connected
         if self.mod_port.is_connected:
-            # Read modulation signal (0-1 range, modulates threshold)
-            mod_values = read_samples(self.mod_port, num_samples)
-            # Combine base threshold with modulation
-            threshold_values = base_threshold * mod_values
-            # Use engine's utility function for vectorized clipping
-            result = apply_vectorized_clip(samples, threshold_values)
-            self.out_port.write(result)
-            return
+            # When modulated: knob controls modulation depth (0.0 to 1.0)
+            if self.port_adapter is not None:
+                self.port_adapter.modulation_amount = threshold_value
+        else:
+            # When unmodulated: knob controls threshold directly
+            self.component.wave_range = (-threshold_value, threshold_value)
 
-        # Unmodulated path: use engine utility function with constant threshold
-        result = apply_vectorized_clip(samples, base_threshold)
-        self.out_port.write(result)
-
-        # Update component for compatibility (though we don't use it in process_runtime)
-        if self.component is None:
-            self.component = self.create_unmodulated_component()
-        self.component.wave_range = (-base_threshold, base_threshold)
+        # Call component directly - works for both Clipper and ModulatedClipper
+        self.out_port.write(self.component(samples))

@@ -4,7 +4,7 @@ import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from src.engine import ModulatedPanner, Panner, apply_vectorized_panning
+from src.engine import ModulatedPanner, Panner
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, silence
@@ -89,38 +89,34 @@ class PannerModule(ModulatedModuleBase):
         return Panner(position)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        """Pan the connected input for one render cycle."""
+        """Pan the connected input for one render cycle.
+
+        The component (Panner or ModulatedPanner) is prepared by the connection
+        handler, so we just call it directly without branching.
+        """
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))
             return
 
         samples = read_samples(self.in_port, num_samples)
 
-        # Handle modulation if connected
+        # Lazy initialization if component wasn't prepared (e.g., in tests)
+        if self.component is None and self.mod_port.is_connected:
+            self.prepare_modulated_component(num_samples)
+
+        # Get position from knob
+        position = float_parameter(parameters, "position", self.pan_knob.get_value)
+
         if self.mod_port.is_connected:
-            # Read modulation signal (expected range -1 to 1 for pan position)
-            mod_values = read_samples(self.mod_port, num_samples)
-            base_position = float_parameter(
-                parameters, "position", self.pan_knob.get_value
-            )
-
-            # Combine base position with modulation
-            positions = base_position + mod_values
-
-            # Use engine's vectorized panning function (handles clamping internally)
-            left, right = apply_vectorized_panning(samples, positions)
-            self.out_port.write(np.column_stack((left, right)))
-            return
-
-        # Unmodulated path: use Panner component
-        if self.component is None or isinstance(self.component, ModulatedPanner):
-            self.component = Panner(
-                float_parameter(parameters, "position", self.pan_knob.get_value)
-            )
+            # When modulated: knob controls modulation depth (0.0 to 1.0)
+            # Map position range [-1, 1] to modulation amount [0.0, 1.0]
+            modulation_amount = (position + 1.0) / 2.0  # Maps [-1, 1] to [0, 1]
+            if self.port_adapter is not None:
+                self.port_adapter.modulation_amount = modulation_amount
         else:
-            self.component.position = float_parameter(
-                parameters, "position", self.pan_knob.get_value
-            )
+            # When unmodulated: knob controls position directly
+            self.component.position = position
 
-        left, right = self.component.pan_vectorized(samples)
+        # Call component directly - works for both Panner and ModulatedPanner
+        left, right = self.component(samples)
         self.out_port.write(np.column_stack((left, right)))

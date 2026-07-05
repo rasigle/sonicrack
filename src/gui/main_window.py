@@ -488,11 +488,20 @@ class ModularSynthWindow(QMainWindow):
         self.audio_engine.mark_graph_changed()
         self._mark_patch_modified()
 
-        # Check if this connection involves an Output module
-        from src.gui.modules.output.output import OutputModule
-
+        # Notify modules about connection change
         start_module = start_port.parent_module
         target_module = target_port.parent_module
+
+        # Notify target module (input port) about connection
+        if hasattr(target_module, "on_port_connection_changed"):
+            target_module.on_port_connection_changed(target_port.port_name, True)
+
+        # Notify source module (output port) about connection if needed
+        if hasattr(start_module, "on_port_connection_changed"):
+            start_module.on_port_connection_changed(start_port.port_name, True)
+
+        # Check if this connection involves an Output module
+        from src.gui.modules.output.output import OutputModule
 
         # If connecting to/from Output module, start playback
         if isinstance(start_module, OutputModule) or isinstance(
@@ -516,11 +525,20 @@ class ModularSynthWindow(QMainWindow):
         self.audio_engine.mark_graph_changed()
         self._mark_patch_modified()
 
-        # Check if this disconnection involves an Output module
-        from src.gui.modules.output.output import OutputModule
-
+        # Notify modules about disconnection
         start_module = start_port.parent_module
         target_module = target_port.parent_module
+
+        # Notify target module (input port) about disconnection
+        if hasattr(target_module, "on_port_connection_changed"):
+            target_module.on_port_connection_changed(target_port.port_name, False)
+
+        # Notify source module (output port) about disconnection if needed
+        if hasattr(start_module, "on_port_connection_changed"):
+            start_module.on_port_connection_changed(start_port.port_name, False)
+
+        # Check if this disconnection involves an Output module
+        from src.gui.modules.output.output import OutputModule
 
         # If disconnecting from Output module, check if we should stop playback
         if isinstance(start_module, OutputModule) or isinstance(

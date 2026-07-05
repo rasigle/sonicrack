@@ -10,9 +10,173 @@ This provides common functionality for modules that have:
 import logging
 from typing import Any
 
+import numpy as np
+
 from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)
+
+
+class PortModulatorAdapter:
+    """Adapter that makes a port act like a generator/modulator for engine components.
+
+    This allows engine components like ModulatedVolume, ModulatedPanner to read
+    from GUI ports as if they were generator components.
+
+    Automatically handles CV range conversion when source and destination ranges differ.
+    Supports modulation amount/depth control for blending between base value and modulation.
+    """
+
+    def __init__(
+        self,
+        port,
+        num_samples: int,
+        expected_range: tuple[float, float] = (0.0, 1.0),
+        modulation_amount: float = 1.0,
+    ):
+        """Initialize the adapter.
+
+        Args:
+            port: The port to read from (can be Port or PortWidget)
+            num_samples: Number of samples to read per iteration
+            expected_range: Expected CV range for the destination (default: [0, 1])
+            modulation_amount: How much modulation to apply (0.0 = none, 1.0 = full)
+        """
+        # Extract actual Port if we received a PortWidget
+        from src.gui.core.port import Port
+        from src.gui.widgets.port_widget import PortWidget
+
+        if isinstance(port, PortWidget):
+            self.port: Port = port.port
+        else:
+            self.port: Port = port
+
+        self.num_samples = num_samples
+        self.expected_range = expected_range
+        self.modulation_amount = modulation_amount
+        self._index = 0
+        self._buffer = None
+
+        # Check if we need CV scaling
+        self._needs_scaling = False
+        self._scale = 1.0
+        self._offset = 0.0
+
+        # Get source output range if available
+        source_module = self._get_source_module()
+        if source_module and hasattr(source_module, 'get_cv_output_range'):
+            source_range = source_module.get_cv_output_range()
+            if source_range != expected_range:
+                self._needs_scaling = True
+                # Calculate scaling parameters: output = input * scale + offset
+                in_min, in_max = source_range
+                out_min, out_max = expected_range
+                in_range = in_max - in_min
+                out_range = out_max - out_min
+                self._scale = out_range / in_range
+                self._offset = out_min - (in_min * self._scale)
+                logger.debug(
+                    f"PortModulatorAdapter: CV scaling enabled "
+                    f"{source_range} → {expected_range}, "
+                    f"scale={self._scale:.3f}, offset={self._offset:.3f}"
+                )
+
+    def _get_source_module(self):
+        """Get the source module connected to this port."""
+        if not self.port:
+            return None
+
+        # Try cables first (for GUI PortWidget or mocks)
+        if hasattr(self.port, 'cables') and self.port.cables:
+            for cable in self.port.cables:
+                # The port is an input, so we want the start_port's parent (source)
+                if (hasattr(cable, 'start_port') and cable.start_port
+                        and hasattr(cable.start_port, 'parent_module')):
+                    return cable.start_port.parent_module
+
+        # Try connected_to (for direct Port API)
+        if hasattr(self.port, 'connected_to') and self.port.connected_to:
+            # Get the first connected port
+            for connected_port in self.port.connected_to:
+                # Return the parent module of the connected port
+                if hasattr(connected_port, 'parent_module'):
+                    return connected_port.parent_module
+
+        return None
+
+    def __iter__(self):
+        """Reset iterator."""
+        self._index = 0
+        return self
+
+    def __next__(self) -> float:
+        """Get next sample from port buffer.
+
+        Note: This is for scalar iteration. Vectorized mode should use
+        get_samples() instead for performance.
+        """
+        if self._buffer is None or self._index >= len(self._buffer):
+            # Read new buffer from port
+            from src.gui.core.runtime_helpers import read_samples
+            self._buffer = read_samples(self.port, self.num_samples)
+            self._index = 0
+
+        value = float(self._buffer[self._index])
+        self._index += 1
+
+        # Apply CV scaling if needed
+        if self._needs_scaling:
+            value = value * self._scale + self._offset
+            # Clamp to expected range
+            value = max(self.expected_range[0], min(self.expected_range[1], value))
+
+        # Apply modulation amount (depth control)
+        if self.modulation_amount < 1.0:
+            range_center = (self.expected_range[0] + self.expected_range[1]) / 2
+            value = range_center + (value - range_center) * self.modulation_amount
+
+        return value
+
+    def get_samples(self, n: int, mode: str = "vectorized") -> np.ndarray:
+        """Get samples from port (engine API).
+
+        This matches the engine's component API where get_samples() is the
+        standard method for getting audio buffers.
+
+        Args:
+            n: Number of samples to get
+            mode: Sampling mode (ignored, always uses vectorized)
+
+        Returns:
+            Array of samples scaled by modulation amount
+        """
+        from src.gui.core.runtime_helpers import read_samples
+        samples = read_samples(self.port, n)
+
+        # Apply CV scaling if needed
+        if self._needs_scaling:
+            samples = samples * self._scale + self._offset
+            # Clamp to expected range
+            samples = np.clip(samples, self.expected_range[0], self.expected_range[1])
+
+        # Apply modulation amount (depth control)
+        # Scale modulation around the center of the expected range
+        if self.modulation_amount < 1.0:
+            range_center = (self.expected_range[0] + self.expected_range[1]) / 2
+            samples = range_center + (samples - range_center) * self.modulation_amount
+
+        return samples
+
+    def get_samples_vectorized(self, n: int) -> np.ndarray:
+        """Get vectorized samples from port (compatibility method).
+
+        Args:
+            n: Number of samples to get
+
+        Returns:
+            Array of samples
+        """
+        return self.get_samples(n, mode="vectorized")
 
 
 class ModulatedModuleBase(ModuleWidget):
@@ -36,35 +200,135 @@ class ModulatedModuleBase(ModuleWidget):
         super().__init__(*args, **kwargs)
         self.control_knob = None  # Subclass must set this
         self.modulator_component = None
+        self.port_adapter = None  # Store adapter reference for updating modulation_amount
+        self._is_modulated = False  # Track current modulation state
+
+    def on_port_connection_changed(self, port_name: str, is_connected: bool):
+        """Handle port connection/disconnection events.
+
+        This automatically switches between modulated and unmodulated components
+        when the Mod port connection state changes. Components are prepared here
+        to keep process_runtime() fast and simple.
+
+        Args:
+            port_name: Name of the port that changed
+            is_connected: True if connected, False if disconnected
+        """
+        if port_name != "Mod":
+            return
+
+        # Update component based on connection state
+        if is_connected and not self._is_modulated:
+            # Switch to modulated component - prepare it now
+            logger.debug(f"{self.__class__.__name__}: Switching to modulated component")
+            self._is_modulated = True
+            # Prepare modulated component with port adapter
+            # Use a default buffer size, it will adapt at runtime
+            self.prepare_modulated_component(num_samples=512)
+        elif not is_connected and self._is_modulated:
+            # Switch to unmodulated component - create it now
+            logger.debug(
+                f"{self.__class__.__name__}: Switching to unmodulated component"
+            )
+            self._is_modulated = False
+            # Pre-create the unmodulated component
+            self.component = self.create_unmodulated_component()
+
+        # Update knob state
+        self.update_knob_state()
+
+    def prepare_modulated_component(self, num_samples: int):
+        """Prepare the modulated component with port adapter.
+        
+        This creates the modulated component using a PortModulatorAdapter
+        to bridge port-based signal flow with component-based processing.
+        
+        Args:
+            num_samples: Buffer size for the adapter
+        """
+        # Find the Mod port
+        mod_port = None
+        for port in self.input_ports:
+            if port.port_name == "Mod":
+                mod_port = port
+                break
+        
+        if mod_port is None:
+            logger.warning(f"{self.__class__.__name__}: Mod port not found!")
+            return
+        
+        # Get expected CV range for this module
+        expected_range = self.get_cv_range("Mod")
+
+        # Create port adapter that acts like a generator/modulator with CV scaling
+        self.port_adapter = PortModulatorAdapter(
+            mod_port, num_samples, expected_range, modulation_amount=1.0
+        )
+
+        # Use the abstract method to create the proper modulated component
+        self.component = self.create_modulated_component(self.port_adapter)
+        logger.debug(
+            f"{self.__class__.__name__}: Created modulated component with port adapter "
+            f"(CV range: {expected_range})"
+        )
 
     def update_knob_state(self):
-        """Update knob enabled state based on port connections.
+        """Update knob tooltip based on port connections.
 
-        This is called when connections change to provide immediate visual feedback,
-        even if compilation fails.
+        When modulation is connected, the knob controls modulation depth/amount.
+        When no modulation, the knob controls the base parameter value.
+        Knob is always enabled to provide control in both modes.
         """
         if not self.control_knob:
             logger.warning(f"{self.__class__.__name__}: control_knob not set!")
             return
 
-        # Check if Mod port has any cables connected
+        # Check if Mod port has any connections
         mod_port = None
         for port in self.input_ports:
             if port.port_name == "Mod":
                 mod_port = port
                 break
 
-        has_modulation = mod_port and len(mod_port.cables) > 0
+        # Check both GUI cables and direct port connections
+        has_modulation = False
+        if mod_port:
+            # Check GUI cables (PortWidget)
+            cables_connected = (
+                hasattr(mod_port, 'cables')
+                and mod_port.cables
+                and len(mod_port.cables) > 0
+            )
+            # Check direct port connections (Port.connected_to)
+            port_connected = (
+                hasattr(mod_port, 'port')
+                and hasattr(mod_port.port, 'connected_to')
+                and mod_port.port.connected_to
+                and len(mod_port.port.connected_to) > 0
+            )
+            # If mod_port is a Port directly (not PortWidget)
+            direct_connected = False
+            if hasattr(mod_port, 'connected_to'):
+                connected_to = getattr(mod_port, 'connected_to', None)
+                direct_connected = (
+                    connected_to is not None
+                    and hasattr(connected_to, '__len__')
+                    and len(connected_to) > 0
+                )
+
+            has_modulation = cables_connected or port_connected or direct_connected
 
         if has_modulation:
-            # Modulation connected - disable knob
-            self.control_knob.setEnabled(False)
-            self.control_knob.setStyleSheet("opacity: 0.5;")
+            # Modulation connected - knob controls modulation depth/amount
+            self.control_knob.setEnabled(True)
+            self.control_knob.setStyleSheet("")  # Normal appearance
             self.control_knob.setToolTip(
-                f"{self.control_knob.label} controlled by Mod input (CV)"
+                f"{self.control_knob.label} - Modulation Depth\n"
+                f"0.0 = No modulation (fixed value)\n"
+                f"1.0 = Full modulation"
             )
         else:
-            # No modulation - enable knob
+            # No modulation - knob controls base parameter value
             self.control_knob.setEnabled(True)
             self.control_knob.setStyleSheet("")
             self.control_knob.setToolTip(

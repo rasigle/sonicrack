@@ -18,7 +18,9 @@ class RuntimeOscillator(Protocol):
     def __next__(self) -> float: ...
 
 
-DEFAULT_FREQUENCY_SLEW_TIME_MS = 35.0
+# Increased from 35ms to prevent clicks/pops when changing frequency
+# Smoothing happens in log (pitch) space for natural-sounding transitions
+DEFAULT_FREQUENCY_SLEW_TIME_MS = 100.0
 
 
 def smooth_control_signal(

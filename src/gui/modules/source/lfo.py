@@ -34,7 +34,9 @@ LFO_MIN_FREQUENCY = 0.01
 LFO_MAX_FREQUENCY = 20.0  # LFO frequency range in Hz
 LFO_DEFAULT_FREQUENCY = 1.0  # Default LFO frequency in Hz
 LFO_DEFAULT_GAIN_DB = 0
-LFO_FREQUENCY_SLEW_TIME_MS = 120.0
+# Increased slew time to prevent clicks/pops when changing frequency
+# Smoothing happens in log (pitch) space for natural-sounding transitions
+LFO_FREQUENCY_SLEW_TIME_MS = 250.0  # 250ms for click-free frequency changes
 LFO_CLOCK_RESET_SMOOTHING_MS = 2.0
 
 

@@ -10,6 +10,7 @@ from PyQt6 import QtWidgets
 from PyQt6.QtGui import QColor
 
 from src.audio_io import AudioOutput
+from src.engine.dsp.modifiers.amplitude import Volume
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
@@ -71,8 +72,13 @@ class OutputModule(ModuleWidget):
 
         # Master gain control
         self.gain_db = 0.0  # Initialize at 0 dB
-        self._linear_gain = np.float32(1.0)
-        self._muted = False
+
+        # Create Volume component for smooth, click-free gain control
+        self.volume_component = Volume(
+            gain_db=0.0,
+            sample_rate=audio_config.sample_rate,
+            smoothing_time_ms=10.0  # 10ms smoothing prevents clicks
+        )
 
         self.master_gain_knob = Knob(
             label="Master",
@@ -101,6 +107,8 @@ class OutputModule(ModuleWidget):
         """Sync audio output with global sample rate changes."""
         logger.info(f"Output module updating sample rate to {sample_rate} Hz")
         self.audio_output.set_sample_rate(sample_rate)
+        # Update Volume component sample rate for correct smoothing duration
+        self.volume_component.sample_rate = sample_rate
 
     def _on_global_buffer_size_changed(self, buffer_size: int):
         """Sync audio output with global buffer size changes."""
@@ -108,17 +116,13 @@ class OutputModule(ModuleWidget):
         self.audio_output.set_buffer_size(buffer_size)
 
     def _on_gain_changed(self, value: float):
+        """Update master gain when knob changes.
+
+        Uses Volume component which provides smooth gain transitions
+        to prevent clicking/popping artifacts.
+        """
         self.gain_db = value
-
-        if value <= -80.0:
-            self._muted = True
-            self._linear_gain = np.float32(0.0)
-        else:
-            self._muted = False
-            self._linear_gain = np.float32(
-                1.0 if value == 0.0 else 10.0 ** (value / 20.0)
-            )
-
+        self.volume_component.gain_db = value
         logger.debug(f"Master gain changed to {value:.1f} dB")
 
     def get_output_component(self, port_name: str):
@@ -278,7 +282,7 @@ class OutputModule(ModuleWidget):
         """
         out = np.zeros((num_frames, 2), dtype=np.float32)
 
-        if not self.is_active or self._muted:
+        if not self.is_active:
             return out
 
         l_connected = self.inp_port_l.is_connected
@@ -308,7 +312,8 @@ class OutputModule(ModuleWidget):
             out[:, 0] = right
             out[:, 1] = right
 
-        if self._linear_gain != 1.0:
-            out *= self._linear_gain
+        # Apply smooth, click-free gain using Volume component
+        # The Volume component handles gain smoothing internally to prevent clicks
+        out = self.volume_component(out)
 
         return out

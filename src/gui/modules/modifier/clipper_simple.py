@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from src.engine import Clipper
+from src.gui.audio_config import get_sample_rate
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import read_samples, silence
@@ -88,7 +89,8 @@ class ClipperModule(ModuleWidget):
     ):
         """Create the clipper component."""
         threshold = self.threshold_knob.get_value()
-        return Clipper((-threshold, threshold))
+        sample_rate = get_sample_rate()
+        return Clipper((-threshold, threshold), sample_rate=sample_rate)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Clip the connected input for one render cycle."""

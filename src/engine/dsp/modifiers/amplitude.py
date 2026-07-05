@@ -647,13 +647,16 @@ class Clipper(Modifier):
     )
 
     def __init__(
-        self, wave_range: tuple[float, float] = (-1.0, 1.0), *args: Any, **kwargs: Any
+        self, wave_range: tuple[float, float] = (-1.0, 1.0),
+        sample_rate: float = DEFAULT_SAMPLE_RATE,
+        *args: Any, **kwargs: Any
     ):
         """Initialize clipper with wave range.
 
         Args:
             wave_range: tuple of (min, max) values which are used to clip the input
                 signal.
+            sample_rate: Sample rate for smoothing calculations (default: 44100).
 
         Raises:
             TypeError: If wave_range is not a tuple or doesn't have 2 elements.
@@ -661,6 +664,8 @@ class Clipper(Modifier):
         """
         # Input validation
         super().__init__(*args, **kwargs)
+        self.sample_rate = validate_sample_rate(sample_rate)
+
         if not isinstance(wave_range, (tuple, list)):
             raise TypeError(
                 f"wave_range must be a tuple or list, got {type(wave_range).__name__}"
@@ -685,23 +690,42 @@ class Clipper(Modifier):
                 f"wave_range min ({min_val}) must be less than max ({max_val})"
             )
 
-        self._min, self._max = float(min_val), float(max_val)
-        logger.debug(f"Clipper initialized with range: ({self._min}, {self._max})")
+        # Create smoothed parameters for min and max to prevent clicks
+        min_descriptor = ParameterDescriptor(
+            name="clip_min",
+            default=float(min_val),
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=10.0,
+            automation_mode=AutomationMode.AUDIO_RATE,
+        )
+        max_descriptor = ParameterDescriptor(
+            name="clip_max",
+            default=float(max_val),
+            smoothing_policy=SmoothingPolicy.LINEAR,
+            smoothing_duration_ms=10.0,
+            automation_mode=AutomationMode.AUDIO_RATE,
+        )
+
+        self._min_param = RuntimeParameter(min_descriptor, sample_rate=self.sample_rate)
+        self._max_param = RuntimeParameter(max_descriptor, sample_rate=self.sample_rate)
+        logger.debug(f"Clipper initialized with range: ({min_val}, {max_val})")
 
     @property
     def wave_range(self) -> tuple[float, float]:
         """tuple[float, float]: Current clipping range (min, max)."""
-        return self._min, self._max
+        return self._min_param.value, self._max_param.value
 
     @wave_range.setter
     def wave_range(self, value: tuple[float, float]):
-        """Set clipping range and update min/max values."""
-        self._min, self._max = value
+        """Set clipping range and update min/max values with smoothing."""
+        min_val, max_val = value
+        self._min_param.value = float(min_val)
+        self._max_param.value = float(max_val)
 
     def __call__(
         self, val: float | tuple[float, ...] | np.ndarray
     ) -> float | tuple[float, ...] | np.ndarray:
-        """Clip input value(s) to range.
+        """Clip input value(s) to range with smoothing.
 
         Args:
             val: Input value (float, tuple, or array).
@@ -710,18 +734,35 @@ class Clipper(Modifier):
             Clipped value (same type as input).
         """
         if isinstance(val, np.ndarray):
-            # Vectorized clipping (fastest)
-            return np.clip(val, self._min, self._max)
+            n = len(val)
+            # Check if smoothing is active for either parameter
+            if self._min_param.is_smoothing or self._max_param.is_smoothing:
+                # Get per-sample threshold values during smoothing
+                min_envelope = self._min_param.get_interpolated_buffer(n)
+                max_envelope = self._max_param.get_interpolated_buffer(n)
+                # Clip each sample with its corresponding threshold
+                return np.minimum(np.maximum(val, min_envelope), max_envelope)
+            else:
+                # No smoothing - use constant values
+                return np.clip(val, self._min_param.value, self._max_param.value)
 
         if isinstance(val, Iterable):
+            # Advance smoothing once per call
+            self._min_param.advance_smoothing(1)
+            self._max_param.advance_smoothing(1)
             # Tuple clipping
-            return tuple(np.clip(v, self._min, self._max) for v in val)
+            min_val = self._min_param.value
+            max_val = self._max_param.value
+            return tuple(np.clip(v, min_val, max_val) for v in val)
 
+        # Advance smoothing once for scalar
+        self._min_param.advance_smoothing(1)
+        self._max_param.advance_smoothing(1)
         # Scalar clipping
-        return np.clip(val, self._min, self._max)
+        return np.clip(val, self._min_param.value, self._max_param.value)
 
     def clip_vectorized(self, samples: np.ndarray) -> np.ndarray:
-        """Clip array of samples (vectorized).
+        """Clip array of samples (vectorized) with smoothing.
 
         Args:
             samples: Input array.
@@ -729,7 +770,19 @@ class Clipper(Modifier):
         Returns:
             Clipped array (float32).
         """
-        return np.clip(samples, self._min, self._max).astype(np.float32)
+        n = len(samples)
+        # Check if smoothing is active for either parameter
+        if self._min_param.is_smoothing or self._max_param.is_smoothing:
+            # Get per-sample threshold values during smoothing
+            min_envelope = self._min_param.get_interpolated_buffer(n)
+            max_envelope = self._max_param.get_interpolated_buffer(n)
+            # Clip each sample with its corresponding threshold
+            clipped = np.minimum(np.maximum(samples, min_envelope), max_envelope)
+            return clipped.astype(np.float32)
+        else:
+            # No smoothing - use constant values
+            clipped = np.clip(samples, self._min_param.value, self._max_param.value)
+            return clipped.astype(np.float32)
 
 
 @register_component()

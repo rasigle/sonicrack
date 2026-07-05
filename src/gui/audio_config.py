@@ -10,7 +10,7 @@ The AudioConfig singleton ensures:
 - Easy integration with GUI controls
 
 Example:
-    >>> from gui.audio_config import AudioConfig
+    >>> from src.gui.audio_config import AudioConfig
     >>> # Singleton audio configuration
     >>> config = AudioConfig()
     >>> sr = config.sample_rate

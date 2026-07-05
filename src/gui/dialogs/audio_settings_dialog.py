@@ -75,8 +75,7 @@ class AudioSettingsDialog(QtWidgets.QDialog):
         restore_last_patch = self.restore_last_patch_checkbox.isChecked()
 
         logger.info(
-            "Applying settings: sample_rate=%s, buffer_size=%s, "
-            "restore_last_patch=%s",
+            "Applying settings: sample_rate=%s, buffer_size=%s, restore_last_patch=%s",
             new_sample_rate,
             new_buffer_size,
             restore_last_patch,

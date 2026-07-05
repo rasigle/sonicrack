@@ -30,9 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def apply_vectorized_gain(
-    samples: np.ndarray,
-    gain_values: np.ndarray | float,
-    is_db: bool = False
+    samples: np.ndarray, gain_values: np.ndarray | float, is_db: bool = False
 ) -> np.ndarray:
     """Apply gain to samples using vectorized operations.
 
@@ -69,8 +67,7 @@ def apply_vectorized_gain(
 
 
 def apply_vectorized_clip(
-    samples: np.ndarray,
-    threshold_values: np.ndarray | float
+    samples: np.ndarray, threshold_values: np.ndarray | float
 ) -> np.ndarray:
     """Apply clipping to samples using vectorized operations.
 

@@ -412,8 +412,7 @@ class ModulatedPanner(Panner):
 
 
 def apply_vectorized_panning(
-    samples: np.ndarray, 
-    positions: np.ndarray | float
+    samples: np.ndarray, positions: np.ndarray | float
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply constant-power panning using vectorized operations.
 
@@ -431,10 +430,10 @@ def apply_vectorized_panning(
     # Ensure positions is an array
     if isinstance(positions, (int, float)):
         positions = np.full(len(samples), positions, dtype=np.float32)
-    
+
     # Clip to valid range
     positions = np.clip(positions, -1.0, 1.0)
-    
+
     # Convert to angles [0, π/2] - fully vectorized
     angles = (positions + 1.0) * np.pi / 4.0
 

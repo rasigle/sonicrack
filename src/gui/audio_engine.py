@@ -464,6 +464,7 @@ class AudioEngine(QtCore.QObject):
         if plan is None:
             plan = self.compile_render_plan(ports)
             self._render_plan_cache[plan_key] = plan
+
         with self.render_context(num_samples) as context:
             return context.render_plan(plan)
 

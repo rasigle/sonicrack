@@ -54,10 +54,7 @@ class SimplePannerModule(ModuleWidget):
 
         # Pan knob
         self.pan_knob = Knob(
-            label="Pan",
-            min_value=-1.0,
-            max_value=1.0,
-            default_value=0.0
+            label="Pan", min_value=-1.0, max_value=1.0, default_value=0.0
         )
         self.pan_knob.value_changed.connect(self._on_pan_changed)
         layout.addWidget(self.pan_knob, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -100,9 +97,9 @@ class SimplePannerModule(ModuleWidget):
             return
 
         samples = read_samples(self.in_port, num_samples)
-        position = float_parameter(parameters, "position", self.pan_knob.get_value)
 
         # Update component position
+        position = float_parameter(parameters, "position", self.pan_knob.get_value)
         self.component.position = position
 
         # Use component to pan the samples - output as stereo (N, 2)

@@ -137,7 +137,8 @@ class ProfilingRenderContext(RenderContext):
 
         # Format table
         lines.append(
-            f"{'Module':<30} {'Calls':>6} {'Avg':>8} {'Min':>8} {'Max':>8} {'Total':>8} {'%':>6}"
+            f"{'Module':<30} {'Calls':>6} {'Avg':>8} {'Min':>8} {'Max':>8} "
+            f"{'Total':>8} {'%':>6}"
         )
         lines.append("-" * 80)
 
@@ -306,7 +307,8 @@ class ProfilingSession:
 
         # Format table
         lines.append(
-            f"{'Module':<30} {'Avg':>8} {'Min':>8} {'Max':>8} {'StdDev':>8} {'Total':>10}"
+            f"{'Module':<30} {'Avg':>8} {'Min':>8} {'Max':>8} {'StdDev':>8} "
+            f"{'Total':>10}"
         )
         lines.append("-" * 80)
 

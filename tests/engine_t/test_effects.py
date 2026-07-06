@@ -576,5 +576,91 @@ class TestEffectChaining(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(samples)))
 
 
+class TestDelayTimeCrossfade:
+    """Test that delay time changes crossfade smoothly without clicks."""
+
+    def test_delay_time_change_uses_crossfade(self):
+        """Verify that changing delay time initiates crossfade."""
+        delay = Delay(delay_time=0.5, feedback=0.3, mix=1.0)
+
+        # Verify initial state
+        assert delay._crossfade_samples == 0
+        assert delay._delay_samples == int(0.5 * 44100)
+
+        # Change delay time significantly
+        delay.delay_time = 0.2
+
+        # Should initiate crossfade
+        assert delay._crossfade_samples > 0
+        assert delay._old_delay_samples == int(0.5 * 44100)
+        assert delay._delay_samples == int(0.2 * 44100)
+
+    def test_delay_time_small_change_no_crossfade(self):
+        """Verify that small delay time changes don't trigger crossfade."""
+        delay = Delay(delay_time=0.5, feedback=0.3, mix=1.0)
+
+        # Small change (less than 10 samples)
+        new_time = 0.5 + (5 / 44100)  # Only 5 samples different
+        delay.delay_time = new_time
+
+        # Should not initiate crossfade
+        assert delay._crossfade_samples == 0
+
+    def test_delay_time_crossfade_prevents_clicks(self):
+        """Verify that crossfading prevents discontinuities."""
+        delay = Delay(delay_time=0.1, feedback=0.5, mix=1.0, sample_rate=44100)
+
+        # Generate steady input signal
+        input_signal = np.sin(2 * np.pi * 440 * np.arange(4410) / 44100).astype(
+            np.float32
+        )
+
+        # Process first half
+        output1 = delay(input_signal[:2205])
+
+        # Change delay time during processing
+        delay.delay_time = 0.05
+
+        # Process second half
+        output2 = delay(input_signal[2205:])
+
+        # Check for discontinuities at transition point
+        full_output = np.concatenate([output1, output2])
+
+        # Calculate sample-to-sample differences
+        diffs = np.abs(np.diff(full_output))
+
+        # Maximum difference should be reasonable (no clicks)
+        # During crossfade, changes should be smooth
+        max_diff = np.max(diffs)
+
+        # Without crossfading, this would be > 0.5 (causing audible click)
+        # With crossfading, it should be < 0.1 (smooth transition)
+        assert max_diff < 0.2, f"Found large discontinuity: {max_diff}"
+
+    def test_delay_time_crossfade_completes(self):
+        """Verify that crossfade counter decrements properly."""
+        delay = Delay(delay_time=0.5, feedback=0.3, mix=1.0)
+
+        # Change delay time to start crossfade
+        delay.delay_time = 0.2
+        initial_crossfade = delay._crossfade_samples
+
+        assert initial_crossfade > 0
+
+        # Process some samples
+        input_signal = np.ones(100, dtype=np.float32) * 0.1
+        delay(input_signal)
+
+        # Crossfade counter should have decremented
+        assert delay._crossfade_samples == max(0, initial_crossfade - 100)
+
+        # Process more samples to complete crossfade
+        delay(np.ones(1000, dtype=np.float32) * 0.1)
+
+        # Crossfade should be complete
+        assert delay._crossfade_samples == 0
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

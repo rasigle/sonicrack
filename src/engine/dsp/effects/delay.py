@@ -75,12 +75,15 @@ if HAS_NUMBA:
                 old_delayed = buffer[old_pos]
                 new_delayed = buffer[new_pos]
 
-                # Crossfade between old and new
-                progress = crossfade_samples / crossfade_duration
-                crossfade_progress = 1.0 - progress
+                # Crossfade between old and new (explicitly use float32 to match
+                # buffer type)
+                progress_f32 = np.float32(crossfade_samples) / np.float32(
+                    crossfade_duration
+                )
+                crossfade_progress_f32 = np.float32(1.0) - progress_f32
                 delayed_sample = (
-                    old_delayed * (1.0 - crossfade_progress)
-                    + new_delayed * crossfade_progress
+                    old_delayed * (np.float32(1.0) - crossfade_progress_f32)
+                    + new_delayed * crossfade_progress_f32
                 )
 
                 crossfade_samples -= 1
@@ -89,9 +92,9 @@ if HAS_NUMBA:
                 read_pos = (write_pos - delay_samples) % buffer_size
                 delayed_sample = buffer[read_pos]
 
-            # Mix input with wet signal
+            # Mix input with wet signal (explicitly use float32)
             output_samples[i] = (
-                input_sample * (1.0 - mix_envelope[i])
+                input_sample * (np.float32(1.0) - mix_envelope[i])
                 + delayed_sample * mix_envelope[i]
             )
 
@@ -314,8 +317,14 @@ class Delay(Modifier):
         feedback_envelope = self._feedback_param.get_interpolated_buffer(n)
         mix_envelope = self._mix_param.get_interpolated_buffer(n)
 
-        # Use Numba-JIT if available (10-15x faster!)
-        if HAS_NUMBA:
+        # Use Numba-JIT only for mono signals (10-15x faster!)
+        # For stereo/multi-channel, use Python implementation
+        is_mono = len(input_samples.shape) == 1
+        if HAS_NUMBA and is_mono:
+            # Convert envelopes to float32 to match input_samples and buffer types
+            feedback_envelope = np.asarray(feedback_envelope, dtype=np.float32)
+            mix_envelope = np.asarray(mix_envelope, dtype=np.float32)
+
             (
                 output_samples,
                 self._write_pos,
@@ -334,7 +343,8 @@ class Delay(Modifier):
             )
             return output_samples
 
-        # Fallback: Python implementation (slower but works without Numba)
+        # Fallback: Python implementation (slower but works for all cases including
+        # stereo)
         output_samples = np.empty_like(input_samples, dtype=np.float32)
         for index, input_sample in enumerate(input_samples):
             # Read delayed sample (with crossfading if delay time is changing)

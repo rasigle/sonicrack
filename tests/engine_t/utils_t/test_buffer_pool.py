@@ -140,6 +140,7 @@ class TestBufferPool:
 
         # Acquire and release
         buffer1 = pool.acquire()
+        _ = pool.acquire()
         pool.release(buffer1)
 
         stats = pool.get_stats()

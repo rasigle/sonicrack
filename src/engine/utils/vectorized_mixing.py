@@ -47,7 +47,8 @@ def vectorized_mix(
 
     if len(signals) != len(gains):
         raise ValueError(
-            f"Number of signals ({len(signals)}) must match number of gains ({len(gains)})"
+            f"Number of signals ({len(signals)}) must match number of gains "
+            f"({len(gains)})"
         )
 
     # Check all signals have same length
@@ -236,7 +237,7 @@ def normalize_channels(
     rms_levels = compute_rms_levels(signals)
 
     normalized = []
-    for signal, rms in zip(signals, rms_levels):
+    for signal, rms in zip(signals, rms_levels, strict=False):
         if rms > 0:
             gain = target_rms / rms
             normalized.append((signal * gain).astype(np.float32))
@@ -281,7 +282,7 @@ def benchmark_mixing(
     for _ in range(iterations):
         # Simulate sequential mixing
         result = np.zeros(buffer_size, dtype=np.float32)
-        for sig, gain in zip(signals, gains):
+        for sig, gain in zip(signals, gains, strict=False):
             result += sig * gain
     sequential_time = (time.perf_counter_ns() - start) / 1e6
 

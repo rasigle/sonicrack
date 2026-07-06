@@ -187,7 +187,8 @@ def _enable_fault_trace_file(trace_path: Path) -> None:
         except Exception:
             logger.exception("Failed to close previous crash trace file")
 
-    _fault_trace_file = open(
+    # File must remain open until deactivate_crash_diagnostics() is called
+    _fault_trace_file = open(  # noqa: SIM115
         trace_path,
         "a",
         encoding="utf-8",
@@ -212,7 +213,7 @@ def _qt_message_handler(
         source = getattr(context, "file", None) or "<unknown>"
         line = getattr(context, "line", 0)
         function = getattr(context, "function", None) or "<unknown>"
-        formatted = "Qt: %s (%s:%s, %s)" % (message, source, line, function)
+        formatted = f"Qt: {message} ({source}:{line}, {function})"
 
         if msg_type == QtMsgType.QtDebugMsg:
             logger.debug(formatted)

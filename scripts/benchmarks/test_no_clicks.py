@@ -92,7 +92,9 @@ def print_click_report(results: dict[str, Any]) -> None:
         print("")
         print("Click Positions (first 10):")
         for i, (idx, time) in enumerate(
-            zip(results["click_indices"][:10], results["click_times"][:10])
+            zip(
+                results["click_indices"][:10], results["click_times"][:10], strict=False
+            )
         ):
             print(f"    {i + 1}. Sample {idx:,} @ {time:.3f}s")
         if results["click_count"] > 10:

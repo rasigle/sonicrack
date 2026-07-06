@@ -35,7 +35,7 @@ def benchmark_patch_file(
     Returns:
         Dictionary containing benchmark results
     """
-    from gui.utils.patch_loader import HeadlessPatchRenderer
+    from src.gui.utils.patch_loader import HeadlessPatchRenderer
 
     # Load the patch
     renderer = HeadlessPatchRenderer()
@@ -61,7 +61,7 @@ def benchmark_patch_file(
     for i in range(iterations):
         try:
             start = time.perf_counter_ns()
-            audio = renderer.render(buffer_size, sample_rate)
+            _ = renderer.render(buffer_size, sample_rate)
             elapsed = time.perf_counter_ns() - start
             times_ns.append(elapsed)
             successful_renders += 1

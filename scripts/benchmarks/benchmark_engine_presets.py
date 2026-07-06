@@ -35,7 +35,7 @@ def benchmark_patch(patch, buffer_size: int = 512, iterations: int = 1000):
     times_ns = []
     for _ in range(iterations):
         start = time.perf_counter_ns()
-        audio = patch.get_samples_vectorized(buffer_size)
+        _ = patch.get_samples_vectorized(buffer_size)
         times_ns.append(time.perf_counter_ns() - start)
 
     times_us = [t / 1000.0 for t in times_ns]

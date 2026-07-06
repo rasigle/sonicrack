@@ -5,37 +5,36 @@
     "description": "",
     "tags": [],
     "category": "User",
-    "created": "2026-07-06T08:39:13.993326",
+    "created": "2026-07-02T10:53:38.179651",
     "version": "1.0"
   },
   "modules": [
     {
       "id": 0,
-      "type": "Clipper (Mod)",
+      "type": "LFO",
       "custom_name": "",
-      "module_category": "Modifier",
+      "module_category": "Source",
       "position": {
-        "x": -15.0,
-        "y": -184.0
+        "x": -491.0,
+        "y": 44.0
       },
       "parameters": {
         "active": true,
-        "threshold": 0.1
+        "frequency": 1.0,
+        "pulsewidth": 0.5
       }
     },
     {
       "id": 1,
-      "type": "Oscillator",
+      "type": "Waveform",
       "custom_name": "",
-      "module_category": "Source",
+      "module_category": "Visualization",
       "position": {
-        "x": -378.0,
-        "y": -321.0
+        "x": 91.0,
+        "y": 24.0
       },
       "parameters": {
-        "active": true,
-        "frequency": 701.0071662720042,
-        "pulsewidth": 0.5
+        "active": true
       }
     },
     {
@@ -44,8 +43,8 @@
       "custom_name": "",
       "module_category": "Output",
       "position": {
-        "x": 281.0,
-        "y": -119.0
+        "x": 297.0,
+        "y": -330.0
       },
       "parameters": {
         "active": true
@@ -53,35 +52,40 @@
     },
     {
       "id": 3,
-      "type": "LFO",
+      "type": "VCO",
       "custom_name": "",
-      "module_category": "Source",
+      "module_category": "Modulated Source",
       "position": {
-        "x": -396.0,
-        "y": -7.0
+        "x": -213.0,
+        "y": -278.0
       },
       "parameters": {
         "active": true,
-        "frequency": 2.816115083431082,
+        "waveform": "Sine",
+        "mode": "pure",
+        "frequency": 440.0,
+        "gain_db": -20.0,
+        "fm_amount": 100.0,
+        "phase": 0.0,
         "pulsewidth": 0.5
       }
     }
   ],
   "connections": [
     {
-      "source_module": 1,
+      "source_module": 0,
       "source_port": "Sine",
-      "target_module": 0,
-      "target_port": "In"
+      "target_module": 3,
+      "target_port": "FM"
     },
     {
       "source_module": 3,
-      "source_port": "Sine",
-      "target_module": 0,
-      "target_port": "Mod"
+      "source_port": "Out",
+      "target_module": 1,
+      "target_port": "L/Mono"
     },
     {
-      "source_module": 0,
+      "source_module": 3,
       "source_port": "Out",
       "target_module": 2,
       "target_port": "Left/Mono"

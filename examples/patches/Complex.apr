@@ -1,0 +1,162 @@
+{
+  "metadata": {
+    "name": "Untitled Preset",
+    "author": "",
+    "description": "",
+    "tags": [],
+    "category": "User",
+    "created": "2026-07-05T22:10:35.903492",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": {
+        "x": 535.0,
+        "y": -21.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 1,
+      "type": "Delay",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": {
+        "x": 230.0,
+        "y": 41.0
+      },
+      "parameters": {
+        "active": true,
+        "delay_time": 0.5,
+        "feedback": 0.5,
+        "mix": 1.0
+      }
+    },
+    {
+      "id": 2,
+      "type": "Reverb",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": {
+        "x": 417.0,
+        "y": -337.0
+      },
+      "parameters": {
+        "active": true,
+        "room_size": 0.7150000000000002,
+        "damping": 0.7250000000000002,
+        "mix": 0.7799999999999998
+      }
+    },
+    {
+      "id": 3,
+      "type": "VCO",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": -450.0,
+        "y": -42.0
+      },
+      "parameters": {
+        "active": true,
+        "waveform": "Square",
+        "mode": "vcv",
+        "fm_mode": "1V/octave",
+        "frequency": 45.245619880427526,
+        "gain_db": 0.0,
+        "fm_amount": 0.0,
+        "phase": 0.0,
+        "pulsewidth": 0.4362999999999998
+      }
+    },
+    {
+      "id": 4,
+      "type": "Oscillator",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -500.0,
+        "y": -358.0
+      },
+      "parameters": {
+        "active": true,
+        "frequency": 54.942143547081265,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 5,
+      "type": "Mixer",
+      "custom_name": "",
+      "module_category": "Mixer",
+      "position": {
+        "x": -38.0,
+        "y": -332.0
+      },
+      "parameters": {
+        "active": true,
+        "gain1": 0.20000000000000046,
+        "gain2": 0.20499999999999965,
+        "gain3": 0.7,
+        "gain4": 0.7
+      }
+    },
+    {
+      "id": 6,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": {
+        "x": 717.0,
+        "y": -208.0
+      },
+      "parameters": {
+        "active": true
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 0,
+      "target_port": "L/Mono"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 2,
+      "target_port": "In"
+    },
+    {
+      "source_module": 5,
+      "source_port": "Out",
+      "target_module": 1,
+      "target_port": "In"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 6,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 5,
+      "target_port": "In 2"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Sine",
+      "target_module": 5,
+      "target_port": "In 1"
+    }
+  ]
+}

@@ -641,7 +641,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         if scene is None:
             return
 
-        from src.gui.patch_canvas import PatchCanvas
+        from src.gui.widgets.patch_canvas import PatchCanvas
 
         canvas = scene.parent()
 

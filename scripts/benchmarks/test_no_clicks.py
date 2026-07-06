@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -22,7 +23,7 @@ def detect_clicks(
     audio: np.ndarray,
     threshold: float = 0.5,
     sample_rate: int = 44100,
-) -> dict[str, any]:
+) -> dict[str, Any]:
     """Detect clicks in audio signal.
 
     Args:
@@ -69,31 +70,31 @@ def detect_clicks(
     }
 
 
-def print_click_report(results: dict[str, any]) -> None:
+def print_click_report(results: dict[str, Any]) -> None:
     """Print click detection results in a readable format."""
     print(f"\n{'=' * 70}")
-    print(f"CLICK DETECTION REPORT")
+    print("CLICK DETECTION REPORT")
     print(f"{'=' * 70}")
     print(f"Audio Duration:    {results['duration_sec']:.2f} seconds")
     print(f"Sample Count:      {results['sample_count']:,}")
-    print(f"")
-    print(f"Audio Statistics:")
+    print("")
+    print("Audio Statistics:")
     print(f"  RMS Level:       {results['audio_rms']:.4f}")
     print(f"  Peak Level:      {results['audio_peak']:.4f}")
-    print(f"")
-    print(f"Click Detection:")
+    print("")
+    print("Click Detection:")
     print(f"  Threshold:       {results['threshold']:.2f}")
     print(f"  Clicks Found:    {results['click_count']}")
 
     if results["click_count"] > 0:
         print(f"  Max Amplitude:   {results['max_click_amplitude']:.4f}")
         print(f"  Mean Amplitude:  {results['mean_click_amplitude']:.4f}")
-        print(f"")
-        print(f"Click Positions (first 10):")
+        print("")
+        print("Click Positions (first 10):")
         for i, (idx, time) in enumerate(
             zip(results["click_indices"][:10], results["click_times"][:10])
         ):
-            print(f"    {i+1}. Sample {idx:,} @ {time:.3f}s")
+            print(f"    {i + 1}. Sample {idx:,} @ {time:.3f}s")
         if results["click_count"] > 10:
             print(f"    ... and {results['click_count'] - 10} more")
 
@@ -105,7 +106,7 @@ def print_click_report(results: dict[str, any]) -> None:
     else:
         status = "❌ FAIL - Many clicks detected"
 
-    print(f"")
+    print("")
     print(f"Status: {status}")
     print(f"{'=' * 70}\n")
 
@@ -199,6 +200,17 @@ def main() -> int:
         action="store_true",
         help="Run self-test with intentional clicks",
     )
+    parser.add_argument(
+        "--patch",
+        type=Path,
+        help="Render and analyze a patch file (.apr)",
+    )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=10.0,
+        help="Duration to render in seconds (default: 10.0)",
+    )
 
     args = parser.parse_args()
 
@@ -220,6 +232,57 @@ def main() -> int:
         print_click_report(results)
         return 0 if results["click_count"] >= 5 else 1
 
+    elif args.patch:
+        # Render and analyze patch
+        if not args.patch.exists():
+            print(f"Error: Patch file not found: {args.patch}")
+            return 1
+
+        try:
+            from gui.utils.patch_loader import HeadlessPatchRenderer
+
+            print(f"Loading patch: {args.patch.name}")
+            renderer = HeadlessPatchRenderer()
+            if not renderer.load_patch(args.patch):
+                print(f"Error: Failed to load patch: {args.patch}")
+                return 1
+
+            print(f"Rendering {args.duration} seconds of audio...")
+            num_samples = int(args.duration * args.sample_rate)
+            buffer_size = 512
+            audio_chunks = []
+
+            # Render in chunks
+            remaining = num_samples
+            while remaining > 0:
+                chunk_size = min(buffer_size, remaining)
+                try:
+                    chunk = renderer.render(chunk_size, args.sample_rate)
+                    audio_chunks.append(chunk)
+                    remaining -= chunk_size
+                except Exception as e:
+                    print(f"Error during rendering: {e}")
+                    if not audio_chunks:
+                        return 1
+                    break
+
+            # Combine audio chunks
+            audio = np.concatenate(audio_chunks)
+            print(f"Rendered {len(audio)} samples")
+
+            # Detect clicks
+            results = detect_clicks(audio, args.threshold, args.sample_rate)
+            print_click_report(results)
+            return 0 if results["click_count"] == 0 else 1
+
+        except ImportError:
+            print("Error: Patch loader not available")
+            print("       Make sure src.engine.utils.patch_loader is installed")
+            return 1
+        except Exception as e:
+            print(f"Error: {e}")
+            return 1
+
     elif args.audio_file:
         # Analyze audio file
         if not args.audio_file.exists():
@@ -231,12 +294,12 @@ def main() -> int:
             audio = np.load(args.audio_file)
         elif args.audio_file.suffix in [".wav", ".wave"]:
             # TODO: Add scipy.io.wavfile support when available
-            print(f"Error: WAV file support not yet implemented")
-            print(f"       Use .npy files or add scipy dependency")
+            print("Error: WAV file support not yet implemented")
+            print("       Use .npy files or add scipy dependency")
             return 1
         else:
             print(f"Error: Unsupported file format: {args.audio_file.suffix}")
-            print(f"       Supported: .npy (numpy array)")
+            print("       Supported: .npy (numpy array)")
             return 1
 
         results = detect_clicks(audio, args.threshold, args.sample_rate)

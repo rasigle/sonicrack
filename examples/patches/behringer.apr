@@ -1,0 +1,180 @@
+{
+  "metadata": {
+    "name": "Untitled Preset",
+    "author": "",
+    "description": "",
+    "tags": [],
+    "category": "User",
+    "created": "2026-07-06T08:39:47.870363",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Behringer 182",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -427.0,
+        "y": -377.0
+      },
+      "parameters": {
+        "active": true,
+        "cv_a_1": 0.23499999999999988,
+        "cv_a_2": 0.25,
+        "cv_a_3": 0.5,
+        "cv_a_4": 0.75,
+        "cv_a_5": 1.0,
+        "cv_a_6": 0.75,
+        "cv_a_7": 0.5,
+        "cv_a_8": 0.25,
+        "cv_b_1": 1.0,
+        "cv_b_2": 0.75,
+        "cv_b_3": 0.5,
+        "cv_b_4": 0.25,
+        "cv_b_5": 0.0,
+        "cv_b_6": 0.25,
+        "cv_b_7": 1.0,
+        "cv_b_8": 0.75,
+        "gates": "0,0,0,01,1,1,1,1",
+        "running": true,
+        "bpm": 89.1999999999999,
+        "gate_length": 0.5,
+        "cv_a_range": 5.0,
+        "cv_b_range": 5.0,
+        "steps": "8",
+        "division": "1/16",
+        "direction": "reverse"
+      }
+    },
+    {
+      "id": 1,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": {
+        "x": 991.0,
+        "y": -68.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 2,
+      "type": "VCO",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": 94.0,
+        "y": -220.0
+      },
+      "parameters": {
+        "active": true,
+        "waveform": "Sine",
+        "mode": "pure",
+        "fm_mode": "1V/octave",
+        "frequency": 440.0,
+        "gain_db": -20.0,
+        "fm_amount": 0.0,
+        "phase": 0.0,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 3,
+      "type": "VCO",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": 106.0,
+        "y": 95.0
+      },
+      "parameters": {
+        "active": true,
+        "waveform": "Sine",
+        "mode": "pure",
+        "fm_mode": "1V/octave",
+        "frequency": 440.0,
+        "gain_db": -20.0,
+        "fm_amount": 0.0,
+        "phase": 0.0,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 4,
+      "type": "Mixer",
+      "custom_name": "",
+      "module_category": "Mixer",
+      "position": {
+        "x": 596.0,
+        "y": -165.0
+      },
+      "parameters": {
+        "active": true,
+        "gain1": 0.42000000000000004,
+        "gain2": 0.36,
+        "gain3": 0.0,
+        "gain4": 0.0
+      }
+    },
+    {
+      "id": 5,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": {
+        "x": 869.0,
+        "y": 246.0
+      },
+      "parameters": {
+        "active": true
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 0,
+      "source_port": "CV A",
+      "target_module": 2,
+      "target_port": "V/Oct"
+    },
+    {
+      "source_module": 0,
+      "source_port": "CV B",
+      "target_module": 3,
+      "target_port": "V/Oct"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In 1"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In 2"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 1,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 5,
+      "target_port": "L/Mono"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 5,
+      "target_port": "R"
+    }
+  ]
+}

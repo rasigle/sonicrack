@@ -240,7 +240,7 @@ class Cable(QGraphicsItem):
     def _on_delete_requested(self):
         """Handle delete request from context menu."""
         # Use centralized delete method
-        from src.gui.patch_canvas import PatchCanvas
+        from src.gui.widgets.patch_canvas import PatchCanvas
 
         scene = self.scene()
         parent = scene.parent() if scene is not None else None

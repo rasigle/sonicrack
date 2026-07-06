@@ -33,9 +33,9 @@ def test_simple_panner_component_position_updates(qapp: Any):
 
     # Test another value
     module.component.position = -0.75
-    assert module.component.position == pytest.approx(
-        -0.75
-    ), "Position should be updated"
+    assert module.component.position == pytest.approx(-0.75), (
+        "Position should be updated"
+    )
 
 
 def test_simple_panner_component_pan_vectorized(qapp: Any):
@@ -74,9 +74,9 @@ def test_modulated_panner_component_position_updates(qapp: Any):
 
     # Test that position updates work
     module.component.position = -0.5
-    assert module.component.position == pytest.approx(
-        -0.5
-    ), "Position should be updated"
+    assert module.component.position == pytest.approx(-0.5), (
+        "Position should be updated"
+    )
 
 
 def test_modulated_panner_component_pan_vectorized(qapp: Any):
@@ -105,15 +105,15 @@ def test_panner_component_property_returns_target_value(qapp: Any):
 
     # Set position and immediately read it back
     panner.position = 0.75
-    assert panner.position == pytest.approx(
-        0.75
-    ), "Position property should return target value"
+    assert panner.position == pytest.approx(0.75), (
+        "Position property should return target value"
+    )
 
     # Change again
     panner.position = -0.25
-    assert panner.position == pytest.approx(
-        -0.25
-    ), "Position property should return new target value"
+    assert panner.position == pytest.approx(-0.25), (
+        "Position property should return new target value"
+    )
 
 
 def test_panner_constant_power_law(qapp: Any):
@@ -128,6 +128,6 @@ def test_panner_constant_power_law(qapp: Any):
     # Check power is preserved (left^2 + right^2 should equal input^2)
     input_power = np.sum(samples**2)
     output_power = np.sum(left**2) + np.sum(right**2)
-    assert output_power == pytest.approx(
-        input_power, rel=0.01
-    ), "Constant-power law: output power should equal input power"
+    assert output_power == pytest.approx(input_power, rel=0.01), (
+        "Constant-power law: output power should equal input power"
+    )

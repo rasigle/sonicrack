@@ -100,31 +100,37 @@ class PannerModule(ModulatedModuleBase):
 
         samples = read_samples(self.in_port, num_samples)
 
-        # Lazy initialization if component wasn't prepared (e.g., in tests)
-        # Check if we need to switch to modulated component
-        if self.mod_port.is_connected and not isinstance(
-            self.component, ModulatedPanner
-        ):
-            self.prepare_modulated_component(num_samples)
-        elif not self.mod_port.is_connected and isinstance(
-            self.component, ModulatedPanner
-        ):
-            # Switch back to unmodulated
-            self.component = self.create_unmodulated_component()
+        # Thread-safe component access with lock
+        with self._component_lock:
+            # Lazy initialization if component wasn't prepared (e.g., in tests)
+            # Check if we need to switch to modulated component
+            if self.mod_port.is_connected and not isinstance(
+                self.component, ModulatedPanner
+            ):
+                self.prepare_modulated_component(num_samples)
+            elif not self.mod_port.is_connected and isinstance(
+                self.component, ModulatedPanner
+            ):
+                # Switch back to unmodulated
+                self.component = self.create_unmodulated_component()
 
-        # Get position from knob
-        position = float_parameter(parameters, "position", self.pan_knob.get_value)
+            # Get position from knob
+            position = float_parameter(parameters, "position", self.pan_knob.get_value)
 
-        if self.mod_port.is_connected:
-            # When modulated: knob controls modulation depth (0.0 to 1.0)
-            # Map position range [-1, 1] to modulation amount [0.0, 1.0]
-            modulation_amount = (position + 1.0) / 2.0  # Maps [-1, 1] to [0, 1]
-            if self.port_adapter is not None:
-                self.port_adapter.modulation_amount = modulation_amount
-        else:
-            # When unmodulated: knob controls position directly
-            self.component.position = position
+            if self.mod_port.is_connected:
+                # When modulated: knob controls modulation depth (0.0 to 1.0)
+                # Map position range [-1, 1] to modulation amount [0.0, 1.0]
+                modulation_amount = (position + 1.0) / 2.0  # Maps [-1, 1] to [0, 1]
+                if self.port_adapter is not None:
+                    self.port_adapter.modulation_amount = modulation_amount
+            else:
+                # When unmodulated: knob controls position directly
+                if self.component is not None:
+                    self.component.position = position
 
-        # Call component directly - works for both Panner and ModulatedPanner
-        left, right = self.component(samples)
-        self.out_port.write(np.column_stack((left, right)))
+            # Call component directly - works for both Panner and ModulatedPanner
+            if self.component is not None:
+                left, right = self.component(samples)
+                self.out_port.write(np.column_stack((left, right)))
+            else:
+                self.out_port.write(silence(num_samples))

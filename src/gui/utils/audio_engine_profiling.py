@@ -221,9 +221,7 @@ class ProfilingRenderContext(RenderContext):
         Returns:
             List of (module_name, total_time_ms) tuples
         """
-        module_totals = [
-            (name, sum(times)) for name, times in self.timings.items()
-        ]
+        module_totals = [(name, sum(times)) for name, times in self.timings.items()]
         module_totals.sort(key=lambda x: x[1], reverse=True)
         return module_totals[:n]
 
@@ -364,4 +362,3 @@ class ProfilingSession:
         """Clear session data."""
         self.cycles.clear()
         self.total_cycles = 0
-

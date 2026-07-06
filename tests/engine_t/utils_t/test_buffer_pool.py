@@ -125,7 +125,7 @@ class TestBufferPool:
         pool = BufferPool(buffer_size=512, pool_size=4)
 
         try:
-            with pool.acquire_context() as buffer:
+            with pool.acquire_context():
                 assert pool.available_count == 3
                 raise RuntimeError("Test exception")
         except RuntimeError:
@@ -140,7 +140,6 @@ class TestBufferPool:
 
         # Acquire and release
         buffer1 = pool.acquire()
-        buffer2 = pool.acquire()
         pool.release(buffer1)
 
         stats = pool.get_stats()
@@ -365,4 +364,3 @@ class TestBufferPoolIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

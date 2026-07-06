@@ -10,8 +10,8 @@ from src.gui.audio_engine import AudioEngine
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters, get_runtime_spec
 from src.gui.core.runtime_helpers import read_samples
-from src.gui.patch_canvas import PatchCanvas
 from src.gui.widgets.module_widget import ModuleWidget
+from src.gui.widgets.patch_canvas import PatchCanvas
 
 
 class _OnesComponent:

@@ -268,10 +268,7 @@ class Reverb(Modifier):
             max(1, int(d * scale))
             for d in (1557, 1617, 1491, 1422, 1277, 1356, 1188, 1116)
         ]
-        self._allpass_delays = [
-            max(1, int(d * scale))
-            for d in (225, 556, 441, 341)
-        ]
+        self._allpass_delays = [max(1, int(d * scale)) for d in (225, 556, 441, 341)]
 
         self._sample_shape: tuple[int, ...] = ()
         self._comb_buffers: list[np.ndarray] = []
@@ -337,10 +334,7 @@ class Reverb(Modifier):
     @staticmethod
     def _mono_array_to_states(states: np.ndarray) -> list[np.ndarray]:
         """Convert a 1-D mono state array back to list-of-arrays representation."""
-        return [
-            np.asarray(value, dtype=np.float32)
-            for value in states
-        ]
+        return [np.asarray(value, dtype=np.float32) for value in states]
 
     # -- public properties ---------------------------------------------------
 

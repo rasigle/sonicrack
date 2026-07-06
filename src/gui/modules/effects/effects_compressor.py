@@ -166,24 +166,28 @@ class CompressorModule(ModulatedModuleBase):
             self.out_port.write(silence(num_samples))
             return
 
-        if self.component is None:
-            self.component = self.create_unmodulated_component()
+        # Thread-safe component access with lock
+        with self._component_lock:
+            if self.component is None:
+                self.component = self.create_unmodulated_component()
 
-        self.component.threshold_db = float_parameter(
-            parameters, "threshold_db", self.threshold_knob.get_value
-        )
-        self.component.ratio = float_parameter(
-            parameters, "ratio", self.ratio_knob.get_value
-        )
-        self.component.attack_ms = float_parameter(
-            parameters, "attack_ms", self.attack_knob.get_value
-        )
-        self.component.release_ms = float_parameter(
-            parameters, "release_ms", self.release_knob.get_value
-        )
-        self.component.makeup_gain_db = float_parameter(
-            parameters, "makeup_gain_db", self.makeup_knob.get_value
-        )
-        self.component.mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
+            self.component.threshold_db = float_parameter(
+                parameters, "threshold_db", self.threshold_knob.get_value
+            )
+            self.component.ratio = float_parameter(
+                parameters, "ratio", self.ratio_knob.get_value
+            )
+            self.component.attack_ms = float_parameter(
+                parameters, "attack_ms", self.attack_knob.get_value
+            )
+            self.component.release_ms = float_parameter(
+                parameters, "release_ms", self.release_knob.get_value
+            )
+            self.component.makeup_gain_db = float_parameter(
+                parameters, "makeup_gain_db", self.makeup_knob.get_value
+            )
+            self.component.mix = float_parameter(
+                parameters, "mix", self.mix_knob.get_value
+            )
 
-        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))
+            self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

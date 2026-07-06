@@ -17,8 +17,6 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
-
 
 def benchmark_patch_file(
     patch_path: Path,
@@ -37,20 +35,48 @@ def benchmark_patch_file(
     Returns:
         Dictionary containing benchmark results
     """
-    # TODO: Implement actual patch loading when patch system is available
-    # For now, return dummy results
-    print(f"⚠️  Patch loading not yet implemented: {patch_path}")
-    print(f"   This is a placeholder for future patch benchmarking.")
+    from gui.utils.patch_loader import HeadlessPatchRenderer
 
-    # Simulate some processing time
+    # Load the patch
+    renderer = HeadlessPatchRenderer()
+    if not renderer.load_patch(patch_path):
+        raise RuntimeError(f"Failed to load patch: {patch_path}")
+
+    print(f"Loaded patch: {patch_path.name}")
+    print(f"  Modules: {renderer.get_module_count()}")
+    print(f"  Connections: {renderer.get_connection_count()}")
+
+    # Warmup: render a few buffers first
+    try:
+        for _ in range(5):
+            renderer.render(buffer_size, sample_rate)
+    except Exception as e:
+        print(f"⚠️  Warmup failed: {e}")
+        print("   Patch may not be compatible with headless rendering")
+
+    # Benchmark rendering
     times_ns = []
-    for _ in range(iterations):
-        start = time.perf_counter_ns()
-        # Simulate patch processing
-        _ = np.zeros(buffer_size, dtype=np.float32)
-        time.sleep(0.0001)  # Simulate 100µs processing
-        elapsed = time.perf_counter_ns() - start
-        times_ns.append(elapsed)
+    successful_renders = 0
+
+    for i in range(iterations):
+        try:
+            start = time.perf_counter_ns()
+            audio = renderer.render(buffer_size, sample_rate)
+            elapsed = time.perf_counter_ns() - start
+            times_ns.append(elapsed)
+            successful_renders += 1
+        except Exception as e:
+            if i == 0:
+                # Print error on first failure
+                print(f"⚠️  Render failed: {e}")
+                print("   Continuing with what renders successfully...")
+            continue
+
+    if not times_ns:
+        raise RuntimeError("No successful renders - patch may be incompatible")
+
+    if successful_renders < iterations:
+        print(f"⚠️  {iterations - successful_renders}/{iterations} renders failed")
 
     times_us = [t / 1000.0 for t in times_ns]
     budget_us = (buffer_size / sample_rate) * 1e6
@@ -60,12 +86,20 @@ def benchmark_patch_file(
         "mean_us": statistics.fmean(times_us),
         "median_us": statistics.median(times_us),
         "max_us": max(times_us),
-        "p95_us": statistics.quantiles(times_us, n=20)[18],  # 95th percentile
-        "p99_us": statistics.quantiles(times_us, n=100)[98],  # 99th percentile
+        "p95_us": (
+            statistics.quantiles(times_us, n=20)[18]
+            if len(times_us) >= 20
+            else max(times_us)
+        ),  # 95th percentile
+        "p99_us": (
+            statistics.quantiles(times_us, n=100)[98]
+            if len(times_us) >= 100
+            else max(times_us)
+        ),  # 99th percentile
         "budget_us": budget_us,
         "headroom_pct": 100 * (1 - statistics.fmean(times_us) / budget_us),
         "buffer_size": buffer_size,
-        "iterations": iterations,
+        "iterations": successful_renders,
     }
 
 
@@ -76,15 +110,15 @@ def print_benchmark_results(patch_name: str, results: dict[str, float]) -> None:
     print(f"{'=' * 70}")
     print(f"Buffer Size:     {results['buffer_size']} samples")
     print(f"Iterations:      {results['iterations']}")
-    print(f"")
-    print(f"Processing Time:")
+    print("")
+    print("Processing Time:")
     print(f"  Min:           {results['min_us']:.1f} µs")
     print(f"  Mean:          {results['mean_us']:.1f} µs")
     print(f"  Median:        {results['median_us']:.1f} µs")
     print(f"  Max:           {results['max_us']:.1f} µs")
     print(f"  95th percentile: {results['p95_us']:.1f} µs")
     print(f"  99th percentile: {results['p99_us']:.1f} µs")
-    print(f"")
+    print("")
     print(f"Time Budget:     {results['budget_us']:.1f} µs")
     print(f"CPU Headroom:    {results['headroom_pct']:.1f}%")
 

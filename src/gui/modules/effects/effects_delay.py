@@ -132,15 +132,19 @@ class DelayModule(ModulatedModuleBase):
             self.out_port.write(silence(num_samples))
             return
 
-        if self.component is None:
-            self.component = self.create_unmodulated_component()
+        # Thread-safe component access with lock
+        with self._component_lock:
+            if self.component is None:
+                self.component = self.create_unmodulated_component()
 
-        self.component.delay_time = float_parameter(
-            parameters, "delay_time", self.time_knob.get_value
-        )
-        self.component.feedback = float_parameter(
-            parameters, "feedback", self.feedback_knob.get_value
-        )
-        self.component.mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
+            self.component.delay_time = float_parameter(
+                parameters, "delay_time", self.time_knob.get_value
+            )
+            self.component.feedback = float_parameter(
+                parameters, "feedback", self.feedback_knob.get_value
+            )
+            self.component.mix = float_parameter(
+                parameters, "mix", self.mix_knob.get_value
+            )
 
-        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))
+            self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

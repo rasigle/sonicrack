@@ -5,37 +5,35 @@
     "description": "",
     "tags": [],
     "category": "User",
-    "created": "2025-11-05T23:23:29.851229",
+    "created": "2026-07-06T08:40:42.158203",
     "version": "1.0"
   },
   "modules": [
     {
       "id": 0,
-      "type": "Volume (Mod)",
+      "type": "Output",
       "custom_name": "",
-      "module_category": "Modifier",
+      "module_category": "Output",
       "position": {
-        "x": 389.0,
-        "y": -91.0
+        "x": 758.0,
+        "y": -153.0
       },
       "parameters": {
-        "gain_db": -20.0
+        "active": true
       }
     },
     {
       "id": 1,
-      "type": "ADSR Envelope",
+      "type": "MIDI Input",
       "custom_name": "",
-      "module_category": "Modulated Source",
+      "module_category": "Source",
       "position": {
-        "x": 39.0,
-        "y": -20.0
+        "x": -360.0,
+        "y": -243.0
       },
       "parameters": {
-        "attack_duration": 0.7592499999999999,
-        "decay_duration": 0.2,
-        "sustain_level": 0.7,
-        "release_duration": 0.3
+        "active": true,
+        "device": "V49 1"
       }
     },
     {
@@ -48,69 +46,75 @@
         "y": -347.0
       },
       "parameters": {
+        "active": true,
         "waveform": "Sine",
+        "mode": "pure",
+        "fm_mode": "1V/octave",
         "frequency": 667.6999999999991,
         "gain_db": -20.0,
-        "phase": 0.0
+        "fm_amount": 0.0,
+        "phase": 0.0,
+        "pulsewidth": 0.5
       }
     },
     {
       "id": 3,
-      "type": "MIDI Input",
+      "type": "ADSR Envelope",
       "custom_name": "",
-      "module_category": "Source",
+      "module_category": "Modulated Source",
       "position": {
-        "x": -360.0,
-        "y": -243.0
+        "x": 39.0,
+        "y": -20.0
       },
       "parameters": {
-        "device": "V49 1"
+        "active": true,
+        "attack_duration": 0.7592499999999999,
+        "decay_duration": 0.2,
+        "sustain_level": 0.7,
+        "release_duration": 0.3,
+        "retrigger_mode": "Punch",
+        "trigger_mode": "Latched"
       }
     },
     {
       "id": 4,
-      "type": "Output",
+      "type": "Volume (Mod)",
       "custom_name": "",
-      "module_category": "Output",
+      "module_category": "Modifier",
       "position": {
-        "x": 565.0,
-        "y": -263.0
+        "x": 424.0,
+        "y": -97.0
       },
       "parameters": {
-        "master_volume_db": -3
+        "active": true,
+        "gain_db": -20.0
       }
     }
   ],
   "connections": [
     {
-      "source_module": 0,
-      "source_port": "Out",
-      "target_module": 4,
-      "target_port": "In"
-    },
-    {
-      "source_module": 2,
+      "source_module": 4,
       "source_port": "Out",
       "target_module": 0,
-      "target_port": "In"
+      "target_port": "Left/Mono"
     },
     {
       "source_module": 1,
-      "source_port": "Out",
-      "target_module": 0,
-      "target_port": "Mod"
-    },
-    {
-      "source_module": 3,
       "source_port": "Gate",
-      "target_module": 1,
+      "target_module": 3,
       "target_port": "Gate"
     },
     {
       "source_module": 3,
-      "source_port": "Freq",
-      "target_module": 2,
-      "target_port": "Freq"
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "Mod"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In"
     }
   ]
 }

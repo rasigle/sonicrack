@@ -102,22 +102,28 @@ class ClipperModulatedModule(ModulatedModuleBase):
 
         samples = read_samples(self.in_port, num_samples)
 
-        # Lazy initialization if component wasn't prepared (e.g., in tests)
-        if self.component is None and self.mod_port.is_connected:
-            self.prepare_modulated_component(num_samples)
+        # Thread-safe component access with lock
+        with self._component_lock:
+            # Lazy initialization if component wasn't prepared (e.g., in tests)
+            if self.component is None and self.mod_port.is_connected:
+                self.prepare_modulated_component(num_samples)
 
-        # Get threshold/amount from knob
-        threshold_value = float_parameter(
-            parameters, "threshold", self.threshold_knob.get_value
-        )
+            # Get threshold/amount from knob
+            threshold_value = float_parameter(
+                parameters, "threshold", self.threshold_knob.get_value
+            )
 
-        if self.mod_port.is_connected:
-            # When modulated: knob controls modulation depth (0.0 to 1.0)
-            if self.port_adapter is not None:
-                self.port_adapter.modulation_amount = threshold_value
-        else:
-            # When unmodulated: knob controls threshold directly
-            self.component.wave_range = (-threshold_value, threshold_value)
+            if self.mod_port.is_connected:
+                # When modulated: knob controls modulation depth (0.0 to 1.0)
+                if self.port_adapter is not None:
+                    self.port_adapter.modulation_amount = threshold_value
+            else:
+                # When unmodulated: knob controls threshold directly
+                if self.component is not None:
+                    self.component.wave_range = (-threshold_value, threshold_value)
 
-        # Call component directly - works for both Clipper and ModulatedClipper
-        self.out_port.write(self.component(samples))
+            # Call component directly - works for both Clipper and ModulatedClipper
+            if self.component is not None:
+                self.out_port.write(self.component(samples))
+            else:
+                self.out_port.write(silence(num_samples))

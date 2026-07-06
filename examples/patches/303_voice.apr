@@ -1,0 +1,143 @@
+{
+  "metadata": {
+    "name": "Untitled Preset",
+    "author": "",
+    "description": "",
+    "tags": [],
+    "category": "User",
+    "created": "2026-06-30T09:32:50.983823",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": {
+        "x": 546.0,
+        "y": -42.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 1,
+      "type": "Clock",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -504.0,
+        "y": -290.0
+      },
+      "parameters": {
+        "active": true,
+        "bpm": 165.89999999999995,
+        "division": "1/16",
+        "swing": 0.4575,
+        "running": true
+      }
+    },
+    {
+      "id": 2,
+      "type": "Step Sequencer",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -236.0,
+        "y": -301.0
+      },
+      "parameters": {
+        "active": true,
+        "notes": "36,-,36,39,41,-,39,36",
+        "accents": "1,0,0,1,0,0,1,0",
+        "slides": "0,0,1,0,0,0,1,0",
+        "bpm": 245.55000000000004,
+        "gate_length": 0.8,
+        "division": "1/16"
+      }
+    },
+    {
+      "id": 3,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": {
+        "x": 614.0,
+        "y": -362.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "TB-303 Voice",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": 203.0,
+        "y": -310.0
+      },
+      "parameters": {
+        "active": true,
+        "waveform": "Sawtooth",
+        "tuning": 1.4274999999999989,
+        "pulsewidth": 0.3874999999999995,
+        "cutoff": 193.7642669039388,
+        "resonance": 8.0,
+        "env_amount": 2.999999999999999,
+        "decay": 0.2872,
+        "accent": 0.40500000000000025,
+        "slide_time": 0.5,
+        "drive_db": 15.959999999999997,
+        "volume": 0.7999999999999998
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 0,
+      "target_port": "L/Mono"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Slide",
+      "target_module": 4,
+      "target_port": "Slide"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Accent",
+      "target_module": 4,
+      "target_port": "Accent"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Gate",
+      "target_module": 4,
+      "target_port": "Gate"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Clock",
+      "target_module": 2,
+      "target_port": "Clock"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Freq",
+      "target_module": 4,
+      "target_port": "Freq"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "Left/Mono"
+    }
+  ]
+}

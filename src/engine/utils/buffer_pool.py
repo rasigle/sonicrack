@@ -25,8 +25,8 @@ Usage:
 from __future__ import annotations
 
 import threading
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
 import numpy as np
 
@@ -385,4 +385,3 @@ def acquire_buffer_context(size: int) -> Generator[np.ndarray, None, None]:
         yield buffer
     finally:
         release_buffer(buffer, size)
-

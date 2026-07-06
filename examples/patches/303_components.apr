@@ -1,0 +1,242 @@
+{
+  "metadata": {
+    "name": "Untitled Preset",
+    "author": "",
+    "description": "",
+    "tags": [],
+    "category": "User",
+    "created": "2026-06-30T09:24:41.409717",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": {
+        "x": 1228.0,
+        "y": -6.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 1,
+      "type": "Distortion",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": {
+        "x": 960.0,
+        "y": 110.0
+      },
+      "parameters": {
+        "active": true,
+        "drive": 0.5,
+        "mix": 0.5,
+        "distortion_type": "soft"
+      }
+    },
+    {
+      "id": 2,
+      "type": "VCO",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": -161.0,
+        "y": 156.0
+      },
+      "parameters": {
+        "active": true,
+        "waveform": "Square",
+        "mode": "ideal",
+        "frequency": 548.9000000000001,
+        "gain_db": -20.0,
+        "phase": 0.0,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 3,
+      "type": "Acid Filter",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": {
+        "x": 575.0,
+        "y": 132.0
+      },
+      "parameters": {
+        "active": true,
+        "cutoff": 165.96404402233279,
+        "resonance": 2.0326286980769854,
+        "env_amount": 2.319999999999999,
+        "accent_amount": 1.0,
+        "drive_db": 6.0,
+        "output_gain_db": -6.0
+      }
+    },
+    {
+      "id": 4,
+      "type": "VCA",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": {
+        "x": 912.0,
+        "y": -142.0
+      },
+      "parameters": {
+        "active": true,
+        "amplitude": 0.7
+      }
+    },
+    {
+      "id": 5,
+      "type": "Accent",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": 531.0,
+        "y": -279.0
+      },
+      "parameters": {
+        "active": true,
+        "amount": 1.0,
+        "decay": 0.09500000000000013,
+        "amp_depth": 0.35,
+        "cutoff_depth": 0.6,
+        "envelope_depth": 0.5
+      }
+    },
+    {
+      "id": 6,
+      "type": "Decay Envelope",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": 256.0,
+        "y": -95.0
+      },
+      "parameters": {
+        "active": true,
+        "attack_duration": 0.04200000000000003,
+        "decay_duration": 0.13002499999999984,
+        "amount": 1.0,
+        "accent_amount": 0.8700000000000004
+      }
+    },
+    {
+      "id": 7,
+      "type": "Slide",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": {
+        "x": 245.0,
+        "y": -349.0
+      },
+      "parameters": {
+        "active": true,
+        "time": 0.04000000000000019,
+        "always_on": true
+      }
+    },
+    {
+      "id": 8,
+      "type": "Step Sequencer",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -263.0,
+        "y": -355.0
+      },
+      "parameters": {
+        "active": true,
+        "notes": "36,-,36,39,41,-,39,36",
+        "accents": "1,0,0,1,0,0,1,0",
+        "slides": "0,0,1,0,0,0,1,0",
+        "bpm": 125.4,
+        "gate_length": 0.8,
+        "division": "1/16"
+      }
+    },
+    {
+      "id": 9,
+      "type": "Clock",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -528.0,
+        "y": -363.0
+      },
+      "parameters": {
+        "active": true,
+        "bpm": 136.64999999999998,
+        "division": "1/16",
+        "swing": 0.0,
+        "running": true
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 0,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 1,
+      "target_port": "In"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "In"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "Env CV"
+    },
+    {
+      "source_module": 8,
+      "source_port": "Accent",
+      "target_module": 5,
+      "target_port": "Accent"
+    },
+    {
+      "source_module": 8,
+      "source_port": "Gate",
+      "target_module": 6,
+      "target_port": "Gate"
+    },
+    {
+      "source_module": 8,
+      "source_port": "Slide",
+      "target_module": 7,
+      "target_port": "Slide"
+    },
+    {
+      "source_module": 8,
+      "source_port": "Freq",
+      "target_module": 7,
+      "target_port": "Freq In"
+    },
+    {
+      "source_module": 9,
+      "source_port": "Clock",
+      "target_module": 8,
+      "target_port": "Clock"
+    }
+  ]
+}

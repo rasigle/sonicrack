@@ -1,0 +1,163 @@
+{
+  "metadata": {
+    "name": "Untitled Preset",
+    "author": "",
+    "description": "",
+    "tags": [],
+    "category": "User",
+    "created": "2026-06-29T14:02:43.307755",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": {
+        "x": 355.0,
+        "y": 87.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 1,
+      "type": "LFO",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -514.0,
+        "y": 169.0
+      },
+      "parameters": {
+        "active": true,
+        "frequency": 5.4073000000000135,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 2,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": {
+        "x": 588.0,
+        "y": -227.0
+      },
+      "parameters": {
+        "active": false
+      }
+    },
+    {
+      "id": 3,
+      "type": "ADSR Envelope",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": -130.0,
+        "y": 253.0
+      },
+      "parameters": {
+        "active": true,
+        "attack_duration": 0.005,
+        "decay_duration": 3.549330000000002,
+        "sustain_level": 0.9199999999999995,
+        "release_duration": 3.674325000000001
+      }
+    },
+    {
+      "id": 4,
+      "type": "VCA",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": {
+        "x": 244.0,
+        "y": -229.0
+      },
+      "parameters": {
+        "active": true,
+        "amplitude": 0.34999999999999964
+      }
+    },
+    {
+      "id": 5,
+      "type": "Oscillator",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -544.0,
+        "y": -351.0
+      },
+      "parameters": {
+        "active": true,
+        "frequency": 1824.3,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 6,
+      "type": "Resonant Filter",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": {
+        "x": -195.0,
+        "y": -278.0
+      },
+      "parameters": {
+        "active": true,
+        "cutoff": 924.7620427985208,
+        "resonance": 12.0,
+        "cv_depth_octaves": 2.050000000000001,
+        "drive_db": 4.679999999999996,
+        "output_gain_db": -5.580000000000005,
+        "filter_type": "Notch"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 5,
+      "source_port": "Triangle",
+      "target_module": 6,
+      "target_port": "In"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Sine",
+      "target_module": 6,
+      "target_port": "Cutoff CV"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 0,
+      "target_port": "L/Mono"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Square",
+      "target_module": 3,
+      "target_port": "Gate"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 2,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "CV"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In"
+    }
+  ]
+}

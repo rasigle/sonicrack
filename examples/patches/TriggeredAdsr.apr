@@ -1,0 +1,120 @@
+{
+  "metadata": {
+    "name": "Untitled Preset",
+    "author": "",
+    "description": "",
+    "tags": [],
+    "category": "User",
+    "created": "2026-06-29T13:43:10.949326",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": {
+        "x": 489.0,
+        "y": -327.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 1,
+      "type": "Filter",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": {
+        "x": 177.0,
+        "y": -371.0
+      },
+      "parameters": {
+        "active": true,
+        "cutoff": 1261.9146889603926,
+        "high_cutoff": 2000,
+        "order": 3.9970000000000003,
+        "filter_type": "High-pass"
+      }
+    },
+    {
+      "id": 2,
+      "type": "LFO",
+      "custom_name": "",
+      "module_category": "Source",
+      "position": {
+        "x": -489.0,
+        "y": -106.0
+      },
+      "parameters": {
+        "active": true,
+        "frequency": 1.4093000000000078,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 3,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": {
+        "x": 129.0,
+        "y": -33.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "ADSR Envelope",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": {
+        "x": -158.0,
+        "y": -197.0
+      },
+      "parameters": {
+        "active": true,
+        "attack_duration": 0.8042000000000004,
+        "decay_duration": 1.4997400000000012,
+        "sustain_level": 0.48499999999999965,
+        "release_duration": 1.9246749999999977
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "R"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 0,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 1,
+      "target_port": "In"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Square",
+      "target_module": 4,
+      "target_port": "Gate"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "L/Mono"
+    }
+  ]
+}

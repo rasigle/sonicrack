@@ -266,8 +266,7 @@ def benchmark_mixing(
 
     # Generate test data
     signals = [
-        np.random.randn(buffer_size).astype(np.float32)
-        for _ in range(num_channels)
+        np.random.randn(buffer_size).astype(np.float32) for _ in range(num_channels)
     ]
     gains = np.random.rand(num_channels).astype(np.float32)
 
@@ -308,4 +307,3 @@ if __name__ == "__main__":
         print(f"  Vectorized: {results['vectorized_ms']:.2f}ms")
         print(f"  Sequential: {results['sequential_ms']:.2f}ms")
         print(f"  Speedup: {results['speedup']:.2f}x")
-

@@ -122,24 +122,30 @@ class VolumeModule(ModulatedModuleBase):
 
         input_signal = read_samples(self.in_port, num_samples)
 
-        # Lazy initialization if component wasn't prepared (e.g., in tests)
-        if self.component is None and self.mod_port.is_connected:
-            self.prepare_modulated_component(num_samples)
+        # Thread-safe component access with lock
+        with self._component_lock:
+            # Lazy initialization if component wasn't prepared (e.g., in tests)
+            if self.component is None and self.mod_port.is_connected:
+                self.prepare_modulated_component(num_samples)
 
-        # Get gain from knob
-        gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)
+            # Get gain from knob
+            gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)
 
-        if self.mod_port.is_connected:
-            # When modulated: knob controls modulation depth (0.0 to 1.0)
-            # Map gain_db range [-60, 12] to modulation amount [0.0, 1.0]
-            # Use a simple linear mapping for now
-            modulation_amount = (gain_db + 60) / 72  # Maps [-60, 12] to [0, 1]
-            modulation_amount = max(0.0, min(1.0, modulation_amount))
-            if self.port_adapter is not None:
-                self.port_adapter.modulation_amount = modulation_amount
-        else:
-            # When unmodulated: knob controls gain directly
-            self.component.gain_db = gain_db
+            if self.mod_port.is_connected:
+                # When modulated: knob controls modulation depth (0.0 to 1.0)
+                # Map gain_db range [-60, 12] to modulation amount [0.0, 1.0]
+                # Use a simple linear mapping for now
+                modulation_amount = (gain_db + 60) / 72  # Maps [-60, 12] to [0, 1]
+                modulation_amount = max(0.0, min(1.0, modulation_amount))
+                if self.port_adapter is not None:
+                    self.port_adapter.modulation_amount = modulation_amount
+            else:
+                # When unmodulated: knob controls gain directly
+                if self.component is not None:
+                    self.component.gain_db = gain_db
 
-        # Call component directly - works for both Volume and ModulatedVolume
-        self.out_port.write(self.component(input_signal))
+            # Call component directly - works for both Volume and ModulatedVolume
+            if self.component is not None:
+                self.out_port.write(self.component(input_signal))
+            else:
+                self.out_port.write(silence(num_samples))

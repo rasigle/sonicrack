@@ -5,45 +5,12 @@
     "description": "",
     "tags": [],
     "category": "User",
-    "created": "2025-12-16T11:20:36.803551",
+    "created": "2026-07-06T08:42:00.677714",
     "version": "1.0"
   },
   "modules": [
     {
       "id": 0,
-      "type": "Waveform",
-      "custom_name": "",
-      "module_category": "Visualization",
-      "position": {
-        "x": -429.0,
-        "y": 70.0
-      },
-      "parameters": {}
-    },
-    {
-      "id": 1,
-      "type": "Output",
-      "custom_name": "",
-      "module_category": "Output",
-      "position": {
-        "x": 146.0,
-        "y": -357.0
-      },
-      "parameters": {}
-    },
-    {
-      "id": 2,
-      "type": "Spectrum",
-      "custom_name": "",
-      "module_category": "Visualization",
-      "position": {
-        "x": 90.0,
-        "y": 66.0
-      },
-      "parameters": {}
-    },
-    {
-      "id": 3,
       "type": "Oscillator",
       "custom_name": "",
       "module_category": "Source",
@@ -52,28 +19,68 @@
         "y": -265.0
       },
       "parameters": {
+        "active": true,
         "frequency": 120,
         "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 1,
+      "type": "Spectrum",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": {
+        "x": 260.0,
+        "y": -9.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 2,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": {
+        "x": 146.0,
+        "y": -357.0
+      },
+      "parameters": {
+        "active": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": {
+        "x": -429.0,
+        "y": 70.0
+      },
+      "parameters": {
+        "active": true
       }
     }
   ],
   "connections": [
     {
-      "source_module": 3,
+      "source_module": 0,
       "source_port": "Sine",
-      "target_module": 0,
-      "target_port": "In"
+      "target_module": 3,
+      "target_port": "L/Mono"
     },
     {
-      "source_module": 3,
-      "source_port": "Sine",
-      "target_module": 1,
-      "target_port": "In"
-    },
-    {
-      "source_module": 3,
+      "source_module": 0,
       "source_port": "Sine",
       "target_module": 2,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 0,
+      "source_port": "Sine",
+      "target_module": 1,
       "target_port": "In"
     }
   ]

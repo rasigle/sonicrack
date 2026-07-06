@@ -144,41 +144,45 @@ class DistortionModule(ModulatedModuleBase):
             self.out_port.write(silence(num_samples))
             return
 
-        if self.component is None:
-            self.component = self.create_unmodulated_component()
+        # Thread-safe component access with lock
+        with self._component_lock:
+            if self.component is None:
+                self.component = self.create_unmodulated_component()
 
-        self.component.drive = float_parameter(
-            parameters, "drive", self.drive_knob.get_value
-        )
-        self.component.mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
-        self.component.distortion_type = str_parameter(
-            parameters, "distortion_type", self.distortion_combo.currentText
-        )
-
-        input_signal = read_samples(self.in_port, num_samples)
-        drive_cv = (
-            read_samples(self.drive_cv_port, num_samples)
-            if self.drive_cv_port.is_connected
-            else None
-        )
-        mix_cv = (
-            read_samples(self.mix_cv_port, num_samples)
-            if self.mix_cv_port.is_connected
-            else None
-        )
-        if drive_cv is None and mix_cv is None:
-            self.out_port.write(self.component(input_signal))
-            return
-
-        self.out_port.write(
-            self._process_modulated_distortion(
-                input_signal,
-                base_drive=self.component.drive,
-                base_mix=self.component.mix,
-                drive_cv=drive_cv,
-                mix_cv=mix_cv,
+            self.component.drive = float_parameter(
+                parameters, "drive", self.drive_knob.get_value
             )
-        )
+            self.component.mix = float_parameter(
+                parameters, "mix", self.mix_knob.get_value
+            )
+            self.component.distortion_type = str_parameter(
+                parameters, "distortion_type", self.distortion_combo.currentText
+            )
+
+            input_signal = read_samples(self.in_port, num_samples)
+            drive_cv = (
+                read_samples(self.drive_cv_port, num_samples)
+                if self.drive_cv_port.is_connected
+                else None
+            )
+            mix_cv = (
+                read_samples(self.mix_cv_port, num_samples)
+                if self.mix_cv_port.is_connected
+                else None
+            )
+            if drive_cv is None and mix_cv is None:
+                self.out_port.write(self.component(input_signal))
+                return
+
+            self.out_port.write(
+                self._process_modulated_distortion(
+                    input_signal,
+                    base_drive=self.component.drive,
+                    base_mix=self.component.mix,
+                    drive_cv=drive_cv,
+                    mix_cv=mix_cv,
+                )
+            )
 
     def _process_modulated_distortion(
         self,

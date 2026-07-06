@@ -8,6 +8,7 @@ This provides common functionality for modules that have:
 """
 
 import logging
+import threading
 from typing import Any
 
 import numpy as np
@@ -210,6 +211,7 @@ class ModulatedModuleBase(ModuleWidget):
             None  # Store adapter reference for updating modulation_amount
         )
         self._is_modulated = False  # Track current modulation state
+        self._component_lock = threading.RLock()  # Thread-safe component switching
 
     def on_port_connection_changed(self, port_name: str, is_connected: bool):
         """Handle port connection/disconnection events.
@@ -225,22 +227,25 @@ class ModulatedModuleBase(ModuleWidget):
         if port_name != "Mod":
             return
 
-        # Update component based on connection state
-        if is_connected and not self._is_modulated:
-            # Switch to modulated component - prepare it now
-            logger.debug(f"{self.__class__.__name__}: Switching to modulated component")
-            self._is_modulated = True
-            # Prepare modulated component with port adapter
-            # Use a default buffer size, it will adapt at runtime
-            self.prepare_modulated_component(num_samples=512)
-        elif not is_connected and self._is_modulated:
-            # Switch to unmodulated component - create it now
-            logger.debug(
-                f"{self.__class__.__name__}: Switching to unmodulated component"
-            )
-            self._is_modulated = False
-            # Pre-create the unmodulated component
-            self.component = self.create_unmodulated_component()
+        # Update component based on connection state - THREAD SAFE
+        with self._component_lock:
+            if is_connected and not self._is_modulated:
+                # Switch to modulated component - prepare it now
+                logger.debug(
+                    f"{self.__class__.__name__}: Switching to modulated component"
+                )
+                self._is_modulated = True
+                # Prepare modulated component with port adapter
+                # Use a default buffer size, it will adapt at runtime
+                self.prepare_modulated_component(num_samples=512)
+            elif not is_connected and self._is_modulated:
+                # Switch to unmodulated component - create it now
+                logger.debug(
+                    f"{self.__class__.__name__}: Switching to unmodulated component"
+                )
+                self._is_modulated = False
+                # Pre-create the unmodulated component
+                self.component = self.create_unmodulated_component()
 
         # Update knob state
         self.update_knob_state()
@@ -454,3 +459,21 @@ class ModulatedModuleBase(ModuleWidget):
         raise NotImplementedError(
             f"{type(self).__name__} must implement create_unmodulated_component()"
         )
+
+    def safe_process_component(self, input_samples: np.ndarray) -> np.ndarray:
+        """Thread-safe wrapper for processing samples through the component.
+
+        This method should be used in process_runtime() to ensure thread-safe
+        access to self.component while the GUI thread might be switching it.
+
+        Args:
+            input_samples: Input samples to process
+
+        Returns:
+            Processed samples
+        """
+        with self._component_lock:
+            if self.component is None:
+                # Component not initialized yet
+                return np.zeros_like(input_samples, dtype=np.float32)
+            return self.component(input_samples)

@@ -167,9 +167,9 @@ def test_listener_exception_handling():
     # Should not raise, and good listener should still be called
     audio_config.sample_rate = 96000
 
-    assert (
-        len(notifications) == 1
-    ), "Good listener should be called despite bad listener"
+    assert len(notifications) == 1, (
+        "Good listener should be called despite bad listener"
+    )
     assert notifications[0] == 96000
 
     # Cleanup

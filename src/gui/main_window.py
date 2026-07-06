@@ -35,8 +35,8 @@ from src.gui.dialogs.preset_library_dialog import (
     SaveLibraryPresetDialog,
 )
 from src.gui.module_registry import initialize_module_registry
-from src.gui.patch_canvas import PatchCanvas
 from src.gui.ui_constants import APP_ICON_RESOURCE, APP_TITLE, DEFAULT_AUTOSAVE_PATCH
+from src.gui.widgets.patch_canvas import PatchCanvas
 
 if TYPE_CHECKING:
     from src.gui.module_registry import ModuleRegistry

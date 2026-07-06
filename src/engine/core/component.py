@@ -28,6 +28,7 @@ class ComponentCategory(Enum):
     COMPOSER = "composer"
     FILTER = "filter"
     EFFECT = "effect"
+    SEQUENCER = "sequencer"
 
 
 COMMON_PARAMETER_DESCRIPTORS: dict[str, ParameterDescriptor] = {
@@ -108,19 +109,19 @@ class ComponentDescriptor:
     Attributes:
         name: Unique identifier for the component (e.g., "sine_oscillator")
         category: Component category (oscillator, modulator, modifier, composer)
+        fluent_api_name: Name of the component for the fluent API (preset builder)
         parameters: Ordered runtime parameter metadata for config/UI policy.
         description: More detailed and human-readable description of the component.
-        fluent_api_name: Optional name of the component for the fluent API
         serializer: Optional custom serializer function
         deserializer: Optional custom deserializer function
     """
 
     name: str
     category: ComponentCategory
+    fluent_api_name: str
     description: str = ""
     parameters: dict[str, ParameterDescriptor] | None = None
     tags: list[str] | None = None
-    fluent_api_name: str | None = None
     serializer: Callable | None = None
     deserializer: Callable | None = None
 

@@ -82,7 +82,8 @@ class ButterworthFilter(Modifier):
 
     descriptor = ComponentDescriptor(
         name="ButterworthFilter",
-        category=ComponentCategory.MODIFIER,
+        category=ComponentCategory.FILTER,
+        fluent_api_name="butterworth_filter",
         parameters=make_parameter_descriptors(
             "cutoff",
             "order",
@@ -322,6 +323,7 @@ class BiquadResonantFilter(Modifier):
     descriptor = ComponentDescriptor(
         name="BiquadResonantFilter",
         category=ComponentCategory.MODIFIER,
+        fluent_api_name="biquad_resonant_filter",
         parameters=make_parameter_descriptors(
             "cutoff",
             "resonance",

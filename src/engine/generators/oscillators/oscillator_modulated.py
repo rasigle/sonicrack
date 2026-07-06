@@ -102,6 +102,7 @@ class ModulatedOscillator(Generator):
     descriptor = ComponentDescriptor(
         name="ModulatedOscillator",
         category=ComponentCategory.OSCILLATOR,
+        fluent_api_name="oscillator_mod",
         description="Oscillator with modulation support (amplitude, frequency, phase)",
         tags=["oscillator", "modulated", "advanced"],
         parameters={
@@ -633,6 +634,7 @@ class ModulatedFrequency(ModulatedOscillator):
     descriptor = ComponentDescriptor(
         name="Modulated Frequency",
         category=ComponentCategory.OSCILLATOR,
+        fluent_api_name="frequency_mod",
         description="Frequency-modulated oscillator (vibrato, FM synthesis)",
         tags=["oscillator", "modulated", "frequency", "vibrato", "fm"],
         parameters={

@@ -28,7 +28,7 @@ class AcidResonantFilter(Modifier):
 
     descriptor = ComponentDescriptor(
         name="AcidResonantFilter",
-        category=ComponentCategory.MODIFIER,
+        category=ComponentCategory.FILTER,
         description="Acid-style resonant low-pass filter with env/accent CV",
         tags=["filter", "acid", "303", "resonant", "drive"],
         parameters=make_parameter_descriptors(

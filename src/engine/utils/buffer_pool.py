@@ -177,10 +177,7 @@ class BufferPool:
     def reset_stats(self) -> None:
         """Reset statistics counters."""
         with self._lock:
-            self._total_acquires = 0
-            self._total_releases = 0
-            self._peak_usage = 0
-            self._fallback_allocations = 0
+            self._reset()
 
     def clear(self) -> None:
         """Clear the pool and release all buffers.
@@ -198,7 +195,14 @@ class BufferPool:
                 self._pool.append(buffer)
                 self._available.add(i)
 
-            self.reset_stats()
+            # Reset stats (inline to avoid deadlock with reset_stats())
+            self._reset()
+
+    def _reset(self):
+        self._total_acquires = 0
+        self._total_releases = 0
+        self._peak_usage = 0
+        self._fallback_allocations = 0
 
     @property
     def buffer_size(self) -> int:

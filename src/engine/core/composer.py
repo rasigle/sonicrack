@@ -209,6 +209,7 @@ class Chain(Composer):
     descriptor = ComponentDescriptor(
         name="Chain",
         category=ComponentCategory.COMPOSER,
+        fluent_api_name="chain",
         description="Chains a generator with multiple modifiers in sequence.",
         tags=["composer", "chain"],
     )
@@ -341,6 +342,7 @@ class WaveAdder(Composer):
     descriptor = ComponentDescriptor(
         name="WaveAdder",
         category=ComponentCategory.COMPOSER,
+        fluent_api_name="wave_adder",
         description="Adds the output of multiple generators together.",
         parameters={
             "generators": ParameterDescriptor(

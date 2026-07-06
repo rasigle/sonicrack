@@ -115,30 +115,34 @@ class IdealSquareStrategySmoothing(SquareWaveStrategy):
         self._start_amplitude = 1.0
         self._smoothing_samples_total = 0
         self._smoothing_samples_remaining = 0
+        # Protect internal state from concurrent access (reentrant)
+        self._state_lock = threading.RLock()
 
     def set_sample_rate(self, sample_rate: float) -> None:
         self.sample_rate = validate_sample_rate(sample_rate)
 
     def reset_amplitude(self, amplitude: float) -> None:
-        self._current_amplitude = amplitude
-        self._target_amplitude = amplitude
-        self._start_amplitude = amplitude
-        self._smoothing_samples_total = 0
-        self._smoothing_samples_remaining = 0
+        with self._state_lock:
+            self._current_amplitude = amplitude
+            self._target_amplitude = amplitude
+            self._start_amplitude = amplitude
+            self._smoothing_samples_total = 0
+            self._smoothing_samples_remaining = 0
 
     def set_amplitude(self, amplitude: float) -> None:
-        if abs(amplitude - self._current_amplitude) > 0.001:
-            smoothing_samples = duration_ms_to_samples(
-                self.sample_rate,
-                self.smoothing_time_ms,
-                name="smoothing_time_ms",
-            )
-            self._start_amplitude = self._current_amplitude
-            self._target_amplitude = amplitude
-            self._smoothing_samples_total = smoothing_samples
-            self._smoothing_samples_remaining = smoothing_samples
-            if smoothing_samples == 0:
-                self.reset_amplitude(amplitude)
+        with self._state_lock:
+            if abs(amplitude - self._current_amplitude) > 0.001:
+                smoothing_samples = duration_ms_to_samples(
+                    self.sample_rate,
+                    self.smoothing_time_ms,
+                    name="smoothing_time_ms",
+                )
+                self._start_amplitude = self._current_amplitude
+                self._target_amplitude = amplitude
+                self._smoothing_samples_total = smoothing_samples
+                self._smoothing_samples_remaining = smoothing_samples
+                if smoothing_samples == 0:
+                    self.reset_amplitude(amplitude)
 
     def _consume_amplitude_envelope(self, n: int) -> np.ndarray:
         if n <= 0:
@@ -334,6 +338,8 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
         self._last_square_state = 1.0
         self._last_pulsewidth = 0.5
         self._dc_lowpass_state = 0.0
+        # Protect internal state from concurrent access (reentrant)
+        self._state_lock = threading.RLock()
         self._update_dc_alpha()
 
     def set_sample_rate(self, sample_rate: float) -> None:
@@ -344,11 +350,12 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
         self.frequency = frequency
 
     def reset_state(self) -> None:
-        self._buffer.fill(0.0)
-        self._prev_phase = None
-        self._last_square_state = 1.0
-        self._last_pulsewidth = 0.5
-        self._dc_lowpass_state = 0.0
+        with self._state_lock:
+            self._buffer.fill(0.0)
+            self._prev_phase = None
+            self._last_square_state = 1.0
+            self._last_pulsewidth = 0.5
+            self._dc_lowpass_state = 0.0
 
     def _update_dc_alpha(self) -> None:
         cutoff = min(0.4, 20.0 / self.sample_rate)
@@ -479,8 +486,9 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
         low_value: float,
         high_value: float,
     ) -> float:
-        normalized = self._process_normalized_sample(phase, pulsewidth_threshold)
-        return float(self._scale_from_normalized(normalized, low_value, high_value))
+        with self._state_lock:
+            normalized = self._process_normalized_sample(phase, pulsewidth_threshold)
+            return float(self._scale_from_normalized(normalized, low_value, high_value))
 
     def generate_samples(
         self,
@@ -489,17 +497,18 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
         low_value: float,
         high_value: float,
     ) -> np.ndarray:
-        normalized = np.asarray(
-            [
-                self._process_normalized_sample(float(phase), pulsewidth_threshold)
-                for phase in phases
-            ],
-            dtype=np.float32,
-        )
-        return np.asarray(
-            self._scale_from_normalized(normalized, low_value, high_value),
-            dtype=np.float32,
-        )
+        with self._state_lock:
+            normalized = np.asarray(
+                [
+                    self._process_normalized_sample(float(phase), pulsewidth_threshold)
+                    for phase in phases
+                ],
+                dtype=np.float32,
+            )
+            return np.asarray(
+                self._scale_from_normalized(normalized, low_value, high_value),
+                dtype=np.float32,
+            )
 
 
 class ComparatorSquareStrategy(SquareWaveStrategy):
@@ -513,10 +522,13 @@ class ComparatorSquareStrategy(SquareWaveStrategy):
         self.hysteresis = hysteresis
         self._state_high = False
         self._state_initialized = False
+        # Protect internal state from concurrent access (reentrant)
+        self._state_lock = threading.RLock()
 
     def reset_state(self) -> None:
-        self._state_high = False
-        self._state_initialized = False
+        with self._state_lock:
+            self._state_high = False
+            self._state_initialized = False
 
     @staticmethod
     def _comparator_level(phase: float, pulsewidth_threshold: float) -> float:
@@ -537,16 +549,17 @@ class ComparatorSquareStrategy(SquareWaveStrategy):
         low_value: float,
         high_value: float,
     ) -> float:
-        level = self._comparator_level(phase, pulsewidth_threshold)
-        if not self._state_initialized:
-            self._state_high = level >= 0.0
-            self._state_initialized = True
-        elif self._state_high and level < -self.hysteresis:
-            self._state_high = False
-        elif not self._state_high and level > self.hysteresis:
-            self._state_high = True
+        with self._state_lock:
+            level = self._comparator_level(phase, pulsewidth_threshold)
+            if not self._state_initialized:
+                self._state_high = level >= 0.0
+                self._state_initialized = True
+            elif self._state_high and level < -self.hysteresis:
+                self._state_high = False
+            elif not self._state_high and level > self.hysteresis:
+                self._state_high = True
 
-        return high_value if self._state_high else low_value
+            return high_value if self._state_high else low_value
 
     def generate_samples(
         self,

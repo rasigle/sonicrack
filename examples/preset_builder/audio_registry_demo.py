@@ -6,6 +6,7 @@ This example shows how the registry system makes it easy to:
 3. Create plugins that extend the system
 4. Maintain backward compatibility with presets
 """
+from typing import Any
 
 import numpy as np
 
@@ -15,7 +16,9 @@ from engine import (
     ComponentDescriptor,
     Modifier,
     Oscillator,
+    ParameterDescriptor,
     PresetBuilder,
+    SmoothingPolicy,
     audio_registry,
 )
 
@@ -72,7 +75,22 @@ def example_2_custom_oscillator():
         descriptor = ComponentDescriptor(
             name="MyCustomNoiseOscillator",
             category=ComponentCategory.OSCILLATOR,
-            config_params=["amplitude", "sample_rate"],
+            parameters={
+                "amplitude": ParameterDescriptor(
+                    name="amplitude",
+                    default=1.0,
+                    minimum=0.0,
+                    description="Linear gain multiplier.",
+                ),
+                "sample_rate": ParameterDescriptor(
+                    name="sample_rate",
+                    default=DEFAULT_SAMPLE_RATE,
+                    minimum=1.0,
+                    unit="Hz",
+                    description="Processing sample rate.",
+                    smoothing_policy=SmoothingPolicy.NONE,
+                )
+            },
             description="White noise generator",
             fluent_api_name="my_custom_noise",
         )
@@ -127,14 +145,31 @@ def example_3_custom_effect():
         """Simple distortion/overdrive effect."""
 
         descriptor = ComponentDescriptor(
-            name="Distortion",
+            name="MyCustomDistortion",
             category=ComponentCategory.MODIFIER,
-            config_params=["drive", "mix"],
+            parameters={
+                "drive": ParameterDescriptor(
+                    name="drive",
+                    default=1.0,
+                    minimum=0.0,
+                    maximum=10.0,
+                    description="Distortion pre-gain amount.",
+                ),
+                "mix": ParameterDescriptor(
+                    name="mix",
+                    default=1.0,
+                    minimum=0.0,
+                    maximum=1.0,
+                    description="Dry/wet mix.",
+                ),
+            },
             description="Soft clipping distortion/overdrive",
-            fluent_api_name="distortion",
+            fluent_api_name="custom_distortion",
         )
 
-        def __init__(self, drive: float = 2.0, mix: float = 1.0):
+        def __init__(self, drive: float = 2.0, mix: float = 1.0, *args: Any,
+                     **kwargs: Any):
+            super().__init__(*args, **kwargs)
             self.drive = drive
             self.mix = mix
 
@@ -165,7 +200,7 @@ def example_3_custom_effect():
     patch = (
         PresetBuilder("Distorted Lead")
         .sawtooth(440, amplitude=0.9)
-        .distortion(drive=3.0, mix=0.7)  # Auto-generated method!
+        .custom_distortion(drive=3.0, mix=0.7)  # Auto-generated method!
         .volume(0.6)
     )
 
@@ -260,7 +295,12 @@ def example_6_plugin_system():
         descriptor = ComponentDescriptor(
             name="SuperSaw",
             category=ComponentCategory.OSCILLATOR,
-            config_params=["frequency", "voices", "detune", "sample_rate"],
+            parameters={
+                "frequency": ParameterDescriptor("frequency", 440.0),
+                "voices": ParameterDescriptor("voices", 1, 2),
+                "detune": ParameterDescriptor("detune", 0.0),
+                "sample_rate": ParameterDescriptor("sample_rate", 44100),
+            },
             description="Supersaw oscillator with multiple detuned voices",
             fluent_api_name="supersaw",
         )
@@ -302,12 +342,27 @@ def example_6_plugin_system():
         descriptor = ComponentDescriptor(
             name="ResonantFilter",
             category=ComponentCategory.MODIFIER,
-            config_params=["cutoff", "resonance"],
+            parameters={
+                "cutoff": ParameterDescriptor(
+                    name="Cutoff",
+                    minimum=10,
+                    maximum=6000,
+                    default=1000,
+                ),
+                "resonance": ParameterDescriptor(
+                    name="Resonance",
+                    minimum=0.1,
+                    maximum=0.8,
+                    default=0.5,
+                )
+            },
             description="Resonant low-pass filter",
             fluent_api_name="resonant_filter",
         )
 
-        def __init__(self, cutoff: float = 1000, resonance: float = 0.5):
+        def __init__(self, cutoff: float = 1000, resonance: float = 0.5, *args: Any,
+                     **kwargs: Any):
+            super().__init__(*args, **kwargs)
             self.cutoff = cutoff
             self.resonance = resonance
 

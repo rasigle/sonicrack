@@ -37,7 +37,7 @@ class Behringer182Sequencer(AudioComponent):
 
     descriptor = ComponentDescriptor(
         name="Behringer182Sequencer",
-        category=ComponentCategory.MODULATOR,
+        category=ComponentCategory.SEQUENCER,
         description="System 100M 182-style dual CV row analog step sequencer",
         tags=["sequencer", "cv", "gate", "behringer", "182", "system-100m"],
         parameters=make_parameter_descriptors(

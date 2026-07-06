@@ -400,42 +400,43 @@ class PolyBLEPOscillator(Generator):
 
     def __next__(self) -> float:
         """Generate next sample (iterator interface)."""
-        # Get current phase
-        phase = self._phase_normalized
+        with self._state_lock:
+            # Get current phase
+            phase = self._phase_normalized
 
-        # Generate waveform value
-        if self.wave_shape == WaveShape.SINE:
-            value = PolyBLEPWaveforms.sine(phase)
-        elif self.wave_shape == WaveShape.SQUARE:
-            value = PolyBLEPWaveforms.square(phase, self._increment, self._pulsewidth)
-        elif self.wave_shape == WaveShape.SAWTOOTH_UP:
-            value = PolyBLEPWaveforms.sawtooth(phase, self._increment)
-        elif self.wave_shape == WaveShape.SAWTOOTH_DOWN:
-            value = -PolyBLEPWaveforms.sawtooth(phase, self._increment)
-        elif self.wave_shape == WaveShape.TRIANGLE:
-            # Triangle via integration
-            square_val = PolyBLEPWaveforms.square(
-                phase, self._increment, self._pulsewidth
-            )
-            self._triangle_accumulator = (
-                self._increment * square_val
-                + self._triangle_accumulator * (1.0 - (0.25 * self._increment))
-            )
-            value = self._triangle_accumulator * 4.0
-        else:
-            value = 0.0
+            # Generate waveform value
+            if self.wave_shape == WaveShape.SINE:
+                value = PolyBLEPWaveforms.sine(phase)
+            elif self.wave_shape == WaveShape.SQUARE:
+                value = PolyBLEPWaveforms.square(phase, self._increment, self._pulsewidth)
+            elif self.wave_shape == WaveShape.SAWTOOTH_UP:
+                value = PolyBLEPWaveforms.sawtooth(phase, self._increment)
+            elif self.wave_shape == WaveShape.SAWTOOTH_DOWN:
+                value = -PolyBLEPWaveforms.sawtooth(phase, self._increment)
+            elif self.wave_shape == WaveShape.TRIANGLE:
+                # Triangle via integration
+                square_val = PolyBLEPWaveforms.square(
+                    phase, self._increment, self._pulsewidth
+                )
+                self._triangle_accumulator = (
+                    self._increment * square_val
+                    + self._triangle_accumulator * (1.0 - (0.25 * self._increment))
+                )
+                value = self._triangle_accumulator * 4.0
+            else:
+                value = 0.0
 
-        # Apply wave range conversion
-        value = self._apply_range_conversion(value)
+            # Apply wave range conversion
+            value = self._apply_range_conversion(value)
 
-        # Apply amplitude (with smoothing)
-        amp = self._get_current_amplitude()
-        value *= amp
+            # Apply amplitude (with smoothing)
+            amp = self._get_current_amplitude()
+            value *= amp
 
-        # Advance phase
-        self._phase_normalized = (self._phase_normalized + self._increment) % 1.0
+            # Advance phase
+            self._phase_normalized = (self._phase_normalized + self._increment) % 1.0
 
-        return float(value)
+            return float(value)
 
     # Vectorized generation
 
@@ -449,59 +450,60 @@ class PolyBLEPOscillator(Generator):
             Array of n samples
         """
         n = validate_sample_count(n)
-        # Generate phase array
-        phases: np.ndarray | None = (
-            self._phase_normalized + self._increment * np.arange(n)
-        ) % 1.0
+        with self._state_lock:
+            # Generate phase array
+            phases: np.ndarray | None = (
+                self._phase_normalized + self._increment * np.arange(n)
+            ) % 1.0
 
-        # Generate waveform
-        if self.wave_shape == WaveShape.SINE:
-            assert phases is not None
-            samples = np.sin(2.0 * np.pi * phases)
-        elif self.wave_shape == WaveShape.SQUARE:
-            assert phases is not None
-            samples = self._generate_square_vectorized(phases)
-        elif self.wave_shape == WaveShape.SAWTOOTH_UP:
-            assert phases is not None
-            samples = self._generate_sawtooth_vectorized(phases)
-        elif self.wave_shape == WaveShape.SAWTOOTH_DOWN:
-            assert phases is not None
-            samples = -self._generate_sawtooth_vectorized(phases)
-        elif self.wave_shape == WaveShape.TRIANGLE:
-            samples = self._generate_triangle_vectorized(n)
-            phases = None  # Triangle updates phase internally
-        else:
-            samples = np.zeros(n, dtype=np.float32)
+            # Generate waveform
+            if self.wave_shape == WaveShape.SINE:
+                assert phases is not None
+                samples = np.sin(2.0 * np.pi * phases)
+            elif self.wave_shape == WaveShape.SQUARE:
+                assert phases is not None
+                samples = self._generate_square_vectorized(phases)
+            elif self.wave_shape == WaveShape.SAWTOOTH_UP:
+                assert phases is not None
+                samples = self._generate_sawtooth_vectorized(phases)
+            elif self.wave_shape == WaveShape.SAWTOOTH_DOWN:
+                assert phases is not None
+                samples = -self._generate_sawtooth_vectorized(phases)
+            elif self.wave_shape == WaveShape.TRIANGLE:
+                samples = self._generate_triangle_vectorized(n)
+                phases = None  # Triangle updates phase internally
+            else:
+                samples = np.zeros(n, dtype=np.float32)
 
-        # Apply wave range conversion
-        if self._needs_range_conversion:
-            samples = samples * self._range_scale + self._range_offset
+            # Apply wave range conversion
+            if self._needs_range_conversion:
+                samples = samples * self._range_scale + self._range_offset
 
-        # Apply amplitude with smoothing
-        if self._smoothing_samples_remaining > 0:
-            amp_envelope, self._current_amplitude, self._smoothing_samples_remaining = (
-                consume_linear_ramp(
-                    self._current_amplitude,
-                    self._target_amplitude,
-                    self._smoothing_samples_remaining,
-                    n,
+            # Apply amplitude with smoothing
+            if self._smoothing_samples_remaining > 0:
+                amp_envelope, self._current_amplitude, self._smoothing_samples_remaining = (
+                    consume_linear_ramp(
+                        self._current_amplitude,
+                        self._target_amplitude,
+                        self._smoothing_samples_remaining,
+                        n,
+                    )
                 )
-            )
-            samples *= amp_envelope
-            if self._smoothing_samples_remaining <= 0:
-                self._current_amplitude = self._target_amplitude
-        else:
-            samples *= self._current_amplitude
+                samples *= amp_envelope
+                if self._smoothing_samples_remaining <= 0:
+                    self._current_amplitude = self._target_amplitude
+            else:
+                samples *= self._current_amplitude
 
-        # Update phase
-        if phases is not None:
-            self._phase_normalized = (
-                (phases[-1] + self._increment) % 1.0
-                if n > 0
-                else self._phase_normalized
-            )
+            # Update phase
+            if phases is not None:
+                self._phase_normalized = (
+                    (phases[-1] + self._increment) % 1.0
+                    if n > 0
+                    else self._phase_normalized
+                )
 
-        return samples.astype(np.float32)
+            return samples.astype(np.float32)
 
     def _generate_square_vectorized(self, phases: np.ndarray) -> np.ndarray:
         """Generate PolyBLEP square wave with variable pulsewidth (vectorized)."""

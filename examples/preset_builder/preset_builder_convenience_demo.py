@@ -15,7 +15,7 @@ preset = (
     .adsr(0.1, 0.2, 0.7, 0.3)
     .volume(0.5)
     .panner(0.3)
-    .volume((-0.9, 0.9))
+    .clipper((-0.9, 0.9))
 )
 
 # Display preset description

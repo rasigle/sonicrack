@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
@@ -174,6 +175,7 @@ class MixerModule(ModuleWidget):
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Mix connected input channels for the current engine cycle."""
+
         mixed_signal = None
         input_ports = [self.in1_port, self.in2_port, self.in3_port, self.in4_port]
 
@@ -189,9 +191,22 @@ class MixerModule(ModuleWidget):
             self._volume_components[channel_idx].amplitude = gain
             signal = read_samples(port, num_samples)
             gained_signal = self._volume_components[channel_idx](signal)
-            mixed_signal = (
-                gained_signal if mixed_signal is None else mixed_signal + gained_signal
-            )
+
+            # Handle shape compatibility for mixing
+            if mixed_signal is None:
+                mixed_signal = gained_signal
+            else:
+                # Ensure signals have compatible shapes
+                if mixed_signal.shape != gained_signal.shape:
+                    # Convert mono to stereo if needed
+                    if mixed_signal.ndim == 1 and gained_signal.ndim == 2:
+                        # mixed_signal is mono, gained_signal is stereo
+                        mixed_signal = np.column_stack([mixed_signal, mixed_signal])
+                    elif mixed_signal.ndim == 2 and gained_signal.ndim == 1:
+                        # mixed_signal is stereo, gained_signal is mono
+                        gained_signal = np.column_stack([gained_signal, gained_signal])
+
+                mixed_signal = mixed_signal + gained_signal
 
         self.out_port.write(
             mixed_signal if mixed_signal is not None else silence(num_samples)

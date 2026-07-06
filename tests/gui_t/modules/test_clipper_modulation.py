@@ -112,9 +112,9 @@ def test_lfo_to_clipper_cv_scaling_full_range(
     # Expected: [-1, -0.5, 0, 0.5, 1] -> [0, 0.25, 0.5, 0.75, 1]
     expected = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float32)
 
-    assert np.allclose(samples, expected, rtol=1e-5), (
-        f"CV scaling failed! Expected {expected}, got {samples}"
-    )
+    assert np.allclose(
+        samples, expected, rtol=1e-5
+    ), f"CV scaling failed! Expected {expected}, got {samples}"
 
 
 def test_lfo_at_minimum_value(
@@ -138,9 +138,9 @@ def test_lfo_at_minimum_value(
     samples = adapter.get_samples(10)
 
     # LFO at -1.0 should scale to 0.0 (minimum clipping threshold)
-    assert np.allclose(samples, 0.0, rtol=1e-5), (
-        f"LFO at minimum (-1.0) should scale to 0.0, got {samples[0]:.3f}"
-    )
+    assert np.allclose(
+        samples, 0.0, rtol=1e-5
+    ), f"LFO at minimum (-1.0) should scale to 0.0, got {samples[0]:.3f}"
 
 
 def test_lfo_at_maximum_value(
@@ -164,9 +164,9 @@ def test_lfo_at_maximum_value(
     samples = adapter.get_samples(10)
 
     # LFO at 1.0 should scale to 1.0 (maximum clipping threshold)
-    assert np.allclose(samples, 1.0, rtol=1e-5), (
-        f"LFO at maximum (1.0) should scale to 1.0, got {samples[0]:.3f}"
-    )
+    assert np.allclose(
+        samples, 1.0, rtol=1e-5
+    ), f"LFO at maximum (1.0) should scale to 1.0, got {samples[0]:.3f}"
 
 
 def test_lfo_midpoint_value(
@@ -190,9 +190,9 @@ def test_lfo_midpoint_value(
     samples = adapter.get_samples(10)
 
     # LFO at 0.0 should scale to 0.5 (middle clipping threshold)
-    assert np.allclose(samples, 0.5, rtol=1e-5), (
-        f"LFO at midpoint (0.0) should scale to 0.5, got {samples[0]:.3f}"
-    )
+    assert np.allclose(
+        samples, 0.5, rtol=1e-5
+    ), f"LFO at midpoint (0.0) should scale to 0.5, got {samples[0]:.3f}"
 
 
 def test_no_scaling_when_ranges_match(qapp: Any, mock_read_samples):
@@ -223,9 +223,9 @@ def test_no_scaling_when_ranges_match(qapp: Any, mock_read_samples):
     samples = adapter.get_samples(5)
 
     # Data should pass through unchanged
-    assert np.allclose(samples, unipolar_data, rtol=1e-5), (
-        f"Data should be unchanged when ranges match, got {samples}"
-    )
+    assert np.allclose(
+        samples, unipolar_data, rtol=1e-5
+    ), f"Data should be unchanged when ranges match, got {samples}"
 
 
 def test_adapter_with_varying_cv_signal(
@@ -285,17 +285,17 @@ def test_adapter_multiple_get_samples_calls(
     # First call: read 5 samples
     samples1 = adapter.get_samples(5)
     expected1 = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float32)
-    assert np.allclose(samples1, expected1, rtol=1e-5), (
-        f"First read failed: expected {expected1}, got {samples1}"
-    )
+    assert np.allclose(
+        samples1, expected1, rtol=1e-5
+    ), f"First read failed: expected {expected1}, got {samples1}"
 
     # Second call: reads the same data again (mock always reads from start)
     # In real usage, the port would have new data written each buffer
     samples2 = adapter.get_samples(5)
     # Should get the same scaled values (first 5 samples)
-    assert np.allclose(samples2, expected1, rtol=1e-5), (
-        f"Second read failed: expected {expected1}, got {samples2}"
-    )
+    assert np.allclose(
+        samples2, expected1, rtol=1e-5
+    ), f"Second read failed: expected {expected1}, got {samples2}"
 
     # Verify scaling is consistent across multiple calls
     assert adapter._needs_scaling, "Scaling should remain enabled"
@@ -326,9 +326,9 @@ def test_modulation_amount_control(
     )
     samples_full = adapter.get_samples(5)
     expected_full = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float32)
-    assert np.allclose(samples_full, expected_full, rtol=1e-5), (
-        f"Full modulation failed: expected {expected_full}, got {samples_full}"
-    )
+    assert np.allclose(
+        samples_full, expected_full, rtol=1e-5
+    ), f"Full modulation failed: expected {expected_full}, got {samples_full}"
 
     # Test with 50% modulation (amount = 0.5)
     # Should scale around center (0.5): output = 0.5 + (scaled_value - 0.5) * 0.5
@@ -339,15 +339,15 @@ def test_modulation_amount_control(
     # (1.0-0.5)*0.5]
     # = [0.25, 0.375, 0.5, 0.625, 0.75]
     expected_half = np.array([0.25, 0.375, 0.5, 0.625, 0.75], dtype=np.float32)
-    assert np.allclose(samples_half, expected_half, rtol=1e-5), (
-        f"Half modulation failed: expected {expected_half}, got {samples_half}"
-    )
+    assert np.allclose(
+        samples_half, expected_half, rtol=1e-5
+    ), f"Half modulation failed: expected {expected_half}, got {samples_half}"
 
     # Test with no modulation (amount = 0.0)
     # Should output center value (0.5) for all samples
     adapter.modulation_amount = 0.0
     samples_none = adapter.get_samples(5)
     expected_none = np.array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
-    assert np.allclose(samples_none, expected_none, rtol=1e-5), (
-        f"No modulation failed: expected {expected_none}, got {samples_none}"
-    )
+    assert np.allclose(
+        samples_none, expected_none, rtol=1e-5
+    ), f"No modulation failed: expected {expected_none}, got {samples_none}"

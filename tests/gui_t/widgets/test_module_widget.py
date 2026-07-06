@@ -374,7 +374,7 @@ def test_runtime_spec_declares_processor_and_ports(qapp: Any):
     assert spec.parameter_names == ("gain_db",)
 
 
-def test_render_plan_stores_runtime_parameter_snapshot(qapp: Any):
+def test_render_plan_resolves_runtime_parameters_at_render_time(qapp: Any):
     del qapp
     engine = AudioEngine()
     source = _SourceWidget()
@@ -387,4 +387,5 @@ def test_render_plan_stores_runtime_parameter_snapshot(qapp: Any):
     plan = engine.compile_render_plan([visualizer.in_port])
     modifier_node = next(node for node in plan.nodes if node.module is modifier)
 
-    assert modifier_node.parameters == {"gain_db": -3.0}
+    assert modifier_node.spec.parameter_names == ("gain_db",)
+    assert modifier_node.module.get_parameters()["gain_db"] == -3.0

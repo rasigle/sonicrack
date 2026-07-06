@@ -963,7 +963,6 @@ class ModularSynthWindow(QMainWindow):
         patch_canvas = self._require_patch_canvas()
         patch_canvas.clear_all()
         self.audio_engine.modules.clear()
-        self.audio_engine.connections.clear()
         self.audio_engine.mark_graph_changed()
         self._require_statusbar().showMessage("Canvas cleared")
 
@@ -1046,7 +1045,6 @@ class ModularSynthWindow(QMainWindow):
         # Clear current patch
         patch_canvas.clear_all()
         self.audio_engine.modules.clear()
-        self.audio_engine.connections.clear()
         self.audio_engine.mark_graph_changed()
 
         # Rebuild modules
@@ -1132,7 +1130,7 @@ class ModularSynthWindow(QMainWindow):
                     )
 
         # Compile the loaded patch
-        self._require_statusbar().showMessage("Preset loaded successfully")
+        self._require_statusbar().showMessage("Patch loaded successfully")
 
     def shutdown(self, graceful: bool = True) -> None:
         """Release app-owned resources before quitting.

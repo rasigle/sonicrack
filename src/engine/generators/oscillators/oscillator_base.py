@@ -245,6 +245,72 @@ class Oscillator(Generator):
         """Backward compatibility: delegate to RuntimeParameter."""
         self._amplitude_param._smoothing_duration_samples = value
 
+    def process_frequency_buffer(self, frequencies: np.ndarray) -> np.ndarray:
+        """Generate samples with per-sample frequency modulation (bulk API).
+
+        This is a high-performance method for processing frequency-modulated
+        oscillators. Instead of calling next() 512 times with frequency changes,
+        this processes an entire buffer at once with vectorized operations.
+
+        Args:
+            frequencies: Array of frequencies (Hz), one per output sample
+
+        Returns:
+            Array of audio samples with modulated frequency
+
+        Example:
+            >>> from engine import SineOscillator
+            >>>
+            >>> osc = SineOscillator(frequency=440)
+            >>> # Generate 512 samples with frequency sweep 440-880 Hz
+            >>> freqs = np.linspace(440, 880, 512)
+            >>> samples = osc.process_frequency_buffer(freqs)
+        """
+        frequencies = np.asarray(frequencies, dtype=np.float64)
+
+        # Calculate phase increments for each frequency
+        phase_increments = (2.0 * np.pi * frequencies) / self._sample_rate
+
+        # Accumulate phase (cumulative sum maintains phase continuity)
+        phases = np.cumsum(phase_increments) + self._p
+
+        # Update internal phase for next call (maintain continuity)
+        self._p = phases[-1] % (2.0 * np.pi)
+
+        # Generate waveform from phase array (calls subclass implementation)
+        raw_samples = self._generate_waveform_from_phases(phases)
+
+        # Apply amplitude smoothing if active
+        smoothed_samples = self._apply_amplitude_to_buffer(raw_samples)
+
+        # Apply wave range conversion if needed
+        return self._apply_wave_range_values(smoothed_samples).astype(np.float32)
+
+    def _generate_waveform_from_phases(self, phases: np.ndarray) -> np.ndarray:
+        """Generate waveform from array of phase values.
+
+        Subclasses should override this to provide their specific waveform.
+        Default implementation calls the existing _generate_waveform method.
+
+        Args:
+            phases: Array of phase values (radians)
+
+        Returns:
+            Array of raw waveform samples
+        """
+        # Default: call the existing _generate_waveform method if available
+        if hasattr(self, "_generate_waveform"):
+            return self._generate_waveform(phases)
+
+        # Fallback: generate samples one by one (slow, but works)
+        samples = np.empty(len(phases), dtype=np.float32)
+        for i, phase in enumerate(phases):
+            old_phase = self._p
+            self._p = phase
+            samples[i] = next(self)
+            self._p = old_phase
+        return samples
+
     def __next__(self):
         raise StopIteration
 

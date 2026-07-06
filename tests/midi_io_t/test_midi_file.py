@@ -245,9 +245,9 @@ class TestMIDIFileWithComplexFile:
             msg for msg in midi.messages if isinstance(msg, ControlChangeMessage)
         ]
 
-        assert len(cc_messages) > 0, (
-            f"Expected CC messages but got: {[type(m).__name__ for m in midi.messages]}"
-        )
+        assert (
+            len(cc_messages) > 0
+        ), f"Expected CC messages but got: {[type(m).__name__ for m in midi.messages]}"
         assert cc_messages[0].controller == 7  # Volume
 
 

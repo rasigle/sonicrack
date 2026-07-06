@@ -518,11 +518,7 @@ class BiquadResonantFilter(Modifier):
             return self.scale_vectorized(val)
         if isinstance(val, tuple):
             channels = [
-                float(
-                    self.scale_vectorized(
-                        np.asarray([sample], dtype=np.float32)
-                    )[0]
-                )
+                float(self.scale_vectorized(np.asarray([sample], dtype=np.float32))[0])
                 for sample in val
             ]
             return tuple(channels)

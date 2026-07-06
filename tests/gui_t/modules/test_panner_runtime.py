@@ -185,9 +185,9 @@ def test_modulated_panner_with_modulation_input(qapp: Any):
 
     # Channels should not be identical (due to modulation)
     # Use a more lenient check since they might be close at some samples
-    assert not np.allclose(left, right, rtol=0.001), (
-        "Channels should differ significantly with modulation"
-    )
+    assert not np.allclose(
+        left, right, rtol=0.001
+    ), "Channels should differ significantly with modulation"
 
 
 def test_simple_panner_runtime_without_input(qapp: Any):
@@ -252,9 +252,9 @@ def test_simple_panner_runtime_uses_engine_component(qapp: Any):
     right = output[:, 1]
 
     # At position 0.8 (right), right should be louder
-    assert np.sum(np.abs(right)) > np.sum(np.abs(left)), (
-        "Component position should affect output"
-    )
+    assert np.sum(np.abs(right)) > np.sum(
+        np.abs(left)
+    ), "Component position should affect output"
 
 
 def test_modulated_panner_runtime_uses_engine_component(qapp: Any):
@@ -281,6 +281,6 @@ def test_modulated_panner_runtime_uses_engine_component(qapp: Any):
     right = output[:, 1]
 
     # At position -0.8 (left), left should be louder
-    assert np.sum(np.abs(left)) > np.sum(np.abs(right)), (
-        "Component position should affect output in unmodulated mode"
-    )
+    assert np.sum(np.abs(left)) > np.sum(
+        np.abs(right)
+    ), "Component position should affect output in unmodulated mode"

@@ -108,7 +108,7 @@ def create_comparison_plots(
     print(f"Comparing {len(common_patches)} common patches across {len(runs)} runs")
 
     # Create main comparison figure
-    plt.figure(figsize=(18, 12))
+    plt.subplots(figsize=(18, 12))
 
     # 1. Mean processing time comparison
     ax1 = plt.subplot(2, 3, 1)

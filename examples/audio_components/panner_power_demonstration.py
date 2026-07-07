@@ -55,7 +55,7 @@ def demonstrate_constant_power_panning() -> None:
     print(f"\n[OK] Power variation: {np.std(total_powers):.10f}")
     print(f"[OK] All powers ~= 1.0: {np.allclose(total_powers, 1.0)}")
 
-    plt.figure(figsize=(10.0, 6.0))
+    plt.subplots(figsize=(10.0, 6.0))
     plt.plot(positions, left_gains, "b-", label="Left Channel", linewidth=2)
     plt.plot(positions, right_gains, "r-", label="Right Channel", linewidth=2)
     plt.plot(positions, total_powers, "g--", label="Total Power", linewidth=2)

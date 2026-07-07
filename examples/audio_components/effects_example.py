@@ -160,7 +160,7 @@ print(f"  Generated {len(samples)} samples")
 print("  Effect chain: ADSR Envelope → Delay → Reverb")
 
 # Plot the result
-plt.figure(figsize=(12, 4))
+plt.subplots(figsize=(12, 4))
 time = np.arange(len(samples)) / sample_rate
 plt.plot(time, samples, linewidth=0.5)
 plt.title("ADSR Envelope with Delay and Reverb")

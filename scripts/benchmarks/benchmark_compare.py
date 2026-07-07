@@ -145,7 +145,7 @@ def create_comparison_plots(results: list[dict[str, Any]], output_dir: Path) -> 
     modules = [r["modules"] for r in results]
 
     # Create figure with subplots
-    plt.figure(figsize=(16, 12))
+    plt.subplots(figsize=(16, 12))
 
     # 1. Mean processing time comparison
     ax1 = plt.subplot(3, 2, 1)

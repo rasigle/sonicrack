@@ -139,7 +139,7 @@ def plot_metric(
 ) -> None:
     components = sorted({str(row["component"]) for row in rows})
 
-    plt.figure(figsize=(10, 6))
+    plt.subplots(figsize=(10, 6))
 
     for component in components:
         component_rows = [row for row in rows if str(row["component"]) == component]

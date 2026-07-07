@@ -28,8 +28,79 @@ SawtoothMode = Literal["pure", "analog", "vcv"]
 TriangleMode = Literal["pure", "analog"]
 
 
+class _RampOscillator(Oscillator):
+    """Shared ramp-phase logic for sawtooth/triangle style oscillators.
+
+    Not registered as a component itself — it exists purely so
+    SawtoothOscillator and TriangleOscillator don't have to duplicate
+    (or, worse, one inherit-and-ignore) phase bookkeeping and modulated
+    cycle computation. Nothing here depends on VCV/minBLEP state, so it's
+    safe for both subclasses to inherit unconditionally.
+    """
+
+    def get_samples_vectorized(self, n: int) -> np.ndarray:
+        raise NotImplementedError("Implemented in subclasses")
+
+    def _post_freq_set(self):
+        old_period = cast(float | None, getattr(self, "_period", None))
+        self._period = self._sample_rate / self._f
+        if not hasattr(self, "_phase_degrees"):
+            self._phase_degrees = 0.0
+        self._p = (self._phase_degrees / 360) * self._period
+        if old_period is not None and old_period > 0 and self._period > 0:
+            phase_fraction = (self._i % old_period) / old_period
+            self._i = phase_fraction * self._period
+
+    def _post_phase_set(self):
+        if not hasattr(self, "_phase_degrees"):
+            self._phase_degrees = 0.0
+        self._phase_degrees = self._p
+        self._p = (self._p / 360) * self._period
+
+    def _post_sample_rate_set(self):
+        self._post_freq_set()
+
+    def _initialize_osc(self):
+        self._i = 0
+
+    @staticmethod
+    def _saw_state(phase: float) -> float:
+        return float(2.0 * (phase - np.floor(0.5 + phase)))
+
+    def _compute_modulated_cycles(
+        self,
+        freqs: np.ndarray,
+        phase_offsets_deg: np.ndarray | None,
+    ) -> tuple[np.ndarray, float]:
+        """Shared cycle/phase-offset computation for modulated rendering."""
+        increments = freqs / self.sample_rate
+        start_cycle = self._i / self._period if self._period != 0 else 0.0
+        phase_offsets = np.concatenate(
+            ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
+        )
+        carrier_cycles = start_cycle + phase_offsets
+        carrier_end = float(start_cycle + float(np.sum(increments, dtype=np.float64)))
+
+        if phase_offsets_deg is None:
+            offset_cycles = np.full(
+                len(freqs),
+                self._p / self._period if self._period != 0 else 0.0,
+                dtype=np.float64,
+            )
+        else:
+            offset_cycles = phase_offsets_deg / 360.0
+
+        cycles = carrier_cycles + offset_cycles
+        return cycles, carrier_end
+
+    def commit_modulated_phase_state(self, state: dict[str, float]) -> None:
+        """Commit phase state produced by ``render_modulated_waveform``."""
+        carrier_cycle = float(state["carrier_cycle"]) % 1.0
+        self._i = carrier_cycle * self._period if self._period != 0 else 0.0
+
+
 @register_component()
-class SawtoothOscillator(Oscillator):
+class SawtoothOscillator(_RampOscillator):
     """Sawtooth wave generator with optional analog/minBLEP coloration."""
 
     _minblep_table = minimum_phase_minblep_table()
@@ -73,7 +144,7 @@ class SawtoothOscillator(Oscillator):
         self._vcv_buffer = np.zeros(2 * VCV_MINBLEP_ZERO_CROSSINGS, dtype=np.float32)
         self._vcv_prev_phase: float | None = None
         self._dc_lowpass_state = 0.0
-        self.set_mode(mode)
+        self._mode: SawtoothMode = "pure"
 
         kwargs = filter_provided_args(
             self._provided_args,  # noqa
@@ -86,29 +157,12 @@ class SawtoothOscillator(Oscillator):
         )
         super().__init__(**kwargs)
 
-        self._mode: SawtoothMode = "pure"
         self.set_mode(mode)
         self._phase_degrees = self._p
         self._update_dc_alpha()
 
-    def _post_freq_set(self):
-        old_period = cast(float | None, getattr(self, "_period", None))
-        self._period = self._sample_rate / self._f
-        if not hasattr(self, "_phase_degrees"):
-            self._phase_degrees = 0.0
-        self._p = (self._phase_degrees / 360) * self._period
-        if old_period is not None and old_period > 0 and self._period > 0:
-            phase_fraction = (self._i % old_period) / old_period
-            self._i = phase_fraction * self._period
-
-    def _post_phase_set(self):
-        if not hasattr(self, "_phase_degrees"):
-            self._phase_degrees = 0.0
-        self._phase_degrees = self._p
-        self._p = (self._p / 360) * self._period
-
     def _initialize_osc(self):
-        self._i = 0
+        super()._initialize_osc()
         self._vcv_buffer.fill(0.0)
         self._vcv_prev_phase = None
         self._dc_lowpass_state = 0.0
@@ -133,7 +187,7 @@ class SawtoothOscillator(Oscillator):
         return ["pure", "analog", "vcv"]
 
     def _post_sample_rate_set(self):
-        self._post_freq_set()
+        super()._post_sample_rate_set()
         self._update_dc_alpha()
 
     def _update_dc_alpha(self) -> None:
@@ -172,10 +226,6 @@ class SawtoothOscillator(Oscillator):
             value, self._dc_lowpass_state, self._dc_alpha, self.dc_block
         )
         return result
-
-    @staticmethod
-    def _saw_state(phase: float) -> float:
-        return float(2.0 * (phase - np.floor(0.5 + phase)))
 
     def _process_vcv_normalized_sample(self, phase: float) -> float:
         current_phase = phase % 1.0
@@ -217,7 +267,6 @@ class SawtoothOscillator(Oscillator):
             val = self._process_vcv_normalized_sample(div)
         else:
             val = float(2 * (div - np.floor(0.5 + div)))
-
         if self._mode == "analog":
             val = self._apply_analog_character(val)
         val = float(val)
@@ -250,24 +299,8 @@ class SawtoothOscillator(Oscillator):
         phase_offsets_deg: np.ndarray | None = None,
     ) -> tuple[np.ndarray, dict[str, float]]:
         """Render an unamplified waveform for per-sample modulation."""
-        increments = freqs / self.sample_rate
-        start_cycle = self._i / self._period if self._period != 0 else 0.0
-        phase_offsets = np.concatenate(
-            ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
-        )
-        carrier_cycles = start_cycle + phase_offsets
-        carrier_end = float(start_cycle + float(np.sum(increments, dtype=np.float64)))
+        cycles, carrier_end = self._compute_modulated_cycles(freqs, phase_offsets_deg)
 
-        if phase_offsets_deg is None:
-            offset_cycles = np.full(
-                len(freqs),
-                self._p / self._period if self._period != 0 else 0.0,
-                dtype=np.float64,
-            )
-        else:
-            offset_cycles = phase_offsets_deg / 360.0
-
-        cycles = carrier_cycles + offset_cycles
         if self.mode == "vcv":
             waveform = self._generate_vcv_from_cycles(cycles)
         else:
@@ -283,14 +316,9 @@ class SawtoothOscillator(Oscillator):
         waveform = np.asarray(self._apply_wave_range_values(waveform), dtype=np.float64)
         return waveform, {"carrier_cycle": carrier_end}
 
-    def commit_modulated_phase_state(self, state: dict[str, float]) -> None:
-        """Commit phase state produced by ``render_modulated_waveform``."""
-        carrier_cycle = float(state["carrier_cycle"]) % 1.0
-        self._i = carrier_cycle * self._period if self._period != 0 else 0.0
-
 
 @register_component()
-class TriangleOscillator(SawtoothOscillator):
+class TriangleOscillator(_RampOscillator):
     """Triangle wave generator with optional analog coloration."""
 
     descriptor = ComponentDescriptor(
@@ -327,7 +355,7 @@ class TriangleOscillator(SawtoothOscillator):
         wave_range: tuple[float, float] = (-1, 1),
         mode: TriangleMode = "pure",
     ):
-        self.set_mode(mode)
+        self._mode: TriangleMode = "pure"
 
         kwargs = filter_provided_args(
             self._provided_args,  # noqa
@@ -338,14 +366,10 @@ class TriangleOscillator(SawtoothOscillator):
             sample_rate=sample_rate,
             wave_range=wave_range,
         )
-        Oscillator.__init__(self, **kwargs)
+        super().__init__(**kwargs)
 
-        self._mode: TriangleMode = "pure"
         self.set_mode(mode)
         self._phase_degrees = self._p
-
-    def _initialize_osc(self):
-        self._i = 0
 
     @property
     def mode(self) -> TriangleMode:
@@ -363,9 +387,6 @@ class TriangleOscillator(SawtoothOscillator):
     @classmethod
     def get_available_modes(cls) -> list[str]:
         return ["pure", "analog"]
-
-    def _post_sample_rate_set(self):
-        self._post_freq_set()
 
     def _apply_analog_character_triangle(
         self, val: float | np.ndarray, sample_indices: np.ndarray | None = None
@@ -422,24 +443,8 @@ class TriangleOscillator(SawtoothOscillator):
         phase_offsets_deg: np.ndarray | None = None,
     ) -> tuple[np.ndarray, dict[str, float]]:
         """Render an unamplified waveform for per-sample modulation."""
-        increments = freqs / self.sample_rate
-        start_cycle = self._i / self._period if self._period != 0 else 0.0
-        phase_offsets = np.concatenate(
-            ([0.0], np.cumsum(increments[:-1], dtype=np.float64))
-        )
-        carrier_cycles = start_cycle + phase_offsets
-        carrier_end = float(start_cycle + float(np.sum(increments, dtype=np.float64)))
+        cycles, carrier_end = self._compute_modulated_cycles(freqs, phase_offsets_deg)
 
-        if phase_offsets_deg is None:
-            offset_cycles = np.full(
-                len(freqs),
-                self._p / self._period if self._period != 0 else 0.0,
-                dtype=np.float64,
-            )
-        else:
-            offset_cycles = phase_offsets_deg / 360.0
-
-        cycles = carrier_cycles + offset_cycles
         waveform = 2 * (cycles - np.floor(0.5 + cycles))
         waveform = (np.abs(waveform) - 0.5) * 2
         if self.mode == "analog":

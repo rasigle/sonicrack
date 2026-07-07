@@ -6,6 +6,7 @@ This example shows how the registry system makes it easy to:
 3. Create plugins that extend the system
 4. Maintain backward compatibility with presets
 """
+
 from typing import Any
 
 import numpy as np
@@ -89,7 +90,7 @@ def example_2_custom_oscillator():
                     unit="Hz",
                     description="Processing sample rate.",
                     smoothing_policy=SmoothingPolicy.NONE,
-                )
+                ),
             },
             description="White noise generator",
             fluent_api_name="my_custom_noise",
@@ -167,8 +168,9 @@ def example_3_custom_effect():
             fluent_api_name="custom_distortion",
         )
 
-        def __init__(self, drive: float = 2.0, mix: float = 1.0, *args: Any,
-                     **kwargs: Any):
+        def __init__(
+            self, drive: float = 2.0, mix: float = 1.0, *args: Any, **kwargs: Any
+        ):
             super().__init__(*args, **kwargs)
             self.drive = drive
             self.mix = mix
@@ -354,14 +356,19 @@ def example_6_plugin_system():
                     minimum=0.1,
                     maximum=0.8,
                     default=0.5,
-                )
+                ),
             },
             description="Resonant low-pass filter",
             fluent_api_name="resonant_filter",
         )
 
-        def __init__(self, cutoff: float = 1000, resonance: float = 0.5, *args: Any,
-                     **kwargs: Any):
+        def __init__(
+            self,
+            cutoff: float = 1000,
+            resonance: float = 0.5,
+            *args: Any,
+            **kwargs: Any,
+        ):
             super().__init__(*args, **kwargs)
             self.cutoff = cutoff
             self.resonance = resonance

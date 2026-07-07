@@ -788,7 +788,8 @@ class ModulatedOscillatorModule(ModuleWidget):
                 fm_amount=fm_amount,
                 fm_mode=fm_mode,
             )
-            # _last_runtime_frequency is already set by _render_frequency_signal to the FM-modulated frequency
+            # _last_runtime_frequency is already set by _render_frequency_signal to
+            # the FM-modulated frequency
         else:
             self._last_pitch_cv = None
             samples, rendered_frequency = render_with_frequency_ramp(
@@ -807,7 +808,8 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Update component frequency to reflect rendered state for tests and UI
         #
         # Known limitation: In rare cases with rapid frequency modulation across buffer
-        # boundaries, this update may cause minor phase discontinuities (< 0.15 amplitude jump).
+        # boundaries, this update may cause minor phase discontinuities
+        # (< 0.15 amplitude jump).
         # This is a trade-off to allow tests to check the current frequency state.
         # Affected scenarios:
         # - LFO driving VCO freq input with rapid LFO frequency changes

@@ -5,7 +5,11 @@ from abc import abstractmethod
 
 import numpy as np
 
-from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
+from src.constants import (
+    AUTO_MODE_VECTORIZE_THRESHOLD,
+    DEFAULT_GAIN_DB,
+    DEFAULT_SAMPLE_RATE,
+)
 from src.engine.core.component import Generator, ParameterDescriptor
 from src.engine.core.parameter import RuntimeParameter, SmoothingPolicy
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
@@ -342,7 +346,7 @@ class Oscillator(Generator):
             )
 
         if mode == "auto":
-            mode = "vectorized" if n >= 512 else "iterator"
+            mode = "vectorized" if n >= AUTO_MODE_VECTORIZE_THRESHOLD else "iterator"
 
         if mode == "iterator":
             samples_list = self.get_samples_iterator(n, reset=reset)
@@ -351,6 +355,60 @@ class Oscillator(Generator):
         if reset:
             self.reset()
         return self.get_samples_vectorized(n)
+
+    # --- Modulation API (for ModulatedOscillator vectorized path) ---
+
+    def render_modulated_waveform(
+        self,
+        freqs: np.ndarray,
+        phase_offsets_deg: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, dict[str, float]]:
+        """Render unamplified waveform for per-sample modulation.
+
+        Subclasses should override this for optimal performance. The default
+        implementation uses the iterator fallback path.
+
+        Args:
+            freqs: Array of frequencies (Hz) per sample
+            phase_offsets_deg: Optional phase offsets in degrees per sample
+
+        Returns:
+            Tuple of (waveform_samples, phase_state_dict)
+        """
+        n = len(freqs)
+        samples = np.empty(n, dtype=np.float32)
+
+        # Save and restore phase state
+        saved_i = self._i
+        saved_p = self._p
+
+        for i in range(n):
+            self._f = float(freqs[i])
+            self._post_freq_set()
+            if phase_offsets_deg is not None:
+                self._p = float(phase_offsets_deg[i])
+                self._post_phase_set()
+            samples[i] = next(self)
+
+        final_state = {
+            "carrier_phase": self._i,
+            "sample_index": float(n),
+        }
+
+        # Restore original state
+        self._i = saved_i
+        self._p = saved_p
+        self._post_freq_set()
+        self._post_phase_set()
+
+        return samples, final_state
+
+    def commit_modulated_phase_state(self, state: dict[str, float]) -> None:
+        """Commit phase state produced by ``render_modulated_waveform``.
+
+        Subclasses should override this to properly restore internal state.
+        """
+        self._i = float(state.get("carrier_phase", 0.0))
 
 
 def _derive_amplitude_from_init(

@@ -40,7 +40,7 @@ from typing import Any
 
 import numpy as np
 
-from src.constants import DEFAULT_SAMPLE_RATE
+from src.constants import AUTO_MODE_VECTORIZE_THRESHOLD, DEFAULT_SAMPLE_RATE
 from src.engine.core.component import (
     AudioComponent,
     ComponentDescriptor,
@@ -163,7 +163,7 @@ class Composer(AudioComponent, ABC):
             n: Number of samples to produce. Defaults to `DEFAULT_SAMPLE_RATE`.
             reset: If True, reset the composer to initial state before generating.
             mode: Generation mode. Options:
-                - "auto": Automatically choose the best method (vectorized for n >= 512)
+                - "auto": Automatically choose the best method (vectorized for large n)
                 - "iterator": Use Python iterator (returns list)
                 - "vectorized": Convert to NumPy array (returns ndarray)
 
@@ -187,7 +187,7 @@ class Composer(AudioComponent, ABC):
             )
 
         if mode == "auto":
-            mode = "vectorized" if n >= 512 else "iterator"
+            mode = "vectorized" if n >= AUTO_MODE_VECTORIZE_THRESHOLD else "iterator"
 
         if mode == "iterator":
             return self.get_samples_iterator(n, reset=reset)

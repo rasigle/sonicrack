@@ -1,6 +1,5 @@
 """Ramp-based oscillators such as sawtooth and triangle."""
 
-import math
 from typing import Literal, cast
 
 import numpy as np
@@ -14,10 +13,13 @@ from src.engine.core.component import (
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.generators.oscillators.oscillator_base import Oscillator
 from src.engine.generators.oscillators.oscillator_minblep import (
-    TWO_PI,
-    VCV_MINBLEP_OVERSAMPLE,
     VCV_MINBLEP_ZERO_CROSSINGS,
+    compute_dc_alpha,
+    crossing_subsample,
+    insert_minblep_discontinuity,
     minimum_phase_minblep_table,
+    process_dc_filter,
+    shift_minblep_buffer,
 )
 from src.engine.utils.decorators import filter_provided_args, track_provided_args
 from src.engine.utils.validation import validate_sample_count
@@ -135,9 +137,7 @@ class SawtoothOscillator(Oscillator):
         self._update_dc_alpha()
 
     def _update_dc_alpha(self) -> None:
-        cutoff = min(0.4, 20.0 / self._sample_rate)
-        w = TWO_PI * cutoff
-        self._dc_alpha = w / (1.0 + w)
+        self._dc_alpha = compute_dc_alpha(self._sample_rate)
 
     def _apply_analog_character(
         self, val: float | np.ndarray, sample_indices: np.ndarray | None = None
@@ -159,49 +159,19 @@ class SawtoothOscillator(Oscillator):
             self._apply_analog_character(values, sample_indices), dtype=np.float32
         )
 
-    @staticmethod
-    def _crossing_subsample(
-        threshold: float, start_phase: float, end_phase: float
-    ) -> float | None:
-        delta = end_phase - start_phase
-        if delta == 0.0:
-            return None
-        diff = threshold - start_phase
-        if delta >= 0.0:
-            threshold -= math.floor(diff)
-        else:
-            threshold -= math.ceil(diff)
-        subsample = (threshold - start_phase) / delta
-        if 0.0 < subsample <= 1.0:
-            return float(subsample)
-        return None
-
     def _insert_vcv_discontinuity(self, subsample: float, magnitude: float) -> None:
-        if not 0.0 < subsample <= 1.0 or magnitude == 0.0:
-            return
-        table = self._minblep_table
-        extended_table = np.concatenate((table, np.zeros(1, dtype=np.float32)))
-        offset = (1.0 - subsample) * VCV_MINBLEP_OVERSAMPLE
-        for index in range(len(self._vcv_buffer)):
-            position = index * VCV_MINBLEP_OVERSAMPLE + offset
-            lower = int(position)
-            fraction = position - lower
-            value = extended_table[lower] + fraction * (
-                extended_table[lower + 1] - extended_table[lower]
-            )
-            self._vcv_buffer[index] += magnitude * value
+        insert_minblep_discontinuity(
+            self._vcv_buffer, self._minblep_table, subsample, magnitude
+        )
 
     def _shift_vcv_buffer(self) -> float:
-        value = float(self._vcv_buffer[0])
-        self._vcv_buffer[:-1] = self._vcv_buffer[1:]
-        self._vcv_buffer[-1] = 0.0
-        return value
+        return shift_minblep_buffer(self._vcv_buffer)
 
     def _process_vcv_dc_filter(self, value: float) -> float:
-        if not self.dc_block:
-            return value
-        self._dc_lowpass_state += self._dc_alpha * (value - self._dc_lowpass_state)
-        return value - self._dc_lowpass_state
+        result, self._dc_lowpass_state = process_dc_filter(
+            value, self._dc_lowpass_state, self._dc_alpha, self.dc_block
+        )
+        return result
 
     @staticmethod
     def _saw_state(phase: float) -> float:
@@ -223,9 +193,7 @@ class SawtoothOscillator(Oscillator):
             current_phase_unwrapped = current_phase
 
         phase_delta = current_phase_unwrapped - start_phase
-        wrap_subsample = self._crossing_subsample(
-            0.5, start_phase, current_phase_unwrapped
-        )
+        wrap_subsample = crossing_subsample(0.5, start_phase, current_phase_unwrapped)
         if wrap_subsample is not None:
             self._insert_vcv_discontinuity(
                 wrap_subsample,
@@ -249,6 +217,7 @@ class SawtoothOscillator(Oscillator):
             val = self._process_vcv_normalized_sample(div)
         else:
             val = float(2 * (div - np.floor(0.5 + div)))
+
         if self._mode == "analog":
             val = self._apply_analog_character(val)
         val = float(val)

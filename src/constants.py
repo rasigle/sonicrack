@@ -49,6 +49,9 @@ BUFFER_SIZE_256 = 256  # Low latency
 BUFFER_SIZE_1024 = 1024  # Higher latency, lower CPU
 BUFFER_SIZE_2048 = 2048  # Maximum stability
 
+# Auto-mode threshold: use vectorized generation for n >= this value
+AUTO_MODE_VECTORIZE_THRESHOLD = 512
+
 # Bit depth
 DEFAULT_BIT_DEPTH = 16
 BIT_DEPTH_24 = 24

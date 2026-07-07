@@ -1,7 +1,6 @@
 """Square-wave strategies and oscillator implementation."""
 
 import logging
-import math
 import threading
 from abc import ABC, abstractmethod
 from typing import Literal, Protocol, runtime_checkable
@@ -17,9 +16,14 @@ from src.engine.core.component import (
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.generators.oscillators.oscillator_base import Oscillator
 from src.engine.generators.oscillators.oscillator_minblep import (
-    VCV_MINBLEP_OVERSAMPLE,
+    TWO_PI,
     VCV_MINBLEP_ZERO_CROSSINGS,
+    compute_dc_alpha,
+    crossing_subsample,
+    insert_minblep_discontinuity,
     minimum_phase_minblep_table,
+    process_dc_filter,
+    shift_minblep_buffer,
 )
 from src.engine.utils.decorators import filter_provided_args, track_provided_args
 from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples
@@ -28,7 +32,6 @@ from src.engine.utils.validation import validate_sample_count, validate_sample_r
 SquareWaveMode = Literal[
     "ideal", "ideal_smooth", "bandlimited", "vcv", "soft", "comparator"
 ]
-TWO_PI = 2 * np.pi
 logger = logging.getLogger(__name__)
 
 
@@ -358,62 +361,25 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
             self._dc_lowpass_state = 0.0
 
     def _update_dc_alpha(self) -> None:
-        cutoff = min(0.4, 20.0 / self.sample_rate)
-        w = TWO_PI * cutoff
-        self._dc_alpha = w / (1.0 + w)
+        self._dc_alpha = compute_dc_alpha(self.sample_rate)
 
     @staticmethod
     def _square_state(phase: float, pulsewidth: float) -> float:
         return 1.0 if phase < pulsewidth else -1.0
 
-    @staticmethod
-    def _crossing_subsample(
-        threshold: float, start_phase: float, end_phase: float
-    ) -> float | None:
-        delta = end_phase - start_phase
-        if delta == 0.0:
-            return None
-        diff = threshold - start_phase
-        if delta >= 0.0:
-            threshold -= math.floor(diff)
-        else:
-            threshold -= math.ceil(diff)
-        subsample = (threshold - start_phase) / delta
-        if 0.0 < subsample <= 1.0:
-            return float(subsample)
-        return None
-
     def _insert_discontinuity(self, subsample: float, magnitude: float) -> None:
-        if not 0.0 < subsample <= 1.0 or magnitude == 0.0:
-            return
-        table = self._minblep_table
-        extended_table = np.concatenate((table, np.zeros(1, dtype=np.float32)))
-        offset = (1.0 - subsample) * VCV_MINBLEP_OVERSAMPLE
-        for index in range(len(self._buffer)):
-            position = index * VCV_MINBLEP_OVERSAMPLE + offset
-            lower = int(position)
-            fraction = position - lower
-            value = extended_table[lower] + fraction * (
-                extended_table[lower + 1] - extended_table[lower]
-            )
-            self._buffer[index] += magnitude * value
+        insert_minblep_discontinuity(
+            self._buffer, self._minblep_table, subsample, magnitude
+        )
 
     def _shift_buffer(self) -> float:
-        # Use local reference to prevent race condition if buffer is replaced
-        buffer = self._buffer
-        if len(buffer) == 0:
-            return 0.0
-        value = float(buffer[0])
-        # Use np.roll for safer in-place shift
-        buffer[:-1] = buffer[1:].copy()
-        buffer[-1] = 0.0
-        return value
+        return shift_minblep_buffer(self._buffer)
 
     def _process_dc_filter(self, value: float) -> float:
-        if not self.dc_block:
-            return value
-        self._dc_lowpass_state += self._dc_alpha * (value - self._dc_lowpass_state)
-        return value - self._dc_lowpass_state
+        result, self._dc_lowpass_state = process_dc_filter(
+            value, self._dc_lowpass_state, self._dc_alpha, self.dc_block
+        )
+        return result
 
     def _process_normalized_sample(
         self, phase: float, pulsewidth_threshold: float
@@ -447,16 +413,14 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
             current_phase_unwrapped = current_phase
 
         phase_delta = current_phase_unwrapped - start_phase
-        wrap_subsample = self._crossing_subsample(
-            1.0, start_phase, current_phase_unwrapped
-        )
+        wrap_subsample = crossing_subsample(1.0, start_phase, current_phase_unwrapped)
         if wrap_subsample is not None:
             self._insert_discontinuity(
                 wrap_subsample,
                 2.0 if phase_delta > 0.0 else -2.0,
             )
 
-        pulse_subsample = self._crossing_subsample(
+        pulse_subsample = crossing_subsample(
             pulsewidth, start_phase, current_phase_unwrapped
         )
         if pulse_subsample is not None:
@@ -738,6 +702,7 @@ class SquareOscillator(Oscillator):
     ) -> None:
         self._mode = mode
         self._mode_kwargs = mode_kwargs
+
         # Create new strategy with lock to prevent access during replacement
         with self._strategy_lock:
             self._strategy = SquareWaveFactory.create(mode, **mode_kwargs)

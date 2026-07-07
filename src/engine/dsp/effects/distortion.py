@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import numpy as np
 
+from src.constants import AUTO_MODE_VECTORIZE_THRESHOLD
 from src.engine.core.component import (
     ComponentCategory,
     ComponentDescriptor,
@@ -301,7 +302,7 @@ class Distortion(Modifier):
                 f"Invalid mode '{mode}'. Must be 'auto', 'iterator', or 'vectorized'."
             )
         if mode == "auto":
-            mode = "vectorized" if n >= 512 else "iterator"
+            mode = "vectorized" if n >= AUTO_MODE_VECTORIZE_THRESHOLD else "iterator"
         if mode == "vectorized":
             return self.get_samples_vectorized(n)
 

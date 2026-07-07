@@ -99,14 +99,14 @@ class TempoGUI:
         label = ttk.Label(self.root, text="Tempo (BPM)", font=("Arial", 12))
         label.pack(pady=10)
 
+        self.value_label = ttk.Label(self.root, text="120 BPM")
+        self.value_label.pack(pady=10)
+
         self.slider = ttk.Scale(
             self.root, from_=60, to=200, orient="horizontal", command=self.on_slider
         )
         self.slider.set(120)
         self.slider.pack(fill="x", padx=20)
-
-        self.value_label = ttk.Label(self.root, text="120 BPM")
-        self.value_label.pack(pady=10)
 
         # start audio thread
         threading.Thread(target=self.seq.start, daemon=True).start()

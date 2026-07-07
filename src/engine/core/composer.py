@@ -7,10 +7,10 @@ and parallel (WaveAdder) signal routing patterns.
 Classes:
     Composer: Abstract base class for all composers.
     Chain: Serial signal chain for applying multiple modifiers sequentially.
-    WaveAdder: Parallel mixer for combining multiple signal generators.
+    WaveAdder: Parallel mixer for combining multiple signal sources.
 
 Example:
-    >>> from src.engine import SineOscillator, Volume, Panner
+    >>> from src.engine import SineOscillator, SquareOscillator, Volume, Panner
     >>>
     >>> # Serial processing with Chain
     >>> osc = SineOscillator(440)
@@ -22,10 +22,32 @@ Example:
     >>> osc2 = SineOscillator(880)
     >>> adder = WaveAdder(osc1, osc2)
     >>> mixed = adder.get_samples(1000)
+    >>>
+    >>> # Multi-channel mixer: WaveAdder accepts any signal source that
+    >>> # implements the iterator protocol (__iter__/__next__), not just raw
+    >>> # oscillators. Since Chain also implements that protocol, each Chain
+    >>> # below acts as one fully-processed channel (its own volume/pan),
+    >>> # and WaveAdder sums them into a final mix:
+    >>> mixer = WaveAdder(
+    ...     Chain(SineOscillator(440), Volume(0.8), Panner(0.2)),
+    ...     Chain(SquareOscillator(220), Volume(1.0), Panner(0.8)),
+    ...     stereo=True,
+    ...     mix_mode="sum",
+    ... )
+    >>> mix = mixer.get_samples(44100)
 
 Signal Flow:
-    - Chain: oscillator → modifier1 → modifier2 → ... → output
-    - WaveAdder: (osc1 + osc2 + ... + oscN) / N → output
+    - Chain: source → modifier1 → modifier2 → ... → output
+    - WaveAdder: combines source outputs according to mix_mode:
+        - 'average' (default): (source1 + source2 + ... + sourceN) / N
+        - 'sum': source1 + source2 + ... + sourceN
+      A "source" here is anything implementing the iterator protocol
+      (__iter__/__next__) — a bare oscillator, or a full Chain with its own
+      modifiers, or even another WaveAdder (mixers can be nested). A lone
+      Modifier (e.g. Volume(0.5) on its own) does NOT qualify, since
+      modifiers implement __call__ to transform an incoming value rather
+      than __next__ to produce one on their own; wrap it in a Chain first
+      if you want per-channel processing before mixing.
 
 Note:
     Composers support both mono and stereo signal routing, with automatic
@@ -33,10 +55,12 @@ Note:
     trigger_release() and ended properties to all child components.
 """
 
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -52,10 +76,13 @@ from src.engine.generators.oscillators.oscillator import Oscillator
 from src.engine.generators.oscillators.oscillator_modulated import ModulatedOscillator
 from src.engine.utils.validation import validate_sample_count
 
+if TYPE_CHECKING:
+    from src.engine.dsp.modifiers import Modifier
+
 logger = logging.getLogger(__name__)
 
 
-def _get_vectorized_samples(component: Any, n: int) -> np.ndarray:
+def _get_vectorized_samples(component: AudioComponent, n: int) -> np.ndarray:
     """Render a child component through its most direct vectorized entry point."""
     if hasattr(component, "get_samples_vectorized"):
         return component.get_samples_vectorized(n)
@@ -66,23 +93,37 @@ def _get_vectorized_samples(component: Any, n: int) -> np.ndarray:
     return np.array([next(component) for _ in range(n)], dtype=np.float32)
 
 
-def _process_modifier_block(modifier: Any, samples: np.ndarray) -> Any:
+def _process_modifier_block(modifier: Modifier, samples: np.ndarray) -> Any:
     """Apply a modifier through the standardized block API when available."""
     if hasattr(modifier, "process_block"):
         return modifier.process_block(samples)
     return modifier(samples)
 
 
-def _stereo_tuple_to_array(result: Any) -> np.ndarray | None:
-    """Convert ``(left, right)`` block results to an ``(n, 2)`` array."""
+def _stereo_tuple_to_array(result: tuple) -> np.ndarray | None:
+    """Convert ``(left, right)`` block results to an ``(n, 2)`` array.
+
+    Contract: stereo-producing modifiers/generators must return a 2-tuple
+    of (left, right) arrays/sequences, not a list or other 2-length
+    sequence. This is the same convention used by ``_mix_stereo`` below.
+    """
     if isinstance(result, tuple) and len(result) == 2:
         left, right = result
         return np.column_stack((left, right))
     return None
 
 
-def _apply_modifier_to_buffer(modifier: Any, samples: np.ndarray) -> np.ndarray:
-    """Apply one modifier to mono or stereo sample buffers."""
+def _apply_modifier_to_buffer(modifier: Modifier, samples: np.ndarray) -> np.ndarray:
+    """Apply one modifier to mono or stereo sample buffers.
+
+    Note: this uses a try/except on process_block as a form of capability
+    detection ("does this modifier accept a full stereo (n, 2) buffer?").
+    That means a genuine bug inside a modifier's own process_block that
+    happens to raise TypeError/ValueError will be silently reinterpreted
+    as "doesn't support stereo blocks" rather than surfaced. If modifiers
+    grow more complex, prefer an explicit capability flag (e.g.
+    `modifier.supports_stereo_block`) over inferring it from exceptions.
+    """
     if samples.ndim == 1:
         result = _process_modifier_block(modifier, samples)
         stereo_result = _stereo_tuple_to_array(result)
@@ -107,12 +148,38 @@ def _apply_modifier_to_buffer(modifier: Any, samples: np.ndarray) -> np.ndarray:
     return np.column_stack((left_result, right_result))
 
 
+def _validate_iterable_generator(source: Any, label: str = "signal source") -> None:
+    """Validate that a component implements the iterator protocol.
+
+    Shared by Chain and WaveAdder so both fail fast with a clear error
+    instead of surfacing an obscure AttributeError deep inside __next__.
+
+    Note: "source" here means anything implementing __iter__/__next__ —
+    a raw oscillator, a Chain (oscillator + modifiers), or another
+    WaveAdder. A bare Modifier alone does not qualify, since modifiers
+    implement __call__ (transform a value) rather than __next__ (produce
+    one); see the module docstring's "Signal Flow" section.
+    """
+    if source is None:
+        raise ValueError(f"{label} cannot be None")
+    if not (hasattr(source, "__iter__") and hasattr(source, "__next__")):
+        raise TypeError(
+            f"The given {label} must implement the iterator protocol "
+            f"(`__iter__` and `__next__`). Given: {type(source).__name__}. "
+            f"If you're trying to mix in a Modifier (e.g. Volume, Panner) "
+            f"on its own, wrap it in a Chain with a source oscillator first."
+        )
+
+
 class Composer(AudioComponent, ABC):
     """Base for components that combine signals (chain, mixer)."""
 
     def __init__(self, *components: AudioComponent, **kwargs: Any):
         super().__init__(*components, **kwargs)
         self.components = components
+        # Explicit override for `ended`; None means "not overridden, compute
+        # from children". See the `ended` property/setter on subclasses.
+        self._ended: bool | None = None
 
     @abstractmethod
     def __next__(self):
@@ -200,17 +267,19 @@ class Composer(AudioComponent, ABC):
 
 @register_component()
 class Chain(Composer):
-    """A component that allows for chaining a single generator with multiple modifiers
-    after it.
+    """A component that allows for chaining a single signal source with multiple
+    modifiers after it.
 
-    For sequential composition of waves.
+    For sequential composition of waves. The leading argument (``oscillator``)
+    can itself be any iterator-protocol signal source — a raw oscillator, a
+    nested Chain, or a WaveAdder mix — not only a plain oscillator.
     """
 
     descriptor = ComponentDescriptor(
         name="Chain",
         category=ComponentCategory.COMPOSER,
         fluent_api_name="chain",
-        description="Chains a generator with multiple modifiers in sequence.",
+        description="Chains a signal source with multiple modifiers in sequence.",
         tags=["composer", "chain"],
     )
 
@@ -218,8 +287,9 @@ class Chain(Composer):
         """Initialize the Chain.
 
         Args:
-            oscillator: instance of an Oscillator or anything else that can generate a
-                sequence of numbers by using __iter__ and __next__.
+            oscillator: instance of an Oscillator, or any other signal source
+                that can generate a sequence of numbers via __iter__ and
+                __next__ (including a Chain or WaveAdder).
             modifiers: Modifiers or Effects (both implement __call__).
                 Examples: Volume(0.5), Panner(0.7), Distortion(drive=2.0)
 
@@ -237,17 +307,13 @@ class Chain(Composer):
             ...     Panner(0.7)
             ... )
         """
-        super().__init__()
+        # Input validation (before assigning self.oscillator, since
+        # __getattr__ below depends on that attribute already existing).
+        _validate_iterable_generator(oscillator, label="oscillator")
 
-        # Input validation
-        if oscillator is None:
-            raise ValueError("oscillator cannot be None")
-
-        if not (hasattr(oscillator, "__iter__") and hasattr(oscillator, "__next__")):
-            raise TypeError(
-                f"The given oscillator must implement the iterator protocol "
-                f"(`__iter__` and `__next__`). Given: {type(oscillator).__name__}"
-            )
+        # Forward oscillator + modifiers to Composer so self.components
+        # reflects the actual children (matches WaveAdder's behavior).
+        super().__init__(oscillator, *modifiers)
 
         self.oscillator: Oscillator | ModulatedOscillator = oscillator
         self.modifiers = modifiers
@@ -255,6 +321,14 @@ class Chain(Composer):
         iter(self)
 
     def __getattr__(self, attr):
+        # Guard against infinite recursion: __getattr__ only runs when normal
+        # lookup fails, so if `oscillator`/`modifiers` themselves are missing
+        # (e.g. accessed before __init__ finishes, during unpickling, etc.),
+        # `self.oscillator` below would re-trigger __getattr__ on the same
+        # attribute and recurse forever.
+        if attr in ("oscillator", "modifiers"):
+            raise AttributeError(attr)
+
         if hasattr(self.oscillator, attr):
             return getattr(self.oscillator, attr)
 
@@ -275,6 +349,8 @@ class Chain(Composer):
 
     @property
     def ended(self) -> bool:
+        if self._ended is not None:
+            return self._ended
         ended = []
         e = "ended"
         if hasattr(self.oscillator, e):
@@ -309,6 +385,12 @@ class Chain(Composer):
         Modifiers that return tuples (left, right) are automatically detected as
         panners and converted to stereo arrays.
 
+        Note: modifiers with custom __next__ are stepped per-sample in the
+        iterator path (see __next__ above) but have no equivalent per-sample
+        step here; this path relies on process_block being fully
+        self-consistent with whatever state __next__ advances. Keep this in
+        mind when adding a new stateful modifier.
+
         Args:
             n: Number of samples to produce.
 
@@ -318,7 +400,6 @@ class Chain(Composer):
                 - Stereo: shape (n, 2)
         """
         n = validate_sample_count(n)
-        # Generate samples from oscillator (vectorized)
         samples = _get_vectorized_samples(self.oscillator, n)
 
         for modifier in self.modifiers:
@@ -329,11 +410,29 @@ class Chain(Composer):
 
 @register_component()
 class WaveAdder(Composer):
-    """Component that combines the output of multiple generators.
+    """Component that combines the output of multiple signal sources.
+
+    A "signal source" is anything implementing the iterator protocol
+    (__iter__/__next__) — this includes plain oscillators, but also Chain
+    instances (an oscillator plus its own modifiers) and even other
+    WaveAdders. This makes WaveAdder suitable as a general-purpose mixer:
+    to combine per-channel processing (volume, pan, effects) with mixing,
+    wrap each channel in its own Chain and pass the Chains to WaveAdder:
+
+        >>> from src.engine import SineOscillator, SquareOscillator, Volume, Panner
+        >>> mixer = WaveAdder(
+        ...     Chain(SineOscillator(440), Volume(0.8), Panner(0.2)),
+        ...     Chain(SquareOscillator(220), Volume(1.0), Panner(0.8)),
+        ...     stereo=True,
+        ... )
+
+    A bare Modifier on its own (e.g. just `Volume(0.5)`, with no source
+    feeding it) cannot be passed directly, since modifiers implement
+    __call__ (transform an incoming value) rather than __next__ (produce
+    the next value from nothing).
 
     Supports two mixing modes:
-    - 'average': Returns the mean (prevents clipping, default for backward
-      compatibility)
+    - 'average': Returns the mean (prevents clipping)
     - 'sum': Returns the sum (standard mixer behavior, maintains levels)
 
     For parallel composition of waves.
@@ -343,12 +442,20 @@ class WaveAdder(Composer):
         name="WaveAdder",
         category=ComponentCategory.COMPOSER,
         fluent_api_name="wave_adder",
-        description="Adds the output of multiple generators together.",
+        description=(
+            "Mixes multiple signal sources together (oscillators, or Chains "
+            "combining an oscillator with its own modifiers)."
+        ),
         parameters={
             "generators": ParameterDescriptor(
                 name="generators",
                 default=(),
-                description="Generator components to mix.",
+                description=(
+                    "Signal source components to mix. Accepts any component "
+                    "implementing the iterator protocol, including plain "
+                    "oscillators, Chain instances (oscillator + modifiers), "
+                    "or nested WaveAdders."
+                ),
             ),
             "stereo": ParameterDescriptor(
                 name="stereo",
@@ -365,15 +472,17 @@ class WaveAdder(Composer):
                 description="Mixing policy for combined generator output.",
             ),
         },
-        tags=["composer", "wave_adder"],
+        tags=["composer", "wave_adder", "mixer"],
     )
 
     def __init__(self, *generators, stereo: bool = False, mix_mode: str = "average"):
         """Initialize WaveAdder.
 
         Args:
-            *generators: Instances of generators/oscillators that can generate a
-                sequence of numbers by using __iter__ and __next__.
+            *generators: Signal source components to mix — instances of
+                generators/oscillators, or any component (including Chain or
+                another WaveAdder) that implements the iterator protocol via
+                __iter__ and __next__.
             stereo: if True the output will have a tuple of two numbers for the left
                 and the right channel each, else only one number.
             mix_mode: 'average' (default) or 'sum'.
@@ -382,10 +491,9 @@ class WaveAdder(Composer):
 
         Raises:
             ValueError: If no generators provided or invalid mix_mode.
-            TypeError: If stereo is not a boolean.
+            TypeError: If stereo is not a boolean, or a generator doesn't
+                implement the iterator protocol.
         """
-        super().__init__(*generators)
-
         # Input validation
         if len(generators) == 0:
             raise ValueError("WaveAdder requires at least one generator")
@@ -396,19 +504,32 @@ class WaveAdder(Composer):
         if mix_mode not in ("average", "sum"):
             raise ValueError(f"mix_mode must be 'average' or 'sum', got {mix_mode!r}")
 
+        for index, gen in enumerate(generators):
+            _validate_iterable_generator(gen, label=f"generators[{index}]")
+
+        super().__init__(*generators)
+
         self.generators = generators
         self.stereo = stereo
         self.mix_mode = mix_mode
 
-        # Debug logging
         logger.debug(
-            f"WaveAdder initialized: {len(generators)} generators, "
-            f"stereo={stereo}, mix_mode={mix_mode!r}"
+            "WaveAdder initialized: %d generators, stereo=%s, mix_mode=%r",
+            len(generators),
+            stereo,
+            mix_mode,
         )
 
     def _mod_channels(self, _val):
-        if isinstance(_val, (int, float)) and self.stereo:
-            return _val, _val
+        # int/float/np.number scalar handling. Generators are expected to
+        # yield plain Python floats (the convention used throughout this
+        # codebase's oscillators), but np.number is included defensively in
+        # case a generator yields a numpy scalar (e.g. np.float32) directly
+        # without casting first.
+        if isinstance(_val, (int, float, np.number)) and not isinstance(_val, bool):
+            if self.stereo:
+                return _val, _val
+            return _val
 
         if isinstance(_val, Sequence) and not self.stereo:
             if self.mix_mode == "sum":
@@ -443,6 +564,8 @@ class WaveAdder(Composer):
 
     @property
     def ended(self):
+        if self._ended is not None:
+            return self._ended
         ended = [gen.ended for gen in self.generators if hasattr(gen, "ended")]
         return all(ended)
 
@@ -480,9 +603,13 @@ class WaveAdder(Composer):
             vectorized generation and combination.
         """
         n = validate_sample_count(n)
-        # Fast path for single generator (no mixing needed)
+        # Fast path for single generator (no mixing needed).
+        # Uses _get_vectorized_samples (not gen.get_samples directly) so
+        # this path supports the same minimal generators (only __next__ /
+        # get_samples_vectorized, no .get_samples) that the multi-generator
+        # path below already supports.
         if len(self.generators) == 1:
-            samples = self.generators[0].get_samples(n, mode="vectorized")
+            samples = _get_vectorized_samples(self.generators[0], n)
 
             # Handle stereo conversion if needed
             if self.stereo and samples.ndim == 1:

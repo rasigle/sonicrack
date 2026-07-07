@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -18,14 +18,17 @@ from src.engine.dsp.modifiers.base import (
     _get_next_modulation_value,
     _validate_modulator,
 )
-from src.engine.generators.oscillators.oscillator import _derive_amplitude_from_init
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.math import db_to_linear, linear_to_db
 from src.engine.utils.validation import (
-    _is_number,
+    derive_amplitude_from_init,
+    is_number,
     validate_numeric,
     validate_sample_rate,
 )
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 logger = logging.getLogger(__name__)
 
@@ -60,17 +63,19 @@ def _validate_wave_range(
 
 
 def apply_vectorized_gain(
-    samples: np.ndarray, gain_values: np.ndarray | float, is_db: bool = False
-) -> np.ndarray:
+    samples: NDArray, gain_values: float | NDArray[np.floating], is_db: bool = False
+) -> NDArray:
     """Apply gain to samples using vectorized operations.
 
     This is a public utility function that can be used by GUI modules
-    to apply gain without creating a Volume component instance.
+    to apply gain without creating a Volume component instance. It is also
+    the single source of truth for gain application used internally by
+    `Volume._scale_vectorized`, so the two paths cannot drift apart.
 
     Args:
         samples: Input samples (mono or stereo).
-        gain_values: Gain values to apply. Can be a single float or an array
-            matching the length of samples.
+        gain_values: Gain values to apply. Can be a single float, a list, or
+            an array matching the length of samples.
         is_db: If True, gain_values are in dB and will be converted to linear.
             If False, gain_values are linear multipliers.
 
@@ -79,15 +84,15 @@ def apply_vectorized_gain(
     """
     # Convert dB to linear if needed
     if is_db:
-        if _is_number(gain_values):
-            gain_values = db_to_linear(gain_values)
-        else:
-            gain_values = db_to_linear(gain_values)
+        gain_values = db_to_linear(gain_values)
 
     # Ensure gain_values is an array
-    if _is_number(gain_values):
+    if is_number(gain_values):
         result = samples * gain_values
     else:
+        # Coerce lists/tuples to an ndarray so reshape works regardless of
+        # what the caller passed in (mirrors apply_vectorized_clip below).
+        gain_values = np.asarray(gain_values)
         # Handle multidimensional samples (e.g., stereo)
         if samples.ndim > 1:
             gain_values = gain_values.reshape(-1, *([1] * (samples.ndim - 1)))
@@ -97,8 +102,8 @@ def apply_vectorized_gain(
 
 
 def apply_vectorized_clip(
-    samples: np.ndarray, threshold_values: np.ndarray | float
-) -> np.ndarray:
+    samples: NDArray, threshold_values: float | NDArray[np.floating]
+) -> NDArray:
     """Apply clipping to samples using vectorized operations.
 
     This is a public utility function that can be used by GUI modules
@@ -114,15 +119,16 @@ def apply_vectorized_clip(
         Clipped samples (float32).
     """
     # Ensure threshold is positive
-    if _is_number(threshold_values):
+    if is_number(threshold_values):
         threshold_values = abs(threshold_values)
         return np.clip(samples, -threshold_values, threshold_values).astype(np.float32)
-    else:
-        threshold_values = np.abs(np.asarray(threshold_values))
-        # For array thresholds, clip each sample independently. For multichannel
-        # audio, a 1D threshold vector is treated as one value per frame.
-        threshold_values = _reshape_per_sample_values(threshold_values, samples)
-        return np.clip(samples, -threshold_values, threshold_values).astype(np.float32)
+
+    threshold_values = np.abs(np.asarray(threshold_values))
+
+    # For array thresholds, clip each sample independently. For multichannel
+    # audio, a 1D threshold vector is treated as one value per frame.
+    threshold_values = _reshape_per_sample_values(threshold_values, samples)
+    return np.clip(samples, -threshold_values, threshold_values).astype(np.float32)
 
 
 @register_component()
@@ -147,6 +153,18 @@ class Volume(Modifier):
 
     **If both gain_db and amplitude are specified:**
     gain_db takes priority. A warning is logged if they don't match.
+
+    **Switching between amplitude and gain_db control:**
+    Internally, `amplitude` and `gain_db` are backed by two separate
+    `RuntimeParameter` instances so each can use its own smoothing policy
+    (linear in amplitude space, logarithmic in dB space). Only one of them
+    is "active" (driving audio) at a time; the other is read lazily and
+    converted on demand, so it can never go stale. When control is handed
+    from one to the other (e.g. calling `.gain_db = ...` right after
+    `.amplitude = ...`), the newly active parameter's internal current value
+    is snapped to the true current amplitude first, so the next smoothing
+    ramp starts from where the signal actually is instead of jumping from a
+    stale value and causing an audible click.
 
     Args:
         amplitude: Linear amplitude multiplier. Default: 1.0
@@ -238,7 +256,7 @@ class Volume(Modifier):
         if amplitude < 0:
             raise ValueError(f"Amplitude must be non-negative, got {amplitude}")
 
-        initial_amplitude = _derive_amplitude_from_init(
+        initial_amplitude = derive_amplitude_from_init(
             self._provided_args,
             amplitude,
             gain_db,
@@ -275,46 +293,18 @@ class Volume(Modifier):
         logger.debug(f"Volume initialized with amplitude: {initial_amplitude}")
 
     @property
-    def _smoothing_samples_remaining(self) -> int:
-        """Backward compatibility: return smoothing samples from active parameter."""
-        if self._active_param == "amplitude":
-            return self._amplitude_param._smoothing_samples_remaining
-        else:
-            return self._gain_db_param._smoothing_samples_remaining
-
-    @property
-    def _smoothing_duration_samples(self) -> int:
-        """Backward compatibility: return smoothing duration in samples."""
-        if self._active_param == "amplitude":
-            return self._amplitude_param._smoothing_duration_samples
-        else:
-            return self._gain_db_param._smoothing_duration_samples
-
-    @property
-    def _target_amplitude(self) -> float:
-        """Backward compatibility: return target amplitude."""
-        if self._active_param == "amplitude":
-            return self._amplitude_param.target
-        else:
-            return db_to_linear(self._gain_db_param.target)
-
-    @property
-    def _current_amplitude(self) -> float:
-        """Backward compatibility: return current amplitude."""
-        if self._active_param == "amplitude":
-            return self._amplitude_param.value
-        else:
-            return db_to_linear(self._gain_db_param.value)
-
-    @property
     def amplitude(self) -> float:
         """float: Current amplitude multiplier (linear scale).
 
         For audio work, consider using the gain_db property instead.
 
-        Returns the target amplitude (the value you set), not the smoothed value.
+        Returns the target amplitude (the value you set), not the smoothed
+        value. Computed on demand from whichever parameter is currently
+        active, so it is never stale even if `gain_db` was set most recently.
         """
-        return self._amplitude_param.target
+        if self._active_param == "amplitude":
+            return self._amplitude_param.target
+        return float(db_to_linear(self._gain_db_param.target))
 
     @amplitude.setter
     def amplitude(self, value: float):
@@ -322,12 +312,21 @@ class Volume(Modifier):
         if value < 0:
             raise ValueError(f"amplitude must be non-negative, got {value}")
 
-        # Set amplitude parameter (triggers LINEAR smoothing)
-        self._amplitude_param.value = value
+        if self._active_param == "gain_db":
+            # Control is being handed over from gain_db to amplitude. Snap
+            # this parameter's internal "current" value to the true current
+            # amplitude *before* arming a new smoothing ramp, so the ramp
+            # continues from where the signal actually is rather than from
+            # a stale default and causing an audible jump.
+            # NOTE: RuntimeParameter doesn't currently expose a public
+            # "snap current value without smoothing" method, so this reaches
+            # into its private field. Worth promoting to a public API
+            # (e.g. `RuntimeParameter.snap_to(value)`) if this pattern is
+            # needed elsewhere.
+            self._amplitude_param._current_value = self._get_current_amplitude()
 
-        # Update gain_db to stay in sync (no smoothing trigger)
-        self._gain_db_param._target_value = linear_to_db(value)
-        self._gain_db_param._current_value = linear_to_db(self._amplitude_param.value)
+        # Set amplitude parameter (triggers LINEAR smoothing toward `value`)
+        self._amplitude_param.value = value
         self._active_param = "amplitude"
 
     @property
@@ -341,20 +340,26 @@ class Volume(Modifier):
             -∞ dB = silence
 
         Returns the target gain (the value you set), not the smoothed value.
+        Computed on demand from whichever parameter is currently active, so
+        it is never stale even if `amplitude` was set most recently.
         """
-        return self._gain_db_param.target
+        if self._active_param == "gain_db":
+            return self._gain_db_param.target
+        return linear_to_db(self._amplitude_param.target)
 
     @gain_db.setter
     def gain_db(self, value: float):
         value = validate_numeric(value, "gain_db")
 
-        # Set gain_db parameter (triggers LOGARITHMIC smoothing in dB space)
-        self._gain_db_param.value = value
+        if self._active_param == "amplitude":
+            # Same rationale as in the amplitude setter above, mirrored for
+            # the dB-space parameter.
+            self._gain_db_param._current_value = linear_to_db(
+                self._get_current_amplitude()
+            )
 
-        # Update amplitude to stay in sync (no smoothing trigger)
-        new_amplitude = db_to_linear(value)
-        self._amplitude_param._target_value = new_amplitude
-        self._amplitude_param._current_value = db_to_linear(self._gain_db_param.value)
+        # Set gain_db parameter (triggers LOGARITHMIC smoothing toward `value`)
+        self._gain_db_param.value = value
         self._active_param = "gain_db"
 
     def __call__(
@@ -371,7 +376,8 @@ class Volume(Modifier):
         Raises:
             TypeError: If input is not int, float, numpy array, or Iterable.
         """
-        # Scalar input
+        # Scalar input. Note: bool is intentionally accepted here since it's
+        # a subclass of int in Python (True/False behave as 1.0/0.0 gain).
         if isinstance(val, (float, int, np.number)):
             # Get current amplitude (with smoothing if active)
             amp = self._get_current_amplitude()
@@ -388,7 +394,7 @@ class Volume(Modifier):
         )
 
     def _get_current_amplitude(self) -> float:
-        """Get current amplitude value, handling smoothing."""
+        """Get current (smoothed) amplitude value, handling smoothing."""
         if self._active_param == "amplitude":
             return self._amplitude_param.value
 
@@ -406,25 +412,22 @@ class Volume(Modifier):
         """
         n = len(samples)
 
-        # Check if smoothing is active
+        # Determine the amplitude value(s) to apply: either a per-sample
+        # envelope while smoothing, or a constant otherwise.
         if self._active_param == "amplitude" and self._amplitude_param.is_smoothing:
             # Get amplitude envelope (LINEAR smoothing)
-            amp_envelope = self._amplitude_param.get_interpolated_buffer(n)
+            amp_values = self._amplitude_param.get_interpolated_buffer(n)
         elif self._active_param == "gain_db" and self._gain_db_param.is_smoothing:
             # Get gain_db envelope (LOGARITHMIC smoothing) and convert to amplitude
             gain_db_envelope = self._gain_db_param.get_interpolated_buffer(n)
-            amp_envelope = db_to_linear(gain_db_envelope)
+            amp_values = db_to_linear(gain_db_envelope)
         else:
             # No smoothing - use constant value
-            amp = self._get_current_amplitude()
-            return (samples * amp).astype(np.float32)
+            amp_values = self._get_current_amplitude()
 
-        # Apply envelope
-        if samples.ndim > 1:
-            amp_envelope = amp_envelope.reshape(-1, *([1] * (samples.ndim - 1)))
-
-        result = samples * amp_envelope
-        return result.astype(np.float32)
+        # Delegate the actual multiply/reshape/cast to the shared utility so
+        # this path and apply_vectorized_gain() can never drift apart.
+        return apply_vectorized_gain(samples, amp_values, is_db=False)
 
 
 @register_component()
@@ -597,18 +600,18 @@ class ModulatedVolume(Volume):
         """
         if isinstance(val, np.ndarray):
             # Vectorized path: process entire array at once (50-100x faster)
-            mod_values = self._get_modulation_values(len(val))
+            mod_values = self._pull_modulation_values(len(val))
             return self._apply_vectorized_volume(val, mod_values)
 
         # Scalar path: advance modulator once and update amplitude or gain_db
-        mod_value = self._get_next_modulation_value()
+        mod_value = self._pull_next_modulation_value()
         if self._modulation_target == "gain_db":
             self.gain_db = mod_value
         else:
             self.amplitude = mod_value
         return super().__call__(val)
 
-    def _get_modulation_values(self, num_samples: int) -> np.ndarray:
+    def _pull_modulation_values(self, num_samples: int) -> np.ndarray:
         """Get modulation values for vectorized processing.
 
         Args:
@@ -633,21 +636,13 @@ class ModulatedVolume(Volume):
         Returns:
             Volume-modulated samples.
         """
-        if self._modulation_target == "gain_db":
-            # Convert dB values to linear amplitude
-            amplitude_values = np.asarray(db_to_linear(mod_values), dtype=np.float32)
-            if samples.ndim > 1:
-                amplitude_values = amplitude_values.reshape(
-                    -1, *([1] * (samples.ndim - 1))
-                )
-            return (samples * amplitude_values).astype(np.float32)
+        # Delegate to the shared gain-application utility (handles the dB
+        # conversion, reshape, and cast in one place).
+        return apply_vectorized_gain(
+            samples, mod_values, is_db=(self._modulation_target == "gain_db")
+        )
 
-        # Direct amplitude modulation
-        if samples.ndim > 1:
-            mod_values = mod_values.reshape(-1, *([1] * (samples.ndim - 1)))
-        return (samples * mod_values).astype(np.float32)
-
-    def _get_next_modulation_value(self) -> float:
+    def _pull_next_modulation_value(self) -> float:
         """Get the next modulation value for scalar processing.
 
         Returns:
@@ -749,22 +744,7 @@ class Clipper(Modifier):
             Clipped value (same type as input).
         """
         if isinstance(val, np.ndarray):
-            n = len(val)
-            # Check if smoothing is active for either parameter
-            if self._min_param.is_smoothing or self._max_param.is_smoothing:
-                # Get per-sample threshold values during smoothing
-                min_envelope = self._min_param.get_interpolated_buffer(n)
-                max_envelope = self._max_param.get_interpolated_buffer(n)
-                min_envelope = _reshape_per_sample_values(min_envelope, val)
-                max_envelope = _reshape_per_sample_values(max_envelope, val)
-                # Clip each sample with its corresponding threshold
-                return np.minimum(np.maximum(val, min_envelope), max_envelope).astype(
-                    np.float32, copy=False
-                )
-            else:
-                # No smoothing - use constant values
-                clipped = np.clip(val, self._min_param.value, self._max_param.value)
-                return clipped.astype(np.float32, copy=False)
+            return self.clip_vectorized(val)
 
         if isinstance(val, Iterable):
             # Advance smoothing once per call
@@ -921,17 +901,7 @@ class ModulatedClipper(Modifier):
                 self.modulator,
                 len(val),
             )
-
-            thresholds = np.clip(mod_values, 0.0, 1.0)
-
-            # Fully vectorized clipping.
-            # For 1D audio: val.shape == (n,)
-            # For multi-channel audio: val.shape == (n, channels), so expand threshold
-            # dims.
-            if val.ndim > 1:
-                thresholds = thresholds.reshape(-1, *([1] * (val.ndim - 1)))
-
-            return np.clip(val, -thresholds, thresholds).astype(np.float32, copy=False)
+            return apply_vectorized_clip(val, mod_values)
 
         mod_value = next(self.modulator)
         threshold = float(np.clip(mod_value, 0.0, 1.0))

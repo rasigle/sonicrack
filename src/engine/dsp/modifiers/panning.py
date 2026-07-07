@@ -228,9 +228,12 @@ class Panner(Modifier):
     ) -> tuple[float, float] | tuple[np.ndarray, np.ndarray]:
         """Convert mono signal to stereo with panning.
 
-        Scalar input uses the current target gains for immediate response.
-        NumPy array input uses ``pan_vectorized()`` and therefore applies
-        smoothing envelopes when a pan change is in progress.
+        Both scalar and NumPy array input apply the smoothing ramp when a
+        pan change is in progress, so per-sample (scalar) processing and
+        buffer (array) processing behave consistently. Scalar input advances
+        the smoothing state by one sample per call and reads the current
+        (possibly still-ramping) gain; array input uses ``pan_vectorized()``,
+        which pulls a smoothing envelope over the whole buffer in one call.
 
         Args:
             val: Mono scalar input value or mono 1D NumPy array.
@@ -246,8 +249,17 @@ class Panner(Modifier):
             return self.pan_vectorized(val)
 
         if isinstance(val, (float, int, np.number)):
-            left_gain = self._left_gain_param.target
-            right_gain = self._right_gain_param.target
+            # Advance smoothing by one sample and read the current smoothed
+            # gain (matching Clipper's scalar-processing convention). This
+            # used to read `.target` directly, which meant a `position`
+            # change would snap to the new gain instantly instead of
+            # ramping over `smoothing_time_ms` - defeating the purpose of
+            # smoothing for anything driven sample-by-sample and causing an
+            # audible click on pan changes.
+            self._left_gain_param.advance_smoothing(1)
+            self._right_gain_param.advance_smoothing(1)
+            left_gain = self._left_gain_param.value
+            right_gain = self._right_gain_param.value
             return float(left_gain * val), float(right_gain * val)
 
         logger.error("Invalid input type for Panner: %s", type(val))
@@ -297,8 +309,10 @@ class ModulatedPanner(Panner):
         modulator: Generator that returns pan position values.
         sample_rate: Processing sample rate used for smoothing duration.
         smoothing_time_ms: Pan transition duration in milliseconds. This affects
-            scalar/modifier state transitions. Vectorized modulation applies the
-            modulator values directly per sample.
+            scalar/modifier state transitions (which now ramp through Panner's
+            smoothing, same as the base class). Vectorized modulation applies
+            the modulator values directly per sample, since the modulator
+            itself is already the time-varying source.
     """
 
     descriptor = ComponentDescriptor(
@@ -399,11 +413,11 @@ class ModulatedPanner(Panner):
         """
         if isinstance(val, np.ndarray):
             _validate_mono_array(val, name="val")
-            mod_values = self._get_modulation_values(len(val))
-            return _apply_vectorized_panning(val, mod_values)
+            mod_values = self._pull_modulation_values(len(val))
+            return apply_vectorized_panning(val, mod_values)
 
         if isinstance(val, (float, int, np.number)):
-            mod_value = self._get_next_modulation_value()
+            mod_value = self._pull_next_modulation_value()
             self.position = mod_value
             return super().__call__(val)
 
@@ -413,7 +427,7 @@ class ModulatedPanner(Panner):
             f"NumPy array. Got {type(val)}"
         )
 
-    def _get_next_modulation_value(self) -> float:
+    def _pull_next_modulation_value(self) -> float:
         """Get the next modulation value for scalar processing.
 
         Returns:
@@ -424,7 +438,7 @@ class ModulatedPanner(Panner):
         )
         return value
 
-    def _get_modulation_values(self, num_samples: int) -> np.ndarray:
+    def _pull_modulation_values(self, num_samples: int) -> np.ndarray:
         """Get modulation values for vectorized processing.
 
         Args:
@@ -457,7 +471,9 @@ def apply_vectorized_panning(
     """Apply constant-power panning using vectorized operations.
 
     This public utility can be used by GUI modules to apply panning without
-    creating a Panner component instance.
+    creating a Panner component instance. It is also the single
+    implementation used internally by ``ModulatedPanner``, so the two paths
+    cannot drift apart.
 
     Args:
         samples: Mono 1D input samples.
@@ -500,18 +516,3 @@ def apply_vectorized_panning(
     right = right_gains * samples
 
     return left.astype(np.float32), right.astype(np.float32)
-
-
-def _apply_vectorized_panning(
-    samples: np.ndarray, mod_values: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
-    """Legacy wrapper for apply_vectorized_panning.
-
-    Args:
-        samples: Mono 1D input samples.
-        mod_values: Pan positions in range [-1, 1].
-
-    Returns:
-        Tuple of (left, right) stereo arrays as float32.
-    """
-    return apply_vectorized_panning(samples, mod_values)

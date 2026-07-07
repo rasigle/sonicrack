@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Mapping
 
 import numpy as np
 
 from src.engine.core.component import ComponentDescriptor, ParameterDescriptor
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.dsp.modifiers.base import Modifier
-from src.engine.utils.validation import validate_numeric
+from src.engine.utils.validation import is_number, validate_numeric
 
 logger = logging.getLogger(__name__)
+
+# Precompute common type checks to avoid repeated tuple creation in hot paths
+_NP_NUMBER = np.number
+_SCALAR_TYPES = (float, int, _NP_NUMBER)
 
 
 @register_component()
@@ -72,10 +75,11 @@ class Frequency(Modifier):
             raise ValueError(f"frequency must be non-negative, got {value}")
         self._frequency = float(value)
 
-    def __call__(
-        self, val: float | tuple[float, ...] | np.ndarray
-    ) -> float | tuple[float, ...] | np.ndarray:
+    def __call__(self, val: float | tuple | np.ndarray) -> float | tuple | np.ndarray:
         """Apply frequency scaling to input.
+
+        Fast paths for the common cases (scalar, ndarray, tuple).
+        Lists and other iterables are converted to ndarray for batch processing.
 
         Args:
             val: Input value (float, numeric iterable, or array).
@@ -84,36 +88,43 @@ class Frequency(Modifier):
             Scaled value (same type as input).
 
         Raises:
-            TypeError: If input is not int, float, array, or Iterable.
+            TypeError: If input is not a numeric type.
         """
-        # Scalar input
-        if isinstance(val, (float, int, np.number)):
-            return float(val * self.frequency)
+        freq = self._frequency  # local lookup avoids repeated attribute access
 
-        # Vectorized input
+        # Fast path: scalar (most common in hot loops)
+        if isinstance(val, _SCALAR_TYPES):
+            return float(val * freq)
+
+        # Fast path: ndarray (second most common)
         if isinstance(val, np.ndarray):
-            return val * self.frequency
+            return (val * freq).astype(np.float32)
 
-        if isinstance(val, (str, bytes, Mapping)):
-            logger.error("Invalid input type for Frequency: %s", type(val))
+        # Fast path: tuple (stereo pairs, control signals)
+        if isinstance(val, tuple):
+            # Check if tuple contains only scalars (common case)
+            if val and isinstance(val[0], _SCALAR_TYPES):
+                return tuple(v * freq for v in val)
+            # Fallback: tuple of iterables — convert to array
+            arr = np.asarray(val)
+            return (arr * freq).astype(np.float32)
+
+        # Convert list/other iterables to ndarray for batch processing
+        # (avoids slow per-element Python loop + validation)
+        try:
+            arr = np.asarray(val, dtype=np.float64)
+        except (ValueError, TypeError) as exc:
             raise TypeError(
-                "Input value must be an int, float, numpy number, array, "
+                f"Input value must be a numeric scalar, tuple, array, "
                 f"or numeric Iterable. Got {type(val)}"
+            ) from exc
+
+        if arr.dtype.kind not in ("f", "i", "u", "c"):
+            raise TypeError(
+                f"Input value must contain numeric values. Got {type(val)}"
             )
 
-        if isinstance(val, Iterable):
-            try:
-                return tuple(
-                    float(validate_numeric(v, "val item")) * self.frequency for v in val
-                )
-            except (TypeError, ValueError) as exc:
-                raise TypeError("All Iterable input values must be numeric.") from exc
-
-        logger.error("Invalid input type for Frequency: %s", type(val))
-        raise TypeError(
-            f"Input value must be an int, float, numpy number, array, or Iterable. "
-            f"Got {type(val)}"
-        )
+        return (arr * freq).astype(np.float32)
 
     def scale_vectorized(self, samples: np.ndarray) -> np.ndarray:
         """Apply frequency scaling to array of samples (vectorized).
@@ -124,4 +135,18 @@ class Frequency(Modifier):
         Returns:
             Scaled array (float32).
         """
-        return (samples * self.frequency).astype(np.float32)
+        return (samples * self._frequency).astype(np.float32)
+
+    def process_block(self, samples: np.ndarray) -> np.ndarray:
+        """Process an audio/control block through the modifier.
+
+        Optimized path for numpy arrays — avoids type dispatch overhead
+        of __call__ and ensures float32 output for the audio pipeline.
+
+        Args:
+            samples: Input array (float32 or float64).
+
+        Returns:
+            Scaled array (float32).
+        """
+        return (samples * self._frequency).astype(np.float32)

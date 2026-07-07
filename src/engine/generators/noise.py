@@ -68,17 +68,20 @@ import numpy as np
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.core.component import (
     ComponentDescriptor,
-    Generator,
     ParameterDescriptor,
     make_parameter_descriptors,
 )
 from src.engine.core.parameter import RuntimeParameter, SmoothingPolicy
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
-from src.engine.generators.oscillators.oscillator import _derive_amplitude_from_init
+from src.engine.generators.generator import Generator
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.math import db_to_linear, linear_to_db
-from src.engine.utils.validation import validate_sample_count, validate_sample_rate
+from src.engine.utils.validation import (
+    derive_amplitude_from_init,
+    validate_sample_count,
+    validate_sample_rate,
+)
 
 
 def white_noise(
@@ -794,7 +797,7 @@ class NoiseGenerator(Generator):
         self.noise_type: str = noise_type
 
         # Handle amplitude vs gain_db priority (same as oscillators)
-        initial_amplitude = _derive_amplitude_from_init(
+        initial_amplitude = derive_amplitude_from_init(
             self._provided_args,
             amplitude,
             gain_db,  # noqa
@@ -946,15 +949,15 @@ class NoiseGenerator(Generator):
             )
         return self.get_samples_vectorized(num_samples)
 
-    def get_samples_vectorized(self, num_samples: int) -> np.ndarray:
+    def get_samples_vectorized(self, n: int) -> np.ndarray:
         """Generate noise samples (vectorized).
 
         Args:
-            num_samples: Number of samples to generate
+            n: Number of samples to generate
 
         Returns:
             Array of noise samples
         """
-        num_samples = validate_sample_count(num_samples, name="num_samples")
-        duration = num_samples / self.sample_rate
-        return self._generate_noise(duration, num_samples)
+        n = validate_sample_count(n, name="num_samples")
+        duration = n / self.sample_rate
+        return self._generate_noise(duration, n)

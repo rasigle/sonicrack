@@ -14,7 +14,7 @@ from src.engine.core.parameter import (
     ParameterDescriptor,
     SmoothingPolicy,
 )
-from src.engine.utils.validation import validate_sample_count, validate_sample_rate
+from src.engine.utils.validation import validate_sample_count
 
 T = TypeVar("T", bound="AudioComponent")
 
@@ -193,7 +193,6 @@ class AudioComponent(ABC):
         raise StopIteration
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
-        validate_sample_count(n)
         raise NotImplementedError
 
     def get_samples(self, n: int, *args: Any, **kwargs: Any) -> np.ndarray:
@@ -239,12 +238,3 @@ class AudioComponent(ABC):
 
     def __str__(self) -> str:
         return f"AudioComponent {self.get_component_name()}"
-
-
-class Generator(AudioComponent):
-    """Base for components that generate signals (oscillators, modulators, noise)."""
-
-    def __init__(self, sample_rate: float = DEFAULT_SAMPLE_RATE):
-        super().__init__()
-
-        self.sample_rate = validate_sample_rate(sample_rate)

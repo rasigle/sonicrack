@@ -147,7 +147,7 @@ class SawtoothOscillator(_RampOscillator):
         self._mode: SawtoothMode = "pure"
 
         kwargs = filter_provided_args(
-            self._provided_args,  # noqa
+            self._provided_args,
             frequency=frequency,
             amplitude=amplitude,
             gain_db=gain_db,
@@ -358,7 +358,7 @@ class TriangleOscillator(_RampOscillator):
         self._mode: TriangleMode = "pure"
 
         kwargs = filter_provided_args(
-            self._provided_args,  # noqa
+            self._provided_args,
             frequency=frequency,
             amplitude=amplitude,
             gain_db=gain_db,

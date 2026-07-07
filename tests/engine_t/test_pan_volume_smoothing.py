@@ -33,8 +33,11 @@ def test_panner_smoothing():
     )
 
     # Verify smoothing state is active
-    assert panner._smoothing_samples_remaining > 0
+    assert panner._left_gain_param._smoothing_samples_remaining > 0
     assert panner._left_gain_param.target != panner._left_gain_param.value
+
+    assert panner._right_gain_param._smoothing_samples_remaining > 0
+    assert panner._right_gain_param.target != panner._right_gain_param.value
 
     # Generate samples - should smooth over 10ms (441 samples @ 44.1kHz)
     left2, right2 = panner.pan_vectorized(mono_samples[100:541])
@@ -67,7 +70,8 @@ def test_panner_smoothing_duration_uses_explicit_sample_rate():
 
     assert panner.sample_rate == 48000
     assert panner.smoothing_time_ms == 5.0
-    assert panner._smoothing_duration_samples == 240
+    assert panner._left_gain_param._smoothing_duration_samples == 240
+    assert panner._right_gain_param._smoothing_duration_samples == 240
 
 
 def test_volume_smoothing():
@@ -85,8 +89,8 @@ def test_volume_smoothing():
     vol.amplitude = 0.5
 
     # Verify smoothing state is active
-    assert vol._smoothing_samples_remaining > 0
-    assert vol._target_amplitude != vol._current_amplitude
+    assert vol._amplitude_param._smoothing_samples_remaining > 0
+    assert vol._amplitude_param.target != vol._amplitude_param.value
 
     # Generate samples - should smooth
     result2 = vol._scale_vectorized(samples[100:541])
@@ -105,7 +109,7 @@ def test_volume_smoothing_duration_uses_explicit_sample_rate():
 
     assert vol.sample_rate == 96000
     assert vol.smoothing_time_ms == 2.5
-    assert vol._smoothing_duration_samples == 240
+    assert vol._amplitude_param._smoothing_duration_samples == 240
 
 
 def test_volume_gain_db_smoothing():
@@ -122,7 +126,7 @@ def test_volume_gain_db_smoothing():
     vol.gain_db = -12
 
     # Verify smoothing triggered
-    assert vol._smoothing_samples_remaining > 0
+    assert vol._gain_db_param._smoothing_samples_remaining > 0
 
     # Generate with smoothing
     result2 = vol._scale_vectorized(samples[100:541])

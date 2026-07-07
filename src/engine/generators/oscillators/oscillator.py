@@ -58,7 +58,6 @@ Note:
 from src.engine.generators.oscillators.oscillator_base import (
     DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS,
     Oscillator,
-    _derive_amplitude_from_init,
 )
 from src.engine.generators.oscillators.oscillator_ramp import (
     SawtoothOscillator,
@@ -94,5 +93,4 @@ __all__ = [
     "IdealSquareStrategySmoothing",
     "SoftSquareStrategy",
     "SquareWaveFactory",
-    "_derive_amplitude_from_init",
 ]

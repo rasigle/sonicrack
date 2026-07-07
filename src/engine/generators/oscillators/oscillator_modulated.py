@@ -65,13 +65,10 @@ from enum import StrEnum
 import numpy as np
 
 from src.constants import AUTO_MODE_VECTORIZE_THRESHOLD, DEFAULT_SAMPLE_RATE
-from src.engine.core.component import (
-    ComponentDescriptor,
-    Generator,
-    ParameterDescriptor,
-)
+from src.engine.core.component import ComponentDescriptor, ParameterDescriptor
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
+from src.engine.generators.generator import Generator
 from src.engine.generators.oscillators.oscillator import Oscillator
 from src.engine.utils.validation import validate_sample_count
 

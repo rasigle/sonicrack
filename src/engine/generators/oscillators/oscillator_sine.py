@@ -59,7 +59,7 @@ class SineOscillator(Oscillator):
         self._mode: SineWaveMode = "pure"
         self.set_mode(mode)
         kwargs = filter_provided_args(
-            self._provided_args,  # noqa
+            self._provided_args,
             frequency=frequency,
             amplitude=amplitude,
             gain_db=gain_db,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from src.engine.generators.oscillators.oscillator_base import Generator
+from src.engine.generators.generator import Generator
 
 logger = logging.getLogger(__name__)
 

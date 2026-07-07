@@ -1,6 +1,5 @@
 """Shared oscillator infrastructure and amplitude utilities."""
 
-import logging
 from abc import abstractmethod
 
 import numpy as np
@@ -10,12 +9,17 @@ from src.constants import (
     DEFAULT_GAIN_DB,
     DEFAULT_SAMPLE_RATE,
 )
-from src.engine.core.component import Generator, ParameterDescriptor
+from src.engine.core.component import ParameterDescriptor
 from src.engine.core.parameter import RuntimeParameter, SmoothingPolicy
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
+from src.engine.generators.generator import Generator
 from src.engine.utils.decorators import track_provided_args
 from src.engine.utils.math import db_to_linear, linear_to_db
-from src.engine.utils.validation import validate_sample_count, validate_sample_rate
+from src.engine.utils.validation import (
+    derive_amplitude_from_init,
+    validate_sample_count,
+    validate_sample_rate,
+)
 
 DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS = 10
 """Default duration for amplitude smoothing to prevent clicks."""
@@ -24,7 +28,6 @@ DEFAULT_TIME_AMPLITUDE_SMOOTHING_MS = 10
 class Oscillator(Generator):
     """Base class for all signal generators with gain and sample generation helpers."""
 
-    _provided_args: set[str]
     ended: bool = False
 
     @track_provided_args
@@ -44,7 +47,7 @@ class Oscillator(Generator):
         self._freq = frequency
         self._phase = phase
         self._wave_range = wave_range
-        self._initial_amp = _derive_amplitude_from_init(
+        self._initial_amp = derive_amplitude_from_init(
             self._provided_args,
             amplitude,
             gain_db,
@@ -208,47 +211,6 @@ class Oscillator(Generator):
         amp_envelope = self._amplitude_param.get_interpolated_buffer(n)
         return (values * amp_envelope).astype(np.float32)
 
-    # Backward-compatible properties for tests and legacy code
-    @property
-    def _target_amplitude(self) -> float:
-        """Backward compatibility: delegate to RuntimeParameter."""
-        return self._amplitude_param._target_value
-
-    @_target_amplitude.setter
-    def _target_amplitude(self, value: float):
-        """Backward compatibility: delegate to RuntimeParameter."""
-        self._amplitude_param.value = value
-
-    @property
-    def _current_amplitude(self) -> float:
-        """Backward compatibility: delegate to RuntimeParameter."""
-        return self._amplitude_param._current_value
-
-    @_current_amplitude.setter
-    def _current_amplitude(self, value: float):
-        """Backward compatibility: delegate to RuntimeParameter."""
-        self._amplitude_param._current_value = value
-
-    @property
-    def _smoothing_samples_remaining(self) -> int:
-        """Backward compatibility: delegate to RuntimeParameter."""
-        return self._amplitude_param._smoothing_samples_remaining
-
-    @_smoothing_samples_remaining.setter
-    def _smoothing_samples_remaining(self, value: int):
-        """Backward compatibility: delegate to RuntimeParameter."""
-        self._amplitude_param._smoothing_samples_remaining = value
-
-    @property
-    def _smoothing_samples_duration_total(self) -> int:
-        """Backward compatibility: delegate to RuntimeParameter."""
-        return self._amplitude_param._smoothing_duration_samples
-
-    @_smoothing_samples_duration_total.setter
-    def _smoothing_samples_duration_total(self, value: int):
-        """Backward compatibility: delegate to RuntimeParameter."""
-        self._amplitude_param._smoothing_duration_samples = value
-
     def process_frequency_buffer(self, frequencies: np.ndarray) -> np.ndarray:
         """Generate samples with per-sample frequency modulation (bulk API).
 
@@ -409,39 +371,3 @@ class Oscillator(Generator):
         Subclasses should override this to properly restore internal state.
         """
         self._i = float(state.get("carrier_phase", 0.0))
-
-
-def _derive_amplitude_from_init(
-    given_args: set[str], amplitude: float | None, gain_db: float | None
-) -> float:
-    """Determine the initial linear amplitude from constructor arguments."""
-    if amplitude is not None and not isinstance(amplitude, (int, float, np.number)):
-        raise TypeError(f"Amplitude must be number, got {type(amplitude).__name__}")
-    if amplitude is not None and amplitude < 0.0:
-        raise ValueError(f"Amplitude must be non-negative, got {amplitude}")
-    if gain_db is not None and not isinstance(gain_db, (int, float, np.number)):
-        raise TypeError(f"Gain_db must be a number, got {type(gain_db).__name__}")
-
-    gain_db_set = "gain_db" in given_args
-    amplitude_set = "amplitude" in given_args
-
-    if gain_db_set and gain_db is not None:
-        expected_amp = float(db_to_linear(gain_db))
-        if (
-            amplitude_set
-            and amplitude is not None
-            and not np.isclose(amplitude, expected_amp)
-        ):
-            logging.warning(
-                f"Both gain_db={gain_db} and amplitude={amplitude} were specified. "
-                f"Using gain_db, which results in an amplitude of {expected_amp:.3f}."
-            )
-        return expected_amp
-
-    if amplitude_set and amplitude is not None:
-        return amplitude
-
-    if gain_db is not None:
-        return float(db_to_linear(gain_db))
-
-    return 1.0

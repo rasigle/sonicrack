@@ -52,6 +52,7 @@ class TestComponentDescriptor(unittest.TestCase):
                 "param2": ParameterDescriptor(name="param2", default=1.0),
             },
             description="Test component",
+            fluent_api_name="test",
         )
 
         self.assertEqual(descriptor.name, "test_component")
@@ -70,6 +71,7 @@ class TestComponentDescriptor(unittest.TestCase):
                 "frequency": ParameterDescriptor("frequency", 440.0),
                 "amplitude": ParameterDescriptor("amplitude", 1.0),
             },
+            fluent_api_name="test",
         )
 
         config = descriptor.to_config(440, amplitude=0.8)
@@ -89,6 +91,7 @@ class TestComponentDescriptor(unittest.TestCase):
                 "amplitude": ParameterDescriptor("amplitude", 1.0),
                 "phase": ParameterDescriptor("phase", 0.0),
             },
+            fluent_api_name="test",
         )
 
         config = descriptor.to_config(frequency=440, amplitude=0.5, phase=90)

@@ -632,7 +632,7 @@ class SquareOscillator(Oscillator):
         **mode_kwargs,
     ) -> None:
         kwargs = filter_provided_args(
-            self._provided_args,  # noqa
+            self._provided_args,
             frequency=frequency,
             amplitude=amplitude,
             gain_db=gain_db,
@@ -669,9 +669,9 @@ class SquareOscillator(Oscillator):
         if self._strategy_handles_amplitude():
             strategy = self._strategy
             assert isinstance(strategy, IdealSquareStrategySmoothing)
-            strategy.set_amplitude(self._target_amplitude)
+            strategy.set_amplitude(self._amplitude_param.target)
             self._smoothing_samples_remaining = 0
-            self._current_amplitude = self._target_amplitude
+            self._current_amplitude = self._amplitude_param.target
 
     def _post_phase_set(self) -> None:
         self._p = np.deg2rad(self._p)
@@ -726,13 +726,13 @@ class SquareOscillator(Oscillator):
         assert isinstance(strategy, IdealSquareStrategySmoothing)
         strategy.set_sample_rate(self._sample_rate)
         if initial:
-            strategy.set_amplitude(self._target_amplitude)
+            strategy.set_amplitude(self._amplitude_param.target)
         else:
             strategy.reset_amplitude(self._current_amplitude)
-            strategy.set_amplitude(self._target_amplitude)
+            strategy.set_amplitude(self._amplitude_param.target)
 
         self._smoothing_samples_remaining = 0
-        self._current_amplitude = self._target_amplitude
+        self._current_amplitude = self._amplitude_param.target
 
     def _sync_strategy_runtime(self) -> None:
         strategy = getattr(self, "_strategy", None)

@@ -151,6 +151,15 @@ class ParameterDescriptor:
                     f"{param_name} must be between {self.minimum} and {self.maximum}, "
                     f"got {value!r}"
                 )
+            else:
+                # The value passed the epsilon-tolerant check above, but may
+                # still be marginally outside [minimum, maximum] (e.g.
+                # `minimum - 5e-11`). Snap it onto the exact bound so callers
+                # get a value that strictly respects the documented range,
+                # matching the single-bound branches below. Without this,
+                # a value that "passes" validation here could still violate
+                # [minimum, maximum] by a tiny amount downstream.
+                result = max(self.minimum, min(self.maximum, result))
         elif has_min:
             if self.clamp:
                 result = max(self.minimum, result)
@@ -195,11 +204,12 @@ class RuntimeParameter:
 
     Attributes:
         descriptor: The parameter descriptor defining behavior
-        current_value: The current smoothed value
-        target_value: The target value being interpolated toward
+        _sample_rate: Current sample rate
+        _current_value: The current smoothed value
+        _target_value: The target value being interpolated toward
+        _smoothing_start_value: Value at the start of the current smoothing transition
         _smoothing_samples_remaining: Samples left in current smooth transition
         _smoothing_duration_samples: Total smoothing duration in samples
-        _sample_rate: Current sample rate
     """
 
     descriptor: ParameterDescriptor
@@ -258,16 +268,63 @@ class RuntimeParameter:
         validated = self.descriptor.validate(new_value)
 
         if self.descriptor.needs_smoothing() and isinstance(validated, Real):
-            # Trigger smooth transition
+            if validated == self._target_value:
+                # Already the target we're heading to (or already holding
+                # there with no ramp in progress). This must be checked
+                # against the *target*, not the current in-flight value:
+                # comparing against `_current_value` meant that calling
+                # `.value = x` repeatedly with the same `x` while mid-ramp
+                # (completely normal for a UI slider or automation resending
+                # its value every callback) would re-arm a full-duration
+                # ramp on every call, since the smoothed current value only
+                # equals the target once the ramp has fully finished - so
+                # the parameter could chase its target indefinitely and
+                # never settle.
+                return
+
             self._target_value = validated
-            if self._target_value != self._current_value:
-                self._smoothing_start_value = self._current_value
+            self._smoothing_start_value = self._current_value
+
+            if self._smoothing_start_value == self._target_value:
+                # We're already sitting at the new target (e.g. it
+                # coincidentally matches the in-flight ramp's current
+                # position). Cancel any stale ramp instead of leaving it
+                # counting down toward whatever the *old* target was: left
+                # alone, the next few `advance_smoothing()`/
+                # `get_interpolated_buffer()` calls would interpolate away
+                # from and back to this value using the old start point,
+                # producing an audible detour even though nothing should
+                # audibly change.
+                self._smoothing_samples_remaining = 0
+            else:
                 self._smoothing_samples_remaining = self._smoothing_duration_samples
         else:
             # Instant change
             self._target_value = validated
             self._current_value = validated
             self._smoothing_start_value = validated
+
+    def snap_to(self, new_value: Any) -> None:
+        """Immediately set the parameter to `new_value` with no smoothing ramp.
+
+        Unlike the `value` setter, this bypasses smoothing entirely: current,
+        target, and smoothing-start are all set to the (validated) new value
+        and any in-flight ramp is cancelled. Useful when re-deriving this
+        parameter's value from a sibling representation of the same
+        underlying quantity (e.g. syncing a `gain_db` RuntimeParameter after
+        an `amplitude` RuntimeParameter was set directly) where you want the
+        stored value to reflect reality immediately, without arming a click-
+        inducing ramp or leaving a stale one running.
+
+        Args:
+            new_value: The value to snap to. Validated the same way `value`
+                setter validates its input.
+        """
+        validated = self.descriptor.validate(new_value)
+        self._current_value = validated
+        self._target_value = validated
+        self._smoothing_start_value = validated
+        self._smoothing_samples_remaining = 0
 
     @property
     def target(self) -> Any:

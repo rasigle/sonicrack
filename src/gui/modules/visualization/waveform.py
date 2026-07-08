@@ -393,9 +393,9 @@ class WaveformModule(ModuleWidget):
         if min_len == 0:
             return None
 
-        return np.column_stack(
-            (channels[0][-min_len:], channels[1][-min_len:])
-        ).astype(np.float32, copy=False)
+        return np.column_stack((channels[0][-min_len:], channels[1][-min_len:])).astype(
+            np.float32, copy=False
+        )
 
     def shutdown(self, graceful: bool = True) -> None:
         """Stop visualization updates before the module is deleted."""

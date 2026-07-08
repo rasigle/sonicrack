@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from src.audio_io import AudioOutput
+from soniclab.audio_io import AudioOutput
+
 from src.gui.main_window import ModularSynthWindow
 from src.gui.modules.output.output import OutputModule
 

@@ -14,14 +14,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
 )
-
-from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.port import PortSignal
-from src.gui.core.runtime import RuntimeParameters
-from src.gui.module_registry import register_module
-from src.gui.widgets import Knob
-from src.gui.widgets.module_widget import ModuleWidget
-from src.midi_io import (
+from soniclab.midi_io import (
     CVFrequencyOutput,
     CVGateOutput,
     CVVelocityOutput,
@@ -30,6 +23,13 @@ from src.midi_io import (
     NoteOnMessage,
     midi_to_note_name,
 )
+
+from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.module_registry import register_module
+from src.gui.widgets import Knob
+from src.gui.widgets.module_widget import ModuleWidget
 
 WHITE_KEYS = (0, 2, 4, 5, 7, 9, 11)
 BLACK_KEYS = (1, 3, 6, 8, 10)

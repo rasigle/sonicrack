@@ -5,8 +5,8 @@ and notifies all registered listeners.
 """
 
 import pytest
+from soniclab.generators.oscillators.oscillator import SineOscillator
 
-from src.engine.generators.oscillators.oscillator import SineOscillator
 from src.gui.audio_config import AudioConfig, audio_config
 
 

@@ -6,13 +6,13 @@ from typing import Any
 
 import numpy as np
 import pytest
+from soniclab import PITCH_CV_REFERENCE_FREQUENCY, frequency_to_pitch_cv
+from soniclab.dsp.modulators import ADSREnvelope, DecayEnvelope
+from soniclab.generators.oscillators.oscillator_ramp import SawtoothOscillator
+from soniclab.generators.oscillators.oscillator_sine import SineOscillator
+from soniclab.generators.oscillators.oscillator_square import SquareOscillator
 
 from src.constants import DEFAULT_SAMPLE_RATE
-from src.engine import PITCH_CV_REFERENCE_FREQUENCY, frequency_to_pitch_cv
-from src.engine.dsp.modulators import ADSREnvelope, DecayEnvelope
-from src.engine.generators.oscillators.oscillator_ramp import SawtoothOscillator
-from src.engine.generators.oscillators.oscillator_sine import SineOscillator
-from src.engine.generators.oscillators.oscillator_square import SquareOscillator
 from src.gui.core.port import Port
 from src.gui.modules.effects.effects_compressor import CompressorModule
 from src.gui.modules.effects.effects_distortion import DistortionModule

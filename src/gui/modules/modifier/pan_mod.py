@@ -3,8 +3,8 @@ import logging
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
+from soniclab import ModulatedPanner, Panner
 
-from src.engine import ModulatedPanner, Panner
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters
 from src.gui.core.runtime_helpers import float_parameter, read_samples, silence

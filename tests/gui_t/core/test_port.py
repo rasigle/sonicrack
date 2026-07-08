@@ -12,8 +12,8 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+from soniclab import SineOscillator, TriangleOscillator
 
-from src.engine import SineOscillator, TriangleOscillator
 from src.gui.audio_engine import RenderContext
 from src.gui.core.module import ModuleCategory
 from src.gui.core.port import Port, PortSignal, PortType

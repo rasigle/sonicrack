@@ -11,19 +11,19 @@ from PyQt6 import QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QLabel
-
-from src.constants import DEFAULT_GAIN_DB
-from src.engine import (
+from soniclab import (
     PITCH_CV_REFERENCE_FREQUENCY,
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
     TriangleOscillator,
 )
-from src.engine.generators.oscillators.oscillator_modulated import ModulatedOscillator
-from src.engine.generators.oscillators.oscillator_ramp import SawtoothMode, TriangleMode
-from src.engine.generators.oscillators.oscillator_sine import SineWaveMode
-from src.engine.generators.oscillators.oscillator_square import SquareWaveMode
+from soniclab.generators.oscillators.oscillator_modulated import ModulatedOscillator
+from soniclab.generators.oscillators.oscillator_ramp import SawtoothMode, TriangleMode
+from soniclab.generators.oscillators.oscillator_sine import SineWaveMode
+from soniclab.generators.oscillators.oscillator_square import SquareWaveMode
+
+from src.constants import DEFAULT_GAIN_DB
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters
@@ -41,7 +41,7 @@ from src.gui.ui_constants import (
     MAX_PW_PERCENTAGE_VALUE,
     MIN_PW_PERCENTAGE_VALUE,
 )
-from src.gui.widgets import HSlider, Knob
+from src.gui.widgets import Knob
 from src.gui.widgets.module_widget import ModuleWidget
 
 VCO_PITCH_CV_SMOOTHING_MS = 5.0
@@ -871,11 +871,7 @@ class ModulatedOscillatorModule(ModuleWidget):
     ):
         """Create the VCO base oscillator from a runtime parameter snapshot."""
         if wave_type == "Sine":
-            return SineOscillator(
-                frequency,
-                gain_db=gain_db,
-                mode=_as_sine_mode(mode)
-            )
+            return SineOscillator(frequency, gain_db=gain_db, mode=_as_sine_mode(mode))
         if wave_type == "Square":
             return SquareOscillator(
                 frequency,

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit
+from soniclab.sequencing import TB303StepEvent, TB303StepSequencer
 
-from src.engine.sequencing import TB303StepEvent, TB303StepSequencer
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.port import PortSignal

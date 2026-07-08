@@ -6,15 +6,15 @@ import numpy as np
 import pytest
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
+from soniclab import Volume
+from soniclab.midi_io import midi_note_to_pitch_cv, midi_to_frequency
 
-from src.engine import Volume
 from src.gui.core.port import Port
 from src.gui.module_registry import initialize_module_registry
 from src.gui.modules.input.midi_keyboard import MIDIKeyboardModule
 from src.gui.modules.modifier.vca import VCAModule
 from src.gui.modules.modulated_source.envelope_adsr import ADSRModule
 from src.gui.modules.source.vco import ModulatedOscillatorModule
-from src.midi_io import midi_note_to_pitch_cv, midi_to_frequency
 
 
 def test_midi_keyboard_note_press_updates_cv_outputs(qapp: Any):

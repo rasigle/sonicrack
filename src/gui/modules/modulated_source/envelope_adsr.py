@@ -5,8 +5,8 @@ import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from soniclab.dsp.modulators import ADSREnvelope, GateTriggeredADSR
 
-from src.engine.dsp.modulators import ADSREnvelope, GateTriggeredADSR
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.port import PortSignal
 from src.gui.core.runtime import RuntimeParameters

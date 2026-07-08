@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PyQt6 import QtWidgets
 from PyQt6.QtGui import QColor
+from soniclab.audio_io import AudioOutput
+from soniclab.dsp.modifiers.amplitude import Volume
 
-from src.audio_io import AudioOutput
-from src.engine.dsp.modifiers.amplitude import Volume
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module

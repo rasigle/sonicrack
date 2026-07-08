@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
-
-from src.engine.generators.oscillators.oscillator import (
+from soniclab.generators.oscillators.oscillator import (
     SawtoothOscillator,
     SineOscillator,
     SquareOscillator,
     TriangleOscillator,
 )
+
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.port import PortSignal

@@ -12,8 +12,8 @@ from PyQt6.QtWidgets import (
     QLabel,
     QVBoxLayout,
 )
+from soniclab.dsp.filters.butterworth import ButterworthFilter
 
-from src.engine.dsp.filters.butterworth import ButterworthFilter
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters

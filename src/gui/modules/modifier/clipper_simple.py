@@ -3,8 +3,8 @@ from typing import Any
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
+from soniclab import Clipper
 
-from src.engine import Clipper
 from src.gui.audio_config import get_sample_rate
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters

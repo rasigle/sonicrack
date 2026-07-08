@@ -6,8 +6,8 @@ from typing import Any
 
 import numpy as np
 import pytest
+from soniclab import Panner
 
-from src.engine import Panner
 from src.gui.modules.modifier.pan_mod import PannerModule
 from src.gui.modules.modifier.pan_simple import SimplePannerModule
 

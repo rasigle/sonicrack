@@ -8,8 +8,8 @@ import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout
+from soniclab.dsp.filters.butterworth import BiquadResonantFilter
 
-from src.engine.dsp.filters.butterworth import BiquadResonantFilter
 from src.gui.audio_config import audio_config
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.core.runtime import RuntimeParameters

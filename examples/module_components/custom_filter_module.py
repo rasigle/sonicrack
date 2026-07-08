@@ -13,8 +13,8 @@ from typing import Any
 
 import numpy as np
 from PyQt6.QtGui import QColor
+from soniclab import Modifier
 
-from src.engine import Modifier
 from src.gui.core.module import ModuleCategory, ModuleMetadata
 from src.gui.module_registry import register_module
 from src.gui.widgets import Knob

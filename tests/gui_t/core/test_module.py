@@ -3,8 +3,8 @@
 import logging
 
 import pytest
+from soniclab.generators.oscillators.oscillator import SineOscillator
 
-from src.engine.generators.oscillators.oscillator import SineOscillator
 from src.gui.core.module import ModuleCategory, infer_port_signal
 from src.gui.core.port import PortSignal
 from src.gui.modules.input.midi_keyboard import MIDIKeyboardModule

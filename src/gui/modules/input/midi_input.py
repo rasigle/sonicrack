@@ -63,14 +63,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
 )
-
-from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.core.port import PortSignal
-from src.gui.core.runtime import RuntimeParameters
-from src.gui.module_registry import register_module
-from src.gui.modules.input.midi_worker_thread import MIDIWorkerThread
-from src.gui.widgets.module_widget import ModuleWidget
-from src.midi_io import (
+from soniclab.midi_io import (
     CVFrequencyOutput,
     CVGateOutput,
     CVVelocityOutput,
@@ -79,6 +72,13 @@ from src.midi_io import (
     NoteOffMessage,
     NoteOnMessage,
 )
+
+from src.gui.core.module import ModuleCategory, ModuleMetadata
+from src.gui.core.port import PortSignal
+from src.gui.core.runtime import RuntimeParameters
+from src.gui.module_registry import register_module
+from src.gui.modules.input.midi_worker_thread import MIDIWorkerThread
+from src.gui.widgets.module_widget import ModuleWidget
 
 logger = logging.getLogger(__name__)
 
@@ -187,8 +187,8 @@ class MIDIInputModule(ModuleWidget):
         """Refresh the list of available MIDI devices."""
         try:
             # Import MIDIInput only for device listing
-            from src.midi_io import MIDIInput
-            from src.midi_io.input import MIDO_AVAILABLE
+            from soniclab.midi_io import MIDIInput
+            from soniclab.midi_io.input import MIDO_AVAILABLE
 
             if not MIDO_AVAILABLE:
                 self.device_status_changed.emit("MIDI library not installed")
@@ -319,7 +319,7 @@ class MIDIInputModule(ModuleWidget):
         # Update UI
         if isinstance(msg, NoteOnMessage):
             if msg.velocity > 0:
-                from src.midi_io import midi_to_note_name
+                from soniclab.midi_io import midi_to_note_name
 
                 note_name = midi_to_note_name(msg.note)
                 self.note_label.setText(f"{note_name} ({msg.note})")

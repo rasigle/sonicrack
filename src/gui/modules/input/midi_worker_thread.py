@@ -7,8 +7,7 @@ the UI thread via Qt signals (thread-safe).
 import logging
 
 from PyQt6.QtCore import QThread, pyqtSignal
-
-from src.midi_io import MIDIInput
+from soniclab.midi_io import MIDIInput
 
 logger = logging.getLogger(__name__)
 

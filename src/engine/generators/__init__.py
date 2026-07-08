@@ -1,1 +1,0 @@
-"""Signal and audio generators."""

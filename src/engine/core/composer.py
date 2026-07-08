@@ -64,7 +64,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from src.constants import AUTO_MODE_VECTORIZE_THRESHOLD, DEFAULT_SAMPLE_RATE
+from src.constants import DEFAULT_SAMPLE_RATE
 from src.engine.core.component import (
     AudioComponent,
     ComponentDescriptor,
@@ -84,7 +84,11 @@ logger = logging.getLogger(__name__)
 
 def _get_vectorized_samples(component: AudioComponent, n: int) -> np.ndarray:
     """Render a child component through its most direct vectorized entry point."""
-    if hasattr(component, "get_samples_vectorized"):
+    vectorized_method = getattr(type(component), "get_samples_vectorized", None)
+    if (
+        vectorized_method is not None
+        and vectorized_method is not AudioComponent.get_samples_vectorized
+    ):
         return component.get_samples_vectorized(n)
 
     if hasattr(component, "get_samples"):
@@ -254,7 +258,7 @@ class Composer(AudioComponent, ABC):
             )
 
         if mode == "auto":
-            mode = "vectorized" if n >= AUTO_MODE_VECTORIZE_THRESHOLD else "iterator"
+            mode = "vectorized"
 
         if mode == "iterator":
             return self.get_samples_iterator(n, reset=reset)
@@ -622,61 +626,29 @@ class WaveAdder(Composer):
 
             return samples.astype(np.float32)
 
-        # Generate samples from all generators (vectorized)
-        all_samples = []
+        if not self.stereo:
+            mixed = np.zeros(n, dtype=np.float32)
+            for gen in self.generators:
+                samples = _get_vectorized_samples(gen, n)
+                if samples.ndim == 2:
+                    mixed += samples.mean(axis=1, dtype=np.float32)
+                else:
+                    mixed += samples.astype(np.float32, copy=False)
+
+            if self.mix_mode == "average":
+                mixed /= len(self.generators)
+            return mixed
+
+        mixed = np.zeros((n, 2), dtype=np.float32)
         for gen in self.generators:
             samples = _get_vectorized_samples(gen, n)
-            all_samples.append(samples)
+            if samples.ndim == 1:
+                mono = samples.astype(np.float32, copy=False)
+                mixed[:, 0] += mono
+                mixed[:, 1] += mono
+            else:
+                mixed += samples.astype(np.float32, copy=False)
 
-        # Optimize for mono mode (most common case)
-        if not self.stereo:
-            # Check if all inputs are mono
-            all_mono = all(s.ndim == 1 for s in all_samples)
-
-            if all_mono:
-                # Pure mono: direct sum or mean (fastest path)
-                # Stack all: (n_generators, n) -> sum/mean -> (n,)
-                stacked = np.stack(all_samples, axis=0)
-                if self.mix_mode == "sum":
-                    return stacked.sum(axis=0, dtype=np.float32)
-                # average
-                return stacked.mean(axis=0, dtype=np.float32)
-
-            # Mixed mono/stereo: convert stereo to mono, then sum/mean
-            mono_samples = []
-            for samples in all_samples:
-                if samples.ndim == 2:
-                    # Stereo to mono: average channels
-                    mono_samples.append(samples.mean(axis=1))
-                else:
-                    # Already mono
-                    mono_samples.append(samples)
-
-            stacked = np.stack(mono_samples, axis=0)
-            if self.mix_mode == "sum":
-                return stacked.sum(axis=0, dtype=np.float32)
-            # average
-            return stacked.mean(axis=0, dtype=np.float32)
-
-        # Stereo mode
-        # Check if we have mixed mono/stereo inputs
-        has_mono = any(s.ndim == 1 for s in all_samples)
-
-        if has_mono:
-            # Convert mono to stereo only where needed
-            stereo_samples = []
-            for samples in all_samples:
-                if samples.ndim == 1:
-                    # Mono to stereo: duplicate channel
-                    samples = np.column_stack((samples, samples))
-                # Stereo samples pass through
-                stereo_samples.append(samples)
-            all_samples = stereo_samples
-
-        # All samples now stereo: (n, 2) each
-        # Stack: (n_generators, n, 2) -> sum/mean -> (n, 2)
-        stacked = np.stack(all_samples, axis=0)
-        if self.mix_mode == "sum":
-            return stacked.sum(axis=0, dtype=np.float32)
-        # average
-        return stacked.mean(axis=0, dtype=np.float32)
+        if self.mix_mode == "average":
+            mixed /= len(self.generators)
+        return mixed

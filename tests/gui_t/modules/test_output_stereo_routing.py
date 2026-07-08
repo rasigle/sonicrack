@@ -224,6 +224,80 @@ class TestOutputModuleRouting:
         assert np.allclose(samples[:, 0], [0.1, 0.2, 0.3])
         assert np.allclose(samples[:, 1], [0.1, 0.2, 0.3])
 
+    def test_left_mono_input_accepts_stereo_rendered_signal(self, output_module):
+        """A stereo module patched to Left/Mono should reach both output channels."""
+
+        class FakeEngine:
+            def render_ports(self, ports, num_samples):
+                assert len(ports) == 1
+                assert num_samples == 3
+                return [
+                    np.array(
+                        [[0.1, 0.9], [0.2, 0.8], [0.3, 0.7]],
+                        dtype=np.float32,
+                    )
+                ]
+
+        output_module.audio_engine = FakeEngine()
+        output_module.inp_port_l.connect(Port("output", "Stereo Source"))
+
+        samples = output_module._generate_samples(3)
+
+        assert samples.shape == (3, 2)
+        assert np.allclose(samples[:, 0], [0.1, 0.2, 0.3])
+        assert np.allclose(samples[:, 1], [0.9, 0.8, 0.7])
+
+    def test_right_input_accepts_stereo_rendered_signal(self, output_module):
+        """A stereo module patched only to Right should also pass through stereo."""
+
+        class FakeEngine:
+            def render_ports(self, ports, num_samples):
+                assert len(ports) == 1
+                assert num_samples == 3
+                return [
+                    np.array(
+                        [[0.4, -0.4], [0.5, -0.5], [0.6, -0.6]],
+                        dtype=np.float32,
+                    )
+                ]
+
+        output_module.audio_engine = FakeEngine()
+        output_module.inp_port_r.connect(Port("output", "Stereo Source"))
+
+        samples = output_module._generate_samples(3)
+
+        assert samples.shape == (3, 2)
+        assert np.allclose(samples[:, 0], [0.4, 0.5, 0.6])
+        assert np.allclose(samples[:, 1], [-0.4, -0.5, -0.6])
+
+    def test_dual_output_inputs_extract_matching_stereo_channels(self, output_module):
+        """When both inputs are connected, each port contributes its channel."""
+
+        class FakeEngine:
+            def render_ports(self, ports, num_samples):
+                assert len(ports) == 2
+                assert num_samples == 3
+                return [
+                    np.array(
+                        [[0.1, 9.0], [0.2, 9.0], [0.3, 9.0]],
+                        dtype=np.float32,
+                    ),
+                    np.array(
+                        [[8.0, -0.1], [8.0, -0.2], [8.0, -0.3]],
+                        dtype=np.float32,
+                    ),
+                ]
+
+        output_module.audio_engine = FakeEngine()
+        output_module.inp_port_l.connect(Port("output", "Left Stereo Source"))
+        output_module.inp_port_r.connect(Port("output", "Right Stereo Source"))
+
+        samples = output_module._generate_samples(3)
+
+        assert samples.shape == (3, 2)
+        assert np.allclose(samples[:, 0], [0.1, 0.2, 0.3])
+        assert np.allclose(samples[:, 1], [-0.1, -0.2, -0.3])
+
     def test_output_callback_requires_audio_engine(self, output_module):
         """Output callback must not fall back to direct port reads."""
         source_port = Port("output", "Out")

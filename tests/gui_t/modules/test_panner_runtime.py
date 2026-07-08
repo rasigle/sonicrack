@@ -6,8 +6,10 @@ from typing import Any
 
 import numpy as np
 
+from src.gui.audio_engine import AudioEngine
 from src.gui.modules.modifier.pan_mod import PannerModule
 from src.gui.modules.modifier.pan_simple import SimplePannerModule
+from src.gui.modules.output.output import OutputModule
 from src.gui.modules.source.oscillator import OscillatorModule
 
 
@@ -255,6 +257,33 @@ def test_simple_panner_runtime_uses_engine_component(qapp: Any):
     assert np.sum(np.abs(right)) > np.sum(np.abs(left)), (
         "Component position should affect output"
     )
+
+
+def test_simple_panner_position_reaches_output_render_path(qapp: Any):
+    """Knob changes must update the cached runtime params used by AudioEngine."""
+    del qapp
+
+    engine = AudioEngine()
+    osc = OscillatorModule()
+    panner = SimplePannerModule()
+    output = OutputModule()
+    output.audio_engine = engine
+
+    for module in (osc, panner, output):
+        engine.add_module(module)
+
+    osc.sine_port.connect(panner.in_port)
+    panner.out_port.connect(output.inp_port_l)
+
+    panner.pan_knob.set_value(1.0)
+    output._generate_samples(512)
+    samples = output._generate_samples(512)
+
+    left_energy = np.sum(np.abs(samples[:, 0]))
+    right_energy = np.sum(np.abs(samples[:, 1]))
+
+    assert panner.get_parameters()["position"] == 1.0
+    assert right_energy > left_energy * 10
 
 
 def test_modulated_panner_runtime_uses_engine_component(qapp: Any):

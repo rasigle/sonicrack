@@ -46,6 +46,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _target_port_names_for_restore(port_name: str | None) -> tuple[str, ...]:
+    """Return saved target port names plus current aliases for patch restore."""
+    if not isinstance(port_name, str):
+        return ()
+
+    aliases = {
+        "L/Mono": ("L/Mono", "Left/Mono", "In"),
+        "Left/Mono": ("Left/Mono", "L/Mono", "In"),
+        "R": ("R", "Right", "In"),
+        "Right": ("Right", "R", "In"),
+        "Input": ("Input", "In"),
+        "in": ("in", "In"),
+    }
+    return aliases.get(port_name, (port_name,))
+
+
 class ModularSynthWindow(QMainWindow):
     """Main window for the modular synthesizer application.
 
@@ -1116,8 +1132,9 @@ class ModularSynthWindow(QMainWindow):
                         source_port_obj = port
                         break
 
+                target_port_names = _target_port_names_for_restore(target_port)
                 for port in target_module.input_ports:
-                    if port.port_name == target_port:
+                    if port.port_name in target_port_names:
                         target_port_obj = port
                         break
 

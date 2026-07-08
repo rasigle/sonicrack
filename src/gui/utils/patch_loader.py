@@ -20,6 +20,25 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+def _target_port_aliases(port_name: str | None) -> tuple[str, ...]:
+    """Return current and legacy target input names for patch loading."""
+    if not isinstance(port_name, str):
+        return ()
+
+    aliases = {
+        "In": ("In", "Left/Mono", "L/Mono", "Input", "in"),
+        "in": ("in", "In", "Left/Mono", "L/Mono", "Input"),
+        "Input": ("Input", "In", "Left/Mono", "L/Mono", "in"),
+        "L/Mono": ("L/Mono", "Left/Mono", "In"),
+        "Left/Mono": ("Left/Mono", "L/Mono", "In"),
+        "R": ("R", "Right", "In"),
+        "Right": ("Right", "R", "In"),
+        "Mod": ("Mod", "mod", "Modulation", "modulation"),
+        "mod": ("mod", "Mod", "Modulation", "modulation"),
+    }
+    return aliases.get(port_name, (port_name,))
+
+
 # Initialize Qt application for headless rendering
 # This MUST happen before any GUI modules are imported
 _qt_app = None
@@ -288,16 +307,9 @@ class HeadlessPatchRenderer:
 
                     # If target port not found, try common aliases
                     if not target:
-                        # Map legacy port names to current names
-                        target_aliases = {
-                            "In": ["Left/Mono", "in", "input", "Input"],
-                            "in": ["Left/Mono", "In", "input", "Input"],
-                            "Input": ["Left/Mono", "In", "in"],
-                            "Mod": ["mod", "Modulation", "modulation"],
-                            "mod": ["Mod", "Modulation", "modulation"],
-                        }
-
-                        for alias in target_aliases.get(target_port, []):
+                        for alias in _target_port_aliases(target_port):
+                            if alias == target_port:
+                                continue
                             target = target_module.inputs.get(alias)
                             if target:
                                 logger.debug(

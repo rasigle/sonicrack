@@ -94,6 +94,60 @@ class TestOscillatorModeSelection(unittest.TestCase):
                 oscillator_cls(frequency=440, mode="invalid")
 
 
+class TestRampFrequencyBuffer(TestOscillatorBase):
+    """Ramp oscillators should render frequency buffers without iterator fallback."""
+
+    def test_triangle_frequency_buffer_matches_vectorized_constant_frequency(self):
+        expected = TriangleOscillator(
+            frequency=161.0,
+            amplitude=0.8,
+            gain_db=None,
+            phase=188.0,
+            sample_rate=44100,
+            mode="analog",
+        )
+        actual = TriangleOscillator(
+            frequency=161.0,
+            amplitude=0.8,
+            gain_db=None,
+            phase=188.0,
+            sample_rate=44100,
+            mode="analog",
+        )
+
+        samples = actual.process_frequency_buffer(
+            np.full(512, 161.0, dtype=np.float32)
+        )
+        expected_samples = expected.get_samples_vectorized(512)
+
+        np.testing.assert_allclose(samples, expected_samples, rtol=1e-5, atol=1e-5)
+
+    def test_sawtooth_frequency_buffer_matches_vectorized_constant_frequency(self):
+        expected = SawtoothOscillator(
+            frequency=173.0,
+            amplitude=0.7,
+            gain_db=None,
+            phase=47.0,
+            sample_rate=44100,
+            mode="analog",
+        )
+        actual = SawtoothOscillator(
+            frequency=173.0,
+            amplitude=0.7,
+            gain_db=None,
+            phase=47.0,
+            sample_rate=44100,
+            mode="analog",
+        )
+
+        samples = actual.process_frequency_buffer(
+            np.full(512, 173.0, dtype=np.float32)
+        )
+        expected_samples = expected.get_samples_vectorized(512)
+
+        np.testing.assert_allclose(samples, expected_samples, rtol=1e-5, atol=1e-5)
+
+
 class TestSineOscillator(TestOscillatorBase):
     """Test suite for SineOscillator."""
 

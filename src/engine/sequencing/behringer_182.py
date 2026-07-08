@@ -180,6 +180,13 @@ class Behringer182Sequencer(AudioComponent):
         else:
             clock_pulses = self._fit_signal(clock_pulses, num_samples)
 
+        if (
+            reset_pulses is None
+            and hold_signal is None
+            and run_signal is None
+        ):
+            return self._process_clocked(num_samples, clock_pulses)
+
         resets = self._fit_signal(reset_pulses, num_samples)
         holds = self._fit_signal(hold_signal, num_samples)
         runs = (
@@ -226,6 +233,112 @@ class Behringer182Sequencer(AudioComponent):
             end=end,
             step=step,
         )
+
+    def _process_clocked(
+        self, num_samples: int, clock_pulses: np.ndarray
+    ) -> Behringer182Frame:
+        """Fast path for the common clock-only render case."""
+        cv_a = np.empty(num_samples, dtype=np.float32)
+        cv_b = np.empty(num_samples, dtype=np.float32)
+        gate = np.zeros(num_samples, dtype=np.float32)
+        trigger = np.zeros(num_samples, dtype=np.float32)
+        end = np.zeros(num_samples, dtype=np.float32)
+        step = np.empty(num_samples, dtype=np.float32)
+
+        event_indices = np.flatnonzero(clock_pulses > 0.5)
+        if self._active_step < 0 and (
+            len(event_indices) == 0 or event_indices[0] != 0
+        ):
+            event_indices = np.insert(event_indices, 0, 0)
+
+        if len(event_indices) == 0:
+            self._fill_segment(
+                0,
+                num_samples,
+                cv_a=cv_a,
+                cv_b=cv_b,
+                gate=gate,
+                step=step,
+            )
+            self._samples_in_step += num_samples
+            return Behringer182Frame(
+                cv_a=cv_a,
+                cv_b=cv_b,
+                gate=gate,
+                trigger=trigger,
+                end=end,
+                step=step,
+            )
+
+        segment_starts = event_indices.astype(np.int64, copy=False)
+        segment_ends = np.empty_like(segment_starts)
+        segment_ends[:-1] = segment_starts[1:]
+        segment_ends[-1] = num_samples
+
+        if segment_starts[0] > 0:
+            self._fill_segment(
+                0,
+                int(segment_starts[0]),
+                cv_a=cv_a,
+                cv_b=cv_b,
+                gate=gate,
+                step=step,
+            )
+            self._samples_in_step += int(segment_starts[0])
+
+        for start, stop in zip(segment_starts, segment_ends, strict=False):
+            start = int(start)
+            stop = int(stop)
+            wrapped = self._advance_step()
+            active = max(0, self._active_step)
+            if self.gates[active]:
+                trigger[start] = 1.0
+            if wrapped:
+                end[start] = 1.0
+            self._fill_segment(
+                start,
+                stop,
+                cv_a=cv_a,
+                cv_b=cv_b,
+                gate=gate,
+                step=step,
+            )
+            self._samples_in_step += stop - start
+
+        return Behringer182Frame(
+            cv_a=cv_a,
+            cv_b=cv_b,
+            gate=gate,
+            trigger=trigger,
+            end=end,
+            step=step,
+        )
+
+    def _fill_segment(
+        self,
+        start: int,
+        stop: int,
+        *,
+        cv_a: np.ndarray,
+        cv_b: np.ndarray,
+        gate: np.ndarray,
+        step: np.ndarray,
+    ) -> None:
+        if stop <= start:
+            return
+
+        active = max(0, self._active_step)
+        cv_a[start:stop] = self._scale_cv(self.cv_a[active], self.cv_a_range)
+        cv_b[start:stop] = self._scale_cv(self.cv_b[active], self.cv_b_range)
+        step[start:stop] = float(active)
+
+        if not self.gates[active]:
+            return
+
+        gate_limit = max(1, int(self.step_samples * self.gate_length))
+        length = stop - start
+        offsets = self._samples_in_step + np.arange(length)
+        gate[start:stop] = (offsets < gate_limit).astype(np.float32)
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         """Return CV row A for compatibility with generator-style use."""

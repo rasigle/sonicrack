@@ -272,6 +272,61 @@ class TestSampleGeneration(unittest.TestCase):
         large = mod_osc.get_samples(1000, mode="auto", reset=True)
         self.assertIsInstance(large, np.ndarray)
 
+    def test_auto_mode_uses_vectorized_for_small_buffers(self) -> None:
+        """Auto mode should avoid iterator loops even for callback-sized buffers."""
+
+        class CountingModulatedOscillator(ModulatedOscillator):
+            iterator_calls = 0
+            vectorized_calls = 0
+
+            def get_samples_iterator(self, n=44100, reset=False):
+                type(self).iterator_calls += 1
+                return super().get_samples_iterator(n, reset=reset)
+
+            def get_samples_vectorized(self, n):
+                type(self).vectorized_calls += 1
+                return super().get_samples_vectorized(n)
+
+        osc = SineOscillator(440)
+        env = ADSREnvelope(0.1, 0.2, 0.7, 0.3)
+        mod_osc = CountingModulatedOscillator(
+            osc,
+            env,
+            amp_mod=lambda base_amp, env_val: base_amp * env_val,
+        )
+
+        samples = mod_osc.get_samples(64, mode="auto", reset=True)
+
+        self.assertEqual(samples.shape, (64,))
+        self.assertEqual(CountingModulatedOscillator.iterator_calls, 0)
+        self.assertEqual(CountingModulatedOscillator.vectorized_calls, 1)
+
+    def test_modulator_vectorized_override_is_preferred(self) -> None:
+        """Modulators with real vectorized APIs should not go through get_samples."""
+
+        class VectorizedOnlySine(SineOscillator):
+            vectorized_calls = 0
+
+            def get_samples(self, n, *args, **kwargs):
+                raise AssertionError("get_samples should not be called")
+
+            def get_samples_vectorized(self, n):
+                type(self).vectorized_calls += 1
+                return super().get_samples_vectorized(n)
+
+        osc = SineOscillator(440)
+        modulator = VectorizedOnlySine(frequency=2, amplitude=0.5, gain_db=None)
+        mod_osc = ModulatedOscillator(
+            osc,
+            modulator,
+            freq_mod=lambda base_freq, mod_val: base_freq + mod_val,
+        )
+
+        samples = mod_osc.get_samples_vectorized(128)
+
+        self.assertEqual(samples.shape, (128,))
+        self.assertEqual(VectorizedOnlySine.vectorized_calls, 1)
+
     def test_vectorized_matches_iterator_for_bright_sine_mode(self) -> None:
         """Vectorized modulation should preserve sine harmonic modes."""
         sample_rate = 2000

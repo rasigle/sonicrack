@@ -385,6 +385,7 @@ class AudioEngine(QtCore.QObject):
             self.modules.remove(mod)
         except ValueError:
             return
+
         self._output_modules.discard(mod)
         self.mark_graph_changed()
 

@@ -45,21 +45,33 @@ def _as_float32_1d(samples: Any) -> np.ndarray | None:
     if arr.size == 0:
         return None
 
-    arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=-1.0)
-    arr = np.clip(arr.ravel(), -1.0, 1.0)
-
+    arr = arr.ravel()
     if arr.size == 0:
         return None
 
     return arr
 
 
-def _downsample_minmax(samples: np.ndarray, max_points: int) -> np.ndarray:
-    """Downsample audio for display while preserving visible peaks.
+def _normalize_display_samples(samples: Any) -> np.ndarray | None:
+    """Normalize mono or stereo samples without copying full buffers."""
+    if samples is None:
+        return None
 
-    Simple decimation can miss short transients. Min/max envelope downsampling
-    preserves peaks and gives a stable oscilloscope-style display.
-    """
+    arr = np.asarray(samples, dtype=np.float32)
+    if arr.size == 0:
+        return None
+
+    if arr.ndim == 2:
+        if arr.shape[1] == 2:
+            return arr
+        if arr.shape[0] == 2 and arr.shape[1] > 2:
+            return arr.T
+
+    return _as_float32_1d(arr)
+
+
+def _downsample_display(samples: np.ndarray, max_points: int) -> np.ndarray:
+    """Downsample audio for cheap line-only display."""
     samples = np.asarray(samples, dtype=np.float32).ravel()
 
     if samples.size == 0:
@@ -70,25 +82,9 @@ def _downsample_minmax(samples: np.ndarray, max_points: int) -> np.ndarray:
     if samples.size <= max_points:
         return samples
 
-    # We output two points per bucket: min and max.
-    bucket_count = max(1, max_points // 2)
-    bucket_size = max(1, samples.size // bucket_count)
-    usable = bucket_count * bucket_size
-
-    if usable <= 0:
-        return samples[-max_points:]
-
-    trimmed = samples[-usable:]
-    buckets = trimmed.reshape(bucket_count, bucket_size)
-
-    mins = buckets.min(axis=1)
-    maxs = buckets.max(axis=1)
-
-    envelope = np.empty(bucket_count * 2, dtype=np.float32)
-    envelope[0::2] = mins
-    envelope[1::2] = maxs
-
-    return envelope[:max_points]
+    stride = max(1, samples.size // max_points)
+    start = max(0, samples.size - (max_points * stride))
+    return samples[start::stride][:max_points]
 
 
 @dataclass
@@ -129,8 +125,11 @@ class WaveformModule(ModuleWidget):
             color=QColor(60, 70, 90),
         )
 
-        self.in_port_l = self.add_input("L/Mono")
-        self.in_port_r = self.add_input("R")
+        self.in_port = self.add_input("In")
+        # Backward-compatible attributes for older code that looked up the
+        # previous two-input shape. Only one visible/serializable input is used.
+        self.in_port_l = self.in_port
+        self.in_port_r = self.in_port
 
         self._is_frozen = False
         self._frozen_samples: np.ndarray | None = None
@@ -153,7 +152,7 @@ class WaveformModule(ModuleWidget):
 
         self.timerange_knob = Knob(
             label="Time",
-            min_value=64,
+            min_value=32,
             max_value=8192,
             default_value=2048,
             logarithmic=False,
@@ -257,11 +256,7 @@ class WaveformModule(ModuleWidget):
             self.freeze_button.setText("Freeze")
             logger.info("Waveform unfrozen")
 
-    def _update_samples(
-        self,
-        samples_l: np.ndarray | None,
-        samples_r: np.ndarray | None,
-    ) -> None:
+    def _update_samples(self, samples: np.ndarray | None) -> None:
         """Update the display with new audio samples."""
         if self._is_frozen:
             if self._frozen_samples is not None:
@@ -269,34 +264,8 @@ class WaveformModule(ModuleWidget):
                 self._update_stats(self._frozen_samples)
             return
 
-        left = _as_float32_1d(samples_l)
-        right = _as_float32_1d(samples_r)
-
-        if left is None and right is None:
-            self._last_display_samples = None
-            self.waveform_display.clear()
-            self._update_stats(None)
-            return
-
-        if left is not None and right is not None:
-            min_len = min(left.size, right.size)
-            if min_len == 0:
-                self._last_display_samples = None
-                self.waveform_display.clear()
-                self._update_stats(None)
-                return
-
-            display_samples = np.column_stack(
-                (left[-min_len:], right[-min_len:])
-            ).astype(np.float32, copy=False)
-
-        elif left is not None:
-            display_samples = left
-
-        elif right is not None:
-            display_samples = right
-
-        else:
+        display_samples = _normalize_display_samples(samples)
+        if display_samples is None:
             self._last_display_samples = None
             self.waveform_display.clear()
             self._update_stats(None)
@@ -370,38 +339,63 @@ class WaveformModule(ModuleWidget):
                     self._update_stats(self._frozen_samples)
                 return
 
-            l_connected = self.in_port_l.is_connected
-            r_connected = self.in_port_r.is_connected
-
-            if not l_connected and not r_connected:
+            if not self.in_port.is_connected:
                 self._last_display_samples = None
                 self.waveform_display.clear()
                 self._update_stats(None)
                 return
 
             num_samples = int(self.timerange_knob.get_value())
+            samples = self._read_input_samples(num_samples)
 
-            samples_l = (
-                get_visualizer_samples(self.in_port_l, num_samples)
-                if l_connected
-                else None
-            )
-            samples_r = (
-                get_visualizer_samples(self.in_port_r, num_samples)
-                if r_connected
-                else None
-            )
-
-            if samples_l is None and samples_r is None:
+            if samples is None:
                 self._last_display_samples = None
                 self.waveform_display.clear()
                 self._update_stats(None)
                 return
 
-            self._update_samples(samples_l, samples_r)
+            self._update_samples(samples)
 
         except Exception:
             logger.exception("Error in WaveformModule._update_display")
+
+    def _read_input_samples(self, num_samples: int) -> np.ndarray | None:
+        """Read one stereo/mono input, using two mono cables as L/R when present."""
+        if len(self.in_port.connected_to) <= 1:
+            return get_visualizer_samples(self.in_port, num_samples)
+
+        channels: list[np.ndarray] = []
+        for connected_port in self.in_port.connected_to[:2]:
+            try:
+                samples = connected_port.peek_recent(num_samples)
+            except Exception:
+                logger.debug("Error reading waveform input tap", exc_info=True)
+                continue
+
+            arr = _normalize_display_samples(samples)
+            if arr is None:
+                continue
+
+            if arr.ndim == 2 and arr.shape[1] == 2:
+                return arr
+
+            channel = _as_float32_1d(arr)
+            if channel is not None:
+                channels.append(channel)
+
+        if not channels:
+            return None
+
+        if len(channels) == 1:
+            return channels[0]
+
+        min_len = min(channels[0].size, channels[1].size)
+        if min_len == 0:
+            return None
+
+        return np.column_stack(
+            (channels[0][-min_len:], channels[1][-min_len:])
+        ).astype(np.float32, copy=False)
 
     def shutdown(self, graceful: bool = True) -> None:
         """Stop visualization updates before the module is deleted."""
@@ -427,12 +421,9 @@ class WaveformDisplay(QWidget):
         self._has_signal = False
 
         self._mono_path: QPainterPath | None = None
-        self._mono_fill_path: QPainterPath | None = None
 
         self._left_path: QPainterPath | None = None
-        self._left_fill_path: QPainterPath | None = None
         self._right_path: QPainterPath | None = None
-        self._right_fill_path: QPainterPath | None = None
 
         self._grid_pixmap: QPixmap | None = None
         self._grid_key: tuple[int, int, bool] | None = None
@@ -448,15 +439,42 @@ class WaveformDisplay(QWidget):
         self.center_line_color = QColor(60, 70, 80)
 
         self.wave_color_mono = QColor(80, 180, 255)
-        self.wave_fill_mono = QColor(80, 180, 255, 60)
 
         self.wave_color_left = QColor(80, 255, 120)
-        self.wave_fill_left = QColor(80, 255, 120, 50)
 
         self.wave_color_right = QColor(255, 120, 100)
-        self.wave_fill_right = QColor(255, 120, 100, 50)
 
         self.text_color = QColor(120, 130, 140)
+
+        self._grid_pen = QPen(self.grid_color, 1)
+        self._grid_highlight_pen = QPen(self.grid_highlight_color, 1)
+        self._grid_highlight_pen_2 = QPen(self.grid_highlight_color, 2)
+        self._center_line_pen = QPen(self.center_line_color, 2)
+        self._mono_pen = QPen(
+            self.wave_color_mono,
+            1.5,
+            Qt.PenStyle.SolidLine,
+            Qt.PenCapStyle.FlatCap,
+            Qt.PenJoinStyle.MiterJoin,
+        )
+        self._left_pen = QPen(
+            self.wave_color_left,
+            1.5,
+            Qt.PenStyle.SolidLine,
+            Qt.PenCapStyle.FlatCap,
+            Qt.PenJoinStyle.MiterJoin,
+        )
+        self._right_pen = QPen(
+            self.wave_color_right,
+            1.5,
+            Qt.PenStyle.SolidLine,
+            Qt.PenCapStyle.FlatCap,
+            Qt.PenJoinStyle.MiterJoin,
+        )
+        self._text_pen = QPen(self.text_color, 1)
+        self._label_font = QFont("Arial", 8)
+        self._channel_font = QFont("Arial", 10, QFont.Weight.Bold)
+        self._no_signal_font = QFont("Arial", 12)
 
     def set_display_samples(self, num_samples: int) -> None:
         """Set the number of source samples represented in the display."""
@@ -483,9 +501,6 @@ class WaveformDisplay(QWidget):
         if arr.size == 0:
             self.clear()
             return
-
-        arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=-1.0)
-        arr = np.clip(arr, -1.0, 1.0)
 
         # Normalize channel-major stereo, if needed.
         if arr.ndim == 2 and arr.shape[0] == 2 and arr.shape[1] > 2:
@@ -515,11 +530,8 @@ class WaveformDisplay(QWidget):
         self._last_prepared_key = None
 
         self._mono_path = None
-        self._mono_fill_path = None
         self._left_path = None
-        self._left_fill_path = None
         self._right_path = None
-        self._right_fill_path = None
 
         self.update()
 
@@ -536,7 +548,7 @@ class WaveformDisplay(QWidget):
 
     def _target_point_count(self) -> int:
         """Return a bounded point count based on current widget width."""
-        return max(128, min(self.display_samples, max(128, self.width() * 2)))
+        return max(64, min(self.display_samples, max(64, self.width() // 2)))
 
     def _prepare_paths(self, samples: np.ndarray) -> None:
         """Prepare cached QPainterPaths for the current samples."""
@@ -551,11 +563,8 @@ class WaveformDisplay(QWidget):
         self._last_prepared_key = key
 
         self._mono_path = None
-        self._mono_fill_path = None
         self._left_path = None
-        self._left_fill_path = None
         self._right_path = None
-        self._right_fill_path = None
 
         if self.is_stereo:
             stereo = np.asarray(samples, dtype=np.float32)
@@ -563,20 +572,20 @@ class WaveformDisplay(QWidget):
                 self._has_signal = False
                 return
 
-            left = _downsample_minmax(stereo[:, 0], target)
-            right = _downsample_minmax(stereo[:, 1], target)
+            left = _downsample_display(stereo[:, 0], target)
+            right = _downsample_display(stereo[:, 1], target)
 
             left_center = height / 4.0
             right_center = 3.0 * height / 4.0
             y_scale = (height / 4.0) * 0.85
 
-            self._left_path, self._left_fill_path = self._build_wave_paths(
+            self._left_path = self._build_wave_path(
                 left,
                 left_center,
                 y_scale,
                 width,
             )
-            self._right_path, self._right_fill_path = self._build_wave_paths(
+            self._right_path = self._build_wave_path(
                 right,
                 right_center,
                 y_scale,
@@ -589,12 +598,12 @@ class WaveformDisplay(QWidget):
                 self._has_signal = False
                 return
 
-            mono = _downsample_minmax(mono, target)
+            mono = _downsample_display(mono, target)
 
             center_y = height / 2.0
             y_scale = (height / 2.0) * 0.85
 
-            self._mono_path, self._mono_fill_path = self._build_wave_paths(
+            self._mono_path = self._build_wave_path(
                 mono,
                 center_y,
                 y_scale,
@@ -602,20 +611,30 @@ class WaveformDisplay(QWidget):
             )
 
     @staticmethod
-    def _build_wave_paths(
+    def _build_wave_path(
         samples: np.ndarray,
         center_y: float,
         y_scale: float,
         width: int,
-    ) -> tuple[QPainterPath, QPainterPath]:
-        """Build line and fill paths for a waveform."""
+    ) -> QPainterPath:
+        """Build a line-only path for a waveform."""
         samples = np.asarray(samples, dtype=np.float32).ravel()
 
         path = QPainterPath()
-        fill_path = QPainterPath()
 
         if samples.size == 0:
-            return path, fill_path
+            return path
+
+        if not np.all(np.isfinite(samples)):
+            samples = np.nan_to_num(
+                samples,
+                nan=0.0,
+                posinf=1.0,
+                neginf=-1.0,
+                copy=False,
+            )
+        if float(samples.min()) < -1.0 or float(samples.max()) > 1.0:
+            samples = np.clip(samples, -1.0, 1.0)
 
         x_scale = width / max(1, samples.size - 1)
 
@@ -627,12 +646,7 @@ class WaveformDisplay(QWidget):
             y = center_y - float(samples[i]) * y_scale
             path.lineTo(x, y)
 
-        fill_path = QPainterPath(path)
-        fill_path.lineTo(float(width), center_y)
-        fill_path.lineTo(0.0, center_y)
-        fill_path.closeSubpath()
-
-        return path, fill_path
+        return path
 
     def _ensure_grid_pixmap(self) -> QPixmap:
         """Return cached background/grid pixmap, rebuilding only when needed."""
@@ -665,37 +679,57 @@ class WaveformDisplay(QWidget):
 
     def _draw_grid(self, painter: QPainter, width: int, height: int) -> None:
         """Draw oscilloscope-style grid into the cached pixmap."""
-        painter.setPen(QPen(self.grid_color, 1))
+        painter.setPen(self._grid_pen)
 
         num_v_lines = 10
         for i in range(num_v_lines + 1):
             x = int(width * i / num_v_lines)
             painter.drawLine(x, 0, x, height)
 
-        painter.setPen(QPen(self.grid_highlight_color, 1))
+        painter.setPen(self._grid_highlight_pen)
         center_x = int(width / 2)
         painter.drawLine(center_x, 0, center_x, height)
 
-        painter.setPen(QPen(self.grid_color, 1))
+        painter.setPen(self._grid_pen)
         num_h_lines = 8
         for i in range(num_h_lines + 1):
             y = int(height * i / num_h_lines)
             painter.drawLine(0, y, width, y)
 
         if self.is_stereo:
-            painter.setPen(QPen(self.center_line_color, 2))
+            painter.setPen(self._center_line_pen)
             quarter_y = int(height / 4)
             three_quarter_y = int(3 * height / 4)
             painter.drawLine(0, quarter_y, width, quarter_y)
             painter.drawLine(0, three_quarter_y, width, three_quarter_y)
 
-            painter.setPen(QPen(self.grid_highlight_color, 2))
+            painter.setPen(self._grid_highlight_pen_2)
             center_y = int(height / 2)
             painter.drawLine(0, center_y, width, center_y)
+
+            y_scale = (height / 4.0) * 0.85
+            painter.setFont(self._channel_font)
+            painter.setPen(self.wave_color_left)
+            painter.drawText(10, 20, "L")
+            painter.setPen(self.wave_color_right)
+            painter.drawText(10, center_y + 20, "R")
+
+            painter.setPen(self._text_pen)
+            painter.setFont(self._label_font)
+            painter.drawText(width - 30, int(quarter_y - y_scale) + 12, "+1.0")
+            painter.drawText(width - 30, quarter_y + 4, "0.0")
+            painter.drawText(width - 30, int(quarter_y + y_scale) + 12, "-1.0")
         else:
-            painter.setPen(QPen(self.center_line_color, 2))
+            painter.setPen(self._center_line_pen)
             center_y = int(height / 2)
             painter.drawLine(0, center_y, width, center_y)
+
+            y_scale = (height / 2.0) * 0.85
+            painter.setPen(self._text_pen)
+            painter.setFont(self._label_font)
+            painter.drawText(width - 30, int(center_y - y_scale) + 12, "+1.0")
+            painter.drawText(width - 30, center_y + 4, "0.0")
+            painter.drawText(width - 30, int(center_y + y_scale) + 12, "-1.0")
 
     def paintEvent(self, event) -> None:
         """Paint the cached waveform display."""
@@ -706,102 +740,34 @@ class WaveformDisplay(QWidget):
 
         painter.drawPixmap(0, 0, self._ensure_grid_pixmap())
 
-        width = self.width()
-        height = self.height()
-        center_y = height / 2.0
-
         if not self._has_signal:
-            painter.setPen(self.text_color)
-            painter.setFont(QFont("Arial", 12))
+            painter.setPen(self._text_pen)
+            painter.setFont(self._no_signal_font)
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No Signal")
             painter.end()
             return
 
         if self.is_stereo:
-            self._paint_stereo(painter, width, height, center_y)
+            self._paint_stereo(painter)
         else:
-            self._paint_mono(painter, width, height, center_y)
+            self._paint_mono(painter)
 
         painter.end()
 
-    def _paint_mono(
-        self,
-        painter: QPainter,
-        width: int,
-        height: int,
-        center_y: float,
-    ) -> None:
+    def _paint_mono(self, painter: QPainter) -> None:
         """Paint cached mono waveform paths."""
-        if self._mono_path is None or self._mono_fill_path is None:
+        if self._mono_path is None:
             return
 
-        y_scale = (height / 2.0) * 0.85
-
-        painter.fillPath(self._mono_fill_path, QBrush(self.wave_fill_mono))
-
-        painter.setPen(
-            QPen(
-                self.wave_color_mono,
-                2.0,
-                Qt.PenStyle.SolidLine,
-                Qt.PenCapStyle.RoundCap,
-                Qt.PenJoinStyle.RoundJoin,
-            )
-        )
+        painter.setPen(self._mono_pen)
         painter.drawPath(self._mono_path)
 
-        painter.setPen(self.text_color)
-        painter.setFont(QFont("Arial", 8))
-        painter.drawText(width - 30, int(center_y - y_scale) + 12, "+1.0")
-        painter.drawText(width - 30, int(center_y) + 4, "0.0")
-        painter.drawText(width - 30, int(center_y + y_scale) + 12, "-1.0")
-
-    def _paint_stereo(
-        self,
-        painter: QPainter,
-        width: int,
-        height: int,
-        center_y: float,
-    ) -> None:
+    def _paint_stereo(self, painter: QPainter) -> None:
         """Paint cached stereo waveform paths."""
-        left_center = height / 4.0
-        y_scale = (height / 4.0) * 0.85
-
-        if self._left_path is not None and self._left_fill_path is not None:
-            painter.fillPath(self._left_fill_path, QBrush(self.wave_fill_left))
-            painter.setPen(
-                QPen(
-                    self.wave_color_left,
-                    2.0,
-                    Qt.PenStyle.SolidLine,
-                    Qt.PenCapStyle.RoundCap,
-                    Qt.PenJoinStyle.RoundJoin,
-                )
-            )
+        if self._left_path is not None:
+            painter.setPen(self._left_pen)
             painter.drawPath(self._left_path)
 
-        if self._right_path is not None and self._right_fill_path is not None:
-            painter.fillPath(self._right_fill_path, QBrush(self.wave_fill_right))
-            painter.setPen(
-                QPen(
-                    self.wave_color_right,
-                    2.0,
-                    Qt.PenStyle.SolidLine,
-                    Qt.PenCapStyle.RoundCap,
-                    Qt.PenJoinStyle.RoundJoin,
-                )
-            )
+        if self._right_path is not None:
+            painter.setPen(self._right_pen)
             painter.drawPath(self._right_path)
-
-        painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        painter.setPen(self.wave_color_left)
-        painter.drawText(10, 20, "L")
-
-        painter.setPen(self.wave_color_right)
-        painter.drawText(10, int(center_y) + 20, "R")
-
-        painter.setPen(self.text_color)
-        painter.setFont(QFont("Arial", 8))
-        painter.drawText(width - 30, int(left_center - y_scale) + 12, "+1.0")
-        painter.drawText(width - 30, int(left_center) + 4, "0.0")
-        painter.drawText(width - 30, int(left_center + y_scale) + 12, "-1.0")

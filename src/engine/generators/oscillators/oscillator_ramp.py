@@ -41,6 +41,20 @@ class _RampOscillator(Oscillator):
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         raise NotImplementedError("Implemented in subclasses")
 
+    def process_frequency_buffer(self, frequencies: np.ndarray) -> np.ndarray:
+        """Render per-sample frequency modulation using ramp cycle state."""
+        frequencies = np.asarray(frequencies, dtype=np.float64)
+        if len(frequencies) == 0:
+            return np.empty(0, dtype=np.float32)
+
+        waveform, phase_state = self.render_modulated_waveform(
+            freqs=frequencies,
+            phase_offsets_deg=None,
+        )
+        samples = self._apply_amplitude_to_buffer(waveform)
+        self.commit_modulated_phase_state(phase_state)
+        return samples.astype(np.float32)
+
     def _post_freq_set(self):
         old_period = cast(float | None, getattr(self, "_period", None))
         self._period = self._sample_rate / self._f

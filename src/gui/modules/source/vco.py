@@ -165,7 +165,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         self._mode = self._get_default_mode_for_waveform(self._waveform)
         self._base_frequency = 440.0
         self._gain_db = DEFAULT_GAIN_DB
-        self._phase = 0.0
         self._pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
         self._fm_amount = VCO_DEFAULT_FM_AMOUNT_PERCENT
         self._fm_mode = VCO_FM_MODE_V_OCT
@@ -276,13 +275,6 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         layout.addLayout(knobs_layout)
 
-        # Phase control
-        self.phase_slider = HSlider("Phase", 0, 360, 0)
-        self.phase_slider.value_changed.connect(
-            lambda v: self.parameter_changed.emit("phase", v)
-        )
-        layout.addWidget(self.phase_slider)
-
         self.controls_widget.setLayout(layout)
         self.proxy = self._add_controls_to_module(self.controls_widget)
 
@@ -302,7 +294,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("gain_db", self.gain_knob)
         self.register_parameter("fm_amount", self.fm_amount_knob)
-        self.register_parameter("phase", self.phase_slider)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
         self.component = self.create_engine_component()
@@ -365,14 +356,12 @@ class ModulatedOscillatorModule(ModuleWidget):
             return SineOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase,
                 mode=_as_sine_mode(self._mode),
             )
         elif self._waveform == "Square":
             return SquareOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase,
                 pulsewidth=self._pulsewidth,
                 mode=_as_square_mode(self._mode),
             )
@@ -380,14 +369,12 @@ class ModulatedOscillatorModule(ModuleWidget):
             return SawtoothOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase,
                 mode=_as_sawtooth_mode(self._mode),
             )
         elif self._waveform == "Triangle":
             return TriangleOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase,
                 mode=_as_triangle_mode(self._mode),
             )
         else:
@@ -395,7 +382,6 @@ class ModulatedOscillatorModule(ModuleWidget):
             return SineOscillator(
                 self._base_frequency,
                 gain_db=self._gain_db,
-                phase=self._phase,
                 mode=_as_sine_mode(self._mode),
             )
 
@@ -586,7 +572,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         gain_db = self.gain_knob.get_value()
         fm_amount = self.fm_amount_knob.get_value()
         fm_mode = self.fm_mode_combo.currentText()
-        phase = self.phase_slider.get_value()
         pulsewidth = self.pulsewidth_knob.get_value()
 
         # Check for modulation inputs
@@ -616,14 +601,12 @@ class ModulatedOscillatorModule(ModuleWidget):
             osc = SineOscillator(
                 frequency=base_freq,
                 gain_db=gain_db,
-                phase=phase,
                 mode=_as_sine_mode(mode),
             )
         elif wave_type == "Square":
             osc = SquareOscillator(
                 frequency=base_freq,
                 gain_db=gain_db,
-                phase=phase,
                 pulsewidth=pulsewidth,
                 mode=_as_square_mode(mode),
             )
@@ -631,14 +614,12 @@ class ModulatedOscillatorModule(ModuleWidget):
             osc = SawtoothOscillator(
                 frequency=base_freq,
                 gain_db=gain_db,
-                phase=phase,
                 mode=_as_sawtooth_mode(mode),
             )
         elif wave_type == "Triangle":
             osc = TriangleOscillator(
                 frequency=base_freq,
                 gain_db=gain_db,
-                phase=phase,
                 mode=_as_triangle_mode(mode),
             )
         else:
@@ -742,7 +723,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         fm_amount = float_parameter(
             parameters, "fm_amount", self.fm_amount_knob.get_value
         )
-        phase = float_parameter(parameters, "phase", self.phase_slider.get_value)
         pulsewidth = float_parameter(
             parameters, "pulsewidth", self.pulsewidth_knob.get_value
         )
@@ -750,14 +730,13 @@ class ModulatedOscillatorModule(ModuleWidget):
         oscillator_shape = (wave_type, mode)
         if self.component is None or oscillator_shape != self._runtime_oscillator_shape:
             self.component = self._create_runtime_base_oscillator(
-                wave_type, mode, frequency, gain_db, phase, pulsewidth
+                wave_type, mode, frequency, gain_db, pulsewidth
             )
             self._runtime_oscillator_shape = oscillator_shape
             self._last_runtime_frequency = frequency
             self._last_pitch_cv = None
         else:
             self.component.gain_db = gain_db
-            self.component.phase = phase
             if isinstance(self.component, SquareOscillator):
                 self.component.pulsewidth = pulsewidth
 
@@ -888,19 +867,19 @@ class ModulatedOscillatorModule(ModuleWidget):
         mode: str,
         frequency: float,
         gain_db: float,
-        phase: float,
         pulsewidth: float,
     ):
         """Create the VCO base oscillator from a runtime parameter snapshot."""
         if wave_type == "Sine":
             return SineOscillator(
-                frequency, gain_db=gain_db, phase=phase, mode=_as_sine_mode(mode)
+                frequency,
+                gain_db=gain_db,
+                mode=_as_sine_mode(mode)
             )
         if wave_type == "Square":
             return SquareOscillator(
                 frequency,
                 gain_db=gain_db,
-                phase=phase,
                 pulsewidth=pulsewidth,
                 mode=_as_square_mode(mode),
             )
@@ -908,14 +887,12 @@ class ModulatedOscillatorModule(ModuleWidget):
             return SawtoothOscillator(
                 frequency,
                 gain_db=gain_db,
-                phase=phase,
                 mode=_as_sawtooth_mode(mode),
             )
         if wave_type == "Triangle":
             return TriangleOscillator(
                 frequency,
                 gain_db=gain_db,
-                phase=phase,
                 mode=_as_triangle_mode(mode),
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")

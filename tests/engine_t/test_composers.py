@@ -105,13 +105,34 @@ class TestChain(unittest.TestCase):
         """Test auto mode selection."""
         chain = Chain(self.osc, self.volume)
 
-        # Small buffer uses iterator
         small = chain.get_samples(100, mode="auto", reset=True)
         self.assertIsInstance(small, np.ndarray)
 
-        # Large buffer uses vectorized
         large = chain.get_samples(1000, mode="auto", reset=True)
         self.assertIsInstance(large, np.ndarray)
+
+    def test_auto_mode_uses_vectorized_for_small_buffers(self) -> None:
+        """Auto mode should avoid iterator loops even for callback-sized buffers."""
+
+        class CountingChain(Chain):
+            iterator_calls = 0
+            vectorized_calls = 0
+
+            def get_samples_iterator(self, n=44100, reset=False):
+                type(self).iterator_calls += 1
+                return super().get_samples_iterator(n, reset=reset)
+
+            def get_samples_vectorized(self, n=44100):
+                type(self).vectorized_calls += 1
+                return super().get_samples_vectorized(n)
+
+        chain = CountingChain(SineOscillator(440), Volume(0.5))
+
+        samples = chain.get_samples(64, mode="auto", reset=True)
+
+        self.assertEqual(samples.shape, (64,))
+        self.assertEqual(CountingChain.iterator_calls, 0)
+        self.assertEqual(CountingChain.vectorized_calls, 1)
 
 
 class TestWaveAdder(unittest.TestCase):
@@ -207,6 +228,27 @@ class TestWaveAdder(unittest.TestCase):
 
         np.testing.assert_allclose(samples_iter, samples_vec, rtol=1e-5)
 
+    def test_vectorized_sum_matches_explicit_mono_mix(self) -> None:
+        """Accumulator-based mono mixing should match the explicit source sum."""
+        osc1 = SineOscillator(frequency=110, amplitude=0.25, sample_rate=1000)
+        osc2 = SineOscillator(frequency=220, amplitude=0.5, sample_rate=1000)
+        expected_osc1 = SineOscillator(
+            frequency=110, amplitude=0.25, sample_rate=1000
+        )
+        expected_osc2 = SineOscillator(
+            frequency=220, amplitude=0.5, sample_rate=1000
+        )
+        mixer = WaveAdder(osc1, osc2, mix_mode="sum")
+
+        samples = mixer.get_samples_vectorized(128)
+        expected = (
+            expected_osc1.get_samples_vectorized(128)
+            + expected_osc2.get_samples_vectorized(128)
+        ).astype(np.float32)
+
+        self.assertEqual(samples.dtype, np.float32)
+        np.testing.assert_allclose(samples, expected, rtol=1e-6, atol=1e-6)
+
 
 class TestWaveAdderMixedInputs(unittest.TestCase):
     """Test WaveAdder with mixed mono and stereo inputs."""
@@ -295,6 +337,30 @@ class TestWaveAdderMixedInputs(unittest.TestCase):
 
         # Left and right should be different (due to panning)
         self.assertFalse(np.allclose(samples[:, 0], samples[:, 1]))
+
+    def test_vectorized_sum_matches_explicit_stereo_mix(self):
+        """Accumulator-based stereo mixing should match explicit channel sums."""
+        stereo = Chain(
+            SineOscillator(440, amplitude=0.4, sample_rate=1000),
+            Panner(0.25),
+        )
+        mono = SineOscillator(220, amplitude=0.2, sample_rate=1000)
+        expected_stereo = Chain(
+            SineOscillator(440, amplitude=0.4, sample_rate=1000),
+            Panner(0.25),
+        )
+        expected_mono = SineOscillator(220, amplitude=0.2, sample_rate=1000)
+        mixer = WaveAdder(stereo, mono, stereo=True, mix_mode="sum")
+
+        samples = mixer.get_samples_vectorized(128)
+        stereo_samples = expected_stereo.get_samples_vectorized(128)
+        mono_samples = expected_mono.get_samples_vectorized(128)
+        expected = stereo_samples.copy()
+        expected[:, 0] += mono_samples
+        expected[:, 1] += mono_samples
+
+        self.assertEqual(samples.dtype, np.float32)
+        np.testing.assert_allclose(samples, expected, rtol=1e-6, atol=1e-6)
 
 
 if __name__ == "__main__":

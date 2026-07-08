@@ -64,8 +64,12 @@ from enum import StrEnum
 
 import numpy as np
 
-from src.constants import AUTO_MODE_VECTORIZE_THRESHOLD, DEFAULT_SAMPLE_RATE
-from src.engine.core.component import ComponentDescriptor, ParameterDescriptor
+from src.constants import DEFAULT_SAMPLE_RATE
+from src.engine.core.component import (
+    AudioComponent,
+    ComponentDescriptor,
+    ParameterDescriptor,
+)
 from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.core.sample_mode import VALID_SAMPLE_MODES, SampleMode
 from src.engine.generators.generator import Generator
@@ -360,7 +364,13 @@ class ModulatedOscillator(Generator):
         # Step 1: Generate all modulator values in bulk (vectorized)
         mod_arrays = []
         for modulator in self.modulators:
-            if hasattr(modulator, "get_samples"):
+            vectorized_method = getattr(type(modulator), "get_samples_vectorized", None)
+            if (
+                vectorized_method is not None
+                and vectorized_method is not AudioComponent.get_samples_vectorized
+            ):
+                mod_vals = modulator.get_samples_vectorized(n)
+            elif hasattr(modulator, "get_samples"):
                 mod_vals = modulator.get_samples(n, mode="vectorized")
             else:
                 # Fallback to iterator for modulators without get_samples
@@ -536,7 +546,7 @@ class ModulatedOscillator(Generator):
             )
 
         if mode == "auto":
-            mode = "vectorized" if n >= AUTO_MODE_VECTORIZE_THRESHOLD else "iterator"
+            mode = "vectorized"
 
         if mode == "iterator":
             samples_list = self.get_samples_iterator(n, reset=reset)

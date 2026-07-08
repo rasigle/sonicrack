@@ -76,6 +76,7 @@ class SimplePannerModule(ModuleWidget):
         if self.component:
             self.component.position = pan_value
             logger.debug(f"Panner: position value set to {pan_value:.3f}")
+        self.parameter_changed.emit("position", pan_value)
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:

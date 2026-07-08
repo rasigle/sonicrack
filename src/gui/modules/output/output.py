@@ -265,12 +265,60 @@ class OutputModule(ModuleWidget):
         out[:n, channel] = x[:n]
         return n > 0
 
+    @staticmethod
+    def _copy_samples_to_stereo(
+        samples,
+        out: np.ndarray,
+        num_frames: int,
+    ) -> bool:
+        if samples is None:
+            return False
+
+        x = np.asarray(samples)
+        if x.size == 0:
+            return False
+
+        if x.ndim == 0:
+            out[:1, 0] = x
+            out[:1, 1] = x
+            return True
+
+        if x.ndim == 1:
+            n = min(x.shape[0], num_frames)
+            out[:n, 0] = x[:n]
+            out[:n, 1] = x[:n]
+            return n > 0
+
+        if x.ndim == 2 and x.shape[1] == 2:
+            n = min(x.shape[0], num_frames)
+            out[:n, :2] = x[:n, :2]
+            return n > 0
+
+        if x.ndim == 2 and x.shape[1] == 1:
+            n = min(x.shape[0], num_frames)
+            mono = x[:n, 0]
+            out[:n, 0] = mono
+            out[:n, 1] = mono
+            return n > 0
+
+        if x.ndim == 2 and x.shape[0] == 2:
+            n = min(x.shape[1], num_frames)
+            out[:n, 0] = x[0, :n]
+            out[:n, 1] = x[1, :n]
+            return n > 0
+
+        x = x.ravel()
+        n = min(x.shape[0], num_frames)
+        out[:n, 0] = x[:n]
+        out[:n, 1] = x[:n]
+        return n > 0
+
     def _generate_samples(self, num_frames: int) -> np.ndarray:
         """Generate stereo audio samples through the engine-owned graph.
 
         Routing behavior:
-        - Only L connected: L signal duplicated to both stereo channels
-        - Only R connected: R signal duplicated to both stereo channels
+        - Only L connected: mono L is duplicated; stereo L passes through
+        - Only R connected: mono R is duplicated; stereo R passes through
         - Both L+R connected: L to left channel, R to right channel
         - Neither connected: Return silence
 
@@ -301,16 +349,14 @@ class OutputModule(ModuleWidget):
                 [self.inp_port_l, self.inp_port_r],
                 num_frames,
             )
-            out[:, 0] = left
-            out[:, 1] = right
+            self._copy_samples_to_channel(left, out, 0, num_frames)
+            self._copy_samples_to_channel(right, out, 1, num_frames)
         elif l_connected:
             left = engine.render_ports([self.inp_port_l], num_frames)[0]
-            out[:, 0] = left
-            out[:, 1] = left
+            self._copy_samples_to_stereo(left, out, num_frames)
         else:
             right = engine.render_ports([self.inp_port_r], num_frames)[0]
-            out[:, 0] = right
-            out[:, 1] = right
+            self._copy_samples_to_stereo(right, out, num_frames)
 
         # Apply smooth, click-free gain using Volume component
         # The Volume component handles gain smoothing internally to prevent clicks

@@ -167,6 +167,79 @@ def test_behringer_182_reset_and_hold_control_position():
     np.testing.assert_allclose(frame.step, [0, 0, 0, 1, 2])
 
 
+def test_behringer_182_clock_only_fast_path_matches_control_fallback():
+    fast = Behringer182Sequencer(
+        cv_a=[0.0, 0.5, 1.0],
+        cv_b=[1.0, 0.5, 0.0],
+        gates=[True, False, True],
+        steps=3,
+        gate_length=0.5,
+        cv_a_range=5.0,
+        cv_b_range=2.0,
+        sample_rate=10,
+    )
+    fallback = Behringer182Sequencer(
+        cv_a=[0.0, 0.5, 1.0],
+        cv_b=[1.0, 0.5, 0.0],
+        gates=[True, False, True],
+        steps=3,
+        gate_length=0.5,
+        cv_a_range=5.0,
+        cv_b_range=2.0,
+        sample_rate=10,
+    )
+    clock = np.array([1, 0, 0, 0, 1, 0, 0, 1, 0, 0], dtype=np.float32)
+    run = np.ones_like(clock)
+
+    fast_frame = fast.process(len(clock), clock)
+    fallback_frame = fallback.process(len(clock), clock, run_signal=run)
+
+    for field in ("cv_a", "cv_b", "gate", "trigger", "end", "step"):
+        np.testing.assert_allclose(
+            getattr(fast_frame, field),
+            getattr(fallback_frame, field),
+            err_msg=field,
+        )
+
+
+def test_behringer_182_clock_only_fast_path_preserves_state_across_buffers():
+    fast = Behringer182Sequencer(
+        cv_a=[0.0, 0.5],
+        gates=[True, True],
+        steps=2,
+        gate_length=0.5,
+        cv_a_range=4.0,
+        sample_rate=10,
+    )
+    fallback = Behringer182Sequencer(
+        cv_a=[0.0, 0.5],
+        gates=[True, True],
+        steps=2,
+        gate_length=0.5,
+        cv_a_range=4.0,
+        sample_rate=10,
+    )
+    clocks = [
+        np.array([1, 0, 0], dtype=np.float32),
+        np.array([0, 0, 1, 0], dtype=np.float32),
+    ]
+
+    for clock in clocks:
+        fast_frame = fast.process(len(clock), clock)
+        fallback_frame = fallback.process(
+            len(clock),
+            clock,
+            run_signal=np.ones_like(clock),
+        )
+
+        for field in ("cv_a", "cv_b", "gate", "trigger", "end", "step"):
+            np.testing.assert_allclose(
+                getattr(fast_frame, field),
+                getattr(fallback_frame, field),
+                err_msg=field,
+            )
+
+
 def test_behringer_182_is_registered_component():
     from src.engine.core.registry import audio_registry
 

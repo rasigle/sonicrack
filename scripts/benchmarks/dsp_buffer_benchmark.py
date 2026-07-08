@@ -66,6 +66,9 @@ def _render_cases(buffer_size: int) -> dict[str, RenderFn]:
 
 
 def benchmark_render(render: RenderFn, iterations: int) -> dict[str, float]:
+    for _ in range(32):
+        render()
+
     durations_ns: list[int] = []
     for _ in range(iterations):
         start = time.perf_counter_ns()

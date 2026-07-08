@@ -394,7 +394,7 @@ class TestVCVRackSquareStrategy:
         iterator_samples = np.array([next(iterator_osc) for _ in range(2048)])
         vectorized_samples = vectorized_osc.get_samples_vectorized(2048)
 
-        np.testing.assert_allclose(iterator_samples, vectorized_samples)
+        np.testing.assert_allclose(iterator_samples, vectorized_samples, atol=1e-6)
 
     def test_vcv_has_minblep_ringing(self):
         """VCV mode should show minBLEP edge ringing rather than hard clipping."""

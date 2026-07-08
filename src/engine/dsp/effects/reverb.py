@@ -8,10 +8,8 @@ import numpy as np
 
 try:
     import numba
-
-    HAS_NUMBA = True
 except ImportError:
-    HAS_NUMBA = False
+    numba = None
 
 from src.constants import AUTO_MODE_VECTORIZE_THRESHOLD, DEFAULT_SAMPLE_RATE
 from src.engine.core.component import (
@@ -37,6 +35,7 @@ _ALLPASS_COUNT = 4
 
 
 # Numba-JIT compiled reverb processing for mono buffers
+HAS_NUMBA = numba is not None
 if HAS_NUMBA:
 
     @numba.jit(nopython=True, cache=True, fastmath=True, nogil=True)

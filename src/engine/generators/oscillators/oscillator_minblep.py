@@ -48,6 +48,7 @@ def insert_minblep_discontinuity(
     minblep_table: np.ndarray,
     subsample: float,
     magnitude: float,
+    extended_table: np.ndarray | None = None,
 ) -> None:
     """Insert a minBLEP discontinuity correction into a buffer.
 
@@ -56,10 +57,13 @@ def insert_minblep_discontinuity(
         minblep_table: MinBLEP lookup table
         subsample: Subsample position (0.0 to 1.0) of the discontinuity
         magnitude: Magnitude of the discontinuity (positive or negative)
+        extended_table: Extended table to add the correction to
+            (optional, defaults to minblep_table with an extra zero)
     """
     if not 0.0 < subsample <= 1.0 or magnitude == 0.0:
         return
-    extended_table = np.concatenate((minblep_table, np.zeros(1, dtype=np.float32)))
+    if extended_table is None:
+        extended_table = np.concatenate((minblep_table, np.zeros(1, dtype=np.float32)))
     offset = (1.0 - subsample) * VCV_MINBLEP_OVERSAMPLE
     for index in range(len(buffer)):
         position = index * VCV_MINBLEP_OVERSAMPLE + offset
@@ -83,7 +87,7 @@ def shift_minblep_buffer(buffer: np.ndarray) -> float:
     if len(buffer) == 0:
         return 0.0
     value = float(buffer[0])
-    buffer[:-1] = buffer[1:].copy()
+    buffer[:-1] = buffer[1:]
     buffer[-1] = 0.0
     return value
 

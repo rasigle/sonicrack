@@ -7,6 +7,11 @@ from typing import Literal, Protocol, runtime_checkable
 
 import numpy as np
 
+try:
+    import numba
+except ImportError:
+    numba = None
+
 from src.constants import DEFAULT_GAIN_DB, DEFAULT_SAMPLE_RATE
 from src.engine.core.component import (
     ComponentDescriptor,
@@ -17,6 +22,7 @@ from src.engine.core.registry import ComponentCategory, register_component
 from src.engine.generators.oscillators.oscillator_base import Oscillator
 from src.engine.generators.oscillators.oscillator_minblep import (
     TWO_PI,
+    VCV_MINBLEP_OVERSAMPLE,
     VCV_MINBLEP_ZERO_CROSSINGS,
     compute_dc_alpha,
     crossing_subsample,
@@ -29,10 +35,154 @@ from src.engine.utils.decorators import filter_provided_args, track_provided_arg
 from src.engine.utils.ramping import consume_linear_ramp, duration_ms_to_samples
 from src.engine.utils.validation import validate_sample_count, validate_sample_rate
 
+HAS_NUMBA = numba is not None
 SquareWaveMode = Literal[
     "ideal", "ideal_smooth", "bandlimited", "vcv", "soft", "comparator"
 ]
 logger = logging.getLogger(__name__)
+
+
+if HAS_NUMBA:
+
+    @numba.jit(nopython=True, cache=True, nogil=True)
+    def _generate_vcv_square_numba(
+        phases: np.ndarray,
+        pulsewidth_threshold: float,
+        low_value: float,
+        high_value: float,
+        frequency: float,
+        sample_rate: float,
+        blep_buffer: np.ndarray,
+        minblep_table: np.ndarray,
+        prev_initialized: bool,
+        prev_phase: float,
+        last_square_state: float,
+        last_pulsewidth: float,
+        dc_lowpass_state: float,
+        dc_alpha: float,
+        dc_block: bool,
+    ) -> tuple[np.ndarray, float, float, float, float]:
+        output = np.empty(len(phases), dtype=np.float32)
+
+        pulsewidth = pulsewidth_threshold / TWO_PI
+        if pulsewidth < 0.01:
+            pulsewidth = 0.01
+        elif pulsewidth > 0.99:
+            pulsewidth = 0.99
+
+        midpoint = (high_value + low_value) / 2.0
+        scale = (high_value - low_value) / 2.0
+
+        for sample_index in range(len(phases)):
+            current_phase = (phases[sample_index] % TWO_PI) / TWO_PI
+            if not prev_initialized:
+                prev_phase = (current_phase - frequency / sample_rate) % 1.0
+                last_square_state = 1.0 if prev_phase < pulsewidth else -1.0
+                last_pulsewidth = pulsewidth
+                prev_initialized = True
+
+            if pulsewidth != last_pulsewidth:
+                changed_state = 1.0 if prev_phase < pulsewidth else -1.0
+                magnitude = changed_state - last_square_state
+                if magnitude != 0.0:
+                    offset = (1.0 - 1e-6) * VCV_MINBLEP_OVERSAMPLE
+                    for index in range(len(blep_buffer)):
+                        position = index * VCV_MINBLEP_OVERSAMPLE + offset
+                        lower = int(position)
+                        fraction = position - lower
+                        value = minblep_table[lower] + fraction * (
+                            minblep_table[lower + 1] - minblep_table[lower]
+                        )
+                        blep_buffer[index] += magnitude * value
+                    last_square_state = changed_state
+                last_pulsewidth = pulsewidth
+
+            start_phase = prev_phase
+            delta = current_phase - start_phase
+            if delta < -0.5:
+                current_phase_unwrapped = current_phase + 1.0
+            elif delta > 0.5:
+                current_phase_unwrapped = current_phase - 1.0
+            else:
+                current_phase_unwrapped = current_phase
+
+            phase_delta = current_phase_unwrapped - start_phase
+
+            # Wrap edge crossing.
+            crossing_delta = current_phase_unwrapped - start_phase
+            wrap_subsample = -1.0
+            if crossing_delta != 0.0:
+                threshold = 1.0
+                diff = threshold - start_phase
+                if crossing_delta >= 0.0:
+                    threshold -= np.floor(diff)
+                else:
+                    threshold -= np.ceil(diff)
+                subsample = (threshold - start_phase) / crossing_delta
+                if 0.0 < subsample <= 1.0:
+                    wrap_subsample = subsample
+
+            if wrap_subsample > 0.0:
+                magnitude = 2.0 if phase_delta > 0.0 else -2.0
+                offset = (1.0 - wrap_subsample) * VCV_MINBLEP_OVERSAMPLE
+                for index in range(len(blep_buffer)):
+                    position = index * VCV_MINBLEP_OVERSAMPLE + offset
+                    lower = int(position)
+                    fraction = position - lower
+                    value = minblep_table[lower] + fraction * (
+                        minblep_table[lower + 1] - minblep_table[lower]
+                    )
+                    blep_buffer[index] += magnitude * value
+
+            # Pulse-width edge crossing.
+            pulse_subsample = -1.0
+            if crossing_delta != 0.0:
+                threshold = pulsewidth
+                diff = threshold - start_phase
+                if crossing_delta >= 0.0:
+                    threshold -= np.floor(diff)
+                else:
+                    threshold -= np.ceil(diff)
+                subsample = (threshold - start_phase) / crossing_delta
+                if 0.0 < subsample <= 1.0:
+                    pulse_subsample = subsample
+
+            if pulse_subsample > 0.0:
+                magnitude = -2.0 if phase_delta > 0.0 else 2.0
+                offset = (1.0 - pulse_subsample) * VCV_MINBLEP_OVERSAMPLE
+                for index in range(len(blep_buffer)):
+                    position = index * VCV_MINBLEP_OVERSAMPLE + offset
+                    lower = int(position)
+                    fraction = position - lower
+                    value = minblep_table[lower] + fraction * (
+                        minblep_table[lower + 1] - minblep_table[lower]
+                    )
+                    blep_buffer[index] += magnitude * value
+
+            normalized = 1.0 if current_phase < pulsewidth else -1.0
+            last_square_state = normalized
+            prev_phase = current_phase
+
+            normalized += blep_buffer[0]
+            for index in range(len(blep_buffer) - 1):
+                blep_buffer[index] = blep_buffer[index + 1]
+            blep_buffer[len(blep_buffer) - 1] = 0.0
+
+            if dc_block:
+                dc_lowpass_state = dc_lowpass_state + dc_alpha * (
+                    normalized - dc_lowpass_state
+                )
+                normalized -= dc_lowpass_state
+
+            output[sample_index] = midpoint + normalized * scale
+
+        return (
+            output,
+            prev_phase,
+            last_square_state,
+            last_pulsewidth,
+            dc_lowpass_state,
+        )
 
 
 @runtime_checkable
@@ -326,6 +476,9 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
     """VCV Rack Fundamental-style minBLEP square wave with DC blocking."""
 
     _minblep_table = minimum_phase_minblep_table()
+    _minblep_table_extended = np.concatenate(
+        (_minblep_table, np.zeros(1, dtype=np.float32))
+    )
 
     def __init__(
         self,
@@ -369,7 +522,11 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
 
     def _insert_discontinuity(self, subsample: float, magnitude: float) -> None:
         insert_minblep_discontinuity(
-            self._buffer, self._minblep_table, subsample, magnitude
+            self._buffer,
+            self._minblep_table,
+            subsample,
+            magnitude,
+            self._minblep_table_extended,
         )
 
     def _shift_buffer(self) -> float:
@@ -462,6 +619,32 @@ class VCVRackSquareStrategy(SquareWaveStrategy):
         high_value: float,
     ) -> np.ndarray:
         with self._state_lock:
+            if HAS_NUMBA:
+                (
+                    samples,
+                    self._prev_phase,
+                    self._last_square_state,
+                    self._last_pulsewidth,
+                    self._dc_lowpass_state,
+                ) = _generate_vcv_square_numba(
+                    phases,
+                    pulsewidth_threshold,
+                    low_value,
+                    high_value,
+                    self.frequency,
+                    self.sample_rate,
+                    self._buffer,
+                    self._minblep_table_extended,
+                    self._prev_phase is not None,
+                    0.0 if self._prev_phase is None else self._prev_phase,
+                    self._last_square_state,
+                    self._last_pulsewidth,
+                    self._dc_lowpass_state,
+                    self._dc_alpha,
+                    self.dc_block,
+                )
+                return samples
+
             normalized = np.asarray(
                 [
                     self._process_normalized_sample(float(phase), pulsewidth_threshold)

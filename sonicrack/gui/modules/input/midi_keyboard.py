@@ -24,12 +24,12 @@ from soniclab.midi_io import (
     midi_to_note_name,
 )
 
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.port import PortSignal
-from sonicrack.gui.core.runtime import RuntimeParameters
-from sonicrack.gui.module_registry import register_module
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.port import PortSignal
+from sonicrack.patching.registry import register_module
+from sonicrack.runtime.specs import RuntimeParameters
 
 WHITE_KEYS = (0, 2, 4, 5, 7, 9, 11)
 BLACK_KEYS = (1, 3, 6, 8, 10)

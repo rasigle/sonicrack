@@ -11,12 +11,12 @@ from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QMessageBox
 
-from sonicrack.gui.core.module import ModuleCategory
-from sonicrack.gui.core.port import PortType, port_signals_compatible
 from sonicrack.gui.modules.output.output import OutputModule
 from sonicrack.gui.widgets.cable_widget import Cable
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.gui.widgets.port_widget import PortWidget
+from sonicrack.patching.module import ModuleCategory
+from sonicrack.patching.port import PortType, port_signals_compatible
 
 logger = logging.getLogger(__name__)
 

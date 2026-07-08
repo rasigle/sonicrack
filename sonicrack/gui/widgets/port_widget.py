@@ -13,7 +13,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import QGraphicsItem
 
-from sonicrack.gui.core.port import Port, PortType
+from sonicrack.patching.port import Port, PortType
 
 if TYPE_CHECKING:
     from sonicrack.gui.widgets.cable_widget import Cable

@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
-from sonicrack.gui.core.module import ModuleCategory
+from sonicrack.patching.module import ModuleCategory
 
 if TYPE_CHECKING:
-    from sonicrack.gui.core.module import ModuleMetadata
     from sonicrack.gui.widgets.port_widget import PortWidget
+    from sonicrack.patching.module import ModuleMetadata
 
 logger = logging.getLogger(__name__)
 

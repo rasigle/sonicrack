@@ -14,19 +14,19 @@ from PyQt6.QtWidgets import (
 )
 from soniclab.dsp.filters.butterworth import ButterworthFilter
 
-from sonicrack.gui.audio_config import audio_config
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.runtime import RuntimeParameters
-from sonicrack.gui.core.runtime_helpers import (
+from sonicrack.config.audio_config import audio_config
+from sonicrack.gui.widgets import HSlider, Knob
+from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.registry import register_module
+from sonicrack.runtime.helpers import (
     float_parameter,
     read_samples,
     silence,
     str_parameter,
     write_output,
 )
-from sonicrack.gui.module_registry import register_module
-from sonicrack.gui.widgets import HSlider, Knob
-from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()

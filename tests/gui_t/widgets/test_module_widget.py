@@ -6,12 +6,12 @@ import numpy as np
 from PyQt6.QtCore import QPointF
 from soniclab.core.component import AudioComponent
 
-from sonicrack.gui.audio_engine import AudioEngine
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.runtime import RuntimeParameters, get_runtime_spec
-from sonicrack.gui.core.runtime_helpers import read_samples
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.gui.widgets.patch_canvas import PatchCanvas
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.runtime.engine import AudioEngine
+from sonicrack.runtime.helpers import read_samples
+from sonicrack.runtime.specs import RuntimeParameters, get_runtime_spec
 
 
 class _OnesComponent:

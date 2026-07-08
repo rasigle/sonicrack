@@ -19,14 +19,14 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.module_registry import register_module
 from sonicrack.gui.modules.visualization.visualizer_utils import (
     get_visualizer_samples,
     stop_visualizer_timer,
 )
 from sonicrack.gui.widgets.knob_widget import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.registry import register_module
 
 logger = logging.getLogger(__name__)
 

@@ -3,8 +3,8 @@
 from PyQt6 import QtWidgets
 
 from sonicrack.gui.main_window import ModularSynthWindow
-from sonicrack.gui.module_registry import ModuleRegistry
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.registry import ModuleRegistry
 
 
 def _make_module(title: str, category: str) -> type[ModuleWidget]:

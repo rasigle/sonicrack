@@ -20,7 +20,7 @@ from typing import Any
 
 import numpy as np
 
-from sonicrack.gui.audio_engine import RenderContext
+from sonicrack.runtime.engine import RenderContext
 
 
 class ProfilingRenderContext(RenderContext):

@@ -13,7 +13,6 @@ from soniclab.generators.oscillators.oscillator_sine import SineOscillator
 from soniclab.generators.oscillators.oscillator_square import SquareOscillator
 
 from sonicrack.constants import DEFAULT_SAMPLE_RATE
-from sonicrack.gui.core.port import Port
 from sonicrack.gui.modules.effects.effects_compressor import CompressorModule
 from sonicrack.gui.modules.effects.effects_distortion import DistortionModule
 from sonicrack.gui.modules.mixer import MixerModule
@@ -29,7 +28,8 @@ from sonicrack.gui.modules.source.lfo import LFOModule
 from sonicrack.gui.modules.source.oscillator import OscillatorModule
 from sonicrack.gui.modules.source.vco import ModulatedOscillatorModule
 from sonicrack.gui.modules.voice.tb303_voice import TB303VoiceModule
-from sonicrack.gui.ui_constants import AUDIO_FREQUENCY_KNOB_CURVE
+from sonicrack.constants import AUDIO_FREQUENCY_KNOB_CURVE
+from sonicrack.patching.port import Port
 
 
 def _connect_constant_input(input_port: Port, value: float = 1.0) -> Port:

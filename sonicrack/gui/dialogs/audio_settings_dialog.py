@@ -6,9 +6,9 @@ import logging
 
 from PyQt6 import QtWidgets
 
-from sonicrack.gui.app_settings import app_settings
-from sonicrack.gui.audio_config import audio_config
-from sonicrack.gui.ui_constants import DEFAULT_BUFFER_SIZES, DEFAULT_SAMPLE_RATES
+from sonicrack.config.app_settings import app_settings
+from sonicrack.config.audio_config import audio_config
+from sonicrack.constants import DEFAULT_SAMPLE_RATES, DEFAULT_BUFFER_SIZES
 
 logger = logging.getLogger(__name__)
 

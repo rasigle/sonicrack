@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from sonicrack.gui.ui_constants import DEFAULT_SETTINGS_FILE
+from sonicrack.constants import DEFAULT_SETTINGS_FILE
 
 logger = logging.getLogger(__name__)
 

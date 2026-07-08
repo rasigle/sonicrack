@@ -6,14 +6,14 @@ from typing import Any
 
 import numpy as np
 
-from sonicrack.gui.core.port import Port
-from sonicrack.gui.module_registry import discover_modules, get_registry
 from sonicrack.gui.modules.sequencing.accent import AccentModule
 from sonicrack.gui.modules.sequencing.behringer_182 import Behringer182Module
 from sonicrack.gui.modules.sequencing.clock import ClockModule
 from sonicrack.gui.modules.sequencing.slide import SlideModule
 from sonicrack.gui.modules.sequencing.step_sequencer import StepSequencerModule
 from sonicrack.gui.widgets import ImagePushButton
+from sonicrack.patching.port import Port
+from sonicrack.patching.registry import discover_modules, get_registry
 
 
 def _connect_signal(input_port: Port, values: np.ndarray) -> Port:

@@ -9,12 +9,12 @@ from PyQt6.QtGui import QKeyEvent
 from soniclab import Volume
 from soniclab.midi_io import midi_note_to_pitch_cv, midi_to_frequency
 
-from sonicrack.gui.core.port import Port
-from sonicrack.gui.module_registry import initialize_module_registry
 from sonicrack.gui.modules.input.midi_keyboard import MIDIKeyboardModule
 from sonicrack.gui.modules.modifier.vca import VCAModule
 from sonicrack.gui.modules.modulated_source.envelope_adsr import ADSRModule
 from sonicrack.gui.modules.source.vco import ModulatedOscillatorModule
+from sonicrack.patching.port import Port
+from sonicrack.patching.registry import initialize_module_registry
 
 
 def test_midi_keyboard_note_press_updates_cv_outputs(qapp: Any):

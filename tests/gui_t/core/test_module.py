@@ -5,8 +5,6 @@ import logging
 import pytest
 from soniclab.generators.oscillators.oscillator import SineOscillator
 
-from sonicrack.gui.core.module import ModuleCategory, infer_port_signal
-from sonicrack.gui.core.port import PortSignal
 from sonicrack.gui.modules.input.midi_keyboard import MIDIKeyboardModule
 from sonicrack.gui.modules.mixer import MixerModule
 from sonicrack.gui.modules.modifier.volume_mod import VolumeModule
@@ -15,6 +13,8 @@ from sonicrack.gui.modules.source.lfo import LFOModule
 from sonicrack.gui.modules.source.oscillator import OscillatorModule
 from sonicrack.gui.modules.source.vco import ModulatedOscillatorModule
 from sonicrack.gui.modules.voice.tb303_voice import TB303VoiceModule
+from sonicrack.patching.module import ModuleCategory, infer_port_signal
+from sonicrack.patching.port import PortSignal
 
 
 def test_oscillator_interface():

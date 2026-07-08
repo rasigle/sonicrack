@@ -9,14 +9,14 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from sonicrack.gui.audio_config import audio_config
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.module_registry import register_module
+from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules.visualization.visualizer_utils import (
     get_visualizer_samples,
     stop_visualizer_timer,
 )
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.registry import register_module
 
 logger = logging.getLogger(__name__)
 

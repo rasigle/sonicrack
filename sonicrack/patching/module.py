@@ -9,7 +9,7 @@ from typing import Any
 
 from soniclab.core.component import AudioComponent
 
-from sonicrack.gui.core.port import Port, PortSignal, PortType, normalize_port_signal
+from sonicrack.patching.port import Port, PortSignal, PortType, normalize_port_signal
 
 
 class ModuleCategory(StrEnum):

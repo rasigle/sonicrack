@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from sonicrack.gui.core.module import AudioModule
+from sonicrack.patching.module import AudioModule
 
 logger = logging.getLogger(__name__)
 

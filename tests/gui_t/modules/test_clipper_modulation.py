@@ -71,13 +71,13 @@ def mock_clipper_unipolar():
 @pytest.fixture
 def mock_read_samples(monkeypatch):
     """Patch runtime_helpers.read_samples to use mock data."""
-    import sonicrack.gui.core.runtime_helpers
+    import sonicrack.runtime.helpers
 
     def _mock_read_samples(port, num_samples):
         return port._data[:num_samples]
 
     monkeypatch.setattr(
-        sonicrack.gui.core.runtime_helpers, "read_samples", _mock_read_samples
+        sonicrack.runtime.helpers, "read_samples", _mock_read_samples
     )
 
 

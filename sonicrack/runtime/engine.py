@@ -23,16 +23,16 @@ from typing import Protocol, cast
 import numpy as np
 from PyQt6 import QtCore
 
+from sonicrack.config.audio_config import audio_config
 from sonicrack.constants import DEFAULT_SAMPLE_RATE
-from sonicrack.gui.audio_config import audio_config
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.port import Port
-from sonicrack.gui.core.runtime import (
+from sonicrack.gui.widgets.port_widget import PortWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.port import Port
+from sonicrack.runtime.specs import (
     RuntimeModuleSpec,
     get_runtime_spec,
     process_runtime_module,
 )
-from sonicrack.gui.widgets.port_widget import PortWidget
 
 logger = logging.getLogger(__name__)
 

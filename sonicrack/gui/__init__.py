@@ -11,6 +11,8 @@ synthesis engine, featuring:
 
 __all__ = ["ModularSynthWindow"]
 
+from sonicrack.gui.main_window import ModularSynthWindow
+
 
 def __getattr__(name: str):
     """Lazily import GUI window classes so submodule imports stay lightweight."""

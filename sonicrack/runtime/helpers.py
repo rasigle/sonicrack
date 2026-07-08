@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 
 if TYPE_CHECKING:
-    from sonicrack.gui.core.port import Port
+    from sonicrack.patching.port import Port
 
 RuntimeParameters = Mapping[str, object]
 

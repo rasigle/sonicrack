@@ -8,13 +8,13 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 from soniclab.dsp.modulators import DecayEnvelope
 
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.port import PortSignal
-from sonicrack.gui.core.runtime import RuntimeParameters
-from sonicrack.gui.core.runtime_helpers import float_parameter, read_samples
-from sonicrack.gui.module_registry import register_module
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.port import PortSignal
+from sonicrack.patching.registry import register_module
+from sonicrack.runtime.helpers import float_parameter, read_samples
+from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()

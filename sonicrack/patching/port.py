@@ -271,7 +271,7 @@ class Port:
         render_context = None
         if num_samples is not None:
             with contextlib.suppress(ImportError):
-                from sonicrack.gui.audio_engine import get_active_render_context
+                from sonicrack.runtime.engine import get_active_render_context
 
                 render_context = get_active_render_context()
 

@@ -45,8 +45,8 @@ class PortModulatorAdapter:
             modulation_amount: How much modulation to apply (0.0 = none, 1.0 = full)
         """
         # Extract actual Port if we received a PortWidget
-        from sonicrack.gui.core.port import Port
         from sonicrack.gui.widgets.port_widget import PortWidget
+        from sonicrack.patching.port import Port
 
         if isinstance(port, PortWidget):
             self.port: Port = port.port
@@ -122,7 +122,7 @@ class PortModulatorAdapter:
         """
         if self._buffer is None or self._index >= len(self._buffer):
             # Read new buffer from port
-            from sonicrack.gui.core.runtime_helpers import read_samples
+            from sonicrack.runtime.helpers import read_samples
 
             self._buffer = read_samples(self.port, self.num_samples)
             self._index = 0
@@ -156,7 +156,7 @@ class PortModulatorAdapter:
         Returns:
             Array of samples scaled by modulation amount
         """
-        from sonicrack.gui.core.runtime_helpers import read_samples
+        from sonicrack.runtime.helpers import read_samples
 
         samples = read_samples(self.port, n)
 

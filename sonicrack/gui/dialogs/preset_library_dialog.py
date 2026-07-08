@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from sonicrack.gui.core.preset_manager import PresetManager
+from sonicrack.patching.preset_manager import PresetManager
 
 logger = logging.getLogger(__name__)
 

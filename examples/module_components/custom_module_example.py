@@ -14,9 +14,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QGraphicsProxyWidget, QVBoxLayout, QWidget
 
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 
 
 # Step 1: Create the audio engine component

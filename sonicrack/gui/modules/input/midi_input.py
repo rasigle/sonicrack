@@ -73,12 +73,12 @@ from soniclab.midi_io import (
     NoteOnMessage,
 )
 
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.port import PortSignal
-from sonicrack.gui.core.runtime import RuntimeParameters
-from sonicrack.gui.module_registry import register_module
 from sonicrack.gui.modules.input.midi_worker_thread import MIDIWorkerThread
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.port import PortSignal
+from sonicrack.patching.registry import register_module
+from sonicrack.runtime.specs import RuntimeParameters
 
 logger = logging.getLogger(__name__)
 

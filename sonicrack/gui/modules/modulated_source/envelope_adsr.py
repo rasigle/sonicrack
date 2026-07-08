@@ -7,13 +7,13 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 from soniclab.dsp.modulators import ADSREnvelope, GateTriggeredADSR
 
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.port import PortSignal
-from sonicrack.gui.core.runtime import RuntimeParameters
-from sonicrack.gui.core.runtime_helpers import float_parameter
-from sonicrack.gui.module_registry import register_module
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.port import PortSignal
+from sonicrack.patching.registry import register_module
+from sonicrack.runtime.helpers import float_parameter
+from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()

@@ -1,10 +1,10 @@
 @echo off
-REM Launch the AudioPlayground Modular Synthesizer
+REM Launch the SonicRack Modular Synthesizer
 REM
 REM This script launches the GUI application
 
 echo ================================================
-echo AudioPlayground - Modular Synthesizer
+echo SonicRack - Modular Synthesizer
 echo ================================================
 echo.
 

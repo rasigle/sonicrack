@@ -24,28 +24,24 @@ from PyQt6.QtWidgets import (
 )
 
 from sonicrack import __version__
+from sonicrack.config.app_settings import app_settings
+from sonicrack.constants import APP_ICON_RESOURCE, APP_TITLE, DEFAULT_AUTOSAVE_PATCH
 from sonicrack.constants import PRESET_FILE_EXTENSION, resource, resource_path
-from sonicrack.gui.app_settings import app_settings
-from sonicrack.gui.audio_engine import AudioEngine
-from sonicrack.gui.core.module import ModuleCategory
-from sonicrack.gui.core.preset_manager import PresetManager
 from sonicrack.gui.dialogs.about_dialog import show_about
 from sonicrack.gui.dialogs.preset_library_dialog import (
     LibraryPresetBrowserDialog,
     SaveLibraryPresetDialog,
 )
-from sonicrack.gui.module_registry import initialize_module_registry
-from sonicrack.gui.ui_constants import (
-    APP_ICON_RESOURCE,
-    APP_TITLE,
-    DEFAULT_AUTOSAVE_PATCH,
-)
 from sonicrack.gui.widgets.patch_canvas import PatchCanvas
+from sonicrack.patching.module import ModuleCategory
+from sonicrack.patching.preset_manager import PresetManager
+from sonicrack.patching.registry import initialize_module_registry
+from sonicrack.runtime.engine import AudioEngine
 
 if TYPE_CHECKING:
-    from sonicrack.gui.module_registry import ModuleRegistry
     from sonicrack.gui.modules.output.output import OutputModule
     from sonicrack.gui.widgets.port_widget import PortWidget
+    from sonicrack.patching.registry import ModuleRegistry
 
 logger = logging.getLogger(__name__)
 

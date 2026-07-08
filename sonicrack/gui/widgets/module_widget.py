@@ -17,9 +17,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from sonicrack.gui.core.module import AudioModule
 from sonicrack.gui.dialogs.module_info_dialog import ModuleInfoDialog
 from sonicrack.gui.widgets.port_widget import PortWidget
+from sonicrack.patching.module import AudioModule
 
 logger = logging.getLogger(__name__)
 
@@ -695,7 +695,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
     def get_runtime_spec(self):
         """Return this module's runtime declaration for the graph renderer."""
-        from sonicrack.gui.core.runtime import RuntimeModuleSpec
+        from sonicrack.runtime.specs import RuntimeModuleSpec
 
         return RuntimeModuleSpec(
             kind=self.runtime_kind,

@@ -11,23 +11,20 @@ from soniclab.generators.oscillators.oscillator import (
     TriangleOscillator,
 )
 
-from sonicrack.gui.audio_config import audio_config
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.port import PortSignal
-from sonicrack.gui.core.runtime import RuntimeParameters
-from sonicrack.gui.core.runtime_helpers import float_parameter, read_samples
-from sonicrack.gui.module_registry import register_module
+from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules.source._oscillator_runtime import render_with_clock_resets
-from sonicrack.gui.ui_constants import (
-    DEFAULT_PW_PERCENTAGE_VALUE,
-    MAX_PW_PERCENTAGE_VALUE,
-    MIN_PW_PERCENTAGE_VALUE,
-)
+from sonicrack.constants import MIN_PW_PERCENTAGE_VALUE, MAX_PW_PERCENTAGE_VALUE, \
+    DEFAULT_PW_PERCENTAGE_VALUE
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.port import PortSignal
+from sonicrack.patching.registry import register_module
+from sonicrack.runtime.helpers import float_parameter, read_samples
+from sonicrack.runtime.specs import RuntimeParameters
 
 if TYPE_CHECKING:
-    from sonicrack.gui.core.port import Port
+    from sonicrack.patching.port import Port
 
 
 LFO_MIN_FREQUENCY = 0.01

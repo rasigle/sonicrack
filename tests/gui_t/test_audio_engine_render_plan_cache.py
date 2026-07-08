@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from sonicrack.gui.audio_engine import AudioEngine
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.port import Port
-from sonicrack.gui.core.runtime import RuntimeModuleSpec
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.port import Port
+from sonicrack.runtime.engine import AudioEngine
+from sonicrack.runtime.specs import RuntimeModuleSpec
 
 
 class _PortWidgetStub:

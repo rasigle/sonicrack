@@ -8,8 +8,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.module_registry import (
+from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.registry import (
     ModuleRegistry,
     discover_modules,
     get_registry,
@@ -17,7 +18,6 @@ from sonicrack.gui.module_registry import (
     load_module,
     register_module,
 )
-from sonicrack.gui.widgets.module_widget import ModuleWidget
 
 
 class TestModuleRegistry:
@@ -179,7 +179,7 @@ class TestModuleRegistry:
 class TestDiscoverModules:
     """Tests for module discovery functionality."""
 
-    @patch("sonicrack.gui.module_registry.importlib.import_module")
+    @patch("sonicrack.patching.registry.importlib.import_module")
     def test_discover_modules_recursive_file_discovery(self, mock_import):
         """Test that recursive discovery finds files in subdirectories."""
         # Mock the import to prevent actual module loading
@@ -193,7 +193,7 @@ class TestDiscoverModules:
         # Recursive should find at least as many (likely more with subdirs)
         assert count_recursive >= count_flat
 
-    @patch("sonicrack.gui.module_registry.importlib.import_module")
+    @patch("sonicrack.patching.registry.importlib.import_module")
     def test_discover_modules_handles_import_errors(self, mock_import):
         """Test that import errors are handled gracefully."""
         # Make import fail
@@ -399,7 +399,7 @@ class TestLoadPlugin:
         """Test loading a valid plugin file."""
         plugin_file = Path(self.temp_dir) / "test_plugin.py"
         plugin_file.write_text("""
-from sonicrack.gui.module_registry import register_module
+from sonicrack.patching.registry import register_module
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 
 @register_module()
@@ -436,7 +436,7 @@ class PluginModule(ModuleWidget):
 class TestInitializeModules:
     """Tests for module initialization."""
 
-    @patch("sonicrack.gui.module_registry.discover_modules")
+    @patch("sonicrack.patching.registry.discover_modules")
     def test_initialize_modules(self, mock_discover):
         """Test module initialization process."""
         mock_discover.return_value = 10

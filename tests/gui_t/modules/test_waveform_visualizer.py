@@ -6,8 +6,8 @@ from typing import Any
 
 import numpy as np
 
-from sonicrack.gui.core.port import Port, PortType
 from sonicrack.gui.modules.visualization.waveform import WaveformDisplay, WaveformModule
+from sonicrack.patching.port import Port, PortType
 
 
 def test_waveform_display_uses_bounded_line_only_paths(qapp: Any) -> None:

@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from sonicrack.gui.core.port import Port
 from sonicrack.gui.modules.output.output import OutputModule
+from sonicrack.patching.port import Port
 from sonicrack.utils.audio_utils import combine_lr_to_stereo, mono_to_stereo
 
 

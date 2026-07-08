@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from sonicrack.constants import PRESET_FILE_EXTENSION
-from sonicrack.gui.ui_constants import DEFAULT_PRESET_DIRECTORY
+from sonicrack.constants import DEFAULT_PRESET_DIRECTORY
 
 logger = logging.getLogger(__name__)
 

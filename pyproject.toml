@@ -8,7 +8,7 @@ dynamic = ["version"]
 authors = [
     {name = "Rainer Sigle", email = "rainer.sigle@live.de"}
 ]
-description = "Modular audio synthesis framework with visual patching interface and high-performance audio engine"
+description = "PyQt6 modular synthesizer rack"
 readme = "README.md"
 license = {text = "MIT"}
 keywords = ["audio", "synthesis", "modular", "synthesizer", "music", "sound-design", "dsp"]
@@ -21,6 +21,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Sound/Audio :: Sound Synthesis",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
@@ -31,6 +33,9 @@ dependencies = [
     "scipy",
     "soniclab@git+https://github.com/rasigle/soniclab",
 ]
+
+[project.scripts]
+sonicrack = "sonicrack.modular_synth_app:main"
 
 [project.optional-dependencies]
 # install with e.g.: uv sync --extra examples

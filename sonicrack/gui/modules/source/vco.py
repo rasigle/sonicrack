@@ -24,29 +24,25 @@ from soniclab.generators.oscillators.oscillator_sine import SineWaveMode
 from soniclab.generators.oscillators.oscillator_square import SquareWaveMode
 
 from sonicrack.constants import DEFAULT_GAIN_DB
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.port import PortSignal
-from sonicrack.gui.core.runtime import RuntimeParameters
-from sonicrack.gui.core.runtime_helpers import (
-    float_parameter,
-    read_samples,
-    str_parameter,
-)
-from sonicrack.gui.module_registry import register_module
 from sonicrack.gui.modules.source._oscillator_runtime import (
     RuntimeOscillator,
     _frequency_slew_values,
     render_with_frequency_ramp,
     smooth_control_signal,
 )
-from sonicrack.gui.ui_constants import (
-    AUDIO_FREQUENCY_KNOB_CURVE,
-    DEFAULT_PW_PERCENTAGE_VALUE,
-    MAX_PW_PERCENTAGE_VALUE,
-    MIN_PW_PERCENTAGE_VALUE,
-)
+from sonicrack.constants import MIN_PW_PERCENTAGE_VALUE, MAX_PW_PERCENTAGE_VALUE, \
+    DEFAULT_PW_PERCENTAGE_VALUE, AUDIO_FREQUENCY_KNOB_CURVE
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.port import PortSignal
+from sonicrack.patching.registry import register_module
+from sonicrack.runtime.helpers import (
+    float_parameter,
+    read_samples,
+    str_parameter,
+)
+from sonicrack.runtime.specs import RuntimeParameters
 
 VCO_PITCH_CV_SMOOTHING_MS = 5.0
 VCO_DEFAULT_FM_AMOUNT_PERCENT = 0.0
@@ -724,6 +720,11 @@ class ModulatedOscillatorModule(ModuleWidget):
         fm_mode = str_parameter(parameters, "fm_mode", self.fm_mode_combo.currentText)
         frequency = float_parameter(parameters, "frequency", self.freq_knob.get_value)
         gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)
+        phase = (
+            float_parameter(parameters, "phase", lambda: 0.0)
+            if "phase" in parameters
+            else None
+        )
         fm_amount = float_parameter(
             parameters, "fm_amount", self.fm_amount_knob.get_value
         )
@@ -734,7 +735,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         oscillator_shape = (wave_type, mode)
         if self.component is None or oscillator_shape != self._runtime_oscillator_shape:
             self.component = self._create_runtime_base_oscillator(
-                wave_type, mode, frequency, gain_db, pulsewidth
+                wave_type, mode, frequency, gain_db, pulsewidth, phase
             )
             self._runtime_oscillator_shape = oscillator_shape
             self._last_runtime_frequency = frequency
@@ -802,6 +803,13 @@ class ModulatedOscillatorModule(ModuleWidget):
         # that verify frequency modulation is working correctly.
         if hasattr(self.component, "frequency"):
             self.component.frequency = self._last_runtime_frequency
+        if (
+            phase is not None
+            and not self.freq_input.is_connected
+            and fm_signal is None
+            and hasattr(self.component, "phase")
+        ):
+            self.component.phase = phase
 
     def _render_frequency_signal(
         self,
@@ -872,14 +880,22 @@ class ModulatedOscillatorModule(ModuleWidget):
         frequency: float,
         gain_db: float,
         pulsewidth: float,
+        phase_degrees: float | None,
     ):
         """Create the VCO base oscillator from a runtime parameter snapshot."""
+        phase = phase_degrees or 0.0
         if wave_type == "Sine":
-            return SineOscillator(frequency, gain_db=gain_db, mode=_as_sine_mode(mode))
+            return SineOscillator(
+                frequency,
+                gain_db=gain_db,
+                phase=phase,
+                mode=_as_sine_mode(mode),
+            )
         if wave_type == "Square":
             return SquareOscillator(
                 frequency,
                 gain_db=gain_db,
+                phase=phase,
                 pulsewidth=pulsewidth,
                 mode=_as_square_mode(mode),
             )
@@ -887,12 +903,14 @@ class ModulatedOscillatorModule(ModuleWidget):
             return SawtoothOscillator(
                 frequency,
                 gain_db=gain_db,
+                phase=phase,
                 mode=_as_sawtooth_mode(mode),
             )
         if wave_type == "Triangle":
             return TriangleOscillator(
                 frequency,
                 gain_db=gain_db,
+                phase=phase,
                 mode=_as_triangle_mode(mode),
             )
         raise ValueError(f"Unknown waveform type: {wave_type}")

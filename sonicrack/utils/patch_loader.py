@@ -112,7 +112,7 @@ def _get_module_registry():
             app.setQuitOnLastWindowClosed(False)
             logger.info("Created QApplication for headless rendering")
 
-        from sonicrack.gui.module_registry import (
+        from sonicrack.patching.registry import (
             get_registry,
             initialize_module_registry,
         )
@@ -190,7 +190,7 @@ class HeadlessPatchRenderer:
             self._output_module = None
 
             # Create AudioEngine for proper rendering
-            from sonicrack.gui.audio_engine import AudioEngine
+            from sonicrack.runtime.engine import AudioEngine
 
             self._audio_engine = AudioEngine(sample_rate=self._sample_rate)
 
@@ -370,14 +370,14 @@ class HeadlessPatchRenderer:
             elif hasattr(self._output_module, "inputs"):
                 # Try to find the first connected input port
                 for port in self._output_module.inputs.values():
-                    from sonicrack.gui.core.port import Port
+                    from sonicrack.patching.port import Port
 
                     if isinstance(port, Port) and port.is_connected:
                         output_port = port
                         break
 
             if output_port:
-                from sonicrack.gui.core.port import Port
+                from sonicrack.patching.port import Port
 
                 if isinstance(output_port, Port):
                     # Render using the audio engine's proper pipeline

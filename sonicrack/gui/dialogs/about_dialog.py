@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QMessageBox, QWidget
 
-from sonicrack.gui.ui_constants import APP_TITLE
+from sonicrack.constants import APP_TITLE
 
 
 def show_about(parent: QWidget, version: str = ""):

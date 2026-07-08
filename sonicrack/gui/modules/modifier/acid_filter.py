@@ -7,13 +7,13 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.filters.acid_303 import AcidResonantFilter
 
-from sonicrack.gui.audio_config import audio_config
-from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
-from sonicrack.gui.core.runtime import RuntimeParameters
-from sonicrack.gui.core.runtime_helpers import float_parameter, read_samples, silence
-from sonicrack.gui.module_registry import register_module
+from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.registry import register_module
+from sonicrack.runtime.helpers import float_parameter, read_samples, silence
+from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()

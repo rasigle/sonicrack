@@ -18,7 +18,7 @@ import numpy as np
 from PyQt6.QtCore import QTimer
 
 if TYPE_CHECKING:
-    from sonicrack.gui.core.port import Port
+    from sonicrack.patching.port import Port
 
 logger = logging.getLogger(__name__)
 

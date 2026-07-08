@@ -2,7 +2,7 @@
 
 import json
 
-from sonicrack.gui.app_settings import AppSettings
+from sonicrack.config.app_settings import AppSettings
 
 
 class _FakeAppSettings:

@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 from soniclab import Panner
 
-from src.gui.modules.modifier.pan_mod import PannerModule
-from src.gui.modules.modifier.pan_simple import SimplePannerModule
+from sonicrack.gui.modules.modifier.pan_mod import PannerModule
+from sonicrack.gui.modules.modifier.pan_simple import SimplePannerModule
 
 
 def test_simple_panner_creates_engine_component(qapp: Any):

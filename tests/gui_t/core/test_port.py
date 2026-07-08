@@ -14,9 +14,9 @@ import numpy as np
 import pytest
 from soniclab import SineOscillator, TriangleOscillator
 
-from src.gui.audio_engine import RenderContext
-from src.gui.core.module import ModuleCategory
-from src.gui.core.port import Port, PortSignal, PortType
+from sonicrack.gui.audio_engine import RenderContext
+from sonicrack.gui.core.module import ModuleCategory
+from sonicrack.gui.core.port import Port, PortSignal, PortType
 
 
 # Mock parent module for tests
@@ -772,7 +772,7 @@ def test_no_qt_dependencies():
     port.write(5.0)
 
     # PortModel module should not import PyQt6
-    import src.gui.core.port as port_module
+    import sonicrack.gui.core.port as port_module
 
     assert "PyQt6" not in sys.modules or "PyQt6" not in str(port_module.__file__)
 

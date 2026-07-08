@@ -14,7 +14,7 @@ echo Setting up the environment...
 call .\scripts\environment\uv_check_activate_venv.bat
 
 echo Launching the Modular Synthesizer application...
-python -m src.modular_synth_app
+python -m sonicrack.modular_synth_app
 
 if errorlevel 1 (
     echo.

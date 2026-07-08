@@ -4,8 +4,8 @@ from pathlib import Path
 
 from soniclab.audio_io import AudioOutput
 
-from src.gui.main_window import ModularSynthWindow
-from src.gui.modules.output.output import OutputModule
+from sonicrack.gui.main_window import ModularSynthWindow
+from sonicrack.gui.modules.output.output import OutputModule
 
 
 def test_apply_preset_recreates_saved_cables(monkeypatch):
@@ -158,7 +158,7 @@ def test_close_autosaves_and_next_window_restores_patch(tmp_path):
 
 def test_window_respects_disabled_restore_last_patch_setting(tmp_path, monkeypatch):
     """Startup should skip autosave restore when the persisted setting disables it."""
-    from src.gui import main_window
+    from sonicrack.gui import main_window
 
     autosave_path = tmp_path / "last_session.apr"
     window = ModularSynthWindow(

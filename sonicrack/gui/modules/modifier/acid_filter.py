@@ -1,0 +1,202 @@
+"""Acid-style resonant filter module."""
+
+from __future__ import annotations
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QHBoxLayout
+from soniclab.dsp.filters.acid_303 import AcidResonantFilter
+
+from sonicrack.gui.audio_config import audio_config
+from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
+from sonicrack.gui.core.runtime import RuntimeParameters
+from sonicrack.gui.core.runtime_helpers import float_parameter, read_samples, silence
+from sonicrack.gui.module_registry import register_module
+from sonicrack.gui.widgets import Knob
+from sonicrack.gui.widgets.module_widget import ModuleWidget
+
+
+@register_module()
+class AcidFilterModule(ModuleWidget):
+    """303-oriented resonant low-pass filter with env and accent CV."""
+
+    runtime_kind = "acid_filter"
+
+    metadata = ModuleMetadata(
+        title="Acid Filter",
+        category=ModuleCategory.MODIFIER,
+        description="Acid-style resonant low-pass filter with drive",
+    )
+
+    def __init__(self) -> None:
+        super().__init__(width=260, height=325, color=QColor(85, 165, 120))
+
+        self.in_port = self.add_input("In")
+        self.cutoff_cv_port = self.add_input("Cutoff CV")
+        self.env_cv_port = self.add_input("Env CV")
+        self.accent_cv_port = self.add_input("Accent CV")
+        self.out_port = self.add_output("Out")
+
+        self.component = AcidResonantFilter(sample_rate=audio_config.sample_rate)
+
+        self.controls_widget = self._create_controls_container()
+        layout = self._create_standard_layout(spacing=6)
+
+        tone_row = QHBoxLayout()
+        tone_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.cutoff_knob = Knob(
+            label="Cutoff",
+            description="Sets the cutoff frequency of the filter",
+            min_value=20.0,
+            max_value=12000.0,
+            default_value=1.0,
+            logarithmic=True,
+        )
+        self.cutoff_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("cutoff", self.cutoff_knob.get_value())
+        )
+        tone_row.addWidget(self.cutoff_knob)
+
+        self.resonance_knob = Knob(
+            label="Resonance",
+            description="Adjusts the resonance of the filter",
+            min_value=0.0,
+            max_value=18.0,
+            default_value=0.1,
+            logarithmic=True,
+        )
+        self.resonance_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit(
+                "resonance", self.resonance_knob.get_value()
+            )
+        )
+        tone_row.addWidget(self.resonance_knob)
+        layout.addLayout(tone_row)
+
+        mod_row = QHBoxLayout()
+        mod_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.env_mod_knob = Knob(
+            label="Env.Mod",
+            description="Controls the envelope modulation depth",
+            min_value=0.0,
+            max_value=6.0,
+            default_value=0.1,
+        )
+        self.env_mod_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit(
+                "env_amount", self.env_mod_knob.get_value()
+            )
+        )
+        mod_row.addWidget(self.env_mod_knob)
+
+        self.accent_knob = Knob(
+            label="Accent",
+            description="Controls the accent amount",
+            min_value=0.0,
+            max_value=4.0,
+            default_value=0.1,
+        )
+        self.accent_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit(
+                "accent_amount", self.accent_knob.get_value()
+            )
+        )
+        mod_row.addWidget(self.accent_knob)
+        layout.addLayout(mod_row)
+
+        gain_row = QHBoxLayout()
+        gain_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.drive_knob = Knob(
+            label="Drive",
+            description="Adjusts the drive of the filter",
+            min_value=0.0,
+            max_value=24.0,
+            default_value=0.1,
+        )
+        self.drive_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("drive_db", self.drive_knob.get_value())
+        )
+        gain_row.addWidget(self.drive_knob)
+
+        self.output_knob = Knob(
+            label="Output",
+            description="Adjusts the output level of the filter",
+            min_value=0.0,
+            max_value=12.0,
+            default_value=0.1,
+        )
+        self.output_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit(
+                "output_gain_db", self.output_knob.get_value()
+            )
+        )
+        gain_row.addWidget(self.output_knob)
+        layout.addLayout(gain_row)
+
+        self.controls_widget.setLayout(layout)
+        self.proxy = self._add_controls_to_module(self.controls_widget)
+
+        self.register_parameter("cutoff", self.cutoff_knob)
+        self.register_parameter("resonance", self.resonance_knob)
+        self.register_parameter("env_amount", self.env_mod_knob)
+        self.register_parameter("accent_amount", self.accent_knob)
+        self.register_parameter("drive_db", self.drive_knob)
+        self.register_parameter("output_gain_db", self.output_knob)
+
+        self._sample_rate_listener = self._on_global_sample_rate_changed
+        audio_config.add_sample_rate_listener(self._sample_rate_listener)
+        self.destroyed.connect(self._cleanup_audio_config_listeners)
+
+    def get_required_inputs(self) -> list[str]:
+        return ["In"]
+
+    def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
+        self.component = AcidResonantFilter(sample_rate=new_sample_rate)
+
+    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
+        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
+
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
+        if not self.in_port.is_connected:
+            self.out_port.write(silence(num_samples))
+            return
+
+        self.component.cutoff = float_parameter(
+            parameters, "cutoff", self.cutoff_knob.get_value
+        )
+        self.component.resonance = float_parameter(
+            parameters, "resonance", self.resonance_knob.get_value
+        )
+        self.component.env_amount = float_parameter(
+            parameters, "env_amount", self.env_mod_knob.get_value
+        )
+        self.component.accent_amount = float_parameter(
+            parameters, "accent_amount", self.accent_knob.get_value
+        )
+        self.component.drive_db = float_parameter(
+            parameters, "drive_db", self.drive_knob.get_value
+        )
+        self.component.output_gain_db = float_parameter(
+            parameters, "output_gain_db", self.output_knob.get_value
+        )
+
+        self.out_port.write(
+            self.component.process_modulated(
+                read_samples(self.in_port, num_samples),
+                cutoff_cv=(
+                    read_samples(self.cutoff_cv_port, num_samples)
+                    if self.cutoff_cv_port.is_connected
+                    else None
+                ),
+                env_cv=(
+                    read_samples(self.env_cv_port, num_samples)
+                    if self.env_cv_port.is_connected
+                    else None
+                ),
+                accent_cv=(
+                    read_samples(self.accent_cv_port, num_samples)
+                    if self.accent_cv_port.is_connected
+                    else None
+                ),
+            )
+        )

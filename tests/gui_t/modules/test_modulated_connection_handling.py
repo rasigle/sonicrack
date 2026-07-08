@@ -8,10 +8,10 @@ from typing import Any
 
 import pytest
 
-from src.gui.modules.modifier.clipper_mod import ClipperModulatedModule
-from src.gui.modules.modifier.pan_mod import PannerModule
-from src.gui.modules.modifier.volume_mod import VolumeModule
-from src.gui.modules.source.oscillator import OscillatorModule
+from sonicrack.gui.modules.modifier.clipper_mod import ClipperModulatedModule
+from sonicrack.gui.modules.modifier.pan_mod import PannerModule
+from sonicrack.gui.modules.modifier.volume_mod import VolumeModule
+from sonicrack.gui.modules.source.oscillator import OscillatorModule
 
 
 @pytest.fixture

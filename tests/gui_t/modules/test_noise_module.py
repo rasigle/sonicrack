@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.gui.modules.source.noise import NoiseModule
+from sonicrack.gui.modules.source.noise import NoiseModule
 
 
 def test_noise_runtime_updates_gain_from_parameters(qapp):

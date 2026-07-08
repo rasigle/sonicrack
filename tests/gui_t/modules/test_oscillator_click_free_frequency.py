@@ -7,8 +7,8 @@ slewing to prevent clicking/popping artifacts when frequency changes.
 import numpy as np
 import pytest
 
-from src.gui.modules.source.lfo import LFOModule
-from src.gui.modules.source.oscillator import OscillatorModule
+from sonicrack.gui.modules.source.lfo import LFOModule
+from sonicrack.gui.modules.source.oscillator import OscillatorModule
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ class TestLFOClickFreeFrequency:
 
     def test_lfo_has_frequency_slewing(self, lfo_module):
         """Test that LFO has frequency slewing constant defined."""
-        from src.gui.modules.source.lfo import LFO_FREQUENCY_SLEW_TIME_MS
+        from sonicrack.gui.modules.source.lfo import LFO_FREQUENCY_SLEW_TIME_MS
 
         # Should have a substantial slew time to prevent clicks
         assert LFO_FREQUENCY_SLEW_TIME_MS > 100.0  # At least 100ms
@@ -62,7 +62,7 @@ class TestOscillatorClickFreeFrequency:
 
     def test_oscillator_uses_frequency_slewing(self, osc_module):
         """Test that Oscillator uses the render_with_frequency_ramp function."""
-        from src.gui.modules.source._oscillator_runtime import (
+        from sonicrack.gui.modules.source._oscillator_runtime import (
             DEFAULT_FREQUENCY_SLEW_TIME_MS,
         )
 
@@ -96,7 +96,7 @@ class TestFrequencySlewingMechanism:
 
     def test_frequency_slewing_in_log_space(self):
         """Test that frequency slewing happens in logarithmic (pitch) space."""
-        from src.gui.modules.source._oscillator_runtime import (
+        from sonicrack.gui.modules.source._oscillator_runtime import (
             _frequency_slew_values,
         )
 
@@ -120,7 +120,7 @@ class TestFrequencySlewingMechanism:
 
     def test_zero_slew_time_changes_immediately(self):
         """Test that zero slew time changes frequency immediately."""
-        from src.gui.modules.source._oscillator_runtime import (
+        from sonicrack.gui.modules.source._oscillator_runtime import (
             _frequency_slew_values,
         )
 
@@ -137,7 +137,7 @@ class TestFrequencySlewingMechanism:
 
     def test_equal_frequencies_no_slewing(self):
         """Test that equal start and target frequencies produce constant output."""
-        from src.gui.modules.source._oscillator_runtime import (
+        from sonicrack.gui.modules.source._oscillator_runtime import (
             _frequency_slew_values,
         )
 

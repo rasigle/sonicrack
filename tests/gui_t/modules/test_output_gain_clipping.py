@@ -7,8 +7,8 @@ for smooth gain transitions that prevent clicking/popping artifacts.
 import numpy as np
 import pytest
 
-from src.gui.core.port import Port
-from src.gui.modules.output.output import OutputModule
+from sonicrack.gui.core.port import Port
+from sonicrack.gui.modules.output.output import OutputModule
 
 
 @pytest.fixture

@@ -1,92 +1,91 @@
 # AudioPlayground
 
-AudioPlayground is a Python audio-synthesis workspace that combines a vectorized DSP engine with a PyQt6 modular-synth GUI.
-
-This repository currently contains:
-
-- a reusable engine API under `src/engine`
-- a desktop modular patching application under `src/gui` and `src/modular_synth_app.py`
-- examples, notebooks, and experiment folders under `examples/`
-- a large set of implementation notes and design docs under `docs/`
-- an active test suite under `tests/`
+AudioPlayground is a PyQt6 modular synthesizer application for building audio
+patches visually. 
 
 ## Snapshot
 
-- **Package version:** `0.1.0`
-- **Python:** `>=3.11`
-- **Primary GUI entry point:** `python -m src.modular_synth_app`
-- **Recommended environment tool:** `uv`
-- **Main engine import surface:** `from src.engine import ...`
-- **License:** MIT
+- Package version: `0.1.0`
+- Python: `>=3.11`
+- Primary entry point: `python -m src.modular_synth_app`
+- Recommended environment tool: `uv`
+- Main application package today: `src`
+- DSP dependency: `soniclab`
+- License: MIT
 
-## What is implemented
+## Current Scope
 
-### Engine (`src/engine`)
+This repository currently contains:
 
-The engine exposes a fairly broad synthesis surface:
+- a desktop modular patching application under `src/gui`
+- a graph render coordinator in `src/gui/audio_engine.py`
+- GUI module contracts, ports, runtime dispatch, and preset loading under
+  `src/gui/core`
+- built-in patch modules under `src/gui/modules`
+- Qt widgets, dialogs, resources, logging, crash diagnostics, and audio helpers
+- example patch files and GUI/module examples under `examples`
+- GUI and utility tests under `tests`
 
-- **Oscillators:** sine, square, sawtooth, triangle
-- **Modulation:** ADSR and modulated oscillators / frequency modulation helpers
-- **Modifiers:** volume, panning, clipping, frequency-related processors
-- **Composition:** `Chain`, `WaveAdder`
-- **Noise:** white, pink, brownian, blue, grey, velvet, sample-and-hold, Perlin
-- **Filters:** Butterworth filter utilities and filter component support
-- **Effects:** distortion, delay, reverb
-- **I/O:** optional `AudioOutput` via `src.audio_io` using the `audio-io` extra
-- **MIDI:** optional MIDI adapters via `src.midi_io` using the `midi` extra
-- **Preset/build helpers:** preset builder and preset library modules
+The removed packages `src/engine`, `src/audio_io`, and `src/midi_io` are no
+longer part of this repository. Code that needs oscillators, filters, effects,
+sequencers, audio output, or MIDI helpers imports them from `soniclab`.
 
-Example:
+## What Is Implemented
 
-```python
-from src.engine import SineOscillator
+### Application Shell
 
-osc = SineOscillator(frequency=440, amplitude=0.3)
-samples = osc.get_samples(44100)
-```
+`src/modular_synth_app.py` starts the PyQt6 application, configures logging,
+shows the splash screen when available, creates the main window, and activates
+crash diagnostics.
 
-### GUI (`src/gui`)
+### Modular GUI
 
-The GUI is a modular patching application built on PyQt6. At the time of verification, the dynamic module registry discovers **21 GUI modules**:
+`src/gui/main_window.py` owns the main window, patch canvas, module library,
+menu actions, patch save/load flow, autosave restore behavior, and preset
+integration.
 
-- `ADSR Envelope`
-- `Clipper`
-- `Clipper (Mod)`
-- `Delay`
-- `Distortion`
-- `Filter`
-- `LFO`
-- `MIDI Input`
-- `Mixer`
-- `Noise`
-- `Oscillator`
-- `Output`
-- `Panner`
-- `Panner (Mod)`
-- `Reverb`
-- `Spectrum`
-- `VCA`
-- `VCO`
-- `Volume`
-- `Volume (Mod)`
-- `Waveform`
+### Runtime Graph
 
-The GUI module system is registry-driven via `src/gui/core/module_registry.py` and recursively discovers modules from `src/gui/modules/`.
+`src/gui/audio_engine.py` owns graph rendering for the GUI. Sink modules such as
+Output, Waveform, and Spectrum request buffers from the engine. The engine
+compiles a render plan, processes upstream modules once per render cycle, and
+caches port values through `RenderContext`.
 
-## Quick start
+### Module System
 
-### 1. Install dependencies
+GUI modules register themselves with `@register_module()` and are discovered
+recursively from `src/gui/modules`. Static analysis currently finds 32
+registered module classes across these categories:
+
+- effects
+- input
+- mixer
+- modifier
+- modulated source
+- output
+- sequencing
+- source
+- visualization
+- voice
+
+Module runtime behavior is declared with `RuntimeModuleSpec` and implemented by
+the module widgets themselves. Low-level DSP work is delegated to `soniclab`
+objects where appropriate.
+
+## Quick Start
+
+### Install Dependencies
 
 Recommended:
 
 ```powershell
-uv sync
+uv sync --extra gui
 ```
 
-Alternative editable install:
+Editable install alternative:
 
 ```powershell
-python -m pip install -e .
+python -m pip install -e ".[gui]"
 ```
 
 Optional extras:
@@ -94,21 +93,19 @@ Optional extras:
 ```powershell
 python -m pip install -e ".[audio-io]"
 python -m pip install -e ".[midi]"
-python -m pip install -e ".[gui]"
 python -m pip install -e ".[examples]"
 python -m pip install -e ".[full]"
 ```
 
 Notes:
 
-- The base install covers the core DSP engine only.
-- Audio-device output lives behind the `audio-io` extra.
-- GUI support lives behind the `gui` extra.
-- MIDI support lives behind the `midi` extra and is exposed from `src.midi_io`.
-- Notebook and visualization-heavy example dependencies live behind `examples` extras.
-- Depending on your machine, real audio or MIDI features may also require working local system drivers.
+- `gui` installs PyQt6 and the audio-output extra.
+- `audio-io` installs realtime audio dependencies.
+- `midi` installs MIDI dependencies.
+- `examples` installs notebook, plotting, and analysis dependencies.
+- Realtime audio and MIDI also depend on working local system drivers.
 
-### 2. Launch the GUI
+### Launch The GUI
 
 Windows helper:
 
@@ -116,136 +113,173 @@ Windows helper:
 run_modular_synth.bat
 ```
 
-Direct module launch:
+Direct launch:
 
 ```powershell
 python -m src.modular_synth_app
 ```
 
-### 3. Try the engine directly
+Useful launch options:
 
 ```powershell
-python -c "from src.engine import SineOscillator; import numpy as np; osc=SineOscillator(frequency=440, amplitude=0.2); samples=osc.get_samples(16); print(samples.shape, samples.dtype, np.round(samples[:5], 4))"
+python -m src.modular_synth_app --no-splash
+python -m src.modular_synth_app --log-level DEBUG --detailed-log
 ```
 
-## Testing
-
-The repository currently has a large automated test suite.
-
-### Verified on 2026-05-26
-
-These test runs were executed successfully during this update:
-
-- `python -m pytest tests/engine/io/test_audio_output.py -q` → `39 passed`
-- `python -m pytest tests/engine/io -q` → `177 passed`
-- `python -m pytest tests/engine -q` → `679 passed, 8 subtests passed`
-
-In addition, test collection reports:
-
-- `python -m pytest tests --collect-only -q` → `942 tests collected`
-
-Suggested commands:
-
-```powershell
-python -m pytest tests/engine -q
-python -m pytest tests/gui -q
-python -m pytest tests/utils -q
-python -m pytest tests --collect-only -q
-```
-
-## Repository layout
+## Current Repository Layout
 
 ```text
 AudioPlayground/
-├── src/
-│   ├── audio_io/             # Realtime audio interface
-│   ├── engine/               # DSP engine
-│   ├── gui/                  # PyQt6 modular synth UI
-│   ├── midi_io/              # Utilities for MIDI input/output
-│   ├── utils/
-│   ├── resources/            # packaged runtime assets
-│   ├── modular_synth_app.py  # GUI entry point
-│   └── constants.py
-├── tests/
-│   ├── engine_t/
-│   ├── gui_t/
-│   └── utils_t/
-├── examples/
-│   ├── audio_components/
-│   ├── filter/
-│   ├── midi/
-│   ├── module_components/
-│   ├── oscillators/
-│   ├── preset_builder/
-│   ├── sequencer/
-│   └── signal_analysis/
-├── docs/                     # design notes, implementation docs, status docs
-├── pyproject.toml
-└── run_modular_synth.bat
+|-- src/
+|   |-- modular_synth_app.py      # PyQt application entry point
+|   |-- constants.py              # app constants and packaged resource helpers
+|   |-- gui/
+|   |   |-- app_settings.py       # persistent JSON app preferences
+|   |   |-- audio_config.py       # sample-rate and buffer-size settings
+|   |   |-- audio_engine.py       # GUI graph renderer and render-plan cache
+|   |   |-- main_window.py        # main Qt window and patch workflow
+|   |   |-- module_registry.py    # module discovery and registration
+|   |   |-- core/                 # module, port, runtime, preset contracts
+|   |   |-- dialogs/              # Qt dialogs
+|   |   |-- modules/              # built-in modular synth modules
+|   |   |-- utils/                # GUI-specific utilities
+|   |   `-- widgets/              # reusable Qt widgets
+|   |-- resources/                # packaged icons, splash, screenshots
+|   `-- utils/                    # logging, diagnostics, audio file helpers
+|-- tests/
+|   |-- gui_t/
+|   `-- utils_t/
+|-- examples/
+|   |-- module_components/
+|   |-- patches/
+|   `-- signal_analysis/
+|-- docs/
+|-- pyproject.toml
+`-- run_modular_synth.bat
 ```
 
-## Documentation
+## Proposed Package Structure
 
-The `docs/` folder is extensive, but it is a mix of:
+The current package name `src` works, but it makes imports and distribution less
+clear. A cleaner long-term structure is to use a real package name and separate
+application, domain, infrastructure, and assets:
 
-- design documents
-- implementation summaries
-- troubleshooting notes
-- historical status reports
-- targeted feature write-ups
-
-Useful starting points:
-
-- `docs/index.md`
-- `docs/archive/REPO_ANALYSIS_2026-05-26.md`
-- `docs/developer-guide/ARCHITECTURE_VISUAL_GUIDE.md`
-- `docs/developer-guide/PROCESS_ARCHITECTURE_ANALYSIS.md`
-- `docs/user-guide/troubleshooting.md`
-
-Some older docs still describe the project as more polished or more final than the current repository state supports, so treat historical status claims carefully.
-
-## Development notes
-
-### Adding GUI modules
-
-GUI modules register themselves with `@register_module()` and are discovered recursively from `src/gui/modules/`.
-
-### Engine imports
-
-The stable top-level engine import surface is under `src.engine`:
-
-```python
-from src.engine import (
-    SineOscillator,
-    SquareOscillator,
-    TriangleOscillator,
-    SawtoothOscillator,
-    ADSREnvelope,
-    Chain,
-    WaveAdder,
-)
+```text
+src/
+`-- audioplayground/
+    |-- __init__.py
+    |-- __main__.py                  # optional: python -m audioplayground
+    |-- app/
+    |   |-- cli.py                   # argument parsing and process startup
+    |   |-- qt_app.py                # QApplication, splash, shutdown wiring
+    |   `-- logging.py               # app logging setup
+    |-- config/
+    |   |-- app_settings.py          # persistent user preferences
+    |   |-- audio_config.py          # runtime audio configuration
+    |   `-- constants.py             # app-level constants
+    |-- runtime/
+    |   |-- graph.py                 # render graph and topological planning
+    |   |-- render_context.py        # per-buffer cache and port reads
+    |   |-- engine.py                # GUI render coordinator
+    |   `-- specs.py                 # RuntimeModuleSpec and dispatch helpers
+    |-- patching/
+    |   |-- ports.py                 # Port, PortType, PortSignal
+    |   |-- modules.py               # AudioModule and metadata contracts
+    |   |-- registry.py              # module discovery and registration
+    |   |-- presets.py               # preset persistence
+    |   `-- patch_io.py              # patch save/load serialization
+    |-- modules/
+    |   |-- sources/
+    |   |-- processors/
+    |   |-- effects/
+    |   |-- sequencing/
+    |   |-- input/
+    |   |-- output/
+    |   |-- visualization/
+    |   `-- voices/
+    |-- ui/
+    |   |-- main_window.py
+    |   |-- dialogs/
+    |   |-- widgets/
+    |   `-- styles/
+    |-- integrations/
+    |   |-- soniclab.py              # thin adapters around soniclab imports
+    |   |-- audio_output.py          # realtime output boundary
+    |   `-- midi.py                  # MIDI boundary
+    |-- resources/
+    `-- utilities/
+        |-- diagnostics.py
+        |-- audio_files.py
+        `-- paths.py
 ```
 
-Audio-device output is optional and intentionally kept out of the core engine import:
+### Why This Is Cleaner
 
-```python
-from src.audio_io import AudioOutput
+- `audioplayground` is a real import package; `src` becomes only the packaging
+  layout directory.
+- `runtime` contains graph execution, not Qt widgets.
+- `patching` contains patch-domain concepts such as ports, module metadata,
+  registry, preset management, and serialization.
+- `modules` contains user-visible patch modules only.
+- `ui` contains Qt presentation code only.
+- `integrations` isolates third-party boundaries such as `soniclab`, realtime
+  audio output, and MIDI.
+- `config` separates persistent settings from UI and runtime logic.
+
+### Suggested Migration Order
+
+1. Create `src/audioplayground` and move import-neutral utilities first.
+2. Move resources and constants, then update resource loading to use
+   `audioplayground.resources`.
+3. Move `src/gui/core` into `patching` and `runtime` based on responsibility.
+4. Move Qt widgets, dialogs, and `main_window.py` into `ui`.
+5. Move `src/gui/modules` into `modules` without changing module behavior.
+6. Add compatibility imports from old `src.*` paths for one release if external
+   callers depend on them.
+7. Rename tests from `gui_t` and `utils_t` to match the new package boundaries.
+
+## Testing
+
+Run the current test suite with:
+
+```powershell
+python -m pytest tests -q
 ```
 
-## What this README intentionally does not claim
+Focused runs:
 
-To keep this file honest, it does **not** claim that:
+```powershell
+python -m pytest tests/gui_t -q
+python -m pytest tests/utils_t -q
+```
 
-- the repo is fully production-ready
-- every documented feature path is complete
-- every test in the entire workspace has been freshly executed in this update
-- the docs tree is fully consolidated or perfectly current
+For headless GUI testing on systems without a display server:
 
-What it does claim is based on the current source tree, verified entry points, and the test runs listed above.
+```powershell
+$env:QT_QPA_PLATFORM="offscreen"
+python -m pytest tests/gui_t -q
+```
 
-## Contributing
+## Development Notes
 
-There is not currently a single dedicated top-level contributing guide. Use `docs/README.md`, the existing tests, and nearby module patterns as the best reference for contributing changes.
+### Adding GUI Modules
+
+Add a module under `src/gui/modules`, subclass the established widget/module
+base classes, define metadata, and decorate the class with `@register_module()`.
+The registry imports module files recursively during application startup.
+
+### Working With DSP
+
+Do not add a new local engine package unless there is a clear reason to own DSP
+code in this repository again. Prefer a thin GUI adapter around `soniclab`
+objects, and keep module-specific runtime code close to the module that owns the
+controls.
+
+### Documentation Status
+
+The `docs` directory still contains historical engine-focused design notes and
+completion reports. Treat older claims about `src/engine`, `src/audio_io`, or
+`src/midi_io` as archival unless the current source tree confirms them.
 
 ## License
 

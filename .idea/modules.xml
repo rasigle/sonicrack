@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/audioplayground.iml" filepath="$PROJECT_DIR$/.idea/audioplayground.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/sonicrack.iml" filepath="$PROJECT_DIR$/.idea/sonicrack.iml" />
     </modules>
   </component>
 </project>

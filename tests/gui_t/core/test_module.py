@@ -5,16 +5,16 @@ import logging
 import pytest
 from soniclab.generators.oscillators.oscillator import SineOscillator
 
-from src.gui.core.module import ModuleCategory, infer_port_signal
-from src.gui.core.port import PortSignal
-from src.gui.modules.input.midi_keyboard import MIDIKeyboardModule
-from src.gui.modules.mixer import MixerModule
-from src.gui.modules.modifier.volume_mod import VolumeModule
-from src.gui.modules.sequencing.step_sequencer import StepSequencerModule
-from src.gui.modules.source.lfo import LFOModule
-from src.gui.modules.source.oscillator import OscillatorModule
-from src.gui.modules.source.vco import ModulatedOscillatorModule
-from src.gui.modules.voice.tb303_voice import TB303VoiceModule
+from sonicrack.gui.core.module import ModuleCategory, infer_port_signal
+from sonicrack.gui.core.port import PortSignal
+from sonicrack.gui.modules.input.midi_keyboard import MIDIKeyboardModule
+from sonicrack.gui.modules.mixer import MixerModule
+from sonicrack.gui.modules.modifier.volume_mod import VolumeModule
+from sonicrack.gui.modules.sequencing.step_sequencer import StepSequencerModule
+from sonicrack.gui.modules.source.lfo import LFOModule
+from sonicrack.gui.modules.source.oscillator import OscillatorModule
+from sonicrack.gui.modules.source.vco import ModulatedOscillatorModule
+from sonicrack.gui.modules.voice.tb303_voice import TB303VoiceModule
 
 
 def test_oscillator_interface():
@@ -79,7 +79,7 @@ def test_volume_with_modulation(caplog):
     assert str(lfo) == "AudioComponent Sine"
 
     # Create component with modulation
-    with caplog.at_level(logging.DEBUG, logger="src.gui.modules._modulated_base"):
+    with caplog.at_level(logging.DEBUG, logger="sonicrack.gui.modules._modulated_base"):
         component = module.create_engine_component(
             input_components=None, modulation_components={"Mod": lfo}
         )

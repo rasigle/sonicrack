@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from src.gui.widgets.button_widget import ImageButtonStyle, ImagePushButton
-from src.gui.widgets.led_widget import LedIndicator, LedStyle
+from sonicrack.gui.widgets.button_widget import ImageButtonStyle, ImagePushButton
+from sonicrack.gui.widgets.led_widget import LedIndicator, LedStyle
 
 
 def test_image_push_button_uses_style_size(qapp: Any):

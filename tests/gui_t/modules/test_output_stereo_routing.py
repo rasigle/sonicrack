@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from src.gui.core.port import Port
-from src.gui.modules.output.output import OutputModule
-from src.utils.audio_utils import combine_lr_to_stereo, mono_to_stereo
+from sonicrack.gui.core.port import Port
+from sonicrack.gui.modules.output.output import OutputModule
+from sonicrack.utils.audio_utils import combine_lr_to_stereo, mono_to_stereo
 
 
 @pytest.fixture

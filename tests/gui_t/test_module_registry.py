@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.module_registry import (
+from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
+from sonicrack.gui.module_registry import (
     ModuleRegistry,
     discover_modules,
     get_registry,
@@ -17,7 +17,7 @@ from src.gui.module_registry import (
     load_module,
     register_module,
 )
-from src.gui.widgets.module_widget import ModuleWidget
+from sonicrack.gui.widgets.module_widget import ModuleWidget
 
 
 class TestModuleRegistry:
@@ -179,28 +179,28 @@ class TestModuleRegistry:
 class TestDiscoverModules:
     """Tests for module discovery functionality."""
 
-    @patch("src.gui.module_registry.importlib.import_module")
+    @patch("sonicrack.gui.module_registry.importlib.import_module")
     def test_discover_modules_recursive_file_discovery(self, mock_import):
         """Test that recursive discovery finds files in subdirectories."""
         # Mock the import to prevent actual module loading
         mock_import.return_value = MagicMock()
 
-        # This will use the actual src.gui.modules directory structure
+        # This will use the actual sonicrack.gui.modules directory structure
         # We just test that recursive mode finds more files
-        count_recursive = discover_modules("src.gui.modules", recursive=True)
-        count_flat = discover_modules("src.gui.modules", recursive=False)
+        count_recursive = discover_modules("sonicrack.gui.modules", recursive=True)
+        count_flat = discover_modules("sonicrack.gui.modules", recursive=False)
 
         # Recursive should find at least as many (likely more with subdirs)
         assert count_recursive >= count_flat
 
-    @patch("src.gui.module_registry.importlib.import_module")
+    @patch("sonicrack.gui.module_registry.importlib.import_module")
     def test_discover_modules_handles_import_errors(self, mock_import):
         """Test that import errors are handled gracefully."""
         # Make import fail
         mock_import.side_effect = ImportError("Test import error")
 
         # Should not raise, just return 0
-        count = discover_modules("src.gui.modules", recursive=False)
+        count = discover_modules("sonicrack.gui.modules", recursive=False)
         assert isinstance(count, int)
 
     def test_discover_modules_invalid_package(self):
@@ -212,7 +212,7 @@ class TestDiscoverModules:
         """Integration test: discover actual modules with recursive search."""
         # This tests the actual discovery on the real module directory
         # It should find multiple modules
-        count = discover_modules("src.gui.modules", recursive=True)
+        count = discover_modules("sonicrack.gui.modules", recursive=True)
         assert count > 0  # Should find at least some modules
 
 
@@ -399,8 +399,8 @@ class TestLoadPlugin:
         """Test loading a valid plugin file."""
         plugin_file = Path(self.temp_dir) / "test_plugin.py"
         plugin_file.write_text("""
-from src.gui.module_registry import register_module
-from src.gui.widgets.module_widget import ModuleWidget
+from sonicrack.gui.module_registry import register_module
+from sonicrack.gui.widgets.module_widget import ModuleWidget
 
 @register_module()
 class PluginModule(ModuleWidget):
@@ -436,7 +436,7 @@ class PluginModule(ModuleWidget):
 class TestInitializeModules:
     """Tests for module initialization."""
 
-    @patch("src.gui.module_registry.discover_modules")
+    @patch("sonicrack.gui.module_registry.discover_modules")
     def test_initialize_modules(self, mock_discover):
         """Test module initialization process."""
         mock_discover.return_value = 10
@@ -444,7 +444,7 @@ class TestInitializeModules:
         registry = initialize_module_registry()
 
         # Should call discover_modules with recursive=True
-        mock_discover.assert_called_once_with("src.gui.modules", recursive=True)
+        mock_discover.assert_called_once_with("sonicrack.gui.modules", recursive=True)
         assert isinstance(registry, ModuleRegistry)
 
 

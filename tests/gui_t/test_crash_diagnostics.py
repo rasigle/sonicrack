@@ -6,8 +6,8 @@ import threading
 
 from PyQt6.QtCore import qInstallMessageHandler
 
-from src.utils import crash_diagnostics
-from src.utils.crash_diagnostics import activate_crash_diagnostics
+from sonicrack.utils import crash_diagnostics
+from sonicrack.utils.crash_diagnostics import activate_crash_diagnostics
 
 
 class _FakeApp:

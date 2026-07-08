@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 from soniclab.dsp.filters.butterworth import BiquadResonantFilter, ButterworthFilter
 
-from src.gui.core.port import Port
-from src.gui.core.runtime import process_runtime_module
-from src.gui.modules.modifier.filter import FilterModule
-from src.gui.modules.modifier.resonant_filter import ResonantFilterModule
+from sonicrack.gui.core.port import Port
+from sonicrack.gui.core.runtime import process_runtime_module
+from sonicrack.gui.modules.modifier.filter import FilterModule
+from sonicrack.gui.modules.modifier.resonant_filter import ResonantFilterModule
 
 
 def test_filter_module_create_engine_component_returns_modifier(app):

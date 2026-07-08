@@ -6,8 +6,8 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
 
-from src.gui.widgets.knob_style import ProceduralKnobStyle
-from src.gui.widgets.knob_widget import Knob
+from sonicrack.gui.widgets.knob_style import ProceduralKnobStyle
+from sonicrack.gui.widgets.knob_widget import Knob
 
 AUDIO_FREQUENCY_CURVE = (
     (0.0, 11.0),

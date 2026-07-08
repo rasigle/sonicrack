@@ -15,10 +15,10 @@ import numpy as np
 from PyQt6.QtGui import QColor
 from soniclab import Modifier
 
-from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.module_registry import register_module
-from src.gui.widgets import Knob
-from src.gui.widgets.module_widget import ModuleWidget
+from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
+from sonicrack.gui.module_registry import register_module
+from sonicrack.gui.widgets import Knob
+from sonicrack.gui.widgets.module_widget import ModuleWidget
 
 
 # Custom audio engine component

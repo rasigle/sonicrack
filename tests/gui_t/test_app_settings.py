@@ -2,7 +2,7 @@
 
 import json
 
-from src.gui.app_settings import AppSettings
+from sonicrack.gui.app_settings import AppSettings
 
 
 class _FakeAppSettings:
@@ -40,8 +40,8 @@ def test_app_settings_persists_restore_last_patch(tmp_path):
 
 def test_settings_dialog_edits_restore_last_patch(monkeypatch, qapp):
     """The application settings dialog should expose the restore preference."""
-    from src.gui.dialogs import audio_settings_dialog
-    from src.gui.dialogs.audio_settings_dialog import AudioSettingsDialog
+    from sonicrack.gui.dialogs import audio_settings_dialog
+    from sonicrack.gui.dialogs.audio_settings_dialog import AudioSettingsDialog
 
     fake_settings = _FakeAppSettings(restore_last_patch=True)
     monkeypatch.setattr(audio_settings_dialog, "app_settings", fake_settings)

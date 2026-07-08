@@ -9,14 +9,14 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+from engine import Modifier
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QGraphicsProxyWidget, QVBoxLayout, QWidget
 
-from engine import Modifier
-from src.gui.core.module import ModuleCategory, ModuleMetadata
-from src.gui.widgets import Knob
-from src.gui.widgets.module_widget import ModuleWidget
+from sonicrack.gui.core.module import ModuleCategory, ModuleMetadata
+from sonicrack.gui.widgets import Knob
+from sonicrack.gui.widgets.module_widget import ModuleWidget
 
 
 # Step 1: Create the audio engine component
@@ -199,7 +199,7 @@ class LowPassFilterModule(ModuleWidget):
 
 # To make this module available in the GUI, add it to module_registry.py:
 """
-from src.gui.modules.lowpass_filter import LowPassFilterModule
+from sonicrack.gui.modules.lowpass_filter import LowPassFilterModule
 
 MODULE_REGISTRY = {
     # ... existing modules ...

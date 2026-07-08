@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "audioplayground"
+name = "sonicrack"
 dynamic = ["version"]
 authors = [
     {name = "Rainer Sigle", email = "rainer.sigle@live.de"}
@@ -40,7 +40,7 @@ audio-io = [
 ]
 gui = [
     "pyqt6", # GUI library
-    "audioplayground[audio-io]",
+    "sonicrack[audio-io]",
 ]
 midi = [
     "mido", # MIDI support is optional in code and only required for MIDI features
@@ -56,7 +56,7 @@ examples = [
     "ipython>=9.15.0", # Interactive Python shell for examples
 ]
 full = [
-    "audioplayground[audio-io, gui, midi, examples]",
+    "sonicrack[audio-io, gui, midi, examples]",
 ]
 
 [dependency-groups]
@@ -87,10 +87,10 @@ allow-direct-references = true
 
 [tool.hatch.version]
 source = "code"
-path = "src/_version.py"
+path = "sonicrack/_version.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["sonicrack"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

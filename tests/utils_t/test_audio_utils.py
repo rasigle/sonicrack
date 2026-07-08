@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.constants import DEFAULT_SAMPLE_RATE
-from src.utils.audio_utils import (
+from sonicrack.constants import DEFAULT_SAMPLE_RATE
+from sonicrack.utils.audio_utils import (
     combine_lr_to_stereo,
     load_wave,
     mono_to_stereo,

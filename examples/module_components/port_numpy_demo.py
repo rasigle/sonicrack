@@ -6,7 +6,7 @@ and numpy arrays for efficient batch audio processing.
 
 import numpy as np
 
-from src.gui.core.port import Port
+from sonicrack.gui.core.port import Port
 
 
 def main():

@@ -6,11 +6,11 @@ from typing import Any
 
 import numpy as np
 
-from src.gui.audio_engine import AudioEngine
-from src.gui.modules.modifier.pan_mod import PannerModule
-from src.gui.modules.modifier.pan_simple import SimplePannerModule
-from src.gui.modules.output.output import OutputModule
-from src.gui.modules.source.oscillator import OscillatorModule
+from sonicrack.gui.audio_engine import AudioEngine
+from sonicrack.gui.modules.modifier.pan_mod import PannerModule
+from sonicrack.gui.modules.modifier.pan_simple import SimplePannerModule
+from sonicrack.gui.modules.output.output import OutputModule
+from sonicrack.gui.modules.source.oscillator import OscillatorModule
 
 
 def test_simple_panner_runtime_center_position(qapp: Any):

@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from src.gui.modules._modulated_base import PortModulatorAdapter
+from sonicrack.gui.modules._modulated_base import PortModulatorAdapter
 
 
 class MockPort:
@@ -71,13 +71,13 @@ def mock_clipper_unipolar():
 @pytest.fixture
 def mock_read_samples(monkeypatch):
     """Patch runtime_helpers.read_samples to use mock data."""
-    import src.gui.core.runtime_helpers
+    import sonicrack.gui.core.runtime_helpers
 
     def _mock_read_samples(port, num_samples):
         return port._data[:num_samples]
 
     monkeypatch.setattr(
-        src.gui.core.runtime_helpers, "read_samples", _mock_read_samples
+        sonicrack.gui.core.runtime_helpers, "read_samples", _mock_read_samples
     )
 
 

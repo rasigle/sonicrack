@@ -12,24 +12,24 @@ from soniclab.generators.oscillators.oscillator_ramp import SawtoothOscillator
 from soniclab.generators.oscillators.oscillator_sine import SineOscillator
 from soniclab.generators.oscillators.oscillator_square import SquareOscillator
 
-from src.constants import DEFAULT_SAMPLE_RATE
-from src.gui.core.port import Port
-from src.gui.modules.effects.effects_compressor import CompressorModule
-from src.gui.modules.effects.effects_distortion import DistortionModule
-from src.gui.modules.mixer import MixerModule
-from src.gui.modules.modifier.acid_filter import AcidFilterModule
-from src.gui.modules.modifier.filter import FilterModule
-from src.gui.modules.modulated_source.envelope_adsr import ADSRModule
-from src.gui.modules.modulated_source.envelope_decay import DecayEnvelopeModule
-from src.gui.modules.source._oscillator_runtime import (
+from sonicrack.constants import DEFAULT_SAMPLE_RATE
+from sonicrack.gui.core.port import Port
+from sonicrack.gui.modules.effects.effects_compressor import CompressorModule
+from sonicrack.gui.modules.effects.effects_distortion import DistortionModule
+from sonicrack.gui.modules.mixer import MixerModule
+from sonicrack.gui.modules.modifier.acid_filter import AcidFilterModule
+from sonicrack.gui.modules.modifier.filter import FilterModule
+from sonicrack.gui.modules.modulated_source.envelope_adsr import ADSRModule
+from sonicrack.gui.modules.modulated_source.envelope_decay import DecayEnvelopeModule
+from sonicrack.gui.modules.source._oscillator_runtime import (
     _frequency_slew_values,
     render_with_frequency_ramp,
 )
-from src.gui.modules.source.lfo import LFOModule
-from src.gui.modules.source.oscillator import OscillatorModule
-from src.gui.modules.source.vco import ModulatedOscillatorModule
-from src.gui.modules.voice.tb303_voice import TB303VoiceModule
-from src.gui.ui_constants import AUDIO_FREQUENCY_KNOB_CURVE
+from sonicrack.gui.modules.source.lfo import LFOModule
+from sonicrack.gui.modules.source.oscillator import OscillatorModule
+from sonicrack.gui.modules.source.vco import ModulatedOscillatorModule
+from sonicrack.gui.modules.voice.tb303_voice import TB303VoiceModule
+from sonicrack.gui.ui_constants import AUDIO_FREQUENCY_KNOB_CURVE
 
 
 def _connect_constant_input(input_port: Port, value: float = 1.0) -> Port:

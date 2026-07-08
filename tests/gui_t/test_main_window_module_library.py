@@ -2,9 +2,9 @@
 
 from PyQt6 import QtWidgets
 
-from src.gui.main_window import ModularSynthWindow
-from src.gui.module_registry import ModuleRegistry
-from src.gui.widgets.module_widget import ModuleWidget
+from sonicrack.gui.main_window import ModularSynthWindow
+from sonicrack.gui.module_registry import ModuleRegistry
+from sonicrack.gui.widgets.module_widget import ModuleWidget
 
 
 def _make_module(title: str, category: str) -> type[ModuleWidget]:

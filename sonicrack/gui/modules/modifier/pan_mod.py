@@ -102,17 +102,8 @@ class PannerModule(ModulatedModuleBase):
 
         # Thread-safe component access with lock
         with self._component_lock:
-            # Lazy initialization if component wasn't prepared (e.g., in tests)
-            # Check if we need to switch to modulated component
-            if self.mod_port.is_connected and not isinstance(
-                self.component, ModulatedPanner
-            ):
-                self.prepare_modulated_component(num_samples)
-            elif not self.mod_port.is_connected and isinstance(
-                self.component, ModulatedPanner
-            ):
-                # Switch back to unmodulated
-                self.component = self.create_unmodulated_component()
+            # Runtime safety net if a disconnect missed UI notifications.
+            self.ensure_modulation_component_state(num_samples)
 
             # Get position from knob
             position = float_parameter(parameters, "position", self.pan_knob.get_value)

@@ -114,6 +114,16 @@ def test_infer_port_signal_treats_ambiguous_freq_as_hz():
     assert infer_port_signal("V/Oct", "input") == PortSignal.PITCH_CV
 
 
+def test_infer_port_signal_distinguishes_gate_and_trigger():
+    assert infer_port_signal("Gate", "input") == PortSignal.GATE
+    assert infer_port_signal("Hold", "input") == PortSignal.GATE
+    assert infer_port_signal("Trig", "output") == PortSignal.TRIGGER
+    assert infer_port_signal("Trigger", "output") == PortSignal.TRIGGER
+    assert infer_port_signal("Clock", "input") == PortSignal.TRIGGER
+    assert infer_port_signal("Reset", "input") == PortSignal.TRIGGER
+    assert infer_port_signal("End", "output") == PortSignal.TRIGGER
+
+
 def test_modules_explicitly_mark_pitch_cv_ports(qapp):
     del qapp
 

@@ -42,6 +42,8 @@ _RANDOMIZE_SCALE_INTERVALS = (0, 2, 3, 5, 7, 8, 10, 12, 15)
 _REST_PROBABILITY = 0.2
 _ACCENT_PROBABILITY = 0.3
 _SLIDE_PROBABILITY = 0.25
+_DEFAULT_ACCENTS = (True, False, False, True, False, False, True, False)
+_DEFAULT_SLIDES = (False, False, True, False, False, False, True, False)
 
 
 @register_module()
@@ -58,10 +60,10 @@ class StepSequencerModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=340, height=400, color=QColor(120, 100, 170))
+        super().__init__(width=340, height=340, color=QColor(120, 100, 170))
 
-        self.clock_input = self.add_input("Clock", signal=PortSignal.GATE)
-        self.reset_input = self.add_input("Reset", signal=PortSignal.GATE)
+        self.clock_input = self.add_input("Clock", signal=PortSignal.TRIGGER)
+        self.reset_input = self.add_input("Reset", signal=PortSignal.TRIGGER)
         self.freq_port = self.add_output("Freq", signal=PortSignal.PITCH_CV)
         self.gate_port = self.add_output("Gate", signal=PortSignal.GATE)
         self.accent_port = self.add_output("Accent", signal=PortSignal.CONTROL_CV)
@@ -86,18 +88,7 @@ class StepSequencerModule(ModuleWidget):
         )
         layout.addWidget(QLabel("Notes:"))
         layout.addWidget(self.notes_edit)
-
-        self.accent_edit = QLineEdit("1,0,0,1,0,0,1,0")
-        self.accent_edit.textChanged.connect(self._on_accents_text_changed)
-        layout.addWidget(QLabel("Accents:"))
-        layout.addWidget(self.accent_edit)
-
-        self.slide_edit = QLineEdit("0,0,1,0,0,0,1,0")
-        self.slide_edit.textChanged.connect(self._on_slides_text_changed)
-        layout.addWidget(QLabel("Slides:"))
-        layout.addWidget(self.slide_edit)
         layout.addLayout(self._create_step_toggle_grid())
-        self._sync_step_toggles_from_text()
 
         randomize_layout = QHBoxLayout()
         randomize_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -176,10 +167,10 @@ class StepSequencerModule(ModuleWidget):
             "notes", self.notes_edit, getter="text", setter="setText"
         )
         self.register_parameter(
-            "accents", self.accent_edit, getter="text", setter="setText"
+            "accents", self, getter="get_accents", setter="set_accents"
         )
         self.register_parameter(
-            "slides", self.slide_edit, getter="text", setter="setText"
+            "slides", self, getter="get_slides", setter="set_slides"
         )
         self.register_parameter("bpm", self.bpm_knob)
         self.register_parameter("gate_length", self.gate_length_knob)
@@ -206,11 +197,15 @@ class StepSequencerModule(ModuleWidget):
         toggle_grid.addWidget(QLabel("Acc"), 0, 0)
         toggle_grid.addWidget(QLabel("Sld"), 1, 0)
         for index in range(self.step_toggle_count):
+            accent_on = _DEFAULT_ACCENTS[index]
+            slide_on = _DEFAULT_SLIDES[index]
+
             accent_button = ImagePushButton(
                 str(index + 1),
                 style=button_style,
                 checkable=True,
             )
+            accent_button.setChecked(accent_on)
             accent_button.setToolTip(f"Toggle accent for step {index + 1}")
             accent_button.toggled.connect(
                 lambda checked, step=index: self._on_step_toggle_changed(
@@ -218,12 +213,14 @@ class StepSequencerModule(ModuleWidget):
                 )
             )
             accent_led = LedIndicator(style=accent_led_style)
+            accent_led.set_on(accent_on)
 
             slide_button = ImagePushButton(
                 str(index + 1),
                 style=button_style,
                 checkable=True,
             )
+            slide_button.setChecked(slide_on)
             slide_button.setToolTip(f"Toggle slide for step {index + 1}")
             slide_button.toggled.connect(
                 lambda checked, step=index: self._on_step_toggle_changed(
@@ -231,6 +228,7 @@ class StepSequencerModule(ModuleWidget):
                 )
             )
             slide_led = LedIndicator(style=slide_led_style)
+            slide_led.set_on(slide_on)
 
             self.accent_buttons.append(accent_button)
             self.accent_leds.append(accent_led)
@@ -251,13 +249,27 @@ class StepSequencerModule(ModuleWidget):
 
         return toggle_grid
 
-    def _on_accents_text_changed(self, value: str) -> None:
-        self.parameter_changed.emit("accents", value)
-        self._sync_step_toggles_from_text()
+    def get_accents(self) -> str:
+        """Serialize accent step toggles for parameters and presets."""
+        return self._flags_to_text(
+            [button.isChecked() for button in self.accent_buttons]
+        )
 
-    def _on_slides_text_changed(self, value: str) -> None:
-        self.parameter_changed.emit("slides", value)
-        self._sync_step_toggles_from_text()
+    def set_accents(self, value: str) -> None:
+        """Load accent step toggles from a comma-separated flag string."""
+        self._apply_flags("accent", value)
+        self.parameter_changed.emit("accents", self.get_accents())
+
+    def get_slides(self) -> str:
+        """Serialize slide step toggles for parameters and presets."""
+        return self._flags_to_text(
+            [button.isChecked() for button in self.slide_buttons]
+        )
+
+    def set_slides(self, value: str) -> None:
+        """Load slide step toggles from a comma-separated flag string."""
+        self._apply_flags("slide", value)
+        self.parameter_changed.emit("slides", self.get_slides())
 
     def _on_randomize_clicked(self) -> None:
         self.randomize_pattern()
@@ -286,29 +298,28 @@ class StepSequencerModule(ModuleWidget):
             slides.append(generator.random() < _SLIDE_PROBABILITY)
 
         self.notes_edit.setText(",".join(notes))
-        self.accent_edit.setText(self._flags_to_text(accents))
-        self.slide_edit.setText(self._flags_to_text(slides))
+        self.set_accents(self._flags_to_text(accents))
+        self.set_slides(self._flags_to_text(slides))
 
     def _on_step_toggle_changed(self, kind: str, step: int, checked: bool) -> None:
         if self._syncing_step_toggles:
             return
-        edit = self.accent_edit if kind == "accent" else self.slide_edit
-        values = self._parse_flags(edit.text(), self.step_toggle_count)
-        values[step] = checked
-        edit.setText(self._flags_to_text(values))
+        leds = self.accent_leds if kind == "accent" else self.slide_leds
+        leds[step].set_on(checked)
+        if kind == "accent":
+            self.parameter_changed.emit("accents", self.get_accents())
+        else:
+            self.parameter_changed.emit("slides", self.get_slides())
 
-    def _sync_step_toggles_from_text(self) -> None:
+    def _apply_flags(self, kind: str, text: str) -> None:
+        flags = self._parse_flags(text, self.step_toggle_count)
+        buttons = self.accent_buttons if kind == "accent" else self.slide_buttons
+        leds = self.accent_leds if kind == "accent" else self.slide_leds
         self._syncing_step_toggles = True
         try:
-            accents = self._parse_flags(self.accent_edit.text(), self.step_toggle_count)
-            slides = self._parse_flags(self.slide_edit.text(), self.step_toggle_count)
-            for index in range(self.step_toggle_count):
-                accent_on = accents[index]
-                slide_on = slides[index]
-                self.accent_buttons[index].setChecked(accent_on)
-                self.accent_leds[index].set_on(accent_on)
-                self.slide_buttons[index].setChecked(slide_on)
-                self.slide_leds[index].set_on(slide_on)
+            for index, flag in enumerate(flags):
+                buttons[index].setChecked(flag)
+                leds[index].set_on(flag)
         finally:
             self._syncing_step_toggles = False
 
@@ -326,8 +337,8 @@ class StepSequencerModule(ModuleWidget):
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         notes = str_parameter(parameters, "notes", self.notes_edit.text)
-        accents = str_parameter(parameters, "accents", self.accent_edit.text)
-        slides = str_parameter(parameters, "slides", self.slide_edit.text)
+        accents = str_parameter(parameters, "accents", self.get_accents)
+        slides = str_parameter(parameters, "slides", self.get_slides)
         gate_length = float_parameter(
             parameters, "gate_length", self.gate_length_knob.get_value
         )

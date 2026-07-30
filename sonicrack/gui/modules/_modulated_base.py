@@ -223,28 +223,53 @@ class ModulatedModuleBase(ModuleWidget):
         if port_name != "Mod":
             return
 
-        # Update component based on connection state - THREAD SAFE
+        self.ensure_modulation_component_state(
+            num_samples=512, is_connected=is_connected
+        )
+        self.update_knob_state()
+
+    def _mod_port_is_connected(self) -> bool:
+        """Return whether the Mod port currently has a live model connection."""
+        for port in self.input_ports:
+            if port.port_name != "Mod":
+                continue
+            model = getattr(port, "port", port)
+            return bool(getattr(model, "is_connected", False))
+        mod_port = getattr(self, "mod_port", None)
+        if mod_port is not None:
+            return bool(getattr(mod_port, "is_connected", False))
+        return False
+
+    def ensure_modulation_component_state(
+        self,
+        num_samples: int = 512,
+        *,
+        is_connected: bool | None = None,
+    ) -> None:
+        """Promote/demote the component to match Mod connection state.
+
+        Safe to call from the UI connection path and as a runtime safety net
+        when a disconnect missed ``on_port_connection_changed``.
+        """
+        if is_connected is None:
+            is_connected = self._mod_port_is_connected()
+
         with self._component_lock:
             if is_connected and not self._is_modulated:
-                # Switch to modulated component - prepare it now
                 logger.debug(
                     f"{self.__class__.__name__}: Switching to modulated component"
                 )
                 self._is_modulated = True
-                # Prepare modulated component with port adapter
-                # Use a default buffer size, it will adapt at runtime
-                self.prepare_modulated_component(num_samples=512)
+                self.prepare_modulated_component(num_samples=num_samples)
             elif not is_connected and self._is_modulated:
-                # Switch to unmodulated component - create it now
                 logger.debug(
                     f"{self.__class__.__name__}: Switching to unmodulated component"
                 )
                 self._is_modulated = False
-                # Pre-create the unmodulated component
                 self.component = self.create_unmodulated_component()
-
-        # Update knob state
-        self.update_knob_state()
+            elif is_connected and self.component is None:
+                self._is_modulated = True
+                self.prepare_modulated_component(num_samples=num_samples)
 
     def prepare_modulated_component(self, num_samples: int):
         """Prepare the modulated component with port adapter.

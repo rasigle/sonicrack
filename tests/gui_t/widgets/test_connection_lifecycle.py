@@ -204,3 +204,45 @@ def test_key_delete_module_demotes_modulated_neighbor(qapp: Any):
 
     assert volume._is_modulated is False
     assert type(volume.component).__name__ == "Volume"
+
+
+def test_clear_all_disconnects_port_models(qapp: Any):
+    del qapp
+    canvas = PatchCanvas()
+    source = OscillatorModule()
+    target = VolumeModule()
+    canvas.add_module(source)
+    canvas.add_module(target)
+    _attach_main_window_like_handlers(canvas)
+
+    assert canvas.create_connection(source.output_ports[0], target.input_ports[0])
+    assert source.output_ports[0].port.is_connected
+    assert target.input_ports[0].port.is_connected
+
+    out_port = source.output_ports[0].port
+    in_port = target.input_ports[0].port
+    canvas.clear_all()
+
+    assert not out_port.is_connected
+    assert not in_port.is_connected
+    assert canvas.get_modules() == []
+    assert canvas.get_connections() == []
+
+
+def test_runtime_demotes_volume_when_mod_disconnected_without_notify(qapp: Any):
+    del qapp
+    from sonicrack.runtime.specs import RuntimeParameters
+
+    volume = VolumeModule()
+    lfo = OscillatorModule()
+    lfo.sine_port.connect(volume.mod_port)
+    volume.on_port_connection_changed("Mod", True)
+    assert volume._is_modulated is True
+
+    # Sever model without UI notification.
+    lfo.sine_port.disconnect(volume.mod_port)
+    assert volume._is_modulated is True
+
+    volume.process_runtime(64, {})
+    assert volume._is_modulated is False
+    assert type(volume.component).__name__ == "Volume"

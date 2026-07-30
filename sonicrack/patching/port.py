@@ -34,6 +34,7 @@ class PortSignal(StrEnum):
     FREQUENCY_HZ = "frequency_hz"
     PITCH_CV = "pitch_cv"
     GATE = "gate"
+    TRIGGER = "trigger"
     CONTROL_CV = "control_cv"
 
 
@@ -42,6 +43,7 @@ _ANALOG_PATCH_SIGNALS = frozenset(
         PortSignal.AUDIO,
         PortSignal.PITCH_CV,
         PortSignal.GATE,
+        PortSignal.TRIGGER,
         PortSignal.CONTROL_CV,
     }
 )

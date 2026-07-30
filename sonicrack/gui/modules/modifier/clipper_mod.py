@@ -96,6 +96,9 @@ class ClipperModulatedModule(ModulatedModuleBase):
         The component (Clipper or ModulatedClipper) is prepared by the connection
         handler, so we just call it directly without branching.
         """
+        # Runtime safety net if a disconnect missed UI notifications.
+        self.ensure_modulation_component_state(num_samples)
+
         if not self.in_port.is_connected:
             self.out_port.write(silence(num_samples))
             return
@@ -104,10 +107,6 @@ class ClipperModulatedModule(ModulatedModuleBase):
 
         # Thread-safe component access with lock
         with self._component_lock:
-            # Lazy initialization if component wasn't prepared (e.g., in tests)
-            if self.component is None and self.mod_port.is_connected:
-                self.prepare_modulated_component(num_samples)
-
             # Get threshold/amount from knob
             threshold_value = float_parameter(
                 parameters, "threshold", self.threshold_knob.get_value

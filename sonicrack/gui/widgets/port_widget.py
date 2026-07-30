@@ -13,6 +13,10 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import QGraphicsItem
 
+from sonicrack.gui.widgets.signal_style import (
+    label_for_port_signal,
+    port_color_for_signal,
+)
 from sonicrack.patching.port import Port, PortType
 
 if TYPE_CHECKING:
@@ -147,10 +151,11 @@ class PortWidget(QGraphicsItem):
         """Return the tooltip shown when hovering over this port."""
         module_name = self.parent_module.get_display_name()
         direction = "Input" if self.port_type == PortType.INPUT else "Output"
+        signal_label = label_for_port_signal(self.port.signal)
         return (
             f"{module_name} {direction}: {self.port_name}\n"
             f"Port Type: {self.port_type}\n"
-            f"Signal: {self.port.signal}"
+            f"Signal: {signal_label}"
         )
 
     # ========================================================================
@@ -178,11 +183,8 @@ class PortWidget(QGraphicsItem):
         if painter is None:
             return
 
-        # Port color based on type
-        if self.port_type == PortType.INPUT:
-            color = QColor(100, 200, 100) if self.hovered else QColor(80, 180, 80)
-        else:
-            color = QColor(200, 100, 100) if self.hovered else QColor(180, 80, 80)
+        # Jack color follows signal kind (audio / V/Oct / gate / trigger / …)
+        color = port_color_for_signal(self.port.signal, hovered=self.hovered)
 
         painter.setBrush(color)
         painter.setPen(QPen(Qt.GlobalColor.black, 2))
@@ -236,6 +238,17 @@ class PortWidget(QGraphicsItem):
         self.hovered = False
         self.update()
         super().hoverLeaveEvent(event)
+
+    def itemChange(self, change, value):  # noqa: N802 - Qt API
+        """Keep cable geometry in sync when this port moves with its module."""
+        if change == QGraphicsItem.GraphicsItemChange.ItemScenePositionHasChanged:
+            for cable in self.cables:
+                refresh = getattr(cable, "refresh_geometry", None)
+                if callable(refresh):
+                    refresh()
+                else:
+                    cable.update()
+        return super().itemChange(change, value)
 
     # ========================================================================
     # Cable Management (UI Concern)

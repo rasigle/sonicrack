@@ -389,6 +389,12 @@ class AudioEngine(QtCore.QObject):
         self._output_modules.discard(mod)
         self.mark_graph_changed()
 
+    def clear_modules(self) -> None:
+        """Remove all modules and clear output-module tracking."""
+        self.modules.clear()
+        self._output_modules.clear()
+        self.mark_graph_changed()
+
     def _on_config_changed(self, value):
         """Handle sample rate or buffer size changes."""
         _ = value

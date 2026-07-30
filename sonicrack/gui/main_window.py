@@ -738,9 +738,8 @@ class ModularSynthWindow(QMainWindow):
         if callable(shutdown):
             shutdown(graceful=True)
 
-        with contextlib.suppress(ValueError):
-            self.audio_engine.modules.remove(module)
-        self.audio_engine.mark_graph_changed()
+        # Use remove_module so Output modules leave _output_modules as well.
+        self.audio_engine.remove_module(module)
 
         from sonicrack.gui.modules.output.output import OutputModule
 
@@ -1054,8 +1053,7 @@ class ModularSynthWindow(QMainWindow):
         # Clear the canvas
         patch_canvas = self._require_patch_canvas()
         patch_canvas.clear_all()
-        self.audio_engine.modules.clear()
-        self.audio_engine.mark_graph_changed()
+        self.audio_engine.clear_modules()
         self._require_statusbar().showMessage("Canvas cleared")
 
     def _stop_all_output_modules(self, graceful: bool = True):
@@ -1136,8 +1134,7 @@ class ModularSynthWindow(QMainWindow):
 
         # Clear current patch
         patch_canvas.clear_all()
-        self.audio_engine.modules.clear()
-        self.audio_engine.mark_graph_changed()
+        self.audio_engine.clear_modules()
 
         # Rebuild modules
         module_map = {}  # Maps old module IDs to new module instances

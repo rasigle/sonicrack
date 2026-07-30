@@ -151,8 +151,8 @@ class PatchCanvas(QGraphicsView):
             event.accept()
             return
 
-        item = self.itemAt(event.pos())
-        if isinstance(item, PortWidget) and item.port_type == "output":
+        item = self._port_at(event.pos(), PortType.OUTPUT)
+        if item is not None:
             # Start dragging a cable from this port
             self.drag_start_port = item
             self.dragging_cable = Cable(item)
@@ -200,7 +200,7 @@ class PatchCanvas(QGraphicsView):
             return
 
         if self.dragging_cable:
-            item = self.itemAt(event.pos())
+            item = self._port_at(event.pos(), PortType.INPUT)
             start_port = self.drag_start_port
 
             if start_port is None:
@@ -209,7 +209,7 @@ class PatchCanvas(QGraphicsView):
                 event.accept()
                 return
 
-            if isinstance(item, PortWidget) and item.port_type == PortType.INPUT:
+            if item is not None:
                 # Check if trying to connect to the same module
                 if item.parent_module == start_port.parent_module:
                     # Self-connection not allowed - show error
@@ -570,13 +570,41 @@ class PatchCanvas(QGraphicsView):
         return None
 
     def clear_all(self):
-        """Clear all modules and cables from the canvas."""
-        # First, clear all port data to prevent stale audio
+        """Clear all modules and cables from the canvas.
+
+        Cables and port models are fully disconnected before the scene is
+        wiped so no ghost ``connected_to`` links keep old graphs alive.
+        """
+        # Disconnect every cable (port models + cable lists) before wipe.
+        for item in list(self._scene.items()):
+            if isinstance(item, Cable):
+                with contextlib.suppress(RuntimeError, AttributeError):
+                    item.remove()
+
+        # Disconnect any remaining port model links and clear values.
         for module in self.get_modules():
-            for port in module.input_ports + module.output_ports:
-                port.port.clear()
+            for port_widget in module.input_ports + module.output_ports:
+                with contextlib.suppress(RuntimeError, AttributeError):
+                    port_widget.port.disconnect()
+                    port_widget.port.clear()
 
         # Then clear the scene
         self._scene.clear()
         self.dragging_cable = None
         self.drag_start_port = None
+        self._panning = False
+        self._pan_start = None
+
+    def _port_at(
+        self, view_pos, port_type: PortType | str | None = None
+    ) -> PortWidget | None:
+        """Return the topmost PortWidget under a view position, if any.
+
+        Uses ``items()`` so ports under labels/proxies can still be hit.
+        """
+        for item in self.items(view_pos):
+            if not isinstance(item, PortWidget):
+                continue
+            if port_type is None or item.port_type == port_type:
+                return item
+        return None

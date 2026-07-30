@@ -1605,6 +1605,17 @@ class TestPortSignalCompatibility:
 
         assert audio_source in control_input.connected_to
 
+    def test_trigger_can_drive_gate_and_clock(self):
+        trigger = Port("output", "Trig", signal=PortSignal.TRIGGER)
+        gate_input = Port("input", "Gate", signal=PortSignal.GATE)
+        clock_input = Port("input", "Clock", signal=PortSignal.TRIGGER)
+
+        gate_input.connect(trigger)
+        clock_input.connect(trigger)
+
+        assert trigger in gate_input.connected_to
+        assert trigger in clock_input.connected_to
+
 
 class TestPortCopyOptimization:
     """Test that port copying is optimized correctly."""

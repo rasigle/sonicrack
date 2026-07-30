@@ -63,7 +63,7 @@ class LFOModule(ModuleWidget):
             color=QColor(100, 140, 200),
         )
 
-        self.clock_input: Port = self.add_input("Clock", signal=PortSignal.GATE)
+        self.clock_input: Port = self.add_input("Clock", signal=PortSignal.TRIGGER)
 
         # Create oscillator components FIRST (before creating ports)
         freq = LFO_DEFAULT_FREQUENCY

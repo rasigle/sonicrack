@@ -76,12 +76,12 @@ def test_step_sequencer_module_writes_all_cv_outputs(qapp: Any):
     np.testing.assert_allclose(module.slide_port.value, [0, 0, 1, 1])
 
 
-def test_step_sequencer_step_toggles_follow_text_parameters(qapp: Any):
+def test_step_sequencer_step_toggles_follow_set_parameters(qapp: Any):
     del qapp
     module = StepSequencerModule()
 
-    module.accent_edit.setText("0,1,0,1,0,1,0,1")
-    module.slide_edit.setText("1,0,1,0,1,0,1,0")
+    module.set_accents("0,1,0,1,0,1,0,1")
+    module.set_slides("1,0,1,0,1,0,1,0")
 
     assert [button.isChecked() for button in module.accent_buttons] == [
         False,
@@ -105,15 +105,17 @@ def test_step_sequencer_step_toggles_follow_text_parameters(qapp: Any):
     ]
 
 
-def test_step_sequencer_step_toggles_update_text_parameters(qapp: Any):
+def test_step_sequencer_step_toggles_update_parameters(qapp: Any):
     del qapp
     module = StepSequencerModule()
 
     module.accent_buttons[1].setChecked(True)
     module.slide_buttons[0].setChecked(True)
 
-    assert module.accent_edit.text() == "1,1,0,1,0,0,1,0"
-    assert module.slide_edit.text() == "1,0,1,0,0,0,1,0"
+    assert module.get_accents() == "1,1,0,1,0,0,1,0"
+    assert module.get_slides() == "1,0,1,0,0,0,1,0"
+    assert module.accent_leds[1].is_on()
+    assert module.slide_leds[0].is_on()
 
 
 def test_step_sequencer_randomize_updates_pattern_and_toggles(qapp: Any):
@@ -124,8 +126,8 @@ def test_step_sequencer_randomize_updates_pattern_and_toggles(qapp: Any):
     module.randomize_pattern(random.Random(42))
 
     notes = [item.strip() for item in module.notes_edit.text().split(",") if item.strip()]
-    accents = module.accent_edit.text().split(",")
-    slides = module.slide_edit.text().split(",")
+    accents = module.get_accents().split(",")
+    slides = module.get_slides().split(",")
 
     assert len(notes) == module.step_toggle_count
     assert len(accents) == module.step_toggle_count
@@ -152,23 +154,25 @@ def test_step_sequencer_randomize_button_triggers_pattern_change(qapp: Any):
     del qapp
     module = StepSequencerModule()
     module.notes_edit.setText("36,36,36,36,36,36,36,36")
-    module.accent_edit.setText("0,0,0,0,0,0,0,0")
-    module.slide_edit.setText("0,0,0,0,0,0,0,0")
+    module.set_accents("0,0,0,0,0,0,0,0")
+    module.set_slides("0,0,0,0,0,0,0,0")
     before = (
         module.notes_edit.text(),
-        module.accent_edit.text(),
-        module.slide_edit.text(),
+        module.get_accents(),
+        module.get_slides(),
     )
 
     module.randomize_button.click()
 
     after = (
         module.notes_edit.text(),
-        module.accent_edit.text(),
-        module.slide_edit.text(),
+        module.get_accents(),
+        module.get_slides(),
     )
     assert after != before
     assert module.randomize_button.text() == "Randomize"
+    assert not hasattr(module, "accent_edit")
+    assert not hasattr(module, "slide_edit")
 
 
 def test_behringer_182_module_writes_dual_cv_and_gate_outputs(qapp: Any):

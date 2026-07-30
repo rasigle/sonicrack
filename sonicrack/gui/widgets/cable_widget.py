@@ -4,8 +4,11 @@ import contextlib
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
+from PyQt6.QtGui import QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QGraphicsItem
+
+from sonicrack.gui.widgets.signal_style import cable_color_for_signal
+from sonicrack.patching.port import PortSignal, PortType
 
 if TYPE_CHECKING:
     from sonicrack.gui.widgets.port_widget import PortWidget
@@ -14,7 +17,8 @@ if TYPE_CHECKING:
 class Cable(QGraphicsItem):
     """A cable connecting two ports.
 
-    Cables route audio signals between module outputs and inputs.
+    Cables route signals between module outputs and inputs. Stroke color
+    follows the source port's signal kind (audio, V/Oct, gate, trigger, …).
 
     This is a UI component that works with PortWidget (the visual representation).
     The actual connection logic is handled by PortModel (contained in PortWidget).
@@ -53,6 +57,7 @@ class Cable(QGraphicsItem):
         Args:
             port: The port widget to connect to
         """
+        self.prepareGeometryChange()
         if self.end_port:
             self.end_port.remove_cable(self)
         self.end_port = port
@@ -62,7 +67,13 @@ class Cable(QGraphicsItem):
 
     def set_temp_end_pos(self, pos: QPointF):
         """Set a temporary end position while dragging."""
+        self.prepareGeometryChange()
         self.temp_end_pos = pos
+        self.update()
+
+    def refresh_geometry(self) -> None:
+        """Invalidate cached geometry after attached ports move."""
+        self.prepareGeometryChange()
         self.update()
 
     def boundingRect(self) -> QRectF:
@@ -104,22 +115,41 @@ class Cable(QGraphicsItem):
 
         path.cubicTo(ctrl1, ctrl2, end)
 
-        # Cable color based on selection and hover state
-        if self.isSelected():
-            color = QColor(255, 200, 0)  # Yellow when selected
-            width = 4
-        elif self.is_hovered:
-            color = QColor(150, 150, 150)  # Lighter gray when hovered
-            width = 4
-        else:
-            color = QColor(100, 100, 100)  # Normal gray
-            width = 3
+        selected = self.isSelected()
+        color = cable_color_for_signal(
+            self.signal_kind(),
+            selected=selected,
+            hovered=self.is_hovered,
+        )
+        width = 4 if selected or self.is_hovered else 3
 
         pen = QPen(color, width)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
 
         painter.setPen(pen)
         painter.drawPath(path)
+
+    def signal_kind(self) -> PortSignal:
+        """Return the signal kind used for this cable's color.
+
+        Prefers the output/source port when both ends are known so the cable
+        reflects what is actually being sent.
+        """
+        start = self.start_port
+        end = self.end_port
+
+        if start is not None and end is not None:
+            if start.port_type == PortType.OUTPUT:
+                return start.port.signal
+            if end.port_type == PortType.OUTPUT:
+                return end.port.signal
+            return start.port.signal
+
+        if start is not None:
+            return start.port.signal
+        if end is not None:
+            return end.port.signal
+        return PortSignal.UNKNOWN
 
     def shape(self) -> QPainterPath:
         """Return the shape for collision detection (wider than visual cable)."""

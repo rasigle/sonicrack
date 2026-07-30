@@ -5,9 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from PyQt6.QtCore import QPoint, QPointF, Qt
+from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QMouseEvent, QWheelEvent
-from PyQt6.QtCore import QEvent
 
 from sonicrack.gui.widgets.patch_canvas import PatchCanvas
 

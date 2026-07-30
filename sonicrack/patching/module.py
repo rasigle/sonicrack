@@ -295,8 +295,11 @@ def infer_port_signal(name: str, direction: str) -> PortSignal:
     if normalized in {"freq", "freq in", "freq out", "hz", "frequency hz", "freq hz"}:
         return PortSignal.FREQUENCY_HZ
 
-    if normalized in {"gate", "clock", "reset", "trig", "trigger", "end", "hold"}:
+    if normalized in {"gate", "hold"}:
         return PortSignal.GATE
+
+    if normalized in {"trig", "trigger", "clock", "reset", "end"}:
+        return PortSignal.TRIGGER
 
     if normalized in {
         "accent",

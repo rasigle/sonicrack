@@ -100,7 +100,6 @@ All notable changes to AudioPlayground will be documented in this file.
 
 ## Backlog
 
-- Display ADSR shape in module
 - Undo / Redo system
 
 ### Review Findings
@@ -151,6 +150,12 @@ is centralized in `ParameterDescriptor` with:
 ## Unreleased
 
 ### Added
+
+- **ADSR shape display**: live envelope curve preview on the ADSR module
+- **Effect CV inputs**: Delay (`CV_Time`/`CV_Feedback`/`CV_Mix`), Reverb
+  (`CV_Room`/`CV_Damping`/`CV_Mix`), and Compressor (`CV_Thresh`/`CV_Ratio`/`CV_Mix`)
+- **Canvas zoom/pan**: scroll-wheel zoom, middle-mouse drag to pan, View menu
+  Zoom In/Out/Reset (`Ctrl+=`/`Ctrl+-`/`Ctrl+0`)
 
 - **Enhanced Parameter System**: Complete single-source-of-truth parameter management
   - `ParameterDescriptor` now includes smoothing policies (none/linear/exponential/logarithmic)

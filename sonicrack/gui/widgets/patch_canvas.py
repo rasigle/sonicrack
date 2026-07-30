@@ -7,8 +7,8 @@ import logging
 from typing import cast
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import QPointF, Qt
-from PyQt6.QtGui import QColor, QPainter
+from PyQt6.QtCore import QPoint, QPointF, Qt
+from PyQt6.QtGui import QColor, QCursor, QPainter
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QMessageBox
 
 from sonicrack.gui.modules.output.output import OutputModule
@@ -27,6 +27,11 @@ class PatchCanvas(QGraphicsView):
     This is where modules are placed and connected with cables.
     """
 
+    MIN_ZOOM = 0.25
+    MAX_ZOOM = 3.0
+    DEFAULT_ZOOM = 1.0
+    ZOOM_STEP = 1.15
+
     # Emitted when a cable is connected
     cable_connected = QtCore.pyqtSignal(PortWidget, PortWidget)
 
@@ -35,6 +40,9 @@ class PatchCanvas(QGraphicsView):
 
     # Emitted when a module is deleted
     module_deleted = QtCore.pyqtSignal(object)
+
+    # Emitted when the view zoom factor changes (absolute scale)
+    zoom_changed = QtCore.pyqtSignal(float)
 
     def __init__(self, parent=None):
         """Initialize the patch canvas."""
@@ -48,19 +56,95 @@ class PatchCanvas(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setMouseTracking(True)
         self.viewport().setMouseTracking(True)
 
         # Background
         self.setBackgroundBrush(QColor(45, 45, 48))
 
+        # Zoom state (absolute scale relative to identity transform)
+        self._zoom_factor = self.DEFAULT_ZOOM
+
+        # Middle-mouse pan state
+        self._panning = False
+        self._pan_start: QPoint | None = None
+
         # Cable dragging state
         self.dragging_cable: Cable | None = None
         self.drag_start_port: PortWidget | None = None
 
-    def mousePressEvent(self, event):
-        """Handle mouse press for cable creation."""
+    @property
+    def zoom_factor(self) -> float:
+        """Current absolute zoom scale (1.0 = 100%)."""
+        return self._zoom_factor
+
+    def set_zoom(self, factor: float, *, anchor_under_mouse: bool = False) -> None:
+        """Set the absolute zoom factor, clamped to MIN/MAX_ZOOM."""
+        target = max(self.MIN_ZOOM, min(self.MAX_ZOOM, float(factor)))
+        if abs(target - self._zoom_factor) < 1e-9:
+            return
+
+        if anchor_under_mouse:
+            self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        else:
+            self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+
+        # Scale relatively from the current zoom so anchors stay stable.
+        relative = target / self._zoom_factor if self._zoom_factor else target
+        self.scale(relative, relative)
+        self._zoom_factor = target
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.zoom_changed.emit(self._zoom_factor)
+
+    def zoom_in(self) -> None:
+        """Zoom in by one step."""
+        self.set_zoom(self._zoom_factor * self.ZOOM_STEP)
+
+    def zoom_out(self) -> None:
+        """Zoom out by one step."""
+        self.set_zoom(self._zoom_factor / self.ZOOM_STEP)
+
+    def reset_zoom(self) -> None:
+        """Reset zoom to 100% (identity transform)."""
+        if abs(self._zoom_factor - self.DEFAULT_ZOOM) < 1e-9:
+            return
+        self.resetTransform()
+        self._zoom_factor = self.DEFAULT_ZOOM
+        self.zoom_changed.emit(self._zoom_factor)
+
+    def wheelEvent(self, event):  # noqa: N802 - Qt API
+        """Zoom with the scroll wheel (under the cursor)."""
         if event is None:
+            return
+
+        delta = event.angleDelta().y()
+        if delta == 0:
+            # High-res trackpads may report pixel deltas instead.
+            delta = event.pixelDelta().y()
+        if delta > 0:
+            self.set_zoom(self._zoom_factor * self.ZOOM_STEP, anchor_under_mouse=True)
+            event.accept()
+            return
+        if delta < 0:
+            self.set_zoom(self._zoom_factor / self.ZOOM_STEP, anchor_under_mouse=True)
+            event.accept()
+            return
+
+        super().wheelEvent(event)
+
+    def mousePressEvent(self, event):
+        """Handle mouse press for pan, cable creation, and selection."""
+        if event is None:
+            return
+
+        # Middle mouse button: enter pan mode
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self._panning = True
+            self._pan_start = event.pos()
+            self.setCursor(QCursor(Qt.CursorShape.ClosedHandCursor))
+            event.accept()
             return
 
         item = self.itemAt(event.pos())
@@ -75,8 +159,20 @@ class PatchCanvas(QGraphicsView):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        """Handle mouse move for cable dragging."""
+        """Handle mouse move for pan and cable dragging."""
         if event is None:
+            return
+
+        if self._panning and self._pan_start is not None:
+            delta = event.pos() - self._pan_start
+            self._pan_start = event.pos()
+            h_bar = self.horizontalScrollBar()
+            v_bar = self.verticalScrollBar()
+            if h_bar is not None:
+                h_bar.setValue(h_bar.value() - delta.x())
+            if v_bar is not None:
+                v_bar.setValue(v_bar.value() - delta.y())
+            event.accept()
             return
 
         if self.dragging_cable:
@@ -88,8 +184,15 @@ class PatchCanvas(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        """Handle mouse release for cable connection."""
+        """Handle mouse release for pan and cable connection."""
         if event is None:
+            return
+
+        if event.button() == Qt.MouseButton.MiddleButton and self._panning:
+            self._panning = False
+            self._pan_start = None
+            self.unsetCursor()
+            event.accept()
             return
 
         if self.dragging_cable:

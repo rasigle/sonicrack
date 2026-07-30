@@ -394,6 +394,36 @@ class ModularSynthWindow(QMainWindow):
         )
         view_menu.addAction(self.module_library_toggle_action)
 
+        view_menu.addSeparator()
+
+        zoom_in_action = QtGui.QAction("Zoom &In", self)
+        zoom_in_action.setShortcuts(
+            [
+                QtGui.QKeySequence.StandardKey.ZoomIn,
+                QtGui.QKeySequence("Ctrl+="),
+                QtGui.QKeySequence("Ctrl++"),
+            ]
+        )
+        zoom_in_action.triggered.connect(self._zoom_in)
+        view_menu.addAction(zoom_in_action)
+
+        zoom_out_action = QtGui.QAction("Zoom &Out", self)
+        zoom_out_action.setShortcuts(
+            [
+                QtGui.QKeySequence.StandardKey.ZoomOut,
+                QtGui.QKeySequence("Ctrl+-"),
+            ]
+        )
+        zoom_out_action.triggered.connect(self._zoom_out)
+        view_menu.addAction(zoom_out_action)
+
+        reset_zoom_action = QtGui.QAction("&Reset Zoom", self)
+        reset_zoom_action.setShortcut("Ctrl+0")
+        reset_zoom_action.triggered.connect(self._reset_zoom)
+        view_menu.addAction(reset_zoom_action)
+
+        view_menu.addSeparator()
+
         full_screen_action = QtGui.QAction("&Full Screen", self)
         full_screen_action.setCheckable(True)
         full_screen_action.setShortcut("F11")
@@ -435,6 +465,24 @@ class ModularSynthWindow(QMainWindow):
         patch_canvas.cable_connected.connect(self._on_cable_connected)
         patch_canvas.cable_disconnected.connect(self._on_cable_disconnected)
         patch_canvas.module_deleted.connect(self._on_module_deleted)
+        patch_canvas.zoom_changed.connect(self._on_zoom_changed)
+
+    def _zoom_in(self) -> None:
+        """Zoom the patch canvas in."""
+        self._require_patch_canvas().zoom_in()
+
+    def _zoom_out(self) -> None:
+        """Zoom the patch canvas out."""
+        self._require_patch_canvas().zoom_out()
+
+    def _reset_zoom(self) -> None:
+        """Reset the patch canvas zoom to 100%."""
+        self._require_patch_canvas().reset_zoom()
+
+    def _on_zoom_changed(self, factor: float) -> None:
+        """Show the current zoom level in the status bar."""
+        percent = int(round(factor * 100))
+        self._require_statusbar().showMessage(f"Zoom: {percent}%", 2000)
 
     def _require_patch_canvas(self) -> PatchCanvas:
         """Return the initialized patch canvas."""

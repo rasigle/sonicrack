@@ -2,17 +2,72 @@
 
 SonicRack is a PyQt6 modular synthesizer application for building audio patches
 visually. The app owns the patching UI, runtime graph, presets, and packaged
-assets; DSP, realtime audio, and MIDI primitives come from `soniclab`.
+assets; DSP, realtime audio, and MIDI primitives come from [`soniclab`](https://pypi.org/project/soniclab/).
 
 ## Snapshot
 
-- Package version: `0.1.0`
+- Package version: `2026.1.0`
 - Python: `>=3.11`
-- Primary entry point: `python -m sonicrack.modular_synth_app`
-- Recommended environment tool: `uv`
+- CLI entry point: `sonicrack`
+- Module entry point: `python -m sonicrack.modular_synth_app`
 - Main package: `sonicrack`
 - DSP dependency: `soniclab`
 - License: MIT
+
+## Install (PyPI)
+
+```bash
+pip install sonicrack
+```
+
+That installs the desktop app stack (PyQt6, device audio via `sounddevice`/`numba`,
+and the `soniclab` engine). Launch with:
+
+```bash
+sonicrack
+# or:
+python -m sonicrack.modular_synth_app
+```
+
+Optional extras:
+
+```bash
+pip install "sonicrack[midi]"       # MIDI ports via soniclab[midi]
+pip install "sonicrack[examples]"   # analysis notebooks / live-input demos
+pip install "sonicrack[full]"       # midi + examples
+```
+
+Notes:
+
+- Realtime playback needs working system audio drivers.
+- MIDI needs local ports/backends and the `midi` extra.
+- `pyaudio` (examples only) may require PortAudio system packages on some OSes.
+
+## Development install
+
+Recommended environment tool: `uv`.
+
+```powershell
+uv sync --group dev
+# or editable with pip:
+python -m pip install -e ".[dev]"
+```
+
+Legacy install scripts that used `--extra gui` or `.[gui]` still work; those
+extras are empty because GUI/audio deps are part of the base install.
+
+Windows helper:
+
+```powershell
+run_modular_synth.bat
+```
+
+Useful launch options:
+
+```powershell
+sonicrack --no-splash
+sonicrack --log-level DEBUG --detailed-log
+```
 
 ## Current Scope
 
@@ -24,7 +79,7 @@ This repository contains:
   `sonicrack.patching`
 - graph rendering and runtime dispatch under `sonicrack.runtime`
 - built-in patch modules under `sonicrack.gui.modules`
-- packaged icons, splash screens, and screenshots under `sonicrack.resources`
+- packaged icons and splash screens under `sonicrack.resources`
 - examples, patch files, and GUI/module tests
 
 The old local engine packages are no longer part of this repository. Code that
@@ -82,48 +137,6 @@ recursively from `sonicrack.gui.modules`. Module runtime behavior is declared
 with `RuntimeModuleSpec` and implemented by the module widget that owns the
 controls.
 
-## Quick Start
-
-Install GUI dependencies:
-
-```powershell
-uv sync --extra gui
-```
-
-Editable install alternative:
-
-```powershell
-python -m pip install -e ".[gui]"
-```
-
-Optional extras:
-
-```powershell
-python -m pip install -e ".[audio-io]"
-python -m pip install -e ".[midi]"
-python -m pip install -e ".[examples]"
-python -m pip install -e ".[full]"
-```
-
-Launch the GUI:
-
-```powershell
-python -m sonicrack.modular_synth_app
-```
-
-Windows helper:
-
-```powershell
-run_modular_synth.bat
-```
-
-Useful launch options:
-
-```powershell
-python -m sonicrack.modular_synth_app --no-splash
-python -m sonicrack.modular_synth_app --log-level DEBUG --detailed-log
-```
-
 ## Testing
 
 Run the current test suite with:
@@ -146,6 +159,12 @@ $env:QT_QPA_PLATFORM="offscreen"
 uv run pytest tests/gui_t -q
 ```
 
+## Publishing
+
+Release builds use Hatchling (`uv build`). CI can publish via Trusted Publishing
+on GitHub release (PyPI) or `workflow_dispatch` (TestPyPI). See
+`.github/workflows/publish.yml`.
+
 ## Development Notes
 
 ### Adding GUI Modules
@@ -167,6 +186,10 @@ The `docs` directory still contains historical engine-focused design notes and
 completion reports. Treat older claims about removed local engine packages as
 archival unless the current source tree confirms them.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
-See `LICENSE`.
+See [LICENSE](LICENSE).

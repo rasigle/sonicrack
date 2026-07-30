@@ -1,7 +1,33 @@
 # Changelog
 
-All notable changes to AudioPlayground will be documented in this file.
+All notable changes to SonicRack will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Version numbers follow a calendar-style scheme (`YYYY.MINOR.PATCH`), aligned with
+the companion `soniclab` engine package.
+
+## [2026.1.0] - 2026-07-30
+
+### Added
+
+- PyPI-oriented packaging metadata: project URLs, desktop/Qt classifiers, and
+  `Typing :: Typed`.
+- Console entry point `sonicrack` for a standard `pip install sonicrack` launch path.
+- GitHub Actions publish workflow (Trusted Publishing to TestPyPI / PyPI).
+
+### Changed
+
+- Base install now includes the desktop runtime stack (`pyqt6`, `sounddevice`,
+  `numba`) so the app starts without optional extras.
+- `gui` / `audio-io` extras are kept as empty compatibility aliases.
+- `midi` extra delegates to `soniclab[midi]`.
+- Wheel/sdist exclude marketing screenshots and icon/splash generator scripts.
+- README documents PyPI install first; package version snapshot set to `2026.1.0`.
+
+### Notes
+
+- First public packaging target for the modular rack application.
+- DSP remains provided by the separate `soniclab` distribution on PyPI.
 
 ## [2026-07-06] - Performance Optimization Sprint
 

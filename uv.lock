@@ -3221,21 +3221,26 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/43/28/07fcf747b37cd7bb3c0f49eed4eb372d825f01fc9b606c76a0d1bec276b8/soniclab-2026.1.0-py3-none-any.whl", hash = "sha256:15f49165740ae3733a79a2c257dbf4ae760acbf3136c8052bc144ea95bd5fb28", size = 189608, upload-time = "2026-07-23T06:47:23.848Z" },
 ]
 
+[package.optional-dependencies]
+midi = [
+    { name = "mido" },
+    { name = "python-rtmidi" },
+]
+
 [[package]]
 name = "sonicrack"
 source = { editable = "." }
 dependencies = [
+    { name = "numba" },
     { name = "numpy" },
+    { name = "pyqt6" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "soniclab" },
+    { name = "sounddevice" },
 ]
 
 [package.optional-dependencies]
-audio-io = [
-    { name = "numba" },
-    { name = "sounddevice" },
-]
 examples = [
     { name = "ipykernel" },
     { name = "ipython" },
@@ -3250,23 +3255,13 @@ full = [
     { name = "ipython" },
     { name = "librosa" },
     { name = "matplotlib" },
-    { name = "mido" },
     { name = "notebook" },
-    { name = "numba" },
     { name = "pyaudio" },
-    { name = "pyqt6" },
     { name = "pyqtgraph" },
-    { name = "python-rtmidi" },
-    { name = "sounddevice" },
-]
-gui = [
-    { name = "numba" },
-    { name = "pyqt6" },
-    { name = "sounddevice" },
+    { name = "soniclab", extra = ["midi"] },
 ]
 midi = [
-    { name = "mido" },
-    { name = "python-rtmidi" },
+    { name = "soniclab", extra = ["midi"] },
 ]
 
 [package.dev-dependencies]
@@ -3296,27 +3291,20 @@ requires-dist = [
     { name = "librosa", marker = "extra == 'full'", specifier = ">=0.11.0" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.11.0" },
     { name = "matplotlib", marker = "extra == 'full'", specifier = ">=3.11.0" },
-    { name = "mido", marker = "extra == 'full'" },
-    { name = "mido", marker = "extra == 'midi'" },
     { name = "notebook", marker = "extra == 'examples'", specifier = ">=7.4.7" },
     { name = "notebook", marker = "extra == 'full'", specifier = ">=7.4.7" },
-    { name = "numba", marker = "extra == 'audio-io'", specifier = ">=0.66.0" },
-    { name = "numba", marker = "extra == 'full'", specifier = ">=0.66.0" },
-    { name = "numba", marker = "extra == 'gui'", specifier = ">=0.66.0" },
+    { name = "numba", specifier = ">=0.66.0" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "pyaudio", marker = "extra == 'examples'" },
     { name = "pyaudio", marker = "extra == 'full'" },
-    { name = "pyqt6", marker = "extra == 'full'" },
-    { name = "pyqt6", marker = "extra == 'gui'" },
+    { name = "pyqt6" },
     { name = "pyqtgraph", marker = "extra == 'examples'", specifier = ">=0.13.7" },
     { name = "pyqtgraph", marker = "extra == 'full'", specifier = ">=0.13.7" },
-    { name = "python-rtmidi", marker = "extra == 'full'", specifier = ">=1.5.8" },
-    { name = "python-rtmidi", marker = "extra == 'midi'", specifier = ">=1.5.8" },
-    { name = "scipy" },
+    { name = "scipy", specifier = ">=1.11" },
     { name = "soniclab", specifier = ">=2026.1.0" },
-    { name = "sounddevice", marker = "extra == 'audio-io'", specifier = ">=0.5.5" },
-    { name = "sounddevice", marker = "extra == 'full'", specifier = ">=0.5.5" },
-    { name = "sounddevice", marker = "extra == 'gui'", specifier = ">=0.5.5" },
+    { name = "soniclab", extras = ["midi"], marker = "extra == 'full'" },
+    { name = "soniclab", extras = ["midi"], marker = "extra == 'midi'" },
+    { name = "sounddevice", specifier = ">=0.5.5" },
 ]
 provides-extras = ["audio-io", "examples", "full", "gui", "midi"]
 

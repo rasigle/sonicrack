@@ -14,54 +14,63 @@ license = {text = "MIT"}
 keywords = ["audio", "synthesis", "modular", "synthesizer", "music", "sound-design", "dsp"]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: Qt",
     "Intended Audience :: Developers",
     "Intended Audience :: Education",
+    "Intended Audience :: End Users/Desktop",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Sound/Audio :: Sound Synthesis",
-    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "Typing :: Typed",
 ]
 
 requires-python = ">=3.11"
+# Desktop app: GUI + device audio ship in the base install so
+# `pip install sonicrack` + `sonicrack` works out of the box.
 dependencies = [
     "numpy>=2.4.6",
-    "scipy",
+    "scipy>=1.11",
     "soniclab>=2026.1.0",
+    "pyqt6",
+    "sounddevice>=0.5.5",
+    "numba>=0.66.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/rasigle/sonicrack"
+Repository = "https://github.com/rasigle/sonicrack"
+Issues = "https://github.com/rasigle/sonicrack/issues"
+Changelog = "https://github.com/rasigle/sonicrack/blob/main/CHANGELOG.md"
 
 [project.scripts]
 sonicrack = "sonicrack.modular_synth_app:main"
 
 [project.optional-dependencies]
-# install with e.g.: uv sync --extra examples
-audio-io = [
-    "sounddevice>=0.5.5", # Audio I/O
-    "numba>=0.66.0",  # High-performance audio processing
-]
-gui = [
-    "pyqt6", # GUI library
-    "sonicrack[audio-io]",
-]
+# Base install already includes the GUI and audio I/O stack.
+# These extras remain for backward-compatible install commands.
+gui = []
+audio-io = []
 midi = [
-    "mido", # MIDI support is optional in code and only required for MIDI features
-    "python-rtmidi>=1.5.8", # Common real-time MIDI backend for mido
+    "soniclab[midi]",
 ]
 examples = [
-    "librosa>=0.11.0", # Example audio-analysis scripts/notebooks
-    "matplotlib>=3.11.0", # Plotting in examples
-    "pyaudio", # Live input in signal-analysis examples
-    "pyqtgraph>=0.13.7", # Example visual analyzers
-    "notebook>=7.4.7", # Jupyter notebooks in examples/
+    "librosa>=0.11.0",
+    "matplotlib>=3.11.0",
+    "pyaudio",  # may require system PortAudio headers on some platforms
+    "pyqtgraph>=0.13.7",
+    "notebook>=7.4.7",
     "ipykernel>=7.3.0",
-    "ipython>=9.15.0", # Interactive Python shell for examples
+    "ipython>=9.15.0",
 ]
 full = [
-    "sonicrack[audio-io, gui, midi, examples]",
+    "sonicrack[midi, examples]",
 ]
 
 [dependency-groups]
@@ -87,15 +96,46 @@ full = [
 ]
 
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [tool.hatch.version]
 source = "code"
 path = "sonicrack/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["sonicrack"]
+exclude = [
+    "sonicrack/resources/screenshots",
+    "sonicrack/resources/screenshots/**",
+    "sonicrack/resources/icons/generate_icon.py",
+    "sonicrack/resources/splash/generate_splash.py",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "sonicrack",
+    "tests",
+    "examples",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md",
+    "pyproject.toml",
+]
+exclude = [
+    "**/.pytest_cache",
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/*.pyo",
+    ".idea",
+    ".github",
+    "scripts",
+    "docs",
+    "uv.lock",
+    "dist",
+    "build",
+    "sonicrack/resources/screenshots",
+    "sonicrack/resources/screenshots/**",
+    "sonicrack/resources/icons/generate_icon.py",
+    "sonicrack/resources/splash/generate_splash.py",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

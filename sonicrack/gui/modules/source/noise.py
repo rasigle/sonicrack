@@ -43,7 +43,7 @@ class NoiseModule(ModuleWidget):
         """Initialize noise module."""
         super().__init__(
             width=200,
-            height=180,
+            height=195,
             color=QColor(150, 100, 150),
         )
 

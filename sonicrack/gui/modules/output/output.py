@@ -46,7 +46,7 @@ class OutputModule(ModuleWidget):
         """Initialize output module."""
         super().__init__(
             width=220,
-            height=260,
+            height=175,
             color=QColor(200, 80, 80),
         )
 

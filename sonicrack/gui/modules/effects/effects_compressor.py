@@ -32,7 +32,7 @@ class CompressorModule(ModulatedModuleBase):
     def __init__(self):
         super().__init__(
             width=260,
-            height=290,
+            height=330,
             color=QColor(160, 90, 190),
         )
 

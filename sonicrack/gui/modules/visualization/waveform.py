@@ -121,7 +121,7 @@ class WaveformModule(ModuleWidget):
         """Initialize enhanced waveform display module."""
         super().__init__(
             width=500,
-            height=340,
+            height=385,
             color=QColor(60, 70, 90),
         )
 

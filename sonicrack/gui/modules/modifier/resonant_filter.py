@@ -39,7 +39,7 @@ class ResonantFilterModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(
             width=300,
-            height=330,
+            height=345,
             color=QColor(80, 170, 150),
         )
 

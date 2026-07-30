@@ -96,7 +96,7 @@ class MIDIKeyboardModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(
             width=360,
-            height=260,
+            height=290,
             color=QColor(190, 120, 80),
         )
 

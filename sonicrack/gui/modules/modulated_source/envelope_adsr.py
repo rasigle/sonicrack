@@ -44,7 +44,7 @@ class ADSRModule(ModuleWidget):
         """Initialize ADSR module."""
         super().__init__(
             width=220,
-            height=390,
+            height=440,
             color=QColor(120, 180, 80),
         )
 
@@ -91,9 +91,7 @@ class ADSRModule(ModuleWidget):
             default_value=0.2,
         )
         self.decay_knob.value_changed.connect(
-            lambda *_: self._on_envelope_knob_changed(
-                "decay_duration", self.decay_knob
-            )
+            lambda *_: self._on_envelope_knob_changed("decay_duration", self.decay_knob)
         )
         knobs_layout.addWidget(self.decay_knob)
 

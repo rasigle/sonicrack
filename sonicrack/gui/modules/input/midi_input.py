@@ -112,7 +112,7 @@ class MIDIInputModule(ModuleWidget):
         """Initialize MIDI input module."""
         super().__init__(
             width=240,
-            height=220,
+            height=180,
             color=QColor(200, 100, 150),
         )
 

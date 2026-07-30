@@ -59,7 +59,7 @@ class LFOModule(ModuleWidget):
         """Initialize LFO module."""
         super().__init__(
             width=240,
-            height=300,
+            height=245,
             color=QColor(100, 140, 200),
         )
 

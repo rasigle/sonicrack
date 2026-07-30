@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -10,7 +12,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
+    QPushButton,
 )
 from soniclab.sequencing import Behringer182Sequencer
 
@@ -19,6 +21,7 @@ from sonicrack.gui.widgets import (
     ImageButtonStyle,
     ImagePushButton,
     Knob,
+    KnobGeometry,
     LedIndicator,
     LedStyle,
     ProceduralKnobStyle,
@@ -33,21 +36,25 @@ from sonicrack.runtime.helpers import (
 )
 from sonicrack.runtime.specs import RuntimeParameters
 
+_DEFAULT_GATES = (True, True, True, True, True, True, True, True)
+_GATE_ON_PROBABILITY = 0.75
+
 
 @register_module()
 class Behringer182Module(ModuleWidget):
     """Eight-step 182-style analog sequencer with two CV rows and gate outs."""
 
     runtime_kind = "behringer_182"
+    step_count = 8
 
     metadata = ModuleMetadata(
         title="Behringer 182",
-        category=ModuleCategory.SOURCE,
+        category=ModuleCategory.SEQUENCER,
         description="Eight-step dual CV row sequencer with gate, trigger, and end",
     )
 
     def __init__(self) -> None:
-        super().__init__(width=300, height=960, color=QColor(115, 135, 80))
+        super().__init__(width=280, height=760, color=QColor(115, 135, 80))
 
         self.clock_input = self.add_input("Clock")
         self.reset_input = self.add_input("Reset")
@@ -61,21 +68,36 @@ class Behringer182Module(ModuleWidget):
         self.component = Behringer182Sequencer(sample_rate=audio_config.sample_rate)
         self._previous_structure_key: tuple[int, str] | None = None
         self._previous_running = True
+        self._syncing_gate_toggles = False
         self.step_leds: list[LedIndicator] = []
+        self.gate_buttons: list[ImagePushButton] = []
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout(spacing=6)
+        layout = self._begin_controls(spacing=4)
 
         cv_grid = QGridLayout()
-        cv_grid.setHorizontalSpacing(3)
-        cv_grid.setVerticalSpacing(2)
+        cv_grid.setHorizontalSpacing(2)
+        cv_grid.setVerticalSpacing(0)
         cv_grid.addWidget(QLabel("CH-1"), 0, 0, Qt.AlignmentFlag.AlignCenter)
         cv_grid.addWidget(QLabel("STEP"), 0, 1, Qt.AlignmentFlag.AlignCenter)
         cv_grid.addWidget(QLabel("CH-2"), 0, 2, Qt.AlignmentFlag.AlignCenter)
 
         self.cv_a_knobs: list[Knob] = []
         self.cv_b_knobs: list[Knob] = []
-        row_knob_style = ProceduralKnobStyle.small()
+        # Compact, unlabeled knobs so A/B step values stay dense in the grid.
+        row_knob_style = ProceduralKnobStyle(
+            geometry=KnobGeometry(
+                knob_size=28,
+                min_width=44,
+                min_height=46,
+                max_width=50,
+                max_height=50,
+                center_y=18,
+                value_text_y=34,
+                label_y=48,
+                value_text_height=11,
+                label_height=0,
+            )
+        )
         step_led_style = LedStyle(
             size=10,
             off_color=QColor(50, 42, 42),
@@ -84,19 +106,20 @@ class Behringer182Module(ModuleWidget):
         )
         default_cv_a = [0.0, 0.25, 0.5, 0.75, 1.0, 0.75, 0.5, 0.25]
         default_cv_b = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75]
-        for step in range(8):
+        for step in range(self.step_count):
             step_label = QLabel(str(step + 1))
             step_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             step_led = LedIndicator(style=step_led_style)
             step_cell = QHBoxLayout()
-            step_cell.setSpacing(3)
+            step_cell.setSpacing(2)
+            step_cell.setContentsMargins(0, 0, 0, 0)
             step_cell.addWidget(step_label)
             step_cell.addWidget(step_led)
             self.step_leds.append(step_led)
             cv_grid.addLayout(step_cell, step + 1, 1)
 
             a_knob = Knob(
-                label=f"A{step + 1}",
+                label="",
                 description=f"Step {step + 1} CV A value before range scaling",
                 min_value=0.0,
                 max_value=1.0,
@@ -113,7 +136,7 @@ class Behringer182Module(ModuleWidget):
             cv_grid.addWidget(a_knob, step + 1, 0)
 
             b_knob = Knob(
-                label=f"B{step + 1}",
+                label="",
                 description=f"Step {step + 1} CV B value before range scaling",
                 min_value=0.0,
                 max_value=1.0,
@@ -130,14 +153,35 @@ class Behringer182Module(ModuleWidget):
             cv_grid.addWidget(b_knob, step + 1, 2)
 
         layout.addLayout(cv_grid)
+        layout.addLayout(self._create_gate_row())
 
-        self.gates_edit = QLineEdit("1,1,1,1,1,1,1,1")
-        self.gates_edit.setToolTip("Eight gate flags. Use 1/0 or x/- values.")
-        self.gates_edit.textChanged.connect(
-            lambda value: self.parameter_changed.emit("gates", value)
+        randomize_layout = QHBoxLayout()
+        randomize_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.randomize_button = QPushButton("Randomize")
+        self.randomize_button.setMinimumHeight(26)
+        self.randomize_button.setToolTip(
+            "Randomize CV A, CV B, and gate pattern for all steps"
         )
-        layout.addWidget(QLabel("Gates:"))
-        layout.addWidget(self.gates_edit)
+        self.randomize_button.setStyleSheet("""
+            QPushButton {
+                background-color: #6a7a48;
+                color: white;
+                border: 2px solid #4a5532;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 11px;
+                padding: 2px 12px;
+            }
+            QPushButton:hover {
+                background-color: #7d8e55;
+            }
+            QPushButton:pressed {
+                background-color: #556038;
+            }
+        """)
+        self.randomize_button.clicked.connect(self._on_randomize_clicked)
+        randomize_layout.addWidget(self.randomize_button)
+        layout.addLayout(randomize_layout)
 
         control_label = QLabel("START/STOP")
         control_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -171,52 +215,70 @@ class Behringer182Module(ModuleWidget):
         self.run_button.toggled.connect(self._on_running_changed)
         layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        top_row = QHBoxLayout()
-        top_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        compact_knob_style = ProceduralKnobStyle.small()
+        control_row = QHBoxLayout()
+        control_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        control_row.setSpacing(2)
+        control_row.setContentsMargins(0, 0, 0, 0)
+
         self.bpm_knob = Knob(
-            label="BPM", min_value=20.0, max_value=300.0, default_value=120.0
+            label="BPM",
+            min_value=20.0,
+            max_value=300.0,
+            default_value=120.0,
+            style=compact_knob_style,
         )
         self.bpm_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("bpm", self.bpm_knob.get_value())
         )
-        top_row.addWidget(self.bpm_knob)
+        control_row.addWidget(self.bpm_knob)
 
         self.gate_length_knob = Knob(
-            label="Gate", min_value=0.0, max_value=1.0, default_value=0.5
+            label="Gate",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.5,
+            style=compact_knob_style,
         )
         self.gate_length_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "gate_length", self.gate_length_knob.get_value()
             )
         )
-        top_row.addWidget(self.gate_length_knob)
+        control_row.addWidget(self.gate_length_knob)
 
         self.range_a_knob = Knob(
-            label="A Range", min_value=0.0, max_value=10.0, default_value=5.0
+            label="A Range",
+            min_value=0.0,
+            max_value=10.0,
+            default_value=5.0,
+            style=compact_knob_style,
         )
         self.range_a_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "cv_a_range", self.range_a_knob.get_value()
             )
         )
-        top_row.addWidget(self.range_a_knob)
-        layout.addLayout(top_row)
+        control_row.addWidget(self.range_a_knob)
 
-        range_row = QHBoxLayout()
-        range_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.range_b_knob = Knob(
-            label="B Range", min_value=0.0, max_value=10.0, default_value=5.0
+            label="B Range",
+            min_value=0.0,
+            max_value=10.0,
+            default_value=5.0,
+            style=compact_knob_style,
         )
         self.range_b_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
                 "cv_b_range", self.range_b_knob.get_value()
             )
         )
-        range_row.addWidget(self.range_b_knob)
-        layout.addLayout(range_row)
+        control_row.addWidget(self.range_b_knob)
+        layout.addLayout(control_row)
 
         combo_row = QHBoxLayout()
         combo_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        combo_row.setSpacing(4)
         combo_row.addWidget(QLabel("Steps:"))
         self.steps_combo = QComboBox()
         self.steps_combo.addItems([str(value) for value in range(1, 9)])
@@ -244,15 +306,14 @@ class Behringer182Module(ModuleWidget):
         combo_row.addWidget(self.direction_combo)
         layout.addLayout(combo_row)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         for step, knob in enumerate(self.cv_a_knobs, start=1):
             self.register_parameter(f"cv_a_{step}", knob)
         for step, knob in enumerate(self.cv_b_knobs, start=1):
             self.register_parameter(f"cv_b_{step}", knob)
         self.register_parameter(
-            "gates", self.gates_edit, getter="text", setter="setText"
+            "gates", self, getter="get_gates", setter="set_gates"
         )
         self.register_parameter(
             "running", self.run_button, getter="isChecked", setter="setChecked"
@@ -277,17 +338,116 @@ class Behringer182Module(ModuleWidget):
             setter="setCurrentText",
         )
 
-        self._sample_rate_listener = self._on_global_sample_rate_changed
-        audio_config.add_sample_rate_listener(self._sample_rate_listener)
-        self.destroyed.connect(self._cleanup_audio_config_listeners)
+        self._install_sample_rate_listener()
+
+    def _create_gate_row(self) -> QHBoxLayout:
+        """Build a compact row of graphical per-step gate toggles."""
+        gate_row = QHBoxLayout()
+        gate_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_row.setSpacing(2)
+        gate_row.setContentsMargins(0, 2, 0, 0)
+
+        gate_label = QLabel("Gates")
+        gate_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        gate_row.addWidget(gate_label)
+
+        button_style = ImageButtonStyle(size=22)
+        for index in range(self.step_count):
+            gate_on = _DEFAULT_GATES[index]
+            gate_button = ImagePushButton(
+                str(index + 1),
+                style=button_style,
+                checkable=True,
+            )
+            gate_button.setChecked(gate_on)
+            gate_button.setToolTip(f"Toggle gate for step {index + 1}")
+            gate_button.setStyleSheet("""
+                QToolButton {
+                    background: #3a3f36;
+                    border: 1px solid #1e221c;
+                    border-radius: 4px;
+                    color: #c8d0b8;
+                    font-size: 9px;
+                    font-weight: bold;
+                }
+                QToolButton:checked {
+                    background: #8fbf4a;
+                    color: #1a2410;
+                    border: 1px solid #5a7a30;
+                }
+                QToolButton:pressed {
+                    background: #6a9038;
+                }
+            """)
+            gate_button.toggled.connect(
+                lambda checked, step=index: self._on_gate_toggle_changed(step, checked)
+            )
+            self.gate_buttons.append(gate_button)
+            gate_row.addWidget(gate_button)
+
+        return gate_row
+
+    def get_gates(self) -> str:
+        """Serialize gate step toggles for parameters and presets."""
+        return self._flags_to_text(
+            [button.isChecked() for button in self.gate_buttons]
+        )
+
+    def set_gates(self, value: str) -> None:
+        """Load gate step toggles from a comma-separated flag string."""
+        self._apply_gate_flags(value)
+        self.parameter_changed.emit("gates", self.get_gates())
+
+    def _on_gate_toggle_changed(self, step: int, checked: bool) -> None:
+        del step, checked
+        if self._syncing_gate_toggles:
+            return
+        self.parameter_changed.emit("gates", self.get_gates())
+
+    def _apply_gate_flags(self, text: str) -> None:
+        flags = self._parse_gates(text)
+        self._syncing_gate_toggles = True
+        try:
+            for index, flag in enumerate(flags):
+                self.gate_buttons[index].setChecked(bool(flag))
+        finally:
+            self._syncing_gate_toggles = False
+
+    @staticmethod
+    def _flags_to_text(flags: list[bool]) -> str:
+        return ",".join("1" if flag else "0" for flag in flags)
+
+    def _on_randomize_clicked(self) -> None:
+        self.randomize_pattern()
+
+    def randomize_pattern(self, rng: random.Random | None = None) -> None:
+        """Randomize CV A, CV B, and gate flags for all steps.
+
+        Args:
+            rng: Optional random generator for deterministic tests.
+        """
+        generator = rng if rng is not None else random.Random()
+        gates: list[bool] = []
+
+        for index in range(self.step_count):
+            a_value = generator.random()
+            b_value = generator.random()
+            self.cv_a_knobs[index].set_value(a_value)
+            self.cv_b_knobs[index].set_value(b_value)
+            self.parameter_changed.emit(f"cv_a_{index + 1}", a_value)
+            self.parameter_changed.emit(f"cv_b_{index + 1}", b_value)
+            gates.append(generator.random() < _GATE_ON_PROBABILITY)
+
+        # Keep at least one gate active so the pattern still produces events.
+        if not any(gates):
+            gates[generator.randrange(self.step_count)] = True
+
+        self.set_gates(self._flags_to_text(gates))
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component.sample_rate = new_sample_rate
         self.component.clock.sample_rate = new_sample_rate
         self.component.reset()
-
-    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
-        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
 
     def _on_running_changed(self, running: bool) -> None:
         self.run_button.setText("Stop" if running else "Start")
@@ -298,7 +458,7 @@ class Behringer182Module(ModuleWidget):
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         cv_a = self._cv_row_from_parameters(parameters, "cv_a", self.cv_a_knobs)
         cv_b = self._cv_row_from_parameters(parameters, "cv_b", self.cv_b_knobs)
-        gates_text = str_parameter(parameters, "gates", self.gates_edit.text)
+        gates_text = str_parameter(parameters, "gates", self.get_gates)
         steps = int(str_parameter(parameters, "steps", self.steps_combo.currentText))
         direction = str_parameter(
             parameters, "direction", self.direction_combo.currentText

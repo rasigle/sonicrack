@@ -152,10 +152,10 @@ def test_port_widgets_show_direction_tooltips(qapp: Any):
     modifier = _ModifierWidget()
 
     assert modifier.input_ports[0].toolTip() == (
-        "Test Modifier Input: In\nPort Type: input\nSignal: audio"
+        "Test Modifier Input: In\nPort Type: input\nSignal: Audio"
     )
     assert modifier.output_ports[0].toolTip() == (
-        "Test Modifier Output: Out\nPort Type: output\nSignal: audio"
+        "Test Modifier Output: Out\nPort Type: output\nSignal: Audio"
     )
 
 
@@ -242,7 +242,8 @@ def test_monitor_runtime_renders_visualizer_only_sink(qapp: Any):
     engine.render_monitor_sinks()
 
     assert source.process_count == 1
-    assert source.invalidate_count == 1
+    # Render context owns per-cycle state; full-cache invalidation is no longer
+    # required for monitor-only sinks.
     assert np.allclose(source.out_port.peek_recent(4), np.ones(4, dtype=np.float32))
 
 
@@ -413,3 +414,64 @@ def test_render_plan_resolves_runtime_parameters_at_render_time(qapp: Any):
 
     assert modifier_node.spec.parameter_names == ("gain_db",)
     assert modifier_node.module.get_parameters()["gain_db"] == -3.0
+
+def test_module_widget_bind_parameter_knob_emits_and_formats(qapp: Any):
+    del qapp
+
+    class _Probe(ModuleWidget):
+        metadata = ModuleMetadata("Probe", ModuleCategory.MODIFIER)
+
+        def __init__(self):
+            super().__init__()
+            from sonicrack.gui.widgets import Knob
+            from PyQt6.QtWidgets import QLabel
+
+            self.in_port = self.add_input("In")
+            self.out_port = self.add_output("Out")
+            layout = self._begin_controls()
+            self.knob = Knob(label="K", min_value=0.0, max_value=10.0, default_value=1.0)
+            self.label = QLabel("1.0")
+            self.seen: list[tuple[str, float]] = []
+            self.parameter_changed.connect(lambda n, v: self.seen.append((n, float(v))))
+            self.bind_parameter_knob(
+                self.knob,
+                "cutoff",
+                value_label=self.label,
+                format_value=lambda v: f"{v:.1f}x",
+                on_change=lambda v: None,
+            )
+            layout.addWidget(self.knob)
+            layout.addWidget(self.label)
+            self._finish_controls(layout)
+
+    module = _Probe()
+    module.knob.set_value(4.5)
+    assert module.label.text() == "4.5x"
+    assert any(name == "cutoff" and abs(value - 4.5) < 1e-6 for name, value in module.seen)
+
+
+def test_module_widget_require_input_or_silence(qapp: Any):
+    del qapp
+
+    class _Probe(ModuleWidget):
+        metadata = ModuleMetadata("Probe", ModuleCategory.MODIFIER)
+
+        def __init__(self):
+            super().__init__()
+            self.in_port = self.add_input("In")
+            self.out_port = self.add_output("Out")
+            self.controls_widget = self._create_controls_container()
+            self._create_portwidgets()
+
+    module = _Probe()
+    assert module._require_input_or_silence(8) is True
+    assert np.allclose(module.out_port.value, np.zeros(8, dtype=np.float32))
+
+    source = type("S", (), {})()
+    # Connect via Port
+    from sonicrack.patching.port import Port
+
+    src = Port("output", "src")
+    src.write(np.ones(8, dtype=np.float32))
+    src.connect(module.in_port)
+    assert module._require_input_or_silence(8) is False

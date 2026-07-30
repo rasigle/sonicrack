@@ -24,7 +24,7 @@ class ClockModule(ModuleWidget):
 
     metadata = ModuleMetadata(
         title="Clock",
-        category=ModuleCategory.SOURCE,
+        category=ModuleCategory.SEQUENCER,
         description="BPM-synced pulse source for sequencers",
     )
 
@@ -34,8 +34,7 @@ class ClockModule(ModuleWidget):
         self.clock_port = self.add_output("Clock")
         self.component = StepClock(sample_rate=audio_config.sample_rate)
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         timing_row = QHBoxLayout()
         timing_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -75,8 +74,7 @@ class ClockModule(ModuleWidget):
         division_layout.addWidget(self.run_checkbox)
         layout.addLayout(division_layout)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter("bpm", self.bpm_knob)
         self.register_parameter(
@@ -93,16 +91,11 @@ class ClockModule(ModuleWidget):
             setter="setChecked",
         )
 
-        self._sample_rate_listener = self._on_global_sample_rate_changed
-        audio_config.add_sample_rate_listener(self._sample_rate_listener)
-        self.destroyed.connect(self._cleanup_audio_config_listeners)
+        self._install_sample_rate_listener()
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component.sample_rate = new_sample_rate
         self.component.reset()
-
-    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
-        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         self.component.bpm = float_parameter(parameters, "bpm", self.bpm_knob.get_value)

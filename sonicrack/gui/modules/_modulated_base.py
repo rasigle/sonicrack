@@ -189,6 +189,7 @@ class ModulatedModuleBase(ModuleWidget):
     - get_modulation_inputs() - Returns ["Mod"]
     - get_cv_range() - Returns expected CV range for modulation input
     - Common modulation handling logic
+    - read_modulated_input_or_silence() for process_runtime entry
 
     Subclasses must:
     - Set self.control_knob to the main parameter knob
@@ -208,6 +209,26 @@ class ModulatedModuleBase(ModuleWidget):
         )
         self._is_modulated = False  # Track current modulation state
         self._component_lock = threading.RLock()  # Thread-safe component switching
+
+    def _setup_modulated_io(self) -> None:
+        """Add standard In / Mod / Out ports for modulated modifiers/effects."""
+        self.in_port = self.add_input("In")
+        self.mod_port = self.add_input("Mod")
+        self.out_port = self.add_output("Out")
+
+    def read_modulated_input_or_silence(self, num_samples: int) -> np.ndarray | None:
+        """Sync modulation state; return input samples or write silence.
+
+        Returns:
+            Input buffer when the audio input is connected, otherwise ``None``
+            after writing silence to the output.
+        """
+        from sonicrack.runtime.helpers import read_samples
+
+        self.ensure_modulation_component_state(num_samples)
+        if self._require_input_or_silence(num_samples):
+            return None
+        return read_samples(self.in_port, num_samples)
 
     def on_port_connection_changed(self, port_name: str, is_connected: bool):
         """Handle port connection/disconnection events.

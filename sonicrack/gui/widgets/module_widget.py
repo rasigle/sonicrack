@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from abc import ABCMeta
+from collections.abc import Callable
 from typing import Any
 
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
@@ -20,6 +21,7 @@ from PyQt6.QtWidgets import (
 from sonicrack.gui.dialogs.module_info_dialog import ModuleInfoDialog
 from sonicrack.gui.widgets.port_widget import PortWidget
 from sonicrack.patching.module import AudioModule
+from sonicrack.runtime.helpers import silence, write_silence_if_disconnected
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +222,117 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         layout.setSpacing(spacing)
         layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         return layout
+
+    def _begin_controls(self, *, spacing: int = 10) -> QVBoxLayout:
+        """Create the controls container and return its layout.
+
+        Call after ports are registered so ``_create_standard_layout`` can
+        build port widgets. Finish with :meth:`_finish_controls`.
+        """
+        self.controls_widget = self._create_controls_container()
+        return self._create_standard_layout(spacing=spacing)
+
+    def _finish_controls(self, layout: QVBoxLayout) -> None:
+        """Attach the finished controls layout to the module."""
+        self.controls_widget.setLayout(layout)
+        self.proxy = self._add_controls_to_module(self.controls_widget)
+
+    def _install_sample_rate_listener(
+        self,
+        callback: Callable[[int], None] | None = None,
+    ) -> None:
+        """Listen for global sample-rate changes and clean up on destroy.
+
+        Args:
+            callback: Optional handler. Defaults to
+                :meth:`_on_global_sample_rate_changed`.
+        """
+        from sonicrack.config.audio_config import audio_config
+
+        listener = (
+            callback if callback is not None else self._on_global_sample_rate_changed
+        )
+        previous = getattr(self, "_sample_rate_listener", None)
+        if previous is not None and previous is not listener:
+            audio_config.remove_sample_rate_listener(previous)
+
+        self._sample_rate_listener = listener
+        audio_config.add_sample_rate_listener(listener)
+        if not getattr(self, "_sample_rate_cleanup_connected", False):
+            self.destroyed.connect(self._cleanup_audio_config_listeners)
+            self._sample_rate_cleanup_connected = True
+
+    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
+        """Remove registered global sample-rate listeners during teardown."""
+        from sonicrack.config.audio_config import audio_config
+
+        listener = getattr(self, "_sample_rate_listener", None)
+        if listener is not None:
+            audio_config.remove_sample_rate_listener(listener)
+            self._sample_rate_listener = None
+
+    def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
+        """Default sample-rate handler: rebuild via ``create_engine_component``.
+
+        Subclasses with custom rebuild logic should override this method (or
+        pass a dedicated callback to :meth:`_install_sample_rate_listener`).
+        """
+        del new_sample_rate
+        create = getattr(self, "create_engine_component", None)
+        if callable(create):
+            self.component = create()
+
+    def _write_silence(self, num_samples: int, output_port: Any | None = None) -> None:
+        """Write a silent buffer to the module output port."""
+        port = (
+            output_port
+            if output_port is not None
+            else getattr(self, "out_port", None)
+        )
+        if port is None:
+            return
+        port.write(silence(num_samples))
+
+    def _require_input_or_silence(
+        self,
+        num_samples: int,
+        *,
+        input_port: Any | None = None,
+        output_port: Any | None = None,
+    ) -> bool:
+        """Write silence and return True when the required audio input is missing."""
+        in_port = (
+            input_port if input_port is not None else getattr(self, "in_port", None)
+        )
+        out_port = (
+            output_port
+            if output_port is not None
+            else getattr(self, "out_port", None)
+        )
+        if in_port is None or out_port is None:
+            return False
+        return write_silence_if_disconnected(in_port, out_port, num_samples)
+
+    def bind_parameter_knob(
+        self,
+        knob: Any,
+        param_name: str,
+        *,
+        value_label: Any | None = None,
+        format_value: Callable[[float], str] | None = None,
+        on_change: Callable[[float], None] | None = None,
+    ) -> None:
+        """Connect a knob to ``parameter_changed`` (and optional value label)."""
+
+        def _handler(*_args: object) -> None:
+            value = knob.get_value()
+            if value_label is not None and format_value is not None:
+                value_label.setText(format_value(value))
+            if on_change is not None:
+                on_change(value)
+            self.parameter_changed.emit(param_name, value)
+
+        knob.value_changed.connect(_handler)
 
     def _create_portwidgets(self):
         for in_port in self.inputs.values():

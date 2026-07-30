@@ -12,8 +12,19 @@ the companion `soniclab` engine package.
 
 - PyPI-oriented packaging metadata: project URLs, desktop/Qt classifiers, and
   `Typing :: Typed`.
-- Console entry point `sonicrack` for a standard `pip install sonicrack` launch path.
+- Console entry point `sonicrack` for a standard `uv tool install sonicrack`
+  (or `uv pip install sonicrack`) launch path.
 - GitHub Actions publish workflow (Trusted Publishing to TestPyPI / PyPI).
+- **MIDI Trig outputs**: MIDI Input and MIDI Keyboard emit a one-sample
+  `Trig` pulse on every note-on (including legato retriggers while Gate stays
+  high), alongside existing `1V/Oct` / Gate / Vel ports.
+- **RD-8 / Behringer 182 pattern controls**: per-step gate toggle buttons and a
+  **Randomize** action that scrambles CV A, CV B, and the gate pattern.
+- **Envelope shape previews**: ADSR and Decay Envelope show live curve previews
+  with a glowing playhead for the current phase/level.
+- Shared module helpers: `SimpleModifierBase`, modulated I/O setup,
+  `bind_parameter_knob`, sample-rate listener install/cleanup, and runtime
+  utilities (`read_optional_port`, silence cache, CV influence blend, ramps).
 
 ### Changed
 
@@ -22,7 +33,26 @@ the companion `soniclab` engine package.
 - `gui` / `audio-io` extras are kept as empty compatibility aliases.
 - `midi` extra delegates to `soniclab[midi]`.
 - Wheel/sdist exclude marketing screenshots and icon/splash generator scripts.
-- README documents PyPI install first; package version snapshot set to `2026.1.0`.
+- README documents `uv`-first PyPI and development install; package version
+  snapshot set to `2026.1.0`.
+- Module library categories reorganized:
+  - VCO is **Source** (with oscillators, LFO, noise, MIDI).
+  - All sequencing modules use **Sequencer** (Clock, Step Sequencer,
+    RD-8/Behringer 182, Accent, Slide).
+  - Delay, Reverb, Distortion, and Compressor use **Effect** (audio-processor
+    pass-through like Modifier/Filter).
+  - **Modulated Source** kept for gate/pitch-driven audio generators
+    (TB-303 Voice). Contour generators use **Envelope** (ADSR, Decay).
+- Audio hot path: render uses `RenderContext` per-cycle state (skips full-graph
+  cache invalidation), cached silence buffers, cheaper visualizer tap peeks,
+  and LFO only renders connected outputs.
+- Simple/modulated modifiers, effects, VCO/oscillator runtime, and VCA share
+  the common control-shell and runtime helpers above (less per-module
+  boilerplate).
+
+### Fixed
+
+- Coverage report batch script package path (`fatlife` → `sonicrack`).
 
 ### Notes
 
@@ -177,7 +207,13 @@ is centralized in `ParameterDescriptor` with:
 
 ### Added
 
-- **ADSR shape display**: live envelope curve preview on the ADSR module
+- **ADSR shape display**: live envelope curve preview on the ADSR module with
+  a glowing playhead for the current envelope position
+- **Decay Envelope shape display**: matching attack-decay curve preview and
+  live playhead
+- **Envelope module category**: ADSR and Decay Envelope group under
+  `ModuleCategory.ENVELOPE` in the module library (TB-303 Voice remains
+  Modulated Source)
 - **Effect CV inputs**: Delay (`CV_Time`/`CV_Feedback`/`CV_Mix`), Reverb
   (`CV_Room`/`CV_Damping`/`CV_Mix`), and Compressor (`CV_Thresh`/`CV_Ratio`/`CV_Mix`)
 - **Canvas zoom/pan**: scroll-wheel zoom, middle-mouse drag to pan, View menu

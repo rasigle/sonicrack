@@ -46,8 +46,7 @@ class MixerModule(ModuleWidget):
         self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         # First row of knobs (Ch 1 & 2)
         self.ch1_gain_knob = Knob(
@@ -107,8 +106,7 @@ class MixerModule(ModuleWidget):
         knobs_row2.addWidget(self.ch3_gain_knob)
         knobs_row2.addWidget(self.ch4_gain_knob)
         layout.addLayout(knobs_row2)
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         # Register parameters for automatic get/set
         self.register_parameter("gain1", self.ch1_gain_knob)

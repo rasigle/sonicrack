@@ -41,8 +41,7 @@ class TB303VoiceModule(ModuleWidget):
         self.out_port = self.add_output("Out", signal=PortSignal.AUDIO)
         self.component = TB303Voice(sample_rate=audio_config.sample_rate)
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout(spacing=4)
+        layout = self._begin_controls(spacing=4)
 
         wave_layout = QHBoxLayout()
         wave_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -195,8 +194,7 @@ class TB303VoiceModule(ModuleWidget):
         gain_row.addWidget(self.volume_knob)
         layout.addLayout(gain_row)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter(
             "waveform", self.wave_combo, getter="currentText", setter="setCurrentText"
@@ -212,9 +210,7 @@ class TB303VoiceModule(ModuleWidget):
         self.register_parameter("drive_db", self.drive_knob)
         self.register_parameter("volume", self.volume_knob)
 
-        self._sample_rate_listener = self._on_global_sample_rate_changed
-        audio_config.add_sample_rate_listener(self._sample_rate_listener)
-        self.destroyed.connect(self._cleanup_audio_config_listeners)
+        self._install_sample_rate_listener()
 
     def get_required_inputs(self) -> list[str]:
         return ["Freq", "Gate"]
@@ -222,8 +218,6 @@ class TB303VoiceModule(ModuleWidget):
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component = TB303Voice(sample_rate=new_sample_rate)
 
-    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
-        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         if not self.freq_input.is_connected or not self.gate_input.is_connected:

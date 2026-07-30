@@ -8,11 +8,20 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from sonicrack.runtime.helpers import float_parameter, read_samples
+from sonicrack.runtime.helpers import float_parameter, read_optional_cv
 from sonicrack.runtime.specs import RuntimeParameters
 
 if TYPE_CHECKING:
     from sonicrack.patching.port import Port
+
+# Re-export for existing importers.
+__all__ = [
+    "ControlRateCvSpec",
+    "apply_control_rate_cv",
+    "control_rate_offset",
+    "modulate_param",
+    "read_optional_cv",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,13 +35,6 @@ class ControlRateCvSpec:
     minimum: float
     maximum: float
     scale: float = 1.0
-
-
-def read_optional_cv(port: Port | None, num_samples: int) -> np.ndarray | None:
-    """Read a CV port when connected, otherwise return None."""
-    if port is None or not port.is_connected:
-        return None
-    return read_samples(port, num_samples)
 
 
 def control_rate_offset(

@@ -12,7 +12,7 @@ from sonicrack.gui.modules.effects._cv_modulation import (
 from sonicrack.gui.widgets import Knob
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples, silence
+from sonicrack.runtime.helpers import float_parameter, read_samples
 from sonicrack.runtime.specs import RuntimeParameters
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class CompressorModule(ModulatedModuleBase):
     runtime_kind = "compressor"
     metadata = ModuleMetadata(
         title="Compressor",
-        category=ModuleCategory.MODIFIER,
+        category=ModuleCategory.EFFECT,
         description="Control dynamic range with threshold, ratio, and timing",
     )
 
@@ -43,8 +43,7 @@ class CompressorModule(ModulatedModuleBase):
         self.mix_cv_port = self.add_input("CV_Mix")
         self.component = None
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         threshold_ratio_row = QHBoxLayout()
         threshold_ratio_row.setSpacing(10)
@@ -135,8 +134,7 @@ class CompressorModule(ModulatedModuleBase):
         output_row.addWidget(self.mix_knob)
         layout.addLayout(output_row)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter("threshold_db", self.threshold_knob)
         self.register_parameter("ratio", self.ratio_knob)
@@ -173,8 +171,7 @@ class CompressorModule(ModulatedModuleBase):
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply compression during an engine-owned render cycle."""
-        if not self.in_port.is_connected:
-            self.out_port.write(silence(num_samples))
+        if self._require_input_or_silence(num_samples):
             return
 
         # Thread-safe component access with lock

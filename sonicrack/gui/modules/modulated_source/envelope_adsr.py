@@ -2,7 +2,7 @@ import logging
 from typing import Any, Literal, cast
 
 import numpy as np
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 from soniclab.dsp.modulators import ADSREnvelope, GateTriggeredADSR
@@ -40,7 +40,7 @@ class ADSRModule(ModuleWidget):
 
     metadata = ModuleMetadata(
         title="ADSR Envelope",
-        category=ModuleCategory.MODULATED_SOURCE,  # Receives gate input
+        category=ModuleCategory.ENVELOPE,
         description="ADSR envelope generator with gate input for MIDI triggering",
     )
 
@@ -59,12 +59,18 @@ class ADSRModule(ModuleWidget):
         self.out_port = self.add_output("Out", signal=PortSignal.CONTROL_CV)
 
         # Use helper methods for UI construction
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout(spacing=6)
+        layout = self._begin_controls(spacing=6)
 
-        # Live ADSR shape preview
+        # Live ADSR shape preview with position playhead
         self.shape_widget = EnvelopeShapeWidget()
         layout.addWidget(self.shape_widget)
+
+        # Poll DSP state for the shape playhead (UI thread only).
+        self._viz_timer = QTimer(self)
+        self._viz_timer.setTimerType(Qt.TimerType.CoarseTimer)
+        self._viz_timer.setInterval(33)
+        self._viz_timer.timeout.connect(self._update_live_position)
+        self._viz_timer.start()
 
         # ADSR controls
         knobs_layout = QHBoxLayout()
@@ -204,8 +210,7 @@ class ADSRModule(ModuleWidget):
         trigger_layout.addWidget(self.trigger_button)
         layout.addLayout(trigger_layout)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         # Register parameters for automatic get/set
         self.register_parameter("attack_duration", self.attack_knob)
@@ -246,10 +251,44 @@ class ADSRModule(ModuleWidget):
             self.release_knob.get_value(),
         )
 
+    def _update_live_position(self) -> None:
+        """Refresh the shape playhead from the active ADSR component state."""
+        if self._adsr_component is None:
+            self.shape_widget.clear_live_state()
+            return
+
+        adsr = self._current_adsr()
+        phase = getattr(adsr, "_phase", "idle")
+        phase_name = (
+            str(phase.value) if hasattr(phase, "value") else str(phase or "idle")
+        ).lower()
+        position = int(getattr(adsr, "_phase_position", 0) or 0)
+        level = float(getattr(adsr, "val", 0.0) or 0.0)
+        ended = bool(getattr(adsr, "ended", True))
+
+        if ended or phase_name in {"idle", "ended"}:
+            self.shape_widget.clear_live_state()
+            return
+
+        if phase_name == "attack":
+            total = max(1, int(getattr(adsr, "_attack_samples", 1) or 1))
+        elif phase_name == "decay":
+            total = max(1, int(getattr(adsr, "_decay_samples", 1) or 1))
+        elif phase_name == "release":
+            total = max(1, int(getattr(adsr, "_release_samples", 1) or 1))
+        elif phase_name == "retrigger_reset":
+            total = max(1, int(getattr(adsr, "_retrigger_reset_samples", 1) or 1))
+        else:
+            total = 1
+
+        progress = min(1.0, max(0.0, position / total))
+        self.shape_widget.set_live_state(phase_name, progress, level)
+
     def set_parameters(self, params: dict[str, Any]) -> None:
         """Restore parameters and refresh the envelope shape preview."""
         super().set_parameters(params)
         self._update_shape_display()
+
 
     def _trigger_adsr(self, note_on: bool) -> None:
         """Trigger ADSR note on/off if available."""

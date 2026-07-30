@@ -52,20 +52,15 @@ class MIDIWorkerThread(QThread):
             self.status_changed.emit(f"Connected: {self.device_name}")
             logger.info("Worker thread: MIDI input started")
 
-            # Main polling loop
+            # Main polling loop. Blocking timeout alone bounds wakeups; avoid
+            # an extra msleep that forced ~1 kHz wakeups even when idle.
             while self._running:
                 try:
-                    # Poll for messages (this is a blocking operation)
-                    messages = self.midi_input.get_messages(
-                        timeout=0.01
-                    )  # 10ms timeout
+                    messages = self.midi_input.get_messages(timeout=0.01)
 
                     # Emit each message via signal (thread-safe)
                     for msg in messages:
                         self.message_received.emit(msg)
-
-                    # Small sleep to prevent busy-waiting
-                    self.msleep(1)  # 1ms sleep
 
                 except Exception as e:
                     if self._running:

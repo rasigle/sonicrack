@@ -12,7 +12,7 @@ from sonicrack.gui.modules.effects._cv_modulation import (
 from sonicrack.gui.widgets import Knob
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import read_samples, silence
+from sonicrack.runtime.helpers import read_samples
 from sonicrack.runtime.specs import RuntimeParameters
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class DelayModule(ModulatedModuleBase):
     runtime_kind = "delay"
     metadata = ModuleMetadata(
         title="Delay",
-        category=ModuleCategory.MODIFIER,
+        category=ModuleCategory.EFFECT,
         description="Apply delay effect to audio signal",
     )
 
@@ -46,8 +46,7 @@ class DelayModule(ModulatedModuleBase):
         self.component = None
 
         # Use helper methods for UI construction
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         knobs_row = QHBoxLayout()
         knobs_row.setSpacing(10)
@@ -98,8 +97,7 @@ class DelayModule(ModulatedModuleBase):
         mix_row.addStretch()
         layout.addLayout(mix_row)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         # Register parameters for automatic get/set
         self.register_parameter("delay_time", self.time_knob)
@@ -132,8 +130,7 @@ class DelayModule(ModulatedModuleBase):
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply delay during an engine-owned render cycle."""
-        if not self.in_port.is_connected:
-            self.out_port.write(silence(num_samples))
+        if self._require_input_or_silence(num_samples):
             return
 
         # Thread-safe component access with lock

@@ -28,6 +28,7 @@ from sonicrack.constants import DEFAULT_SAMPLE_RATE
 from sonicrack.gui.widgets.port_widget import PortWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import Port
+from sonicrack.runtime.helpers import EMPTY_PARAMETERS, silence
 from sonicrack.runtime.specs import (
     RuntimeModuleSpec,
     get_runtime_spec,
@@ -207,35 +208,40 @@ class RenderContext:
                 self._port_cache[port] = self._mix_connected_values(port)
 
     def _mix_connected_values(self, port: Port) -> AudioValue:
-        values = [connected_port.value for connected_port in port.connected_to]
-        if not values:
-            return np.zeros(self.num_samples, dtype=np.float32)
+        connected = port.connected_to
+        if not connected:
+            return silence(self.num_samples)
 
+        # Single connection is the common case: return fitted value with no mix alloc.
+        if len(connected) == 1:
+            value = connected[0].value
+            if isinstance(value, np.ndarray):
+                return self._fit_array_length(value)
+            return value
+
+        values = [connected_port.value for connected_port in connected]
         has_arrays = any(isinstance(value, np.ndarray) for value in values)
 
         if not has_arrays:
             return sum(values)
 
-        result = None
+        result: np.ndarray | None = None
         for value in values:
             if result is None:
                 if isinstance(value, np.ndarray):
-                    result = self._fit_array_length(value)
+                    # Own a buffer so subsequent adds cannot mutate source ports.
+                    fitted = self._fit_array_length(value)
+                    result = np.array(fitted, dtype=np.float32, copy=True)
                 else:
                     result = np.full(self.num_samples, value, dtype=np.float32)
                 continue
 
-            result_array = np.asarray(result)
             if isinstance(value, np.ndarray):
-                result = result_array + self._fit_array_length(value)
+                result = result + self._fit_array_length(value)
             else:
-                result = result_array + value
+                result = result + value
 
-        return (
-            result
-            if result is not None
-            else np.zeros(self.num_samples, dtype=np.float32)
-        )
+        return result if result is not None else silence(self.num_samples)
 
     def _fit_array_length(self, value: np.ndarray) -> np.ndarray:
         if len(value) == self.num_samples:
@@ -324,7 +330,18 @@ def resolve_runtime_parameters(
 ) -> dict[str, object]:
     """Resolve a spec's declared runtime parameters from a module."""
     if not spec.parameter_names:
-        return {}
+        return EMPTY_PARAMETERS  # type: ignore[return-value]
+
+    # Prefer the cached parameter store to avoid rebuilding full dicts each buffer.
+    values = getattr(module, "_parameter_values", None)
+    if isinstance(values, dict):
+        resolved = {
+            name: values[name] for name in spec.parameter_names if name in values
+        }
+        # Always expose active when modules track it via get_parameters().
+        if "active" in spec.parameter_names:
+            resolved["active"] = bool(getattr(module, "is_active", True))
+        return resolved
 
     parameters = module.get_parameters()
     return {
@@ -417,9 +434,11 @@ class AudioEngine(QtCore.QObject):
         self._render_plan_cache.clear()
 
     def invalidate_all_caches(self):
-        """Invalidate all module caches.
+        """Invalidate per-module caches.
 
-        Called at the start of each audio processing cycle by OutputModule.
+        Per-cycle port state is owned by ``RenderContext``, and no built-in
+        modules currently override ``invalidate_cache``. Kept as a public API
+        for custom modules; not invoked on the audio hot path.
         """
         for module in self.modules:
             module.invalidate_cache()
@@ -495,7 +514,8 @@ class AudioEngine(QtCore.QObject):
             One value per requested port. Disconnected ports return 0/silence via
             ``Port.read``.
         """
-        self.invalidate_all_caches()
+        # Per-cycle state lives in RenderContext; skip invalidate_all_caches on
+        # the hot path (base module hook is a no-op for all built-in modules).
         plan_key = (tuple(ports), self._graph_version)
         plan = self._render_plan_cache.get(plan_key)
         if plan is None:

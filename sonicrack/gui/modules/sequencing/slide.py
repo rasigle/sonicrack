@@ -23,7 +23,7 @@ class SlideModule(ModuleWidget):
 
     metadata = ModuleMetadata(
         title="Slide",
-        category=ModuleCategory.MODIFIER,
+        category=ModuleCategory.SEQUENCER,
         description="Portamento processor for 1V/oct pitch CV",
     )
 
@@ -35,8 +35,7 @@ class SlideModule(ModuleWidget):
         self.freq_output = self.add_output("Freq Out")
         self.component = SlideProcessor(sample_rate=audio_config.sample_rate)
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         self.time_knob = Knob(
             label="Time", min_value=0.0, max_value=0.5, default_value=0.08
@@ -52,8 +51,7 @@ class SlideModule(ModuleWidget):
         )
         layout.addWidget(self.always_checkbox)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter("time", self.time_knob)
         self.register_parameter(
@@ -63,9 +61,7 @@ class SlideModule(ModuleWidget):
             setter="setChecked",
         )
 
-        self._sample_rate_listener = self._on_global_sample_rate_changed
-        audio_config.add_sample_rate_listener(self._sample_rate_listener)
-        self.destroyed.connect(self._cleanup_audio_config_listeners)
+        self._install_sample_rate_listener()
 
     def get_required_inputs(self) -> list[str]:
         return ["Freq In"]
@@ -74,8 +70,6 @@ class SlideModule(ModuleWidget):
         self.component.sample_rate = new_sample_rate
         self.component.reset()
 
-    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
-        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         if not self.freq_input.is_connected:

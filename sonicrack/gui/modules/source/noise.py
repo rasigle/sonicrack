@@ -51,8 +51,7 @@ class NoiseModule(ModuleWidget):
         self.out_port = self.add_output("Out")
 
         # Use helper methods for UI construction
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         # Noise type selector
         type_layout = QHBoxLayout()
@@ -78,8 +77,7 @@ class NoiseModule(ModuleWidget):
         )
         layout.addWidget(self.gain_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         # Register parameters for automatic get/set
         self.register_parameter(

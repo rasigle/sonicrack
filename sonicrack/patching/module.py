@@ -16,42 +16,58 @@ class ModuleCategory(StrEnum):
     """Categorizes modules by their role in the signal chain.
 
     Attributes:
-        SOURCE: Represents modules that generate audio signals without requiring
-            any input (e.g., Oscillators, LFOs, Envelopes).
-        MODULATED_SOURCE: Represents modules that generate audio signals but
-            require control voltage (CV) inputs for modulation
-            (e.g., Voltage-Controlled Oscillators).
-        MODIFIER: Represents modules that modify an audio signal,
-            typically with one audio input and optional modulation inputs
-            (e.g., Volume, Pan, Clipper).
-        FILTER: Represents frequency-domain filter modules that process
-            audio (e.g., Butterworth Filter, Resonant Filter, Acid Filter).
-            Behaves like a modifier for routing and inactive pass-through.
-        MIXER: Represents modules that combine multiple audio inputs into
-            a single output.
-        VISUALIZATION: Represents modules that display audio signals visually
-            without modifying them (e.g., Waveform, Spectrum Analyzer).
-            These act as pass-through modules.
-        OUTPUT: Represents terminal modules that act as the final node
-            in the signal chain (e.g., speakers, audio output).
+        SOURCE: Free-running or continuously generating modules that do not
+            need a primary audio input (e.g., Oscillators, VCO, LFO, Noise,
+            MIDI input).
+        MODULATED_SOURCE: Gate/pitch-driven generators that need control
+            inputs to produce their main output (e.g., monophonic voices such
+            as TB-303).
+        ENVELOPE: Contour generators driven by gate/trigger (e.g., ADSR,
+            attack-decay). Produce control CV rather than audio.
+        SEQUENCER: Timing, pattern, and sequencing helpers (clocks, step
+            sequencers, accent/slide utilities).
+        MODIFIER: Modules that modify an audio signal, typically with one
+            audio input and optional modulation inputs (e.g., Volume, Pan,
+            Clipper, VCA).
+        FILTER: Frequency-domain filter modules that process audio
+            (e.g., Butterworth, Resonant, Acid). Behaves like a modifier for
+            routing and inactive pass-through.
+        EFFECT: Time- and dynamics-based effects that process audio
+            (e.g., Delay, Reverb, Distortion, Compressor). Behaves like a
+            modifier for routing and inactive pass-through.
+        MIXER: Modules that combine multiple audio inputs into a single
+            output.
+        VISUALIZATION: Modules that display audio signals visually without
+            modifying them (e.g., Waveform, Spectrum Analyzer). Pass-through.
+        OUTPUT: Terminal modules that act as the final node in the signal
+            chain (e.g., speakers, audio output).
     """
 
-    # Oscillators, LFOs, Envelopes - no audio input required
+    # Oscillators, VCO, LFO, noise, MIDI — no primary audio input
     SOURCE = "Source"
 
-    # Oscillators with CV inputs (VCO, etc.) - takes CV, outputs audio
+    # Gate/pitch-driven audio generators (monophonic voices)
     MODULATED_SOURCE = "Modulated Source"
 
-    # Volume, Pan, Clipper - single audio input + optional modulation
+    # Contour generators (ADSR, AD, …) — control CV output
+    ENVELOPE = "Envelope"
+
+    # Clocks, step sequencers, accent/slide sequencing helpers
+    SEQUENCER = "Sequencer"
+
+    # Volume, Pan, Clipper, VCA — single audio input + optional modulation
     MODIFIER = "Modifier"
 
-    # Frequency filters - audio in/out (utility, resonant, acid, …)
+    # Frequency filters — audio in/out (utility, resonant, acid, …)
     FILTER = "Filter"
+
+    # Delay, reverb, distortion, compressor — audio FX processing
+    EFFECT = "Effect"
 
     # Combines multiple audio inputs
     MIXER = "Mixer"
 
-    # Visualization tools - pass-through with display
+    # Visualization tools — pass-through with display
     VISUALIZATION = "Visualization"
 
     # Terminal node
@@ -62,7 +78,11 @@ class ModuleCategory(StrEnum):
 
         Used for inactive pass-through and similar modifier-like routing.
         """
-        return self in (ModuleCategory.MODIFIER, ModuleCategory.FILTER)
+        return self in (
+            ModuleCategory.MODIFIER,
+            ModuleCategory.FILTER,
+            ModuleCategory.EFFECT,
+        )
 
 
 @dataclass(frozen=True)

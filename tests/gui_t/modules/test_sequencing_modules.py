@@ -213,13 +213,101 @@ def test_behringer_182_uses_compact_panel_controls(qapp: Any):
     assert isinstance(module.run_button, ImagePushButton)
     assert module.run_button.text() == "Stop"
     assert module.run_button.width() == 54
-    assert all(knob.knob_size == 34 for knob in module.cv_a_knobs)
-    assert all(knob.knob_size == 34 for knob in module.cv_b_knobs)
+    assert all(knob.knob_size == 28 for knob in module.cv_a_knobs)
+    assert all(knob.knob_size == 28 for knob in module.cv_b_knobs)
+    assert all(knob.label == "" for knob in module.cv_a_knobs)
+    assert all(knob.label == "" for knob in module.cv_b_knobs)
+    assert all(knob.knob_size == 34 for knob in (
+        module.bpm_knob,
+        module.gate_length_knob,
+        module.range_a_knob,
+        module.range_b_knob,
+    ))
     assert len(module.step_leds) == 8
+    assert len(module.gate_buttons) == 8
+    assert module.get_gates() == "1,1,1,1,1,1,1,1"
+    assert not hasattr(module, "gates_edit")
+    assert module.randomize_button.text() == "Randomize"
 
     module.run_button.setChecked(False)
 
     assert module.run_button.text() == "Start"
+
+
+def test_behringer_182_gate_toggles_update_parameters(qapp: Any):
+    del qapp
+    module = Behringer182Module()
+
+    module.gate_buttons[0].setChecked(False)
+    module.gate_buttons[2].setChecked(False)
+
+    assert module.get_gates() == "0,1,0,1,1,1,1,1"
+
+    module.set_gates("1,0,1,0,1,0,1,0")
+    assert module.get_gates() == "1,0,1,0,1,0,1,0"
+    assert [button.isChecked() for button in module.gate_buttons] == [
+        True,
+        False,
+        True,
+        False,
+        True,
+        False,
+        True,
+        False,
+    ]
+
+
+def test_behringer_182_randomize_updates_cv_and_gates(qapp: Any):
+    del qapp
+    module = Behringer182Module()
+    before_a = [knob.get_value() for knob in module.cv_a_knobs]
+    before_b = [knob.get_value() for knob in module.cv_b_knobs]
+    before_gates = module.get_gates()
+
+    module.randomize_pattern(random.Random(42))
+
+    after_a = [knob.get_value() for knob in module.cv_a_knobs]
+    after_b = [knob.get_value() for knob in module.cv_b_knobs]
+    after_gates = module.get_gates()
+    gate_flags = after_gates.split(",")
+
+    assert after_a != before_a
+    assert after_b != before_b
+    assert after_gates != before_gates
+    assert len(gate_flags) == module.step_count
+    assert all(flag in {"0", "1"} for flag in gate_flags)
+    assert any(flag == "1" for flag in gate_flags)
+    assert all(0.0 <= value <= 1.0 for value in after_a)
+    assert all(0.0 <= value <= 1.0 for value in after_b)
+    assert [button.isChecked() for button in module.gate_buttons] == [
+        flag == "1" for flag in gate_flags
+    ]
+
+
+def test_behringer_182_randomize_button_triggers_pattern_change(qapp: Any):
+    del qapp
+    module = Behringer182Module()
+    for knob in module.cv_a_knobs:
+        knob.set_value(0.0)
+    for knob in module.cv_b_knobs:
+        knob.set_value(0.0)
+    module.set_gates("0,0,0,0,0,0,0,0")
+    before = (
+        [knob.get_value() for knob in module.cv_a_knobs],
+        [knob.get_value() for knob in module.cv_b_knobs],
+        module.get_gates(),
+    )
+
+    module.randomize_button.click()
+
+    after = (
+        [knob.get_value() for knob in module.cv_a_knobs],
+        [knob.get_value() for knob in module.cv_b_knobs],
+        module.get_gates(),
+    )
+    assert after != before
+    assert module.randomize_button.text() == "Randomize"
+    assert not hasattr(module, "gates_edit")
 
 
 def test_behringer_182_step_leds_follow_active_step(qapp: Any):

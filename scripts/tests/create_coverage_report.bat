@@ -11,7 +11,7 @@ call %venv_folder%\Scripts\activate
 echo.
 
 echo Running tests and creating coverage report
-pytest --cov=..\..\fatlife --cov-report=html ..\..\tests
+pytest --cov=sonicrack --cov-report=html ..\..\tests
 
 if exist htmlcov\index.html (
     echo Opening coverage report

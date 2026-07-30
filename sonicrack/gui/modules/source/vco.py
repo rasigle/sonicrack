@@ -1,9 +1,8 @@
-"""Modulated Oscillator module with pitch CV input.
+"""Voltage-Controlled Oscillator (VCO) with V/Oct pitch and FM inputs."""
 
-This module provides an oscillator that can have its frequency controlled
-by an external 1V/oct pitch CV source.
-"""
+from __future__ import annotations
 
+import logging
 from typing import Any, cast
 
 import numpy as np
@@ -23,6 +22,7 @@ from soniclab.generators.oscillators.oscillator_ramp import SawtoothMode, Triang
 from soniclab.generators.oscillators.oscillator_sine import SineWaveMode
 from soniclab.generators.oscillators.oscillator_square import SquareWaveMode
 
+from sonicrack.config.audio_config import audio_config
 from sonicrack.constants import (
     AUDIO_FREQUENCY_KNOB_CURVE,
     DEFAULT_PW_PERCENTAGE_VALUE,
@@ -31,7 +31,6 @@ from sonicrack.constants import (
 )
 from sonicrack.gui.modules.source._oscillator_runtime import (
     RuntimeOscillator,
-    _frequency_slew_values,
     render_with_frequency_ramp,
     smooth_control_signal,
 )
@@ -40,20 +39,30 @@ from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import (
-    float_parameter,
-    read_samples,
-    str_parameter,
-)
+from sonicrack.runtime.helpers import float_parameter, read_samples, str_parameter
 from sonicrack.runtime.specs import RuntimeParameters
+
+logger = logging.getLogger(__name__)
 
 VCO_PITCH_CV_SMOOTHING_MS = 5.0
 VCO_DEFAULT_GAIN_DB = 0.0
+VCO_DEFAULT_FREQUENCY = 440.0
+VCO_MIN_FREQUENCY = 11.0
+VCO_MAX_FREQUENCY = 6000.0
 VCO_DEFAULT_FM_AMOUNT_PERCENT = 0.0
 VCO_MIN_FM_AMOUNT_PERCENT = -100.0
 VCO_MAX_FM_AMOUNT_PERCENT = 100.0
 VCO_FM_MODE_V_OCT = "1V/octave"
 VCO_FM_MODE_LINEAR = "Linear"
+VCO_WAVEFORMS = ("Sine", "Square", "Sawtooth", "Triangle")
+
+# Sensible default modes per waveform (must exist in engine mode lists).
+_PREFERRED_MODES = {
+    "Sine": "pure",
+    "Square": "vcv",
+    "Sawtooth": "vcv",
+    "Triangle": "pure",
+}
 
 
 def _as_sine_mode(mode: str) -> SineWaveMode:
@@ -132,52 +141,82 @@ def _as_frequency_buffer(values: float | np.ndarray) -> np.ndarray:
     return np.asarray(values, dtype=np.float32).reshape(-1)
 
 
+def create_vco_oscillator(
+    wave_type: str,
+    mode: str,
+    frequency: float,
+    *,
+    pulsewidth: float = DEFAULT_PW_PERCENTAGE_VALUE / 100,
+    phase: float = 0.0,
+    sample_rate: float | None = None,
+) -> SineOscillator | SquareOscillator | SawtoothOscillator | TriangleOscillator:
+    """Create a base oscillator for the selected waveform and mode."""
+    sr = float(sample_rate if sample_rate is not None else audio_config.sample_rate)
+    common = {
+        "gain_db": VCO_DEFAULT_GAIN_DB,
+        "phase": phase,
+        "sample_rate": sr,
+    }
+
+    if wave_type == "Sine":
+        return SineOscillator(frequency, mode=_as_sine_mode(mode), **common)
+    if wave_type == "Square":
+        return SquareOscillator(
+            frequency,
+            pulsewidth=pulsewidth,
+            mode=_as_square_mode(mode),
+            **common,
+        )
+    if wave_type == "Sawtooth":
+        return SawtoothOscillator(frequency, mode=_as_sawtooth_mode(mode), **common)
+    if wave_type == "Triangle":
+        return TriangleOscillator(frequency, mode=_as_triangle_mode(mode), **common)
+    raise ValueError(f"Unknown waveform type: {wave_type}")
+
+
 @register_module()
 class ModulatedOscillatorModule(ModuleWidget):
-    """Oscillator with 1V/oct pitch CV input.
-
-    This oscillator can have its frequency controlled by an external 1V/oct CV
-    source, making it usable with MIDI and sequencer pitch outputs.
+    """Oscillator with 1V/oct pitch CV and optional FM input.
 
     Inputs:
-        - Freq: 1V/oct pitch CV input (e.g., from MIDI Input)
+        - V/Oct: 1V/oct pitch transpose around the Pitch knob base frequency
+        - FM: bipolar FM (depth via FM Amt %, mode via FM Mode)
 
     Outputs:
-        - Out: Audio output
+        - Out: Audio
     """
 
     runtime_kind = "vco"
 
     metadata = ModuleMetadata(
         title="VCO",
-        category=ModuleCategory.MODULATED_SOURCE,  # Generator with CV inputs
+        category=ModuleCategory.SOURCE,
         description="Voltage-Controlled Oscillator with frequency modulation input",
         version="1.0.0",
         author="SonicRack",
     )
 
-    def __init__(self):
-        """Initialize modulated oscillator module."""
+    def __init__(self) -> None:
         super().__init__(
             width=280,
             height=275,
             color=QColor(100, 140, 220),
         )
 
-        # Initialize default parameters FIRST (before creating component)
         self._waveform = "Sine"
         self._mode = self._get_default_mode_for_waveform(self._waveform)
-        self._base_frequency = 440.0
+        self._base_frequency = VCO_DEFAULT_FREQUENCY
         self._pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
         self._fm_amount = VCO_DEFAULT_FM_AMOUNT_PERCENT
         self._fm_mode = VCO_FM_MODE_V_OCT
 
-        # Create the base oscillator component FIRST
-        self.component = self._create_base_oscillator()
+        self.component = create_vco_oscillator(
+            self._waveform,
+            self._mode,
+            self._base_frequency,
+            pulsewidth=self._pulsewidth,
+        )
 
-        # Add ports with component reference
-        # Note: Input ports don't have components (they receive signals)
-        # Output port has the component reference
         self.freq_input = self.add_input("V/Oct", signal=PortSignal.PITCH_CV)
         self.fm_input = self.add_input("FM", signal=PortSignal.CONTROL_CV)
         self.out_port = self.add_output(
@@ -186,22 +225,18 @@ class ModulatedOscillatorModule(ModuleWidget):
             signal=PortSignal.AUDIO,
         )
 
-        # Use helper methods for UI construction
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout(spacing=6)
+        layout = self._begin_controls(spacing=6)
 
-        # Waveform selector
         wave_layout = QHBoxLayout()
         wave_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         wave_layout.addWidget(QLabel("Wave:"))
         self.wave_combo = QtWidgets.QComboBox()
-        self.wave_combo.addItems(["Sine", "Square", "Sawtooth", "Triangle"])
+        self.wave_combo.addItems(list(VCO_WAVEFORMS))
         self.wave_combo.setCurrentText(self._waveform)
         self.wave_combo.currentTextChanged.connect(self._on_wave_changed)
         wave_layout.addWidget(self.wave_combo)
         layout.addLayout(wave_layout)
 
-        # Mode selector
         mode_layout = QHBoxLayout()
         mode_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         mode_layout.addWidget(QLabel("Mode:"))
@@ -221,19 +256,16 @@ class ModulatedOscillatorModule(ModuleWidget):
         fm_mode_layout.addWidget(self.fm_mode_combo)
         layout.addLayout(fm_mode_layout)
 
-        # Frequency control (base frequency when no modulation)
         knobs_layout = QHBoxLayout()
         knobs_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.freq_knob = Knob(
             label="Pitch (Hz)",
-            min_value=11,
-            max_value=6000,
+            min_value=VCO_MIN_FREQUENCY,
+            max_value=VCO_MAX_FREQUENCY,
             default_value=self._base_frequency,
             curve_points=AUDIO_FREQUENCY_KNOB_CURVE,
         )
-        self.freq_knob.setToolTip(
-            "Base frequency (Hz)\nActive when Freq input is disconnected"
-        )
+        self.freq_knob.setToolTip("Base frequency (Hz); V/Oct transposes this pitch")
         self.freq_knob.value_changed.connect(self._on_frequency_changed)
         knobs_layout.addWidget(self.freq_knob)
 
@@ -263,10 +295,8 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         layout.addLayout(knobs_layout)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
-        # Register parameters for automatic get/set
         self.register_parameter(
             "waveform", self.wave_combo, getter="currentText", setter="setCurrentText"
         )
@@ -283,14 +313,22 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.register_parameter("fm_amount", self.fm_amount_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
-        self.component = self.create_engine_component()
-        self._runtime_oscillator_shape: tuple[str, str] | None = None
+        self._runtime_oscillator_shape: tuple[str, str] | None = (
+            self._waveform,
+            self._mode,
+        )
         self._last_runtime_frequency = self._base_frequency
         self._last_pitch_cv: float | None = None
 
+        self._install_sample_rate_listener()
+
+        self._update_pulsewidth_visibility()
+        self.update_knob_state()
+
+    # ------------------------------------------------------------------ modes
+
     @staticmethod
     def _get_available_modes_for_waveform(waveform: str) -> list[str]:
-        """Return supported engine modes for the selected waveform."""
         if waveform == "Sine":
             return SineOscillator.get_available_modes()
         if waveform == "Square":
@@ -303,19 +341,11 @@ class ModulatedOscillatorModule(ModuleWidget):
 
     @classmethod
     def _get_default_mode_for_waveform(cls, waveform: str) -> str:
-        """Return a sensible default mode for each waveform."""
-        preferred_defaults = {
-            "Sine": "pure",
-            "Square": "vcv",
-            "Sawtooth": "vcv",
-            "Triangle": "pure",
-        }
         available_modes = cls._get_available_modes_for_waveform(waveform)
-        preferred = preferred_defaults.get(waveform, available_modes[0])
+        preferred = _PREFERRED_MODES.get(waveform, available_modes[0])
         return preferred if preferred in available_modes else available_modes[0]
 
     def _refresh_mode_options(self, waveform: str, preserve_current: bool = True):
-        """Refresh mode choices when the selected waveform changes."""
         available_modes = self._get_available_modes_for_waveform(waveform)
         selected_mode = self._normalize_mode_for_waveform(
             waveform, self._mode if preserve_current else None
@@ -331,94 +361,73 @@ class ModulatedOscillatorModule(ModuleWidget):
 
     @classmethod
     def _normalize_mode_for_waveform(cls, waveform: str, mode: str | None) -> str:
-        """Return a valid mode for the selected waveform."""
         available_modes = cls._get_available_modes_for_waveform(waveform)
         if mode in available_modes:
             return str(mode)
         return cls._get_default_mode_for_waveform(waveform)
 
-    def _create_base_oscillator(self):
-        """Create the base oscillator component based on current waveform."""
-        if self._waveform == "Sine":
-            return SineOscillator(
-                self._base_frequency,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                mode=_as_sine_mode(self._mode),
-            )
-        elif self._waveform == "Square":
-            return SquareOscillator(
-                self._base_frequency,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                pulsewidth=self._pulsewidth,
-                mode=_as_square_mode(self._mode),
-            )
-        elif self._waveform == "Sawtooth":
-            return SawtoothOscillator(
-                self._base_frequency,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                mode=_as_sawtooth_mode(self._mode),
-            )
-        elif self._waveform == "Triangle":
-            return TriangleOscillator(
-                self._base_frequency,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                mode=_as_triangle_mode(self._mode),
-            )
-        else:
-            # Default to sine
-            return SineOscillator(
-                self._base_frequency,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                mode=_as_sine_mode(self._mode),
-            )
+    # ------------------------------------------------------------------ rebuild
 
-    def _on_wave_changed(self, wave_type: str):
-        """Handle waveform type change by recreating the component."""
-        import logging
+    def _rebuild_base_oscillator(self) -> None:
+        """Recreate the plain base oscillator and attach it to Out."""
+        self.component = create_vco_oscillator(
+            self._waveform,
+            self._mode,
+            self._base_frequency,
+            pulsewidth=self._pulsewidth,
+        )
+        self.out_port.component = self.component
+        self._runtime_oscillator_shape = (self._waveform, self._mode)
+        self._last_runtime_frequency = self._base_frequency
+        self._last_pitch_cv = None
 
-        logger = logging.getLogger(__name__)
+    def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
+        logger.debug("VCO: sample rate → %s Hz", new_sample_rate)
+        if self.component is not None and hasattr(self.component, "sample_rate"):
+            self.component.sample_rate = new_sample_rate
+        # Force runtime shape rebuild on next process so phase/mode stay coherent.
+        self._runtime_oscillator_shape = None
 
+
+    def _update_pulsewidth_visibility(self) -> None:
+        """Pulse width only applies to square waves."""
+        is_square = self._waveform == "Square"
+        self.pulsewidth_knob.setEnabled(is_square)
+        self.pulsewidth_knob.setStyleSheet("" if is_square else "opacity: 0.4;")
+        self.pulsewidth_knob.setToolTip(
+            "Square pulse width" if is_square else "Pulse width (Square waveform only)"
+        )
+
+    # ------------------------------------------------------------------ UI handlers
+
+    def _on_wave_changed(self, wave_type: str) -> None:
+        if not wave_type:
+            return
         previous_mode = self._mode
         self._waveform = wave_type
         self._refresh_mode_options(wave_type)
-        logger.debug(f"VCO: Waveform changed to {wave_type}")
+        logger.debug("VCO: waveform → %s (mode=%s)", wave_type, self._mode)
 
-        # Recreate the base oscillator with new waveform
-        self.component = self._create_base_oscillator()
-        self.out_port.component = self.component
+        self._rebuild_base_oscillator()
+        self._update_pulsewidth_visibility()
 
         self.parameter_changed.emit("waveform", wave_type)
         if self._mode != previous_mode:
             self.parameter_changed.emit("mode", self._mode)
 
-    def _on_mode_changed(self, mode: str):
-        """Handle oscillator mode changes by recreating the component."""
-        import logging
-
-        logger = logging.getLogger(__name__)
-
+    def _on_mode_changed(self, mode: str) -> None:
         if not mode:
             return
-
         self._mode = mode
-        logger.debug(f"VCO: Mode changed to {mode}")
-
-        self.component = self._create_base_oscillator()
-        self.out_port.component = self.component
-
+        logger.debug("VCO: mode → %s", mode)
+        self._rebuild_base_oscillator()
         self.parameter_changed.emit("mode", mode)
 
-    def _on_frequency_changed(self):
-        """Handle frequency knob change by updating the component."""
-        import logging
-
-        logger = logging.getLogger(__name__)
-
+    def _on_frequency_changed(self) -> None:
         new_freq = self.freq_knob.get_value()
         self._base_frequency = new_freq
-        logger.debug(f"VCO: Frequency changed to {new_freq} Hz")
+        logger.debug("VCO: frequency → %.2f Hz", new_freq)
 
-        # Hotswap the active oscillator without rebuilding the widget.
         if self.component is not None:
             if isinstance(self.component, ModulatedOscillator):
                 self.component.oscillator._freq = new_freq
@@ -428,27 +437,25 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         self.parameter_changed.emit("frequency", new_freq)
 
-    def _on_fm_amount_changed(self):
-        """Handle FM depth changes."""
-        fm_amount = self.fm_amount_knob.get_value()
-        self._fm_amount = fm_amount
-        self.parameter_changed.emit("fm_amount", fm_amount)
+    def _on_fm_amount_changed(self) -> None:
+        self._fm_amount = self.fm_amount_knob.get_value()
+        self.parameter_changed.emit("fm_amount", self._fm_amount)
 
-    def _on_fm_mode_changed(self, fm_mode: str):
-        """Handle FM mode changes."""
+    def _on_fm_mode_changed(self, fm_mode: str) -> None:
         self._fm_mode = fm_mode
         self.parameter_changed.emit("fm_mode", fm_mode)
 
-    def _on_pulsewidth_changed(self):
-        """Handle square pulse width changes."""
+    def _on_pulsewidth_changed(self) -> None:
         pulsewidth = self.pulsewidth_knob.get_value()
         self._pulsewidth = pulsewidth
         if isinstance(self.component, SquareOscillator):
             self.component.pulsewidth = pulsewidth
         self.parameter_changed.emit("pulsewidth", pulsewidth)
 
+    # ------------------------------------------------------------------ module API
+
     def get_required_inputs(self) -> list[str]:
-        """V/Oct and FM inputs are optional - VCO works without them."""
+        """V/Oct and FM are optional; VCO free-runs on the Pitch knob alone."""
         return []
 
     def get_modulation_inputs(self) -> list[str]:
@@ -456,28 +463,18 @@ class ModulatedOscillatorModule(ModuleWidget):
         return ["FM"]
 
     def get_cv_range(self, port_name: str = "FM") -> tuple[float, float]:
-        """Return the expected CV range for VCO modulation inputs.
-
-        Returns:
-            FM: (-1.0, 1.0) - bipolar range scaled by FM Amt %
-        """
+        """Expected CV ranges for VCO modulation inputs."""
+        if port_name in ("V/Oct", "Freq"):
+            # Relative 1V/oct offset in volts (typical keyboard/sequencer span).
+            return -5.0, 5.0
         if port_name == "FM":
             return -1.0, 1.0
         return 0.0, 1.0
 
-    def update_knob_state(self):
-        """Update knob enabled state based on port connections.
-
-        This is called when connections change to provide immediate visual feedback.
-        """
-        import logging
-
-        logger = logging.getLogger(__name__)
-
-        # Check if Freq input is connected
-        has_freq_cv = self.freq_input.is_connected
-
-        logger.debug(f"VCO update_knob_state: Freq port connected={has_freq_cv}")
+    def update_knob_state(self) -> None:
+        """Refresh tooltips from port connection state."""
+        has_freq_cv = bool(getattr(self.freq_input, "is_connected", False))
+        has_fm = bool(getattr(self.fm_input, "is_connected", False))
 
         self.freq_knob.setEnabled(True)
         self.freq_knob.setStyleSheet("")
@@ -485,36 +482,33 @@ class ModulatedOscillatorModule(ModuleWidget):
             self.freq_knob.setToolTip(
                 "Base frequency (Hz); V/Oct input transposes this pitch"
             )
-            logger.debug("VCO: Freq knob ENABLED with V/Oct pitch input")
         else:
-            self.freq_knob.setToolTip("Manual frequency control (Hz)")
-            logger.debug("VCO: Freq knob ENABLED")
-
-        has_fm = self.fm_input.is_connected
-
-        logger.debug(f"VCO update_knob_state: FM port connected={has_fm}")
+            self.freq_knob.setToolTip("Manual base frequency control (Hz)")
 
         if has_fm:
-            self.fm_amount_knob.setToolTip("Signed FM depth for the connected FM input")
+            self.fm_amount_knob.setToolTip(
+                "Signed FM depth for the connected FM input"
+            )
         else:
             self.fm_amount_knob.setToolTip(
                 "Signed FM depth. In 1V/octave mode this scales pitch CV; "
                 "in Linear mode this scales C4 Hz per volt."
             )
 
+        logger.debug(
+            "VCO update_knob_state: V/Oct=%s FM=%s", has_freq_cv, has_fm
+        )
+
     def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,
     ):
-        """Create the modulated oscillator component.
+        """Create oscillator (optionally modulated) for the patch-compiler path.
 
-        Supports frequency modulation via V/Oct and FM inputs.
+        Runtime audio uses ``process_runtime``; this remains for tests and
+        legacy component mapping.
         """
-        import logging
-
-        logger = logging.getLogger(__name__)
-
         wave_type = self.wave_combo.currentText()
         mode = self._normalize_mode_for_waveform(
             wave_type, self.mode_combo.currentText()
@@ -524,7 +518,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         fm_mode = self.fm_mode_combo.currentText()
         pulsewidth = self.pulsewidth_knob.get_value()
 
-        # Check for modulation inputs
         freq_modulator = (
             input_components[0]
             if input_components and len(input_components) > 0
@@ -537,93 +530,45 @@ class ModulatedOscillatorModule(ModuleWidget):
         has_freq_mod = freq_modulator is not None
         has_fm_mod = fm_modulator is not None and fm_amount != 0.0
 
-        logger.debug(f"VCO: freq_mod={has_freq_mod}, fm_mod={has_fm_mod}")
+        osc = create_vco_oscillator(
+            wave_type, mode, base_freq, pulsewidth=pulsewidth
+        )
 
-        # Create the base oscillator
-        if wave_type == "Sine":
-            osc = SineOscillator(
-                frequency=base_freq,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                mode=_as_sine_mode(mode),
-            )
-        elif wave_type == "Square":
-            osc = SquareOscillator(
-                frequency=base_freq,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                pulsewidth=pulsewidth,
-                mode=_as_square_mode(mode),
-            )
-        elif wave_type == "Sawtooth":
-            osc = SawtoothOscillator(
-                frequency=base_freq,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                mode=_as_sawtooth_mode(mode),
-            )
-        elif wave_type == "Triangle":
-            osc = TriangleOscillator(
-                frequency=base_freq,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                mode=_as_triangle_mode(mode),
-            )
-        else:
-            raise ValueError(f"Unknown waveform type: {wave_type}")
+        if not (has_freq_mod or has_fm_mod):
+            return osc
 
-        # Update UI state for frequency knob. V/Oct transposes the knob's base pitch.
-        self.freq_knob.setEnabled(True)
-        self.freq_knob.setStyleSheet("")
+        def freq_mod_func(base_freq_val, pitch_cv):
+            return apply_v_oct_offset(base_freq_val, pitch_cv)
+
+        def fm_mod_func(current_freq, fm_signal):
+            return apply_vcv_fm_offset(
+                current_freq, fm_signal, fm_amount, fm_mode
+            )
+
+        modulators = []
+        freq_mod = None
+        fm_mod = None
         if has_freq_mod:
-            self.freq_knob.setToolTip(
-                "Base frequency (Hz); V/Oct input transposes this pitch"
-            )
-            logger.debug("VCO create_engine_component: Freq knob ENABLED with V/Oct")
-        else:
-            self.freq_knob.setToolTip("Manual frequency control (Hz)")
-            logger.debug("VCO create_engine_component: Freq knob ENABLED")
+            modulators.append(freq_modulator)
+            freq_mod = freq_mod_func
+        if has_fm_mod:
+            modulators.append(fm_modulator)
+            fm_mod = fm_mod_func
 
-        # If we have frequency or FM modulation, create ModulatedOscillator
-        if has_freq_mod or has_fm_mod:
-            # Frequency modulation function
-            def freq_mod_func(base_freq, pitch_cv):
-                """Apply 1V/oct pitch CV as an offset around the base frequency."""
-                return apply_v_oct_offset(base_freq, pitch_cv)
+        logger.debug(
+            "VCO: ModulatedOscillator freq_mod=%s fm_mod=%s",
+            has_freq_mod,
+            has_fm_mod,
+        )
+        return ModulatedOscillator(
+            osc,
+            *modulators,
+            amp_mod=None,
+            freq_mod=freq_mod,
+            fm_mod=fm_mod,
+        )
 
-            def fm_mod_func(current_freq, fm_signal):
-                """Apply VCV-style FM after base pitch CV."""
-                return apply_vcv_fm_offset(
-                    current_freq,
-                    fm_signal,
-                    fm_amount,
-                    fm_mode,
-                )
-
-            logger.debug(
-                f"VCO: Creating ModulatedOscillator (freq_mod={has_freq_mod}, "
-                f"fm_mod={has_fm_mod})"
-            )
-
-            # Build modulator list based on what's connected
-            modulators = []
-            freq_mod = None
-            fm_mod = None
-
-            if has_freq_mod:
-                modulators.append(freq_modulator)
-                freq_mod = freq_mod_func
-
-            if has_fm_mod:
-                modulators.append(fm_modulator)
-                fm_mod = fm_mod_func
-
-            return ModulatedOscillator(
-                osc,
-                *modulators,
-                amp_mod=None,
-                freq_mod=freq_mod,
-                fm_mod=fm_mod,
-            )
-
-        # No modulation - return plain oscillator
-        return osc
+    # ------------------------------------------------------------------ runtime
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render VCO output for the current engine cycle."""
@@ -648,17 +593,20 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         oscillator_shape = (wave_type, mode)
         if self.component is None or oscillator_shape != self._runtime_oscillator_shape:
-            self.component = self._create_runtime_base_oscillator(
-                wave_type, mode, frequency, pulsewidth, phase
+            self.component = create_vco_oscillator(
+                wave_type,
+                mode,
+                frequency,
+                pulsewidth=pulsewidth,
+                phase=phase or 0.0,
             )
+            self.out_port.component = self.component
             self._runtime_oscillator_shape = oscillator_shape
             self._last_runtime_frequency = frequency
             self._last_pitch_cv = None
-        else:
-            if isinstance(self.component, SquareOscillator):
-                self.component.pulsewidth = pulsewidth
+        elif isinstance(self.component, SquareOscillator):
+            self.component.pulsewidth = pulsewidth
 
-        freq_signal = None
         fm_signal = None
         if self.fm_input.is_connected and fm_amount != 0.0:
             fm_signal = read_samples(self.fm_input, num_samples)
@@ -673,8 +621,6 @@ class ModulatedOscillatorModule(ModuleWidget):
                 fm_mode=fm_mode,
             )
         elif fm_signal is not None:
-            # For FM-only rendering, use target frequency directly without ramping
-            # The FM itself provides smoothness
             samples = self._render_frequency_signal(
                 frequency,
                 None,
@@ -682,8 +628,6 @@ class ModulatedOscillatorModule(ModuleWidget):
                 fm_amount=fm_amount,
                 fm_mode=fm_mode,
             )
-            # _last_runtime_frequency is already set by _render_frequency_signal to
-            # the FM-modulated frequency
         else:
             self._last_pitch_cv = None
             samples, rendered_frequency = render_with_frequency_ramp(
@@ -696,18 +640,9 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         self.out_port.write(samples)
 
-        # Update component frequency to reflect rendered state for tests and UI
-        #
-        # Known limitation: In rare cases with rapid frequency modulation across buffer
-        # boundaries, this update may cause minor phase discontinuities
-        # (< 0.15 amplitude jump).
-        # This is a trade-off to allow tests to check the current frequency state.
-        # Affected scenarios:
-        # - LFO driving VCO freq input with rapid LFO frequency changes
-        # - Split-buffer rendering with continuous pitch CV modulation
-        #
-        # The alternative would be to not update this property, which would break tests
-        # that verify frequency modulation is working correctly.
+        # Expose last rendered frequency for tests / UI inspection.
+        # Rare rapid FM across buffer boundaries can cause tiny phase steps;
+        # see tests for boundary tolerances.
         if hasattr(self.component, "frequency"):
             self.component.frequency = self._last_runtime_frequency
         if (
@@ -727,24 +662,18 @@ class ModulatedOscillatorModule(ModuleWidget):
         fm_amount: float = 0.0,
         fm_mode: str = VCO_FM_MODE_V_OCT,
     ) -> np.ndarray:
-        """Render a pitch-CV/FM buffer using bulk frequency processing.
-
-        This method now uses the bulk frequency API which is 30-50x faster
-        than the previous per-sample loop approach.
-        """
-        # Smooth pitch CV if present
+        """Render pitch-CV / FM using the bulk frequency API."""
         if pitch_cv_signal is not None:
             pitch_cv_signal, self._last_pitch_cv = smooth_control_signal(
                 pitch_cv_signal,
                 self._last_pitch_cv,
-                float(getattr(self.component, "sample_rate", 44100.0)),
+                float(getattr(self.component, "sample_rate", audio_config.sample_rate)),
                 VCO_PITCH_CV_SMOOTHING_MS,
             )
         else:
             length = len(fm_signal) if fm_signal is not None else 512
             pitch_cv_signal = np.zeros(length, dtype=np.float32)
 
-        # Calculate final frequencies with pitch CV and FM
         frequencies = apply_v_oct_offset(base_frequency, pitch_cv_signal)
         if fm_signal is not None:
             frequencies = apply_vcv_fm_offset(
@@ -752,72 +681,9 @@ class ModulatedOscillatorModule(ModuleWidget):
             )
         frequency_buffer = _as_frequency_buffer(frequencies)
 
-        # Use bulk frequency API (30-50x faster than loop!)
         samples = self.component.process_frequency_buffer(frequency_buffer)
 
-        # Track last frequency for smooth transitions
         if len(frequency_buffer) > 0:
             self._last_runtime_frequency = float(frequency_buffer[-1])
 
         return samples
-
-    def _build_base_frequency_ramp(
-        self, target_frequency: float, num_samples: int
-    ) -> tuple[np.ndarray, float]:
-        """Build the base-frequency trajectory for FM-only rendering."""
-        sample_rate = float(getattr(self.component, "sample_rate", 44100.0))
-        if self._last_runtime_frequency == target_frequency:
-            frequencies = np.full(num_samples, target_frequency, dtype=np.float64)
-        else:
-            frequencies = _frequency_slew_values(
-                self._last_runtime_frequency,
-                target_frequency,
-                num_samples,
-                sample_rate,
-                35.0,
-            )
-        final_frequency = (
-            float(frequencies[-1]) if len(frequencies) > 0 else target_frequency
-        )
-        return frequencies, final_frequency
-
-    @staticmethod
-    def _create_runtime_base_oscillator(
-        wave_type: str,
-        mode: str,
-        frequency: float,
-        pulsewidth: float,
-        phase_degrees: float | None,
-    ):
-        """Create the VCO base oscillator from a runtime parameter snapshot."""
-        phase = phase_degrees or 0.0
-        if wave_type == "Sine":
-            return SineOscillator(
-                frequency,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                phase=phase,
-                mode=_as_sine_mode(mode),
-            )
-        if wave_type == "Square":
-            return SquareOscillator(
-                frequency,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                phase=phase,
-                pulsewidth=pulsewidth,
-                mode=_as_square_mode(mode),
-            )
-        if wave_type == "Sawtooth":
-            return SawtoothOscillator(
-                frequency,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                phase=phase,
-                mode=_as_sawtooth_mode(mode),
-            )
-        if wave_type == "Triangle":
-            return TriangleOscillator(
-                frequency,
-                gain_db=VCO_DEFAULT_GAIN_DB,
-                phase=phase,
-                mode=_as_triangle_mode(mode),
-            )
-        raise ValueError(f"Unknown waveform type: {wave_type}")

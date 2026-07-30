@@ -55,7 +55,7 @@ class StepSequencerModule(ModuleWidget):
 
     metadata = ModuleMetadata(
         title="Step Sequencer",
-        category=ModuleCategory.SOURCE,
+        category=ModuleCategory.SEQUENCER,
         description="Monophonic pattern sequencer with accent and slide outputs",
     )
 
@@ -78,8 +78,7 @@ class StepSequencerModule(ModuleWidget):
         self.slide_buttons: list[ImagePushButton] = []
         self.slide_leds: list[LedIndicator] = []
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout(spacing=6)
+        layout = self._begin_controls(spacing=6)
 
         self.notes_edit = QLineEdit("36,-,36,39,41,-,39,36")
         self.notes_edit.setToolTip("Comma-separated MIDI notes. Use '-' for rests.")
@@ -160,8 +159,7 @@ class StepSequencerModule(ModuleWidget):
         division_layout.addWidget(self.division_combo)
         layout.addLayout(division_layout)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter(
             "notes", self.notes_edit, getter="text", setter="setText"
@@ -181,9 +179,7 @@ class StepSequencerModule(ModuleWidget):
             setter="setCurrentText",
         )
 
-        self._sample_rate_listener = self._on_global_sample_rate_changed
-        audio_config.add_sample_rate_listener(self._sample_rate_listener)
-        self.destroyed.connect(self._cleanup_audio_config_listeners)
+        self._install_sample_rate_listener()
 
     def _create_step_toggle_grid(self) -> QGridLayout:
         toggle_grid = QGridLayout()
@@ -332,8 +328,6 @@ class StepSequencerModule(ModuleWidget):
         self.component.clock.sample_rate = new_sample_rate
         self.component.reset()
 
-    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
-        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         notes = str_parameter(parameters, "notes", self.notes_edit.text)

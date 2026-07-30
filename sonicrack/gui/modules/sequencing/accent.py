@@ -24,7 +24,7 @@ class AccentModule(ModuleWidget):
 
     metadata = ModuleMetadata(
         title="Accent",
-        category=ModuleCategory.MODULATED_SOURCE,
+        category=ModuleCategory.SEQUENCER,
         description="Convert accent gates into amp, cutoff, and envelope CV",
     )
 
@@ -37,8 +37,7 @@ class AccentModule(ModuleWidget):
         self.env_port = self.add_output("Env CV")
         self.component = AccentProcessor(sample_rate=audio_config.sample_rate)
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         top_row = QHBoxLayout()
         top_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -92,8 +91,7 @@ class AccentModule(ModuleWidget):
         depth_row.addWidget(self.env_depth_knob)
         layout.addLayout(depth_row)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter("amount", self.amount_knob)
         self.register_parameter("decay", self.decay_knob)
@@ -101,9 +99,7 @@ class AccentModule(ModuleWidget):
         self.register_parameter("cutoff_depth", self.cutoff_depth_knob)
         self.register_parameter("envelope_depth", self.env_depth_knob)
 
-        self._sample_rate_listener = self._on_global_sample_rate_changed
-        audio_config.add_sample_rate_listener(self._sample_rate_listener)
-        self.destroyed.connect(self._cleanup_audio_config_listeners)
+        self._install_sample_rate_listener()
 
     def get_required_inputs(self) -> list[str]:
         return ["Accent"]
@@ -112,8 +108,6 @@ class AccentModule(ModuleWidget):
         self.component.sample_rate = new_sample_rate
         self.component.reset()
 
-    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
-        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         if not self.accent_input.is_connected:

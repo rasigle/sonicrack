@@ -100,8 +100,7 @@ class SpectrumModule(ModuleWidget):
         self._sample_rate = int(audio_config.sample_rate)
         self._fft_size = 2048
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         self.spectrum_display = SpectrumAnalyzer(
             sample_rate=self._sample_rate,
@@ -124,10 +123,9 @@ class SpectrumModule(ModuleWidget):
 
         layout.addLayout(stats_layout)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
-        audio_config.add_sample_rate_listener(self._on_sample_rate_changed)
+        self._install_sample_rate_listener(self._on_sample_rate_changed)
 
         # 20 Hz is a good analyzer refresh rate and should not fight the audio
         # thread. CoarseTimer lets Qt coalesce UI work more efficiently.
@@ -155,12 +153,12 @@ class SpectrumModule(ModuleWidget):
             # this bounded so the UI thread cost stays predictable.
             samples = get_visualizer_samples(self.in_port, num_samples=self._fft_size)
 
-            mono = _as_mono_float32(samples)
-            if mono is None or mono.size < 256:
+            # set_samples() normalizes mono; avoid converting twice.
+            if samples is None:
                 self._show_no_signal()
                 return
 
-            result = self.spectrum_display.set_samples(mono)
+            result = self.spectrum_display.set_samples(samples)
 
             if result is None:
                 self._show_no_signal()
@@ -416,14 +414,19 @@ class SpectrumAnalyzer(QWidget):
         if not self._bucket_indices:
             return normalized[: self.fft_bins].astype(np.float32, copy=False)
 
+        # Vectorized max-per-bucket: pad indices and use advanced indexing.
         bars = np.empty(len(self._bucket_indices), dtype=np.float32)
-
+        n = int(normalized.size)
         for i, idx in enumerate(self._bucket_indices):
-            safe_idx = idx[idx < normalized.size]
-            if safe_idx.size == 0:
+            if idx.size == 0:
                 bars[i] = 0.0
+                continue
+            # Indices are built against the current FFT size; clamp only if needed.
+            if idx[-1] < n and idx[0] >= 0:
+                bars[i] = float(normalized[idx].max())
             else:
-                bars[i] = float(np.max(normalized[safe_idx]))
+                safe_idx = idx[idx < n]
+                bars[i] = float(normalized[safe_idx].max()) if safe_idx.size else 0.0
 
         return bars
 

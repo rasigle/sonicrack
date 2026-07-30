@@ -144,8 +144,7 @@ class LFOModule(ModuleWidget):
         self._last_output_values: list[float | None] = [None] * len(self.oscs)
 
         # Use helper methods for UI construction
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         # Frequency control (knob) - optimized for LFO range
         knobs_layout = QHBoxLayout()
@@ -174,15 +173,14 @@ class LFOModule(ModuleWidget):
         pw_layout.addWidget(self.pulsewidth_knob)
         layout.addLayout(pw_layout)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         # Register parameters for automatic get/set
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
         # Register with audio_config to receive sample rate change notifications
-        audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
+        self._install_sample_rate_listener()
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int):
         """Handle global sample rate changes from audio_config.
@@ -229,24 +227,41 @@ class LFOModule(ModuleWidget):
             else None
         )
 
-        final_clock = 0.0
-        for index, (port, osc) in enumerate(zip(self.ports, self.oscs, strict=False)):
-            if osc is not None:
-                samples, rendered_frequency, final_clock = render_with_clock_resets(
-                    osc,
-                    self._last_runtime_frequencies[index],
-                    frequency,
-                    num_samples,
-                    clock_signal,
-                    self._previous_clock,
-                    self._last_output_values[index],
-                    LFO_CLOCK_RESET_SMOOTHING_MS,
-                    LFO_FREQUENCY_SLEW_TIME_MS,
+        # Only render live (connected) outputs. When nothing is connected yet
+        # (unit tests / offline), fall back to all oscillators so state advances.
+        active = [
+            (index, port, osc)
+            for index, (port, osc) in enumerate(
+                zip(self.ports, self.oscs, strict=False)
+            )
+            if osc is not None and port.is_connected
+        ]
+        if not active:
+            active = [
+                (index, port, osc)
+                for index, (port, osc) in enumerate(
+                    zip(self.ports, self.oscs, strict=False)
                 )
-                port.write(samples)
-                self._last_runtime_frequencies[index] = rendered_frequency
-                if len(samples) > 0:
-                    self._last_output_values[index] = float(samples[-1])
+                if osc is not None
+            ]
+
+        final_clock = self._previous_clock if clock_signal is not None else 0.0
+        for index, port, osc in active:
+            samples, rendered_frequency, final_clock = render_with_clock_resets(
+                osc,
+                self._last_runtime_frequencies[index],
+                frequency,
+                num_samples,
+                clock_signal,
+                self._previous_clock,
+                self._last_output_values[index],
+                LFO_CLOCK_RESET_SMOOTHING_MS,
+                LFO_FREQUENCY_SLEW_TIME_MS,
+            )
+            port.write(samples)
+            self._last_runtime_frequencies[index] = rendered_frequency
+            if len(samples) > 0:
+                self._last_output_values[index] = float(samples[-1])
         self._previous_clock = final_clock
 
     @staticmethod

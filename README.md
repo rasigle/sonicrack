@@ -16,25 +16,40 @@ assets; DSP, realtime audio, and MIDI primitives come from [`soniclab`](https://
 
 ## Install (PyPI)
 
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then:
+
 ```bash
-pip install sonicrack
+uv tool install sonicrack
+sonicrack
 ```
 
 That installs the desktop app stack (PyQt6, device audio via `sounddevice`/`numba`,
-and the `soniclab` engine). Launch with:
+and the `soniclab` engine). Alternatives:
 
 ```bash
-sonicrack
-# or:
-python -m sonicrack.modular_synth_app
+# into the active environment
+uv pip install sonicrack
+
+# as a project dependency
+uv add sonicrack
+
+# one-off run without a permanent install
+uvx sonicrack
+```
+
+Module entry point (any install that puts the package on `PYTHONPATH`):
+
+```bash
+uv run python -m sonicrack.modular_synth_app
 ```
 
 Optional extras:
 
 ```bash
-pip install "sonicrack[midi]"       # MIDI ports via soniclab[midi]
-pip install "sonicrack[examples]"   # analysis notebooks / live-input demos
-pip install "sonicrack[full]"       # midi + examples
+uv tool install "sonicrack[midi]"       # MIDI ports via soniclab[midi]
+uv tool install "sonicrack[examples]"   # analysis notebooks / live-input demos
+uv tool install "sonicrack[full]"       # midi + examples
+# or: uv pip install "sonicrack[midi]" / "sonicrack[examples]" / "sonicrack[full]"
 ```
 
 Notes:
@@ -45,28 +60,36 @@ Notes:
 
 ## Development install
 
-Recommended environment tool: `uv`.
+Clone the repo and sync with `uv` (creates `.venv` and installs the project):
 
 ```powershell
 uv sync --group dev
-# or editable with pip:
-python -m pip install -e ".[dev]"
 ```
 
-Legacy install scripts that used `--extra gui` or `.[gui]` still work; those
-extras are empty because GUI/audio deps are part of the base install.
-
-Windows helper:
+Optional extras for local work:
 
 ```powershell
-run_modular_synth.bat
+uv sync --group dev --extra midi
+uv sync --group dev --extra full
 ```
+
+Windows helpers under `scripts/environment/`:
+
+```powershell
+.\scripts\environment\uv_sync_dev.bat      # dev + full extras
+.\scripts\environment\uv_sync_mandatory.bat
+.\scripts\environment\uv_sync_all.bat
+run_modular_synth.bat                      # sync/activate + launch
+```
+
+Legacy `--extra gui` / `.[gui]` still work; those extras are empty because
+GUI/audio deps are part of the base install.
 
 Useful launch options:
 
 ```powershell
-sonicrack --no-splash
-sonicrack --log-level DEBUG --detailed-log
+uv run sonicrack --no-splash
+uv run sonicrack --log-level DEBUG --detailed-log
 ```
 
 ## Current Scope

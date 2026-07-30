@@ -18,6 +18,27 @@ from sonicrack.utils.common_utils import enum_from_value
 
 logger = logging.getLogger(__name__)
 
+# Cached after first successful resolve so Port.read() avoids import work every buffer.
+# Lazy to prevent a circular import with sonicrack.runtime.engine.
+_get_active_render_context = None
+_render_context_resolved = False
+
+
+def _active_render_context():
+    """Return the active render context, resolving the engine import once."""
+    global _get_active_render_context, _render_context_resolved
+    if not _render_context_resolved:
+        try:
+            from sonicrack.runtime.engine import get_active_render_context
+
+            _get_active_render_context = get_active_render_context
+        except ImportError:  # pragma: no cover
+            _get_active_render_context = None
+        _render_context_resolved = True
+    if _get_active_render_context is None:
+        return None
+    return _get_active_render_context()
+
 
 class PortType(StrEnum):
     """Enum describing port type."""
@@ -284,13 +305,7 @@ class Port:
             Sum of values from connected ports (float or np.ndarray), or 0.0 if not
             connected
         """
-        render_context = None
-        if num_samples is not None:
-            with contextlib.suppress(ImportError):
-                from sonicrack.runtime.engine import get_active_render_context
-
-                render_context = get_active_render_context()
-
+        render_context = _active_render_context() if num_samples is not None else None
         if render_context is not None:
             return render_context.read_port(self)
 
@@ -391,11 +406,10 @@ class Port:
             Current cached value from the port
         """
         value = self._latest_buffer
-        if self._tap_history is not None and self._tap_history.size > 0:
-            ordered = self._ordered_tap_history()
+        if self._tap_history is not None and self._tap_count > 0:
             if num_samples is not None and num_samples > 0:
-                return ordered[-num_samples:].copy()
-            return ordered.copy()
+                return self._read_recent_tap_samples(num_samples)
+            return self._ordered_tap_history()
         if isinstance(value, np.ndarray):
             if num_samples is not None and num_samples > 0:
                 return value[-num_samples:].copy()
@@ -408,11 +422,11 @@ class Port:
         Args:
             value: Array value to store
         """
+        # Share the written buffer reference; the circular history owns its own
+        # storage, so a second full-buffer copy on every audio callback is wasted.
+        self._latest_buffer = value
         if self._tap_history_enabled:
-            self._latest_buffer = value.copy()
             self._append_tap_history(value)
-        else:
-            self._latest_buffer = value
 
     def _append_tap_history(self, value: np.ndarray) -> None:
         """Append rendered samples to bounded passive tap history."""
@@ -465,19 +479,45 @@ class Port:
         self._tap_write_index = end % self._tap_history_limit
         self._tap_count = min(self._tap_count + count, self._tap_history_limit)
 
+    def _read_recent_tap_samples(self, num_samples: int) -> np.ndarray:
+        """Copy only the last ``num_samples`` frames from the circular tap buffer.
+
+        Avoids materializing the full 64k ordered history on every visualizer peek.
+        """
+        if self._tap_history is None or self._tap_count == 0 or num_samples <= 0:
+            return np.empty(0, dtype=np.float32)
+
+        count = min(int(num_samples), self._tap_count)
+        hist = self._tap_history
+        out_shape = (count, *hist.shape[1:]) if hist.ndim > 1 else (count,)
+        out = np.empty(out_shape, dtype=hist.dtype)
+
+        if self._tap_count < self._tap_history_limit:
+            start = self._tap_count - count
+            out[:] = hist[start : self._tap_count]
+            return out
+
+        # Ring is full: write index points at the oldest sample.
+        end = self._tap_write_index
+        start = (end - count) % self._tap_history_limit
+        if start < end:
+            out[:] = hist[start:end]
+        elif start > end:
+            first = self._tap_history_limit - start
+            out[:first] = hist[start:]
+            out[first:] = hist[:end]
+        else:
+            # count == limit and start == end: full buffer in chronological order.
+            first = self._tap_history_limit - start
+            out[:first] = hist[start:]
+            out[first:] = hist[:end]
+        return out
+
     def _ordered_tap_history(self) -> np.ndarray:
-        """Return tap history in chronological order."""
+        """Return a copy of tap history in chronological order."""
         if self._tap_history is None or self._tap_count == 0:
             return np.empty(0, dtype=np.float32)
-        if self._tap_count < self._tap_history_limit:
-            return self._tap_history[: self._tap_count]
-        return np.concatenate(
-            (
-                self._tap_history[self._tap_write_index :],
-                self._tap_history[: self._tap_write_index],
-            ),
-            axis=0,
-        )
+        return self._read_recent_tap_samples(self._tap_count)
 
     def _sync_tap_history_subscription(self) -> None:
         """Enable audio tap history only while a visualization input is attached."""

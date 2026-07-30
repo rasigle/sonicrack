@@ -63,12 +63,11 @@ class OutputModule(ModuleWidget):
         self.audio_engine: AudioEngine | None = None
 
         # Register for global audio setting changes
-        audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
+        self._install_sample_rate_listener()
         audio_config.add_buffer_size_listener(self._on_global_buffer_size_changed)
 
         # Build UI
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         # Master gain control
         self.gain_db = 0.0  # Initialize at 0 dB
@@ -98,8 +97,7 @@ class OutputModule(ModuleWidget):
         layout.addWidget(self.status_label)
         layout.addStretch()
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         logger.debug("OutputModule initialized")
 

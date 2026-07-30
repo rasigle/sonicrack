@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 from soniclab.dsp.modulators import DecayEnvelope
 
 from sonicrack.gui.widgets import Knob
+from sonicrack.gui.widgets.envelope_shape_widget import EnvelopeShapeWidget
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
@@ -29,12 +32,12 @@ class DecayEnvelopeModule(ModuleWidget):
 
     metadata = ModuleMetadata(
         title="Decay Envelope",
-        category=ModuleCategory.MODULATED_SOURCE,
+        category=ModuleCategory.ENVELOPE,
         description="Triggered attack-decay envelope for plucks and filter CV",
     )
 
     def __init__(self) -> None:
-        super().__init__(width=220, height=265, color=QColor(140, 175, 75))
+        super().__init__(width=220, height=330, color=QColor(140, 175, 75))
 
         self.gate_input = self.add_input("Gate", signal=PortSignal.GATE)
         self.accent_input = self.add_input("Accent", signal=PortSignal.CONTROL_CV)
@@ -43,8 +46,16 @@ class DecayEnvelopeModule(ModuleWidget):
         self.component = DecayEnvelope()
         self._previous_gate = 0.0
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout(spacing=6)
+        layout = self._begin_controls(spacing=6)
+
+        self.shape_widget = EnvelopeShapeWidget()
+        layout.addWidget(self.shape_widget)
+
+        self._viz_timer = QTimer(self)
+        self._viz_timer.setTimerType(Qt.TimerType.CoarseTimer)
+        self._viz_timer.setInterval(33)
+        self._viz_timer.timeout.connect(self._update_live_position)
+        self._viz_timer.start()
 
         timing_row = QHBoxLayout()
         timing_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -56,8 +67,8 @@ class DecayEnvelopeModule(ModuleWidget):
             default_value=0.001,
         )
         self.attack_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "attack_duration", self.attack_knob.get_value()
+            lambda *_: self._on_envelope_knob_changed(
+                "attack_duration", self.attack_knob
             )
         )
         timing_row.addWidget(self.attack_knob)
@@ -70,8 +81,8 @@ class DecayEnvelopeModule(ModuleWidget):
             default_value=0.001,
         )
         self.decay_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "decay_duration", self.decay_knob.get_value()
+            lambda *_: self._on_envelope_knob_changed(
+                "decay_duration", self.decay_knob
             )
         )
         timing_row.addWidget(self.decay_knob)
@@ -87,7 +98,7 @@ class DecayEnvelopeModule(ModuleWidget):
             default_value=0.001,
         )
         self.amount_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("amount", self.amount_knob.get_value())
+            lambda *_: self._on_envelope_knob_changed("amount", self.amount_knob)
         )
         amount_row.addWidget(self.amount_knob)
 
@@ -110,13 +121,54 @@ class DecayEnvelopeModule(ModuleWidget):
         self.trigger_button.clicked.connect(self._trigger)
         layout.addWidget(self.trigger_button)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter("attack_duration", self.attack_knob)
         self.register_parameter("decay_duration", self.decay_knob)
         self.register_parameter("amount", self.amount_knob)
         self.register_parameter("accent_amount", self.accent_knob)
+
+        self._update_shape_display()
+
+    def _on_envelope_knob_changed(self, param_name: str, knob: Knob) -> None:
+        """Refresh the shape preview and emit the changed parameter signal."""
+        self._update_shape_display()
+        self.parameter_changed.emit(param_name, knob.get_value())
+
+    def _update_shape_display(self) -> None:
+        """Sync the shape widget with attack/decay/amount knobs."""
+        self.shape_widget.set_ad_envelope(
+            self.attack_knob.get_value(),
+            self.decay_knob.get_value(),
+            self.amount_knob.get_value(),
+        )
+
+    def _update_live_position(self) -> None:
+        """Refresh the shape playhead from the decay envelope component."""
+        component = self.component
+        phase = str(getattr(component, "_phase", "idle") or "idle").lower()
+        position = int(getattr(component, "_phase_position", 0) or 0)
+        level = float(getattr(component, "val", 0.0) or 0.0)
+        ended = bool(getattr(component, "ended", True))
+
+        if ended or phase in {"idle", "ended"}:
+            self.shape_widget.clear_live_state()
+            return
+
+        if phase == "attack":
+            total = max(1, int(getattr(component, "_attack_samples", 1) or 1))
+        elif phase == "decay":
+            total = max(1, int(getattr(component, "_decay_samples", 1) or 1))
+        else:
+            total = 1
+
+        progress = min(1.0, max(0.0, position / total))
+        self.shape_widget.set_live_state(phase, progress, level)
+
+    def set_parameters(self, params: dict[str, Any]) -> None:
+        """Restore parameters and refresh the envelope shape preview."""
+        super().set_parameters(params)
+        self._update_shape_display()
 
     def get_required_inputs(self) -> list[str]:
         return []

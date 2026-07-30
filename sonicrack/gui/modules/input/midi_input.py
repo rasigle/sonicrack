@@ -7,6 +7,7 @@ and other synthesis parameters.
 Outputs:
     - Freq: 1V/oct pitch CV based on MIDI note
     - Gate: Gate signal (1.0 = note on, 0.0 = note off)
+    - Trig: One-sample trigger pulse on each note-on (including legato)
     - Vel: Velocity CV (0.0 to 1.0)
 
 Pitch CV convention:
@@ -73,6 +74,7 @@ from soniclab.midi_io import (
     NoteOnMessage,
 )
 
+from sonicrack.gui.modules.input.midi_trigger import MIDITriggerOutput
 from sonicrack.gui.modules.input.midi_worker_thread import MIDIWorkerThread
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
@@ -119,6 +121,7 @@ class MIDIInputModule(ModuleWidget):
         # Add output ports
         self.freq_port = self.add_output("1V/Oct", signal=PortSignal.PITCH_CV)
         self.gate_port = self.add_output("Gate", signal=PortSignal.GATE)
+        self.trigger_port = self.add_output("Trig", signal=PortSignal.TRIGGER)
         self.vel_port = self.add_output("Vel", signal=PortSignal.CONTROL_CV)
 
         # MIDI components
@@ -128,12 +131,12 @@ class MIDIInputModule(ModuleWidget):
         # Create specialized output components for each port
         self.freq_output = CVFrequencyOutput(self.cv_converter)
         self.gate_output = CVGateOutput(self.cv_converter)
+        self.trigger_output = MIDITriggerOutput()
         self.vel_output = CVVelocityOutput(self.cv_converter)
         self._is_running = False
 
         # UI setup
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         # Device selection
         device_layout = QHBoxLayout()
@@ -166,8 +169,7 @@ class MIDIInputModule(ModuleWidget):
         )
         layout.addWidget(self.note_label)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         # Connect signals
         self.midi_message_received.connect(self._on_midi_message)
@@ -273,8 +275,9 @@ class MIDIInputModule(ModuleWidget):
         self.start_btn.setText("Start")
         self.note_label.setText("--")
 
-        # Reset CV converter
+        # Reset CV converter and any armed trigger pulse
         self.cv_converter.reset()
+        self.trigger_output.reset()
 
         logger.info("Stopped MIDI input")
 
@@ -321,6 +324,8 @@ class MIDIInputModule(ModuleWidget):
             if msg.velocity > 0:
                 from soniclab.midi_io import midi_to_note_name
 
+                # One-sample pulse on every note-on, including legato changes.
+                self.trigger_output.arm()
                 note_name = midi_to_note_name(msg.note)
                 self.note_label.setText(f"{note_name} ({msg.note})")
                 self.note_label.setStyleSheet(
@@ -356,7 +361,7 @@ class MIDIInputModule(ModuleWidget):
     def get_output_component(self, port_name: str) -> Any:
         """Get the component for a specific output port.
 
-        The MIDI module has multiple outputs (Freq, Gate, Vel) each with
+        The MIDI module has multiple outputs (Freq, Gate, Trig, Vel) each with
         a specialized adapter component.
 
         Args:
@@ -369,6 +374,7 @@ class MIDIInputModule(ModuleWidget):
             "1V/Oct": self.freq_output,
             "Freq": self.freq_output,
             "Gate": self.gate_output,
+            "Trig": self.trigger_output,
             "Vel": self.vel_output,
         }
         return outputs.get(port_name, self.freq_output)
@@ -378,6 +384,7 @@ class MIDIInputModule(ModuleWidget):
         del parameters
         self.freq_port.write(self.freq_output.get_samples(num_samples))
         self.gate_port.write(self.gate_output.get_samples(num_samples))
+        self.trigger_port.write(self.trigger_output.get_samples(num_samples))
         self.vel_port.write(self.vel_output.get_samples(num_samples))
 
     def __del__(self):

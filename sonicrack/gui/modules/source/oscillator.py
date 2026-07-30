@@ -115,8 +115,7 @@ class OscillatorModule(ModuleWidget):
         self._last_runtime_frequency = freq
 
         # Use helper methods for UI construction
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         # Frequency control (knobs)
         knobs_layout = QHBoxLayout()
@@ -145,14 +144,13 @@ class OscillatorModule(ModuleWidget):
         pw_layout.addWidget(self.pulsewidth_knob)
         layout.addLayout(pw_layout)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
         # Register with audio_config to receive sample rate change notifications
-        audio_config.add_sample_rate_listener(self._on_global_sample_rate_changed)
+        self._install_sample_rate_listener()
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int):
         """Handle global sample rate changes from audio_config.
@@ -193,16 +191,29 @@ class OscillatorModule(ModuleWidget):
 
         self._square_oscillator.pulsewidth = pulsewidth
 
+        # Only render live (connected) outputs. When nothing is connected yet
+        # (unit tests / offline), fall back to all oscillators so state advances.
+        active = [
+            (port, osc)
+            for port, osc in zip(self.ports, self.oscs, strict=False)
+            if osc is not None and port.is_connected
+        ]
+        if not active:
+            active = [
+                (port, osc)
+                for port, osc in zip(self.ports, self.oscs, strict=False)
+                if osc is not None
+            ]
+
         rendered_frequency = self._last_runtime_frequency
-        for port, osc in zip(self.ports, self.oscs, strict=False):
-            if osc is not None:
-                samples, rendered_frequency = render_with_frequency_ramp(
-                    osc,
-                    self._last_runtime_frequency,
-                    frequency,
-                    num_samples,
-                )
-                port.write(samples)
+        for port, osc in active:
+            samples, rendered_frequency = render_with_frequency_ramp(
+                osc,
+                self._last_runtime_frequency,
+                frequency,
+                num_samples,
+            )
+            port.write(samples)
         self._last_runtime_frequency = rendered_frequency
 
     def get_output_component(self, port_name: str):

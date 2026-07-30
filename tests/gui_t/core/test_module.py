@@ -136,6 +136,7 @@ def test_modules_explicitly_mark_pitch_cv_ports(qapp):
     assert vco.freq_input.signal == PortSignal.PITCH_CV
     assert tb303.freq_input.signal == PortSignal.PITCH_CV
     assert midi_keyboard.freq_port.signal == PortSignal.PITCH_CV
+    assert midi_keyboard.trigger_port.signal == PortSignal.TRIGGER
     assert sequencer.freq_port.signal == PortSignal.PITCH_CV
     assert lfo.sine_port.signal == PortSignal.CONTROL_CV
 

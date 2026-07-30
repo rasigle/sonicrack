@@ -24,6 +24,7 @@ from soniclab.midi_io import (
     midi_to_note_name,
 )
 
+from sonicrack.gui.modules.input.midi_trigger import MIDITriggerOutput
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
@@ -72,15 +73,17 @@ COMPUTER_KEY_OFFSETS: dict[int, int] = {
 
 @register_module()
 class MIDIKeyboardModule(ModuleWidget):
-    """On-screen MIDI keyboard with frequency, gate, and velocity CV outputs.
+    """On-screen MIDI keyboard with frequency, gate, trigger, and velocity CV outputs.
 
     Use this module as a local monophonic note source when no external MIDI
-    hardware is needed. Patch ``Freq`` into a VCO frequency input, ``Gate`` into
-    an ADSR gate input, and optionally ``Vel`` into a VCA CV input for
-        velocity-sensitive level control. The generated oscillator signal can be
-        routed to audio outputs, passive visualizers, or both in parallel. When
-        the module has focus, the computer keyboard layout
-        ``A W S E D F T G Y H U J`` plays one chromatic octave from C to B.
+    hardware is needed. Patch ``1V/Oct`` into a VCO frequency input, ``Gate``
+    into an ADSR gate input, ``Trig`` into decay/percussive envelopes or clocked
+    inputs that need a short pulse on each note-on (including legato retriggers),
+    and optionally ``Vel`` into a VCA CV input for velocity-sensitive level
+    control. The generated oscillator signal can be routed to audio outputs,
+    passive visualizers, or both in parallel. When the module has focus, the
+    computer keyboard layout ``A W S E D F T G Y H U J`` plays one chromatic
+    octave from C to B.
     """
 
     runtime_kind = "midi"
@@ -102,19 +105,20 @@ class MIDIKeyboardModule(ModuleWidget):
 
         self.freq_port = self.add_output("1V/Oct", signal=PortSignal.PITCH_CV)
         self.gate_port = self.add_output("Gate", signal=PortSignal.GATE)
+        self.trigger_port = self.add_output("Trig", signal=PortSignal.TRIGGER)
         self.vel_port = self.add_output("Vel", signal=PortSignal.CONTROL_CV)
 
         self.cv_converter = MIDIToCV()
         self.freq_output = CVFrequencyOutput(self.cv_converter)
         self.gate_output = CVGateOutput(self.cv_converter)
+        self.trigger_output = MIDITriggerOutput()
         self.vel_output = CVVelocityOutput(self.cv_converter)
         self._pressed_note_offsets: dict[int, int] = {}
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsFocusable)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout(spacing=8)
+        layout = self._begin_controls(spacing=8)
 
         settings_layout = QHBoxLayout()
         settings_layout.addWidget(QLabel("Octave:"))
@@ -155,8 +159,7 @@ class MIDIKeyboardModule(ModuleWidget):
         self._add_keyboard_buttons(keyboard_layout)
         layout.addLayout(keyboard_layout)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter(
             "octave",
@@ -229,6 +232,9 @@ class MIDIKeyboardModule(ModuleWidget):
         self.cv_converter.process_message(
             NoteOnMessage(timestamp=0.0, channel=0, note=note, velocity=velocity)
         )
+        # Arm a one-sample trigger pulse for the next process_runtime() call.
+        # Fires on every note-on, including legato changes while gate stays high.
+        self.trigger_output.arm()
         self.key_buttons[note_offset].setDown(True)
         self.note_label.setText(f"{midi_to_note_name(note)} ({note})")
         self.note_label.setStyleSheet(
@@ -301,6 +307,7 @@ class MIDIKeyboardModule(ModuleWidget):
             "1V/Oct": self.freq_output,
             "Freq": self.freq_output,
             "Gate": self.gate_output,
+            "Trig": self.trigger_output,
             "Vel": self.vel_output,
         }
         return outputs.get(port_name, self.freq_output)
@@ -309,6 +316,7 @@ class MIDIKeyboardModule(ModuleWidget):
         del parameters
         self.freq_port.write(self.freq_output.get_samples(num_samples))
         self.gate_port.write(self.gate_output.get_samples(num_samples))
+        self.trigger_port.write(self.trigger_output.get_samples(num_samples))
         self.vel_port.write(self.vel_output.get_samples(num_samples))
 
     def set_active(self, active: bool) -> None:
@@ -317,5 +325,6 @@ class MIDIKeyboardModule(ModuleWidget):
             for note_offset in self._pressed_note_offsets:
                 self.key_buttons[note_offset].setDown(False)
             self._pressed_note_offsets.clear()
+            self.trigger_output.reset()
             self.cv_converter.reset()
             self.note_label.setText("--")

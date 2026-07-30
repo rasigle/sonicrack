@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import (
     QBrush,
     QColor,
@@ -16,6 +16,7 @@ from PyQt6.QtGui import (
     QPainterPath,
     QPen,
     QPixmap,
+    QPolygonF,
 )
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
@@ -145,8 +146,7 @@ class WaveformModule(ModuleWidget):
         self._viz_timer.setInterval(50)
         self._viz_timer.timeout.connect(self._update_display)
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout()
+        layout = self._begin_controls()
 
         controls_row = QHBoxLayout()
 
@@ -226,8 +226,7 @@ class WaveformModule(ModuleWidget):
 
         layout.addLayout(stats_layout)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self._viz_timer.start()
         logger.info("Waveform visualization timer started")
@@ -246,6 +245,8 @@ class WaveformModule(ModuleWidget):
             # Capture the current visible/prepared samples once.
             if self._last_display_samples is not None:
                 self._frozen_samples = self._last_display_samples.copy()
+                self.waveform_display.set_samples(self._frozen_samples)
+                self._update_stats(self._frozen_samples)
             else:
                 self._frozen_samples = None
 
@@ -333,10 +334,8 @@ class WaveformModule(ModuleWidget):
     def _update_display(self) -> None:
         """Update waveform from rendered port tap history."""
         try:
+            # Frozen display is applied once on toggle; skip timer work.
             if self._is_frozen:
-                if self._frozen_samples is not None:
-                    self.waveform_display.set_samples(self._frozen_samples)
-                    self._update_stats(self._frozen_samples)
                 return
 
             if not self.in_port.is_connected:
@@ -617,7 +616,7 @@ class WaveformDisplay(QWidget):
         y_scale: float,
         width: int,
     ) -> QPainterPath:
-        """Build a line-only path for a waveform."""
+        """Build a line-only path for a waveform using bulk coordinate arrays."""
         samples = np.asarray(samples, dtype=np.float32).ravel()
 
         path = QPainterPath()
@@ -636,16 +635,14 @@ class WaveformDisplay(QWidget):
         if float(samples.min()) < -1.0 or float(samples.max()) > 1.0:
             samples = np.clip(samples, -1.0, 1.0)
 
-        x_scale = width / max(1, samples.size - 1)
+        n = int(samples.size)
+        x_scale = width / max(1, n - 1)
+        xs = np.arange(n, dtype=np.float64) * x_scale
+        ys = center_y - samples.astype(np.float64, copy=False) * y_scale
 
-        first_y = center_y - float(samples[0]) * y_scale
-        path.moveTo(0.0, first_y)
-
-        for i in range(1, samples.size):
-            x = float(i) * x_scale
-            y = center_y - float(samples[i]) * y_scale
-            path.lineTo(x, y)
-
+        # QPolygonF + addPolygon is faster than per-point lineTo in Python.
+        points = [QPointF(xs[i], ys[i]) for i in range(n)]
+        path.addPolygon(QPolygonF(points))
         return path
 
     def _ensure_grid_pixmap(self) -> QPixmap:

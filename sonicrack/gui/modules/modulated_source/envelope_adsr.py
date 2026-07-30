@@ -48,12 +48,14 @@ class ADSRModule(ModuleWidget):
         """Initialize ADSR module."""
         super().__init__(
             width=220,
-            height=440,
+            height=480,
             color=QColor(120, 180, 80),
         )
 
         # Add input port for gate signal (optional)
         self.gate_input = self.add_input("Gate", signal=PortSignal.GATE)
+        # Optional velocity CV (0..1) scaled by Vel Depth into output level
+        self.vel_input = self.add_input("Vel", signal=PortSignal.CONTROL_CV)
 
         # Add output port
         self.out_port = self.add_output("Out", signal=PortSignal.CONTROL_CV)
@@ -140,6 +142,21 @@ class ADSRModule(ModuleWidget):
 
         layout.addLayout(knobs_layout2)
 
+        self.vel_depth_knob = Knob(
+            label="Vel Depth",
+            description="How much the Vel input scales envelope level "
+            "(0 = ignore velocity, 1 = full velocity scaling)",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=0.0,
+        )
+        self.vel_depth_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit(
+                "velocity_depth", self.vel_depth_knob.get_value()
+            )
+        )
+        layout.addWidget(self.vel_depth_knob, alignment=Qt.AlignmentFlag.AlignCenter)
+
         retrigger_layout = QVBoxLayout()
         retrigger_label = QLabel("Retrigger")
         self.retrigger_combo = QComboBox()
@@ -217,6 +234,7 @@ class ADSRModule(ModuleWidget):
         self.register_parameter("decay_duration", self.decay_knob)
         self.register_parameter("sustain_level", self.sustain_knob)
         self.register_parameter("release_duration", self.release_knob)
+        self.register_parameter("velocity_depth", self.vel_depth_knob)
         self.register_parameter(
             "retrigger_mode",
             self.retrigger_combo,
@@ -472,5 +490,15 @@ class ADSRModule(ModuleWidget):
         else:
             self._previous_gate = 0.0
             samples = adsr.get_samples(num_samples)
+
+        samples = np.asarray(samples, dtype=np.float32)
+        vel_depth = float_parameter(
+            parameters, "velocity_depth", self.vel_depth_knob.get_value
+        )
+        if vel_depth > 0.0 and self.vel_input.is_connected:
+            vel = np.clip(read_samples(self.vel_input, num_samples), 0.0, 1.0)
+            # Blend: full envelope when depth=0; at depth=1 scale by velocity.
+            scale = (1.0 - vel_depth) + vel_depth * vel
+            samples = samples * scale
 
         self.out_port.write(samples)

@@ -1,11 +1,11 @@
-"""Monophonic step sequencer module."""
+"""Monophonic step sequencer module with visual step editing."""
 
 from __future__ import annotations
 
 import random
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import (
     QComboBox,
     QGridLayout,
@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSizePolicy,
 )
 from soniclab.sequencing import TB303StepEvent, TB303StepSequencer
 
@@ -42,13 +43,101 @@ _RANDOMIZE_SCALE_INTERVALS = (0, 2, 3, 5, 7, 8, 10, 12, 15)
 _REST_PROBABILITY = 0.2
 _ACCENT_PROBABILITY = 0.3
 _SLIDE_PROBABILITY = 0.25
+_DEFAULT_NOTES: tuple[int | None, ...] = (36, None, 36, 39, 41, None, 39, 36)
 _DEFAULT_ACCENTS = (True, False, False, True, False, False, True, False)
 _DEFAULT_SLIDES = (False, False, True, False, False, False, True, False)
+_NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+# Click-cycle palette: rest + bass minor-scale pitches around C2–C3.
+_NOTE_CYCLE: tuple[int | None, ...] = (
+    None,
+    36,
+    38,
+    39,
+    41,
+    43,
+    44,
+    46,
+    48,
+    51,
+    53,
+    55,
+    56,
+    58,
+    60,
+)
+
+
+def _midi_to_label(note: int | None) -> str:
+    if note is None:
+        return "—"
+    return f"{_NOTE_NAMES[note % 12]}{note // 12 - 1}"
+
+
+class StepNoteButton(QPushButton):
+    """Compact pitch cell: click cycles, wheel ±semitone, right-click rest."""
+
+    def __init__(self, step_index: int, owner: StepSequencerModule) -> None:
+        # ModuleWidget is a QGraphicsItem, not a QWidget — do not parent to it.
+        super().__init__("—")
+        self._step_index = step_index
+        self._owner = owner
+        self.setFixedSize(36, 28)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setToolTip(
+            "Left-click: cycle note\n"
+            "Right-click: rest\n"
+            "Mouse wheel: ±1 semitone\n"
+            "Shift+click: rest"
+        )
+        self.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #2a2440;
+                color: #e8e4ff;
+                border: 1px solid #5a4d80;
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #3a3358;
+                border-color: #8a7ab8;
+            }
+            QPushButton:pressed {
+                background-color: #1e1a30;
+            }
+            """
+        )
+
+    def mousePressEvent(self, event: QMouseEvent | None) -> None:
+        if event is None:
+            return
+        if event.button() == Qt.MouseButton.RightButton or (
+            event.button() == Qt.MouseButton.LeftButton
+            and event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+        ):
+            self._owner.set_step_note(self._step_index, None)
+            event.accept()
+            return
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._owner.cycle_step_note(self._step_index)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def wheelEvent(self, event: QWheelEvent | None) -> None:
+        if event is None:
+            return
+        delta = event.angleDelta().y()
+        if delta == 0:
+            return
+        self._owner.nudge_step_note(self._step_index, 1 if delta > 0 else -1)
+        event.accept()
 
 
 @register_module()
 class StepSequencerModule(ModuleWidget):
-    """Compact monophonic sequencer for pitch, gate, accent, and slide CV."""
+    """Monophonic sequencer with visual pitch steps, accent, and slide CV."""
 
     runtime_kind = "step_sequencer"
     step_toggle_count = 8
@@ -60,7 +149,7 @@ class StepSequencerModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=340, height=340, color=QColor(120, 100, 170))
+        super().__init__(width=360, height=400, color=QColor(120, 100, 170))
 
         self.clock_input = self.add_input("Clock", signal=PortSignal.TRIGGER)
         self.reset_input = self.add_input("Reset", signal=PortSignal.TRIGGER)
@@ -73,20 +162,25 @@ class StepSequencerModule(ModuleWidget):
         self._previous_pattern_key: tuple[str, str, str, str, float] | None = None
         self._previous_reset = 0.0
         self._syncing_step_toggles = False
+        self._syncing_notes = False
+        self._step_notes: list[int | None] = list(_DEFAULT_NOTES)
         self.accent_buttons: list[ImagePushButton] = []
         self.accent_leds: list[LedIndicator] = []
         self.slide_buttons: list[ImagePushButton] = []
         self.slide_leds: list[LedIndicator] = []
+        self.step_leds: list[LedIndicator] = []
+        self.note_buttons: list[StepNoteButton] = []
 
         layout = self._begin_controls(spacing=6)
 
-        self.notes_edit = QLineEdit("36,-,36,39,41,-,39,36")
+        # Hidden line edit keeps preset/test compatibility for free-text notes.
+        self.notes_edit = QLineEdit(self._notes_to_text(self._step_notes))
         self.notes_edit.setToolTip("Comma-separated MIDI notes. Use '-' for rests.")
-        self.notes_edit.textChanged.connect(
-            lambda value: self.parameter_changed.emit("notes", value)
-        )
-        layout.addWidget(QLabel("Notes:"))
+        self.notes_edit.setVisible(False)
+        self.notes_edit.textChanged.connect(self._on_notes_edit_changed)
         layout.addWidget(self.notes_edit)
+
+        layout.addLayout(self._create_visual_step_grid())
         layout.addLayout(self._create_step_toggle_grid())
 
         randomize_layout = QHBoxLayout()
@@ -180,6 +274,31 @@ class StepSequencerModule(ModuleWidget):
         )
 
         self._install_sample_rate_listener()
+        self._refresh_note_buttons()
+
+    def _create_visual_step_grid(self) -> QGridLayout:
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(3)
+        grid.setVerticalSpacing(2)
+
+        playhead_style = LedStyle(size=8)
+        grid.addWidget(QLabel("Step"), 0, 0)
+        grid.addWidget(QLabel("Note"), 1, 0)
+
+        for index in range(self.step_toggle_count):
+            led = LedIndicator(style=playhead_style)
+            led.set_on(False)
+            self.step_leds.append(led)
+            grid.addWidget(led, 0, index + 1, alignment=Qt.AlignmentFlag.AlignCenter)
+
+            note_button = StepNoteButton(index, self)
+            note_button.setSizePolicy(
+                QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+            )
+            self.note_buttons.append(note_button)
+            grid.addWidget(note_button, 1, index + 1)
+
+        return grid
 
     def _create_step_toggle_grid(self) -> QGridLayout:
         toggle_grid = QGridLayout()
@@ -244,6 +363,35 @@ class StepSequencerModule(ModuleWidget):
             toggle_grid.addLayout(slide_cell, 1, index + 1)
 
         return toggle_grid
+
+    def set_step_note(self, step: int, note: int | None) -> None:
+        """Set a single step pitch (None = rest)."""
+        if not 0 <= step < self.step_toggle_count:
+            return
+        if note is not None:
+            note = max(0, min(127, int(note)))
+        self._step_notes[step] = note
+        if note is None:
+            self._clear_step_flags(step)
+        self._push_notes_to_edit()
+        self._refresh_note_buttons()
+
+    def cycle_step_note(self, step: int) -> None:
+        """Advance a step through the curated note palette."""
+        current = self._step_notes[step]
+        try:
+            index = _NOTE_CYCLE.index(current)
+        except ValueError:
+            index = 0
+        next_note = _NOTE_CYCLE[(index + 1) % len(_NOTE_CYCLE)]
+        self.set_step_note(step, next_note)
+
+    def nudge_step_note(self, step: int, delta: int) -> None:
+        """Nudge a step pitch by semitones; rests become C2 first."""
+        current = self._step_notes[step]
+        if current is None:
+            current = _RANDOMIZE_ROOT if delta > 0 else _RANDOMIZE_ROOT
+        self.set_step_note(step, current + delta)
 
     def get_accents(self) -> str:
         """Serialize accent step toggles for parameters and presets."""
@@ -319,6 +467,96 @@ class StepSequencerModule(ModuleWidget):
         finally:
             self._syncing_step_toggles = False
 
+    def _clear_step_flags(self, step: int) -> None:
+        self._syncing_step_toggles = True
+        try:
+            self.accent_buttons[step].setChecked(False)
+            self.accent_leds[step].set_on(False)
+            self.slide_buttons[step].setChecked(False)
+            self.slide_leds[step].set_on(False)
+        finally:
+            self._syncing_step_toggles = False
+        self.parameter_changed.emit("accents", self.get_accents())
+        self.parameter_changed.emit("slides", self.get_slides())
+
+    def _on_notes_edit_changed(self, value: str) -> None:
+        if self._syncing_notes:
+            return
+        self._step_notes = self._parse_note_list(value, self.step_toggle_count)
+        self._refresh_note_buttons()
+        self.parameter_changed.emit("notes", value)
+
+    def _push_notes_to_edit(self) -> None:
+        text = self._notes_to_text(self._step_notes)
+        self._syncing_notes = True
+        try:
+            self.notes_edit.setText(text)
+        finally:
+            self._syncing_notes = False
+        self.parameter_changed.emit("notes", text)
+
+    def _refresh_note_buttons(self) -> None:
+        for index, button in enumerate(self.note_buttons):
+            note = self._step_notes[index]
+            button.setText(_midi_to_label(note))
+            if note is None:
+                button.setStyleSheet(
+                    """
+                    QPushButton {
+                        background-color: #1a1824;
+                        color: #6a6578;
+                        border: 1px solid #3a3548;
+                        border-radius: 4px;
+                        font-size: 10px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #2a2440;
+                        border-color: #5a4d80;
+                    }
+                    """
+                )
+            else:
+                button.setStyleSheet(
+                    """
+                    QPushButton {
+                        background-color: #2a2440;
+                        color: #e8e4ff;
+                        border: 1px solid #5a4d80;
+                        border-radius: 4px;
+                        font-size: 10px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover {
+                        background-color: #3a3358;
+                        border-color: #8a7ab8;
+                    }
+                    QPushButton:pressed {
+                        background-color: #1e1a30;
+                    }
+                    """
+                )
+
+    @staticmethod
+    def _notes_to_text(notes: list[int | None]) -> str:
+        return ",".join("-" if note is None else str(note) for note in notes)
+
+    @staticmethod
+    def _parse_note_list(text: str, length: int) -> list[int | None]:
+        raw = [item.strip() for item in text.split(",") if item.strip()]
+        notes: list[int | None] = []
+        for item in raw[:length]:
+            if item in {"-", "r", "R", "rest", "Rest"}:
+                notes.append(None)
+            else:
+                try:
+                    notes.append(max(0, min(127, int(item))))
+                except ValueError:
+                    notes.append(None)
+        while len(notes) < length:
+            notes.append(None)
+        return notes
+
     @staticmethod
     def _flags_to_text(flags: list[bool]) -> str:
         return ",".join("1" if flag else "0" for flag in flags)
@@ -327,7 +565,6 @@ class StepSequencerModule(ModuleWidget):
         self.component.sample_rate = new_sample_rate
         self.component.clock.sample_rate = new_sample_rate
         self.component.reset()
-
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         notes = str_parameter(parameters, "notes", self.notes_edit.text)
@@ -343,6 +580,9 @@ class StepSequencerModule(ModuleWidget):
             )
             self.component.reset()
             self._previous_pattern_key = pattern_key
+            # Keep visual grid aligned when parameters are applied externally.
+            self._step_notes = self._parse_note_list(notes, self.step_toggle_count)
+            self._refresh_note_buttons()
 
         self.component.configure_clock(
             bpm=float_parameter(parameters, "bpm", self.bpm_knob.get_value),
@@ -369,6 +609,13 @@ class StepSequencerModule(ModuleWidget):
         self.gate_port.write(frame.gate)
         self.accent_port.write(frame.accent)
         self.slide_port.write(frame.slide)
+
+        active_step = getattr(self.component, "_active_step", -1)
+        self._update_step_leds(active_step if isinstance(active_step, int) else -1)
+
+    def _update_step_leds(self, active_step: int) -> None:
+        for index, led in enumerate(self.step_leds):
+            led.set_on(active_step == index)
 
     @staticmethod
     def _parse_pattern(

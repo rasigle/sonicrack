@@ -8,6 +8,18 @@ the companion `soniclab` engine package.
 
 ## [Unreleased]
 
+### Added
+
+- **Priority synth coverage** (see `docs/SYNTH_MODULE_RECOMMENDATIONS.md`):
+  - Visual Step Sequencer: per-step note grid, playhead LEDs, click/wheel edit
+  - **Poly Voice**: polyphonic keyboard instrument with voice allocation
+  - Effects: **Chorus**, **Phaser**, **Limiter**, **EQ**
+  - Source: morphable **Wavetable** oscillator
+  - Utilities: **Attenuverter**, **Mult** (signal product / ring-mod style)
+  - LFO polarity (bipolar/unipolar) + amount; ADSR optional **Vel** depth
+  - Factory patches: `factory_tb303_voice.apr`, `factory_tb303_modular.apr`
+  - Lightweight DSP package `sonicrack.dsp` for modules not yet in soniclab
+
 ### Changed
 
 - Moved engine-domain helpers into `soniclab` (requires `soniclab>=2026.1.1`):

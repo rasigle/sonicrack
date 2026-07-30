@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel
 from soniclab.generators.oscillators.oscillator import (
     SawtoothOscillator,
     SineOscillator,
@@ -23,7 +24,7 @@ from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples
+from sonicrack.runtime.helpers import float_parameter, read_samples, str_parameter
 from sonicrack.runtime.specs import RuntimeParameters
 
 if TYPE_CHECKING:
@@ -59,7 +60,7 @@ class LFOModule(ModuleWidget):
         """Initialize LFO module."""
         super().__init__(
             width=240,
-            height=245,
+            height=300,
             color=QColor(100, 140, 200),
         )
 
@@ -171,13 +172,45 @@ class LFOModule(ModuleWidget):
         )
         self.pulsewidth_knob.value_changed.connect(self._on_pulsewidth_changed)
         pw_layout.addWidget(self.pulsewidth_knob)
+
+        self.amount_knob = Knob(
+            label="Amount",
+            description="Output depth / scale of the LFO",
+            min_value=0.0,
+            max_value=1.0,
+            default_value=1.0,
+        )
+        self.amount_knob.value_changed.connect(
+            lambda: self.parameter_changed.emit("amount", self.amount_knob.get_value())
+        )
+        pw_layout.addWidget(self.amount_knob)
         layout.addLayout(pw_layout)
+
+        polarity_layout = QHBoxLayout()
+        polarity_layout.addWidget(QLabel("Polarity:"))
+        self.polarity_combo = QComboBox()
+        self.polarity_combo.addItems(["Bipolar", "Unipolar"])
+        self.polarity_combo.setToolTip(
+            "Bipolar: -1…+1\nUnipolar: remap to 0…1 (amount still applies)"
+        )
+        self.polarity_combo.currentTextChanged.connect(
+            lambda value: self.parameter_changed.emit("polarity", value)
+        )
+        polarity_layout.addWidget(self.polarity_combo)
+        layout.addLayout(polarity_layout)
 
         self._finish_controls(layout)
 
         # Register parameters for automatic get/set
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
+        self.register_parameter("amount", self.amount_knob)
+        self.register_parameter(
+            "polarity",
+            self.polarity_combo,
+            getter="currentText",
+            setter="setCurrentText",
+        )
 
         # Register with audio_config to receive sample rate change notifications
         self._install_sample_rate_listener()
@@ -218,6 +251,11 @@ class LFOModule(ModuleWidget):
         pulsewidth = float_parameter(
             parameters, "pulsewidth", self.pulsewidth_knob.get_value
         )
+        amount = float_parameter(parameters, "amount", self.amount_knob.get_value)
+        polarity = str_parameter(
+            parameters, "polarity", self.polarity_combo.currentText
+        ).lower()
+        unipolar = polarity.startswith("uni")
 
         self._square_oscillator.pulsewidth = pulsewidth
 
@@ -258,18 +296,25 @@ class LFOModule(ModuleWidget):
                 LFO_CLOCK_RESET_SMOOTHING_MS,
                 LFO_FREQUENCY_SLEW_TIME_MS,
             )
+            samples = np.asarray(samples, dtype=np.float32)
+            if unipolar:
+                # Map bipolar [-1, 1] → [0, 1], then scale by amount.
+                samples = (samples * 0.5 + 0.5) * amount
+            else:
+                samples = samples * amount
             port.write(samples)
             self._last_runtime_frequencies[index] = rendered_frequency
             if len(samples) > 0:
                 self._last_output_values[index] = float(samples[-1])
         self._previous_clock = final_clock
 
-    @staticmethod
-    def get_cv_output_range() -> tuple[float, float]:
-        """LFO outputs bipolar control voltage in volts.
+    def get_cv_output_range(self) -> tuple[float, float]:
+        """LFO output range depends on polarity mode.
 
         Returns:
-            (-1.0, 1.0) - bipolar modulation range; when patched to pitch inputs,
-            each volt corresponds to one octave.
+            (-1.0, 1.0) for bipolar or (0.0, 1.0) for unipolar.
         """
+        polarity = self.polarity_combo.currentText().lower()
+        if polarity.startswith("uni"):
+            return 0.0, 1.0
         return -1.0, 1.0

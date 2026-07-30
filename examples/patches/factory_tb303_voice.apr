@@ -1,0 +1,110 @@
+{
+  "metadata": {
+    "name": "Factory TB-303 Voice",
+    "author": "SonicRack",
+    "description": "Compact acid bass: Clock → Step Sequencer → TB-303 Voice → Output",
+    "tags": ["factory", "acid", "303", "bass"],
+    "category": "Factory",
+    "created": "2026-07-30T00:00:00",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Clock",
+      "custom_name": "",
+      "module_category": "Sequencer",
+      "position": { "x": -480.0, "y": -40.0 },
+      "parameters": {
+        "active": true,
+        "bpm": 128.0,
+        "division": "1/16",
+        "swing": 0.0,
+        "running": true
+      }
+    },
+    {
+      "id": 1,
+      "type": "Step Sequencer",
+      "custom_name": "",
+      "module_category": "Sequencer",
+      "position": { "x": -200.0, "y": -80.0 },
+      "parameters": {
+        "active": true,
+        "notes": "36,-,36,39,41,-,39,36",
+        "accents": "1,0,0,1,0,0,1,0",
+        "slides": "0,0,1,0,0,0,1,0",
+        "bpm": 128.0,
+        "gate_length": 0.75,
+        "division": "1/16"
+      }
+    },
+    {
+      "id": 2,
+      "type": "TB-303 Voice",
+      "custom_name": "",
+      "module_category": "Modulated Source",
+      "position": { "x": 140.0, "y": -100.0 },
+      "parameters": {
+        "active": true,
+        "waveform": "Sawtooth",
+        "tuning": 0.0,
+        "pulsewidth": 0.5,
+        "cutoff": 480.0,
+        "resonance": 10.0,
+        "env_amount": 2.5,
+        "decay": 0.28,
+        "accent": 0.55,
+        "slide_time": 0.12,
+        "drive_db": 6.0,
+        "volume": 0.75
+      }
+    },
+    {
+      "id": 3,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": { "x": 460.0, "y": -40.0 },
+      "parameters": { "active": true }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 0,
+      "source_port": "Clock",
+      "target_module": 1,
+      "target_port": "Clock"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Freq",
+      "target_module": 2,
+      "target_port": "Freq"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Gate",
+      "target_module": 2,
+      "target_port": "Gate"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Accent",
+      "target_module": 2,
+      "target_port": "Accent"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Slide",
+      "target_module": 2,
+      "target_port": "Slide"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "Left/Mono"
+    }
+  ]
+}

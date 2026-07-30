@@ -7,25 +7,27 @@ from typing import Any, Literal
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout
 from soniclab.dsp.filters.butterworth import BiquadResonantFilter
 
 from sonicrack.config.audio_config import audio_config
+from sonicrack.gui.modules.modifier._filter_base import (
+    RESONANT_TYPE_ITEMS,
+    FilterModuleBase,
+    bind_parameter_knob,
+    create_filter_type_combo,
+    normalize_filter_type,
+    ramp_if_changed,
+)
 from sonicrack.gui.widgets import Knob
-from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import (
-    float_parameter,
-    read_samples,
-    silence,
-    str_parameter,
-)
+from sonicrack.runtime.helpers import float_parameter, read_samples, str_parameter
 from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()
-class ResonantFilterModule(ModuleWidget):
+class ResonantFilterModule(FilterModuleBase):
     """Synth-style resonant biquad filter with cutoff CV and drive."""
 
     runtime_kind = "resonant_filter"
@@ -43,19 +45,13 @@ class ResonantFilterModule(ModuleWidget):
             color=QColor(80, 170, 150),
         )
 
-        self.in_port = self.add_input("In")
-        self.cutoff_cv_port = self.add_input("Cutoff CV")
-        self.out_port = self.add_output("Out")
+        self._setup_filter_ports(cutoff_cv=True)
+        layout = self._begin_controls(spacing=6)
 
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout(spacing=6)
-
-        type_layout = QHBoxLayout()
-        type_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        type_layout.addWidget(QLabel("Type:"))
-        self.type_combo = QComboBox()
-        self.type_combo.addItems(["Low-pass", "High-pass", "Band-pass", "Notch"])
-        type_layout.addWidget(self.type_combo)
+        type_layout, self.type_combo = create_filter_type_combo(
+            RESONANT_TYPE_ITEMS,
+            centered=True,
+        )
         layout.addLayout(type_layout)
 
         cutoff_row = QHBoxLayout()
@@ -72,7 +68,13 @@ class ResonantFilterModule(ModuleWidget):
         )
         self.cutoff_value_label = QLabel("1200 Hz")
         self.cutoff_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.cutoff_knob.value_changed.connect(self._on_cutoff_changed)
+        bind_parameter_knob(
+            self,
+            self.cutoff_knob,
+            "cutoff",
+            value_label=self.cutoff_value_label,
+            format_value=lambda v: f"{int(v)} Hz",
+        )
         cutoff_layout.addWidget(cutoff_label)
         cutoff_layout.addWidget(self.cutoff_knob)
         cutoff_layout.addWidget(self.cutoff_value_label)
@@ -90,7 +92,13 @@ class ResonantFilterModule(ModuleWidget):
         )
         self.resonance_value_label = QLabel("0.71")
         self.resonance_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.resonance_knob.value_changed.connect(self._on_resonance_changed)
+        bind_parameter_knob(
+            self,
+            self.resonance_knob,
+            "resonance",
+            value_label=self.resonance_value_label,
+            format_value=lambda v: f"{v:.2f}",
+        )
         resonance_layout.addWidget(resonance_label)
         resonance_layout.addWidget(self.resonance_knob)
         resonance_layout.addWidget(self.resonance_value_label)
@@ -107,7 +115,13 @@ class ResonantFilterModule(ModuleWidget):
         )
         self.cv_depth_value_label = QLabel("0.0 oct")
         self.cv_depth_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.cv_depth_knob.value_changed.connect(self._on_cv_depth_changed)
+        bind_parameter_knob(
+            self,
+            self.cv_depth_knob,
+            "cv_depth_octaves",
+            value_label=self.cv_depth_value_label,
+            format_value=lambda v: f"{v:.1f} oct",
+        )
         cv_layout.addWidget(cv_label)
         cv_layout.addWidget(self.cv_depth_knob)
         cv_layout.addWidget(self.cv_depth_value_label)
@@ -121,7 +135,13 @@ class ResonantFilterModule(ModuleWidget):
         )
         self.drive_value_label = QLabel("0 dB")
         self.drive_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.drive_knob.value_changed.connect(self._on_drive_changed)
+        bind_parameter_knob(
+            self,
+            self.drive_knob,
+            "drive_db",
+            value_label=self.drive_value_label,
+            format_value=lambda v: f"{v:.0f} dB",
+        )
         drive_layout.addWidget(drive_label)
         drive_layout.addWidget(self.drive_knob)
         drive_layout.addWidget(self.drive_value_label)
@@ -133,7 +153,13 @@ class ResonantFilterModule(ModuleWidget):
         )
         self.output_gain_value_label = QLabel("-6 dB")
         self.output_gain_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.output_gain_knob.value_changed.connect(self._on_output_gain_changed)
+        bind_parameter_knob(
+            self,
+            self.output_gain_knob,
+            "output_gain_db",
+            value_label=self.output_gain_value_label,
+            format_value=lambda v: f"{v:.0f} dB",
+        )
         output_layout.addWidget(output_label)
         output_layout.addWidget(self.output_gain_knob)
         output_layout.addWidget(self.output_gain_value_label)
@@ -141,20 +167,14 @@ class ResonantFilterModule(ModuleWidget):
         character_row.addLayout(output_layout)
         layout.addLayout(character_row)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter("cutoff", self.cutoff_knob)
         self.register_parameter("resonance", self.resonance_knob)
         self.register_parameter("cv_depth_octaves", self.cv_depth_knob)
         self.register_parameter("drive_db", self.drive_knob)
         self.register_parameter("output_gain_db", self.output_gain_knob)
-        self.register_parameter(
-            "filter_type",
-            self.type_combo,
-            getter="currentText",
-            setter="setCurrentText",
-        )
+        self._register_filter_type_parameter(self.type_combo)
 
         self.component = self.create_engine_component()
         self._runtime_filter_params: (
@@ -165,59 +185,7 @@ class ResonantFilterModule(ModuleWidget):
         self._last_resonance = self.resonance_knob.get_value()
         self._last_drive_db = self.drive_knob.get_value()
         self._last_output_gain_db = self.output_gain_knob.get_value()
-        self._sample_rate_listener = self._on_global_sample_rate_changed
-        audio_config.add_sample_rate_listener(self._sample_rate_listener)
-        self.destroyed.connect(self._cleanup_audio_config_listeners)
-
-    def get_required_inputs(self) -> list[str]:
-        return ["In"]
-
-    @staticmethod
-    def _normalize_filter_type(text: str) -> Literal["low", "high", "band", "notch"]:
-        type_map: dict[str, Literal["low", "high", "band", "notch"]] = {
-            "Low-pass": "low",
-            "High-pass": "high",
-            "Band-pass": "band",
-            "Notch": "notch",
-            "low": "low",
-            "high": "high",
-            "band": "band",
-            "notch": "notch",
-        }
-        return type_map.get(text, "low")
-
-    def _on_cutoff_changed(self) -> None:
-        value = self.cutoff_knob.get_value()
-        self.cutoff_value_label.setText(f"{int(value)} Hz")
-        self.parameter_changed.emit("cutoff", value)
-
-    def _on_resonance_changed(self) -> None:
-        value = self.resonance_knob.get_value()
-        self.resonance_value_label.setText(f"{value:.2f}")
-        self.parameter_changed.emit("resonance", value)
-
-    def _on_cv_depth_changed(self) -> None:
-        value = self.cv_depth_knob.get_value()
-        self.cv_depth_value_label.setText(f"{value:.1f} oct")
-        self.parameter_changed.emit("cv_depth_octaves", value)
-
-    def _on_drive_changed(self) -> None:
-        value = self.drive_knob.get_value()
-        self.drive_value_label.setText(f"{value:.0f} dB")
-        self.parameter_changed.emit("drive_db", value)
-
-    def _on_output_gain_changed(self) -> None:
-        value = self.output_gain_knob.get_value()
-        self.output_gain_value_label.setText(f"{value:.0f} dB")
-        self.parameter_changed.emit("output_gain_db", value)
-
-    def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
-        _ = new_sample_rate
-        self.component = self.create_engine_component()
-        self._runtime_filter_params = None
-
-    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
-        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
+        self._install_sample_rate_listener()
 
     def create_engine_component(
         self,
@@ -228,7 +196,9 @@ class ResonantFilterModule(ModuleWidget):
         return BiquadResonantFilter(
             cutoff=self.cutoff_knob.get_value(),
             resonance=self.resonance_knob.get_value(),
-            filter_type=self._normalize_filter_type(self.type_combo.currentText()),
+            filter_type=normalize_filter_type(
+                self.type_combo.currentText(), allow_notch=True
+            ),
             drive_db=self.drive_knob.get_value(),
             output_gain_db=self.output_gain_knob.get_value(),
             sample_rate=audio_config.sample_rate,
@@ -237,11 +207,12 @@ class ResonantFilterModule(ModuleWidget):
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Filter the connected input for one render cycle."""
         if not self.in_port.is_connected:
-            self.out_port.write(silence(num_samples))
+            self._write_silence(num_samples)
             return
 
-        filter_type = self._normalize_filter_type(
-            str_parameter(parameters, "filter_type", self.type_combo.currentText)
+        filter_type = normalize_filter_type(
+            str_parameter(parameters, "filter_type", self.type_combo.currentText),
+            allow_notch=True,
         )
         cutoff = float_parameter(parameters, "cutoff", self.cutoff_knob.get_value)
         resonance = float_parameter(
@@ -278,14 +249,10 @@ class ResonantFilterModule(ModuleWidget):
         self._runtime_filter_params = filter_params
 
         input_signal = read_samples(self.in_port, num_samples)
-        cutoff_values = self._ramp_if_changed(self._last_cutoff, cutoff, num_samples)
-        resonance_values = self._ramp_if_changed(
-            self._last_resonance, resonance, num_samples
-        )
-        drive_db_values = self._ramp_if_changed(
-            self._last_drive_db, drive_db, num_samples
-        )
-        output_gain_db_values = self._ramp_if_changed(
+        cutoff_values = ramp_if_changed(self._last_cutoff, cutoff, num_samples)
+        resonance_values = ramp_if_changed(self._last_resonance, resonance, num_samples)
+        drive_db_values = ramp_if_changed(self._last_drive_db, drive_db, num_samples)
+        output_gain_db_values = ramp_if_changed(
             self._last_output_gain_db, output_gain_db, num_samples
         )
 
@@ -318,11 +285,3 @@ class ResonantFilterModule(ModuleWidget):
         self._last_resonance = resonance
         self._last_drive_db = drive_db
         self._last_output_gain_db = output_gain_db
-
-    @staticmethod
-    def _ramp_if_changed(
-        previous: float, current: float, num_samples: int
-    ) -> np.ndarray | None:
-        if previous == current:
-            return None
-        return np.linspace(previous, current, num_samples, dtype=np.float32)

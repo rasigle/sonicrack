@@ -2,22 +2,28 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.filters.acid_303 import AcidResonantFilter
 
 from sonicrack.config.audio_config import audio_config
+from sonicrack.gui.modules.modifier._filter_base import (
+    FilterModuleBase,
+    bind_parameter_knob,
+    read_optional_port,
+)
 from sonicrack.gui.widgets import Knob
-from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples, silence
+from sonicrack.runtime.helpers import float_parameter, read_samples
 from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()
-class AcidFilterModule(ModuleWidget):
+class AcidFilterModule(FilterModuleBase):
     """303-oriented resonant low-pass filter with env and accent CV."""
 
     runtime_kind = "acid_filter"
@@ -31,16 +37,10 @@ class AcidFilterModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(width=260, height=325, color=QColor(85, 165, 120))
 
-        self.in_port = self.add_input("In")
-        self.cutoff_cv_port = self.add_input("Cutoff CV")
-        self.env_cv_port = self.add_input("Env CV")
-        self.accent_cv_port = self.add_input("Accent CV")
-        self.out_port = self.add_output("Out")
+        self._setup_filter_ports(cutoff_cv=True, env_cv=True, accent_cv=True)
+        self.component = self.create_engine_component()
 
-        self.component = AcidResonantFilter(sample_rate=audio_config.sample_rate)
-
-        self.controls_widget = self._create_controls_container()
-        layout = self._create_standard_layout(spacing=6)
+        layout = self._begin_controls(spacing=6)
 
         tone_row = QHBoxLayout()
         tone_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -52,9 +52,7 @@ class AcidFilterModule(ModuleWidget):
             default_value=700.0,
             logarithmic=True,
         )
-        self.cutoff_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("cutoff", self.cutoff_knob.get_value())
-        )
+        bind_parameter_knob(self, self.cutoff_knob, "cutoff")
         tone_row.addWidget(self.cutoff_knob)
 
         self.resonance_knob = Knob(
@@ -65,11 +63,7 @@ class AcidFilterModule(ModuleWidget):
             default_value=8.0,
             logarithmic=True,
         )
-        self.resonance_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "resonance", self.resonance_knob.get_value()
-            )
-        )
+        bind_parameter_knob(self, self.resonance_knob, "resonance")
         tone_row.addWidget(self.resonance_knob)
         layout.addLayout(tone_row)
 
@@ -82,11 +76,7 @@ class AcidFilterModule(ModuleWidget):
             max_value=6.0,
             default_value=2.5,
         )
-        self.env_mod_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "env_amount", self.env_mod_knob.get_value()
-            )
-        )
+        bind_parameter_knob(self, self.env_mod_knob, "env_amount")
         mod_row.addWidget(self.env_mod_knob)
 
         self.accent_knob = Knob(
@@ -96,11 +86,7 @@ class AcidFilterModule(ModuleWidget):
             max_value=4.0,
             default_value=1.0,
         )
-        self.accent_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "accent_amount", self.accent_knob.get_value()
-            )
-        )
+        bind_parameter_knob(self, self.accent_knob, "accent_amount")
         mod_row.addWidget(self.accent_knob)
         layout.addLayout(mod_row)
 
@@ -113,9 +99,7 @@ class AcidFilterModule(ModuleWidget):
             max_value=24.0,
             default_value=6.0,
         )
-        self.drive_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("drive_db", self.drive_knob.get_value())
-        )
+        bind_parameter_knob(self, self.drive_knob, "drive_db")
         gain_row.addWidget(self.drive_knob)
 
         self.output_knob = Knob(
@@ -125,16 +109,11 @@ class AcidFilterModule(ModuleWidget):
             max_value=12.0,
             default_value=-6.0,
         )
-        self.output_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "output_gain_db", self.output_knob.get_value()
-            )
-        )
+        bind_parameter_knob(self, self.output_knob, "output_gain_db")
         gain_row.addWidget(self.output_knob)
         layout.addLayout(gain_row)
 
-        self.controls_widget.setLayout(layout)
-        self.proxy = self._add_controls_to_module(self.controls_widget)
+        self._finish_controls(layout)
 
         self.register_parameter("cutoff", self.cutoff_knob)
         self.register_parameter("resonance", self.resonance_knob)
@@ -143,22 +122,19 @@ class AcidFilterModule(ModuleWidget):
         self.register_parameter("drive_db", self.drive_knob)
         self.register_parameter("output_gain_db", self.output_knob)
 
-        self._sample_rate_listener = self._on_global_sample_rate_changed
-        audio_config.add_sample_rate_listener(self._sample_rate_listener)
-        self.destroyed.connect(self._cleanup_audio_config_listeners)
+        self._install_sample_rate_listener()
 
-    def get_required_inputs(self) -> list[str]:
-        return ["In"]
-
-    def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
-        self.component = AcidResonantFilter(sample_rate=new_sample_rate)
-
-    def _cleanup_audio_config_listeners(self, *_args: object) -> None:
-        audio_config.remove_sample_rate_listener(self._sample_rate_listener)
+    def create_engine_component(
+        self,
+        input_components: list[Any] | None = None,
+        modulation_components: dict[str, Any] | None = None,
+    ) -> AcidResonantFilter:
+        del input_components, modulation_components
+        return AcidResonantFilter(sample_rate=audio_config.sample_rate)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         if not self.in_port.is_connected:
-            self.out_port.write(silence(num_samples))
+            self._write_silence(num_samples)
             return
 
         self.component.cutoff = float_parameter(
@@ -183,20 +159,8 @@ class AcidFilterModule(ModuleWidget):
         self.out_port.write(
             self.component.process_modulated(
                 read_samples(self.in_port, num_samples),
-                cutoff_cv=(
-                    read_samples(self.cutoff_cv_port, num_samples)
-                    if self.cutoff_cv_port.is_connected
-                    else None
-                ),
-                env_cv=(
-                    read_samples(self.env_cv_port, num_samples)
-                    if self.env_cv_port.is_connected
-                    else None
-                ),
-                accent_cv=(
-                    read_samples(self.accent_cv_port, num_samples)
-                    if self.accent_cv_port.is_connected
-                    else None
-                ),
+                cutoff_cv=read_optional_port(self.cutoff_cv_port, num_samples),
+                env_cv=read_optional_port(self.env_cv_port, num_samples),
+                accent_cv=read_optional_port(self.accent_cv_port, num_samples),
             )
         )

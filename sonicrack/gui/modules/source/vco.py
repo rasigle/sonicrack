@@ -25,7 +25,6 @@ from soniclab.generators.oscillators.oscillator_square import SquareWaveMode
 
 from sonicrack.constants import (
     AUDIO_FREQUENCY_KNOB_CURVE,
-    DEFAULT_GAIN_DB,
     DEFAULT_PW_PERCENTAGE_VALUE,
     MAX_PW_PERCENTAGE_VALUE,
     MIN_PW_PERCENTAGE_VALUE,
@@ -49,6 +48,7 @@ from sonicrack.runtime.helpers import (
 from sonicrack.runtime.specs import RuntimeParameters
 
 VCO_PITCH_CV_SMOOTHING_MS = 5.0
+VCO_DEFAULT_GAIN_DB = 0.0
 VCO_DEFAULT_FM_AMOUNT_PERCENT = 0.0
 VCO_MIN_FM_AMOUNT_PERCENT = -100.0
 VCO_MAX_FM_AMOUNT_PERCENT = 100.0
@@ -168,7 +168,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         self._waveform = "Sine"
         self._mode = self._get_default_mode_for_waveform(self._waveform)
         self._base_frequency = 440.0
-        self._gain_db = DEFAULT_GAIN_DB
         self._pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
         self._fm_amount = VCO_DEFAULT_FM_AMOUNT_PERCENT
         self._fm_mode = VCO_FM_MODE_V_OCT
@@ -181,7 +180,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Output port has the component reference
         self.freq_input = self.add_input("V/Oct", signal=PortSignal.PITCH_CV)
         self.fm_input = self.add_input("FM", signal=PortSignal.CONTROL_CV)
-        self.gain_mod_input = self.add_input("Gain", signal=PortSignal.CONTROL_CV)
         self.out_port = self.add_output(
             "Out",
             component=self.component,
@@ -239,20 +237,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.freq_knob.value_changed.connect(self._on_frequency_changed)
         knobs_layout.addWidget(self.freq_knob)
 
-        # Gain in dB
-        self.gain_knob = Knob(
-            label="Gain (dB)",
-            min_value=-60,
-            max_value=12,
-            default_value=DEFAULT_GAIN_DB,
-            logarithmic=False,
-        )
-        self.gain_knob.setToolTip(
-            "Oscillator gain (dB)\nRange: -60 to +12 dB\nDefault: -20 dB"
-        )
-        self.gain_knob.value_changed.connect(self._on_gain_changed)
-        knobs_layout.addWidget(self.gain_knob)
-
         self.fm_amount_knob = Knob(
             label="FM Amt %",
             min_value=VCO_MIN_FM_AMOUNT_PERCENT,
@@ -296,7 +280,6 @@ class ModulatedOscillatorModule(ModuleWidget):
             setter="setCurrentText",
         )
         self.register_parameter("frequency", self.freq_knob)
-        self.register_parameter("gain_db", self.gain_knob)
         self.register_parameter("fm_amount", self.fm_amount_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
 
@@ -359,33 +342,33 @@ class ModulatedOscillatorModule(ModuleWidget):
         if self._waveform == "Sine":
             return SineOscillator(
                 self._base_frequency,
-                gain_db=self._gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 mode=_as_sine_mode(self._mode),
             )
         elif self._waveform == "Square":
             return SquareOscillator(
                 self._base_frequency,
-                gain_db=self._gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 pulsewidth=self._pulsewidth,
                 mode=_as_square_mode(self._mode),
             )
         elif self._waveform == "Sawtooth":
             return SawtoothOscillator(
                 self._base_frequency,
-                gain_db=self._gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 mode=_as_sawtooth_mode(self._mode),
             )
         elif self._waveform == "Triangle":
             return TriangleOscillator(
                 self._base_frequency,
-                gain_db=self._gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 mode=_as_triangle_mode(self._mode),
             )
         else:
             # Default to sine
             return SineOscillator(
                 self._base_frequency,
-                gain_db=self._gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 mode=_as_sine_mode(self._mode),
             )
 
@@ -445,22 +428,6 @@ class ModulatedOscillatorModule(ModuleWidget):
 
         self.parameter_changed.emit("frequency", new_freq)
 
-    def _on_gain_changed(self):
-        """Handle gain knob change by updating the component."""
-        import logging
-
-        logger = logging.getLogger(__name__)
-
-        gain_value = self.gain_knob.get_value()
-        self._gain_db = gain_value
-        logger.debug(f"VCO: Gain changed to {gain_value} dB")
-
-        # Hotswap the active oscillator without rebuilding the widget.
-        if self.component is not None:
-            self.component.gain_db = gain_value
-
-        self.parameter_changed.emit("gain_db", gain_value)
-
     def _on_fm_amount_changed(self):
         """Handle FM depth changes."""
         fm_amount = self.fm_amount_knob.get_value()
@@ -481,19 +448,17 @@ class ModulatedOscillatorModule(ModuleWidget):
         self.parameter_changed.emit("pulsewidth", pulsewidth)
 
     def get_required_inputs(self) -> list[str]:
-        """Freq and Gain inputs are optional - VCO works as normal oscillator without
-        them."""
-        return []  # No required inputs - Freq and Gain are optional
+        """V/Oct and FM inputs are optional - VCO works without them."""
+        return []
 
     def get_modulation_inputs(self) -> list[str]:
-        """VCO accepts modulation on Gain and FM ports."""
-        return ["Gain", "FM"]
+        """VCO accepts modulation on the FM port."""
+        return ["FM"]
 
-    def get_cv_range(self, port_name: str = "Gain") -> tuple[float, float]:
+    def get_cv_range(self, port_name: str = "FM") -> tuple[float, float]:
         """Return the expected CV range for VCO modulation inputs.
 
         Returns:
-            Gain: (0.0, 1.0) - unipolar range for amplitude modulation
             FM: (-1.0, 1.0) - bipolar range scaled by FM Amt %
         """
         if port_name == "FM":
@@ -525,25 +490,9 @@ class ModulatedOscillatorModule(ModuleWidget):
             self.freq_knob.setToolTip("Manual frequency control (Hz)")
             logger.debug("VCO: Freq knob ENABLED")
 
-        # Check if Gain input is connected
-        has_gain_cv = self.gain_mod_input.is_connected
         has_fm = self.fm_input.is_connected
 
-        logger.debug(f"VCO update_knob_state: Gain port connected={has_gain_cv}")
         logger.debug(f"VCO update_knob_state: FM port connected={has_fm}")
-
-        if has_gain_cv:
-            # Gain controlled by CV - disable knob
-            self.gain_knob.setEnabled(False)
-            self.gain_knob.setStyleSheet("opacity: 0.5;")
-            self.gain_knob.setToolTip("Gain controlled by Gain input (CV)")
-            logger.debug("VCO: Gain knob DISABLED")
-        else:
-            # No gain CV - enable knob
-            self.gain_knob.setEnabled(True)
-            self.gain_knob.setStyleSheet("")
-            self.gain_knob.setToolTip("Manual gain control (dB)")
-            logger.debug("VCO: Gain knob ENABLED")
 
         if has_fm:
             self.fm_amount_knob.setToolTip("Signed FM depth for the connected FM input")
@@ -560,9 +509,7 @@ class ModulatedOscillatorModule(ModuleWidget):
     ):
         """Create the modulated oscillator component.
 
-        Supports both frequency and gain modulation.
-        - Freq input: CV control of frequency (e.g., from MIDI Input)
-        - Gain input: CV control of amplitude (e.g., from envelope)
+        Supports frequency modulation via V/Oct and FM inputs.
         """
         import logging
 
@@ -573,7 +520,6 @@ class ModulatedOscillatorModule(ModuleWidget):
             wave_type, self.mode_combo.currentText()
         )
         base_freq = self.freq_knob.get_value()
-        gain_db = self.gain_knob.get_value()
         fm_amount = self.fm_amount_knob.get_value()
         fm_mode = self.fm_mode_combo.currentText()
         pulsewidth = self.pulsewidth_knob.get_value()
@@ -584,46 +530,39 @@ class ModulatedOscillatorModule(ModuleWidget):
             if input_components and len(input_components) > 0
             else None
         )
-        gain_modulator = (
-            modulation_components.get("Gain") if modulation_components else None
-        )
         fm_modulator = (
             modulation_components.get("FM") if modulation_components else None
         )
 
         has_freq_mod = freq_modulator is not None
-        has_gain_mod = gain_modulator is not None
         has_fm_mod = fm_modulator is not None and fm_amount != 0.0
 
-        logger.debug(
-            f"VCO: freq_mod={has_freq_mod}, gain_mod={has_gain_mod}, "
-            f"fm_mod={has_fm_mod}"
-        )
+        logger.debug(f"VCO: freq_mod={has_freq_mod}, fm_mod={has_fm_mod}")
 
         # Create the base oscillator
         if wave_type == "Sine":
             osc = SineOscillator(
                 frequency=base_freq,
-                gain_db=gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 mode=_as_sine_mode(mode),
             )
         elif wave_type == "Square":
             osc = SquareOscillator(
                 frequency=base_freq,
-                gain_db=gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 pulsewidth=pulsewidth,
                 mode=_as_square_mode(mode),
             )
         elif wave_type == "Sawtooth":
             osc = SawtoothOscillator(
                 frequency=base_freq,
-                gain_db=gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 mode=_as_sawtooth_mode(mode),
             )
         elif wave_type == "Triangle":
             osc = TriangleOscillator(
                 frequency=base_freq,
-                gain_db=gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 mode=_as_triangle_mode(mode),
             )
         else:
@@ -641,24 +580,8 @@ class ModulatedOscillatorModule(ModuleWidget):
             self.freq_knob.setToolTip("Manual frequency control (Hz)")
             logger.debug("VCO create_engine_component: Freq knob ENABLED")
 
-        # Update UI state for gain knob
-        if has_gain_mod:
-            self.gain_knob.setEnabled(False)
-            self.gain_knob.setStyleSheet("opacity: 0.5;")
-            self.gain_knob.setToolTip("Gain controlled by Gain input (CV)")
-            logger.debug(
-                "VCO create_engine_component: Gain knob DISABLED (has modulation)"
-            )
-        else:
-            self.gain_knob.setEnabled(True)
-            self.gain_knob.setStyleSheet("")
-            self.gain_knob.setToolTip("Manual gain control (dB)")
-            logger.debug(
-                "VCO create_engine_component: Gain knob ENABLED (no modulation)"
-            )
-
-        # If we have frequency, FM, or gain modulation, create ModulatedOscillator
-        if has_freq_mod or has_gain_mod or has_fm_mod:
+        # If we have frequency or FM modulation, create ModulatedOscillator
+        if has_freq_mod or has_fm_mod:
             # Frequency modulation function
             def freq_mod_func(base_freq, pitch_cv):
                 """Apply 1V/oct pitch CV as an offset around the base frequency."""
@@ -673,27 +596,15 @@ class ModulatedOscillatorModule(ModuleWidget):
                     fm_mode,
                 )
 
-            # Amplitude modulation function (for gain modulation)
-            def amp_mod_func(base_amp, cv_amp):
-                """Use CV value to scale amplitude."""
-                # cv_amp is typically [0, 1] from envelope
-                # Multiply base amplitude by CV value
-                return base_amp * cv_amp
-
             logger.debug(
                 f"VCO: Creating ModulatedOscillator (freq_mod={has_freq_mod}, "
-                f"gain_mod={has_gain_mod}, fm_mod={has_fm_mod})"
+                f"fm_mod={has_fm_mod})"
             )
 
             # Build modulator list based on what's connected
             modulators = []
-            amp_mod = None
             freq_mod = None
             fm_mod = None
-
-            if has_gain_mod:
-                modulators.append(gain_modulator)
-                amp_mod = amp_mod_func
 
             if has_freq_mod:
                 modulators.append(freq_modulator)
@@ -706,7 +617,7 @@ class ModulatedOscillatorModule(ModuleWidget):
             return ModulatedOscillator(
                 osc,
                 *modulators,
-                amp_mod=amp_mod,
+                amp_mod=None,
                 freq_mod=freq_mod,
                 fm_mod=fm_mod,
             )
@@ -723,7 +634,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         )
         fm_mode = str_parameter(parameters, "fm_mode", self.fm_mode_combo.currentText)
         frequency = float_parameter(parameters, "frequency", self.freq_knob.get_value)
-        gain_db = float_parameter(parameters, "gain_db", self.gain_knob.get_value)
         phase = (
             float_parameter(parameters, "phase", lambda: 0.0)
             if "phase" in parameters
@@ -739,21 +649,17 @@ class ModulatedOscillatorModule(ModuleWidget):
         oscillator_shape = (wave_type, mode)
         if self.component is None or oscillator_shape != self._runtime_oscillator_shape:
             self.component = self._create_runtime_base_oscillator(
-                wave_type, mode, frequency, gain_db, pulsewidth, phase
+                wave_type, mode, frequency, pulsewidth, phase
             )
             self._runtime_oscillator_shape = oscillator_shape
             self._last_runtime_frequency = frequency
             self._last_pitch_cv = None
         else:
-            self.component.gain_db = gain_db
             if isinstance(self.component, SquareOscillator):
                 self.component.pulsewidth = pulsewidth
 
         freq_signal = None
         fm_signal = None
-        gain_signal = None
-        if self.gain_mod_input.is_connected:
-            gain_signal = read_samples(self.gain_mod_input, num_samples)
         if self.fm_input.is_connected and fm_amount != 0.0:
             fm_signal = read_samples(self.fm_input, num_samples)
 
@@ -787,9 +693,6 @@ class ModulatedOscillatorModule(ModuleWidget):
                 num_samples,
             )
             self._last_runtime_frequency = rendered_frequency
-
-        if gain_signal is not None:
-            samples = samples * gain_signal
 
         self.out_port.write(samples)
 
@@ -883,7 +786,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         wave_type: str,
         mode: str,
         frequency: float,
-        gain_db: float,
         pulsewidth: float,
         phase_degrees: float | None,
     ):
@@ -892,14 +794,14 @@ class ModulatedOscillatorModule(ModuleWidget):
         if wave_type == "Sine":
             return SineOscillator(
                 frequency,
-                gain_db=gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 phase=phase,
                 mode=_as_sine_mode(mode),
             )
         if wave_type == "Square":
             return SquareOscillator(
                 frequency,
-                gain_db=gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 phase=phase,
                 pulsewidth=pulsewidth,
                 mode=_as_square_mode(mode),
@@ -907,14 +809,14 @@ class ModulatedOscillatorModule(ModuleWidget):
         if wave_type == "Sawtooth":
             return SawtoothOscillator(
                 frequency,
-                gain_db=gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 phase=phase,
                 mode=_as_sawtooth_mode(mode),
             )
         if wave_type == "Triangle":
             return TriangleOscillator(
                 frequency,
-                gain_db=gain_db,
+                gain_db=VCO_DEFAULT_GAIN_DB,
                 phase=phase,
                 mode=_as_triangle_mode(mode),
             )

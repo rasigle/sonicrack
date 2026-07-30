@@ -153,7 +153,6 @@ def test_midi_keyboard_frequency_can_drive_vco_runtime(qapp: Any):
             "waveform": "Sine",
             "mode": "analog",
             "frequency": midi_to_frequency(60),
-            "gain_db": -12.0,
             "phase": 0.0,
         },
     )
@@ -180,7 +179,6 @@ def test_midi_keyboard_frequency_can_drive_vco_vectorized_runtime(qapp: Any):
             "waveform": "Sine",
             "mode": "analog",
             "frequency": 440.0,
-            "gain_db": -12.0,
             "phase": 0.0,
         },
     )
@@ -200,7 +198,6 @@ def test_midi_keyboard_vco_frequency_is_continuous_across_buffers(qapp: Any):
         "waveform": "Sine",
         "mode": "analog",
         "frequency": 440.0,
-        "gain_db": -12.0,
         "phase": 0.0,
     }
 

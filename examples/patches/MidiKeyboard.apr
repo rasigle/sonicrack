@@ -96,23 +96,16 @@
         "waveform": "Sawtooth",
         "mode": "analog",
         "frequency": 440.0,
-        "gain_db": -37.679999999999986,
         "phase": 0.0
       }
     }
   ],
   "connections": [
     {
-      "source_module": 4,
-      "source_port": "Vel",
-      "target_module": 0,
-      "target_port": "CV"
-    },
-    {
       "source_module": 2,
       "source_port": "Out",
-      "target_module": 5,
-      "target_port": "Gain"
+      "target_module": 0,
+      "target_port": "CV In"
     },
     {
       "source_module": 0,
@@ -142,7 +135,7 @@
       "source_module": 4,
       "source_port": "Freq",
       "target_module": 5,
-      "target_port": "Freq"
+      "target_port": "V/Oct"
     }
   ]
 }

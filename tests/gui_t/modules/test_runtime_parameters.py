@@ -177,7 +177,6 @@ def test_lfo_can_drive_vco_without_click_on_lfo_frequency_change(qapp: Any):
         "waveform": "Sine",
         "mode": "analog",
         "frequency": 440.0,
-        "gain_db": -12.0,
         "phase": 0.0,
     }
 
@@ -201,7 +200,6 @@ def test_vco_pitch_cv_input_is_dezippered(qapp: Any):
         "waveform": "Sine",
         "mode": "analog",
         "frequency": 440.0,
-        "gain_db": -12.0,
         "phase": 0.0,
     }
 
@@ -225,7 +223,6 @@ def test_vco_v_oct_input_transposes_base_frequency(qapp: Any):
         "waveform": "Sine",
         "mode": "analog",
         "frequency": 330.0,
-        "gain_db": -12.0,
         "phase": 0.0,
     }
 
@@ -257,7 +254,6 @@ def test_vco_fm_input_defaults_to_vcv_exponential_mode(qapp: Any):
             "waveform": "Sine",
             "mode": "analog",
             "frequency": 330.0,
-            "gain_db": -12.0,
             "phase": 0.0,
             "fm_amount": 50.0,
         },
@@ -267,7 +263,7 @@ def test_vco_fm_input_defaults_to_vcv_exponential_mode(qapp: Any):
     assert output.shape == (16,)
     assert np.all(np.isfinite(output))
     assert module.component.frequency == pytest.approx(330.0 * np.sqrt(2.0))
-    assert module.get_modulation_inputs() == ["Gain", "FM"]
+    assert module.get_modulation_inputs() == ["FM"]
     assert module.get_cv_range("FM") == pytest.approx((-1.0, 1.0))
 
     module.process_runtime(
@@ -276,7 +272,6 @@ def test_vco_fm_input_defaults_to_vcv_exponential_mode(qapp: Any):
             "waveform": "Sine",
             "mode": "analog",
             "frequency": 330.0,
-            "gain_db": -12.0,
             "phase": 0.0,
             "fm_amount": -50.0,
         },
@@ -298,7 +293,6 @@ def test_vco_linear_fm_uses_vcv_c4_scaled_hz_offset(qapp: Any):
             "mode": "analog",
             "fm_mode": "Linear",
             "frequency": 330.0,
-            "gain_db": -12.0,
             "phase": 0.0,
             "fm_amount": 50.0,
         },
@@ -320,7 +314,6 @@ def test_vco_lfo_fm_differs_from_v_oct_pitch_input(qapp: Any):
         "mode": "analog",
         "fm_mode": "Linear",
         "frequency": 440.0,
-        "gain_db": -12.0,
         "phase": 0.0,
         "fm_amount": 25.0,
     }
@@ -338,7 +331,7 @@ def test_vco_lfo_fm_differs_from_v_oct_pitch_input(qapp: Any):
     fm_vco.process_runtime(1024, parameters)
     fm_output = np.asarray(fm_vco.out_port.value)
 
-    assert pitch_vco.get_runtime_spec().input_names == ("V/Oct", "FM", "Gain")
+    assert pitch_vco.get_runtime_spec().input_names == ("V/Oct", "FM")
     assert fm_vco.component.frequency != pytest.approx(pitch_vco.component.frequency)
     assert np.max(np.abs(pitch_output - fm_output)) > 0.01
 
@@ -917,7 +910,6 @@ def test_vco_runtime_applies_oscillator_parameters(qapp: Any):
             "waveform": "Square",
             "mode": "ideal",
             "frequency": 330.0,
-            "gain_db": -6.0,
             "phase": 45.0,
             "pulsewidth": 0.25,
         },
@@ -925,7 +917,7 @@ def test_vco_runtime_applies_oscillator_parameters(qapp: Any):
 
     assert isinstance(module.component, SquareOscillator)
     assert module.component.frequency == pytest.approx(330.0)
-    assert module.component.gain_db == pytest.approx(-6.0)
+    assert module.component.gain_db == pytest.approx(0.0)
     assert module.component.phase == pytest.approx(np.deg2rad(45.0))
     assert module.component.pulsewidth == pytest.approx(0.25)
 
@@ -954,7 +946,6 @@ def test_vco_runtime_normalizes_stale_mode_after_waveform_change(qapp: Any):
             "waveform": "Sine",
             "mode": "vcv",
             "frequency": 330.0,
-            "gain_db": -6.0,
             "phase": 0.0,
             "pulsewidth": 0.5,
         },

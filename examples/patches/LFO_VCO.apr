@@ -23,7 +23,6 @@
         "waveform": "Sine",
         "mode": "analog",
         "frequency": 440.0,
-        "gain_db": -16.04,
         "fm_amount": -93.0,
         "phase": 0.0,
         "pulsewidth": 0.5

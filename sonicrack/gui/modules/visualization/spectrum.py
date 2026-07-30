@@ -8,6 +8,7 @@ import numpy as np
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from soniclab.utils.spectrum import SpectrumAnalyzerCore
 
 from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules.visualization.visualizer_utils import (
@@ -19,41 +20,6 @@ from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
 
 logger = logging.getLogger(__name__)
-
-
-def _as_mono_float32(samples: Any) -> np.ndarray | None:
-    """Convert mono/stereo samples to a finite mono float32 array.
-
-    QWidget work stays on the UI thread. This function only sanitizes already
-    rendered tap-history samples.
-    """
-    if samples is None:
-        return None
-
-    arr = np.asarray(samples, dtype=np.float32)
-
-    if arr.size == 0:
-        return None
-
-    arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=-1.0)
-
-    # Common stereo layouts:
-    #   (N, 2): frame-major stereo
-    #   (2, N): channel-major stereo
-    if arr.ndim == 2:
-        if arr.shape[1] == 2:
-            arr = arr.mean(axis=1)
-        elif arr.shape[0] == 2:
-            arr = arr.mean(axis=0)
-        else:
-            arr = arr.ravel()
-    else:
-        arr = arr.ravel()
-
-    if arr.size == 0:
-        return None
-
-    return np.clip(arr.astype(np.float32, copy=False), -1.0, 1.0)
 
 
 @dataclass
@@ -214,8 +180,8 @@ class SpectrumModule(ModuleWidget):
 class SpectrumAnalyzer(QWidget):
     """Widget for displaying real-time frequency spectrum.
 
-    FFT and bucket preparation happen in set_samples(). paintEvent() only draws
-    cached bars and cached grid/background.
+    FFT/bucket analysis is delegated to ``soniclab.utils.spectrum.SpectrumAnalyzerCore``.
+    paintEvent() only draws cached bars and cached grid/background.
     """
 
     MIN_FREQ_HZ = 20.0
@@ -248,17 +214,17 @@ class SpectrumAnalyzer(QWidget):
         self.bar_hot_color = QColor(255, 200, 0)
         self.peak_color = QColor(255, 0, 0)
 
-        self._window: np.ndarray | None = None
-        self._window_size: int | None = None
-        self._freqs: np.ndarray | None = None
-
-        self._bucket_indices: list[np.ndarray] = []
-        self._bucket_key: tuple[int, int, int] | None = None
+        self._core = SpectrumAnalyzerCore(
+            sample_rate=self.sample_rate,
+            fft_size=self.fft_size,
+            bar_count=self.fft_bins,
+            floor_db=self.FLOOR_DB,
+            ceiling_db=self.CEILING_DB,
+            min_freq_hz=self.MIN_FREQ_HZ,
+        )
 
         self._grid_pixmap: QPixmap | None = None
         self._grid_key: tuple[int, int] | None = None
-
-        self._prepare_fft_cache()
 
     def set_sample_rate(self, sample_rate: int) -> None:
         """Update sample rate and invalidate frequency-dependent caches."""
@@ -267,12 +233,9 @@ class SpectrumAnalyzer(QWidget):
             return
 
         self.sample_rate = sample_rate
-        self._freqs = None
-        self._bucket_indices = []
-        self._bucket_key = None
+        self._core.set_sample_rate(sample_rate)
         self._grid_pixmap = None
         self._grid_key = None
-        self._prepare_fft_cache()
         self.update()
 
     def set_fft_size(self, fft_size: int) -> None:
@@ -282,68 +245,23 @@ class SpectrumAnalyzer(QWidget):
             return
 
         self.fft_size = fft_size
-        self._window = None
-        self._window_size = None
-        self._freqs = None
-        self._bucket_indices = []
-        self._bucket_key = None
-        self._prepare_fft_cache()
+        self._core.set_fft_size(fft_size)
         self.update()
 
     def set_samples(self, samples: np.ndarray | None) -> SpectrumResult | None:
         """Set audio samples, compute one FFT, and cache display bars."""
-        mono = _as_mono_float32(samples)
-
-        if mono is None or mono.size < 256:
+        analysis = self._core.analyze(samples)
+        if analysis is None:
             self.clear()
             return None
 
-        n = min(mono.size, self.fft_size)
-        if n < 256:
-            self.clear()
-            return None
-
-        # Use the most recent n samples so the analyzer tracks current signal.
-        mono = mono[-n:]
-
-        self._ensure_window(n)
-        self._ensure_freqs(n)
-        self._ensure_bucket_indices(n)
-
-        assert self._window is not None
-
-        level_db = self._time_domain_level_db(mono)
-
-        windowed = mono * self._window
-
-        fft = np.fft.rfft(windowed)
-        magnitude = np.abs(fft).astype(np.float32, copy=False)
-
-        # Normalize roughly against Hann window gain so dB is stable and does
-        # not constantly pin to 0 dB just because FFT length changed.
-        window_gain = max(float(np.sum(self._window)) * 0.5, 1e-12)
-        magnitude = magnitude / window_gain
-
-        magnitude = np.maximum(magnitude, 1e-10)
-        db = 20.0 * np.log10(magnitude)
-
-        # Ignore DC for peak-frequency reporting. A DC offset should not become
-        # the musical/audio peak.
-        peak_frequency_hz = self._find_peak_frequency(db)
-
-        normalized = np.clip(
-            (db - self.FLOOR_DB) / (self.CEILING_DB - self.FLOOR_DB),
-            0.0,
-            1.0,
-        ).astype(np.float32, copy=False)
-
-        self.bars = self._bucketize(normalized)
+        self.bars = analysis.bars
         self.update()
 
         return SpectrumResult(
             bars=self.bars,
-            peak_frequency_hz=peak_frequency_hz,
-            level_db=level_db,
+            peak_frequency_hz=analysis.peak_frequency_hz,
+            level_db=analysis.level_db,
         )
 
     def clear(self) -> None:
@@ -353,111 +271,6 @@ class SpectrumAnalyzer(QWidget):
 
         self.bars = None
         self.update()
-
-    def _prepare_fft_cache(self) -> None:
-        """Prepare caches for the current FFT size/sample rate."""
-        self._ensure_window(self.fft_size)
-        self._ensure_freqs(self.fft_size)
-        self._ensure_bucket_indices(self.fft_size)
-
-    def _ensure_window(self, n: int) -> None:
-        """Cache Hann window for a given FFT length."""
-        if self._window is not None and self._window_size == n:
-            return
-
-        self._window = np.hanning(n).astype(np.float32)
-        self._window_size = n
-
-    def _ensure_freqs(self, n: int) -> None:
-        """Cache rFFT frequency bins."""
-        if self._freqs is not None and self._freqs.size == (n // 2 + 1):
-            return
-
-        self._freqs = np.fft.rfftfreq(n, d=1.0 / float(self.sample_rate)).astype(
-            np.float32
-        )
-
-    def _ensure_bucket_indices(self, n: int) -> None:
-        """Build cached logarithmic bucket indices."""
-        key = (n, self.sample_rate, self.fft_bins)
-        if self._bucket_key == key and self._bucket_indices:
-            return
-
-        self._ensure_freqs(n)
-        assert self._freqs is not None
-
-        nyquist = max(float(self.sample_rate) * 0.5, self.MIN_FREQ_HZ * 2.0)
-        max_freq = max(self.MIN_FREQ_HZ * 2.0, nyquist)
-
-        edges = np.geomspace(self.MIN_FREQ_HZ, max_freq, self.fft_bins + 1)
-
-        bucket_indices: list[np.ndarray] = []
-        for i in range(self.fft_bins):
-            low = edges[i]
-            high = edges[i + 1]
-
-            idx = np.where((self._freqs >= low) & (self._freqs < high))[0]
-
-            # Low-frequency buckets can be empty when FFT size is small. Use the
-            # nearest bin so every visual bucket has a defined value.
-            if idx.size == 0:
-                nearest = int(np.argmin(np.abs(self._freqs - ((low + high) * 0.5))))
-                idx = np.array([nearest], dtype=np.int64)
-
-            bucket_indices.append(idx)
-
-        self._bucket_indices = bucket_indices
-        self._bucket_key = key
-
-    def _bucketize(self, normalized: np.ndarray) -> np.ndarray:
-        """Convert FFT-bin magnitudes to log-spaced display bars."""
-        if not self._bucket_indices:
-            return normalized[: self.fft_bins].astype(np.float32, copy=False)
-
-        # Vectorized max-per-bucket: pad indices and use advanced indexing.
-        bars = np.empty(len(self._bucket_indices), dtype=np.float32)
-        n = int(normalized.size)
-        for i, idx in enumerate(self._bucket_indices):
-            if idx.size == 0:
-                bars[i] = 0.0
-                continue
-            # Indices are built against the current FFT size; clamp only if needed.
-            if idx[-1] < n and idx[0] >= 0:
-                bars[i] = float(normalized[idx].max())
-            else:
-                safe_idx = idx[idx < n]
-                bars[i] = float(normalized[safe_idx].max()) if safe_idx.size else 0.0
-
-        return bars
-
-    def _find_peak_frequency(self, db: np.ndarray) -> float | None:
-        """Find peak frequency, ignoring DC and very-low-frequency bins."""
-        if db.size <= 1:
-            return None
-
-        self._ensure_freqs((db.size - 1) * 2)
-        assert self._freqs is not None
-
-        valid = np.where(self._freqs >= self.MIN_FREQ_HZ)[0]
-        valid = valid[valid < db.size]
-
-        if valid.size == 0:
-            return None
-
-        peak_idx = int(valid[np.argmax(db[valid])])
-        return float(self._freqs[peak_idx])
-
-    @staticmethod
-    def _time_domain_level_db(samples: np.ndarray) -> float:
-        """Return peak level from time-domain samples."""
-        if samples.size == 0:
-            return -100.0
-
-        peak = float(np.max(np.abs(samples)))
-        if peak <= 0.0:
-            return -100.0
-
-        return float(20.0 * np.log10(max(peak, 1e-10)))
 
     def resizeEvent(self, event) -> None:
         """Invalidate cached background when resized."""

@@ -1,7 +1,7 @@
-"""Constants used throughout the audio engine.
+"""App and shared audio constants for SonicRack.
 
-This module defines global constants for sample rates, buffer sizes,
-and other audio-related values.
+Shared engine audio constants are imported from ``soniclab.constants`` so host
+and engine stay aligned. App-only paths, resources, and UI curves remain here.
 """
 
 from collections.abc import Iterator, Sequence
@@ -9,6 +9,33 @@ from contextlib import contextmanager
 from importlib.resources import as_file, files
 from importlib.resources.abc import Traversable
 from pathlib import Path
+
+# Shared audio engine constants (single source of truth in soniclab).
+from soniclab.constants import (  # noqa: F401
+    A4_FREQUENCY,
+    AUTO_MODE_VECTORIZE_THRESHOLD,
+    BIT_DEPTH_24,
+    BIT_DEPTH_32,
+    BUFFER_SIZE_256,
+    BUFFER_SIZE_1024,
+    BUFFER_SIZE_2048,
+    DEFAULT_BIT_DEPTH,
+    DEFAULT_BUFFER_SIZE,
+    DEFAULT_BUFFER_SIZES,
+    DEFAULT_GAIN_DB,
+    DEFAULT_SAMPLE_RATE,
+    DEFAULT_SAMPLE_RATES,
+    KEY_FREQUENCIES,
+    MAX_AMPLITUDE,
+    MAX_GAIN_DB,
+    MIN_AMPLITUDE,
+    MIN_GAIN_DB,
+    NYQUIST_FREQUENCY,
+    SAMPLE_RATE_48K,
+    SAMPLE_RATE_96K,
+    SAMPLE_RATE_192K,
+    SEMITONE_RATIO,
+)
 
 APP_TITLE: str = "SonicRack - Modular Synthesizer"
 APP_ICON_NAME: str = "icon.png"
@@ -44,60 +71,6 @@ def resource_path(*parts: str) -> Iterator[Path]:
         yield path
 
 
-# Sample rate constants
-DEFAULT_SAMPLE_RATE = 44100  # CD quality
-SAMPLE_RATE_48K = 48000  # Professional audio
-SAMPLE_RATE_96K = 96000  # High-resolution audio
-SAMPLE_RATE_192K = 192000  # Ultra high-resolution
-
-# Buffer size constants (in samples)
-DEFAULT_BUFFER_SIZE = 512
-BUFFER_SIZE_256 = 256  # Low latency
-BUFFER_SIZE_1024 = 1024  # Higher latency, lower CPU
-BUFFER_SIZE_2048 = 2048  # Maximum stability
-
-# Auto-mode threshold: use vectorized generation for n >= this value
-AUTO_MODE_VECTORIZE_THRESHOLD = 512
-
-# Bit depth
-DEFAULT_BIT_DEPTH = 16
-BIT_DEPTH_24 = 24
-BIT_DEPTH_32 = 32
-
-# Derived constants
-NYQUIST_FREQUENCY = DEFAULT_SAMPLE_RATE / 2  # Maximum frequency we can represent
-
-# Musical constants
-A4_FREQUENCY = 440.0  # Concert pitch
-SEMITONE_RATIO = 2 ** (1 / 12)  # Ratio between adjacent semitones
-
-# Audio range
-MIN_AMPLITUDE = -1.0
-MAX_AMPLITUDE = 1.0
-
-# Volume range in decibels
-MIN_GAIN_DB = -96.0  # Near silence
-MAX_GAIN_DB = 12.0  # Boost
-DEFAULT_GAIN_DB = 0.0  # Default starting gain
-
-
-# 🎵 Note mapping (keyboard keys → frequencies)
-KEY_FREQUENCIES = {
-    "a": 261.63,  # C4
-    "w": 277.18,  # C#4
-    "s": 293.66,  # D4
-    "e": 311.13,  # D#4
-    "d": 329.63,  # E4
-    "f": 349.23,  # F4
-    "t": 369.99,  # F#4
-    "g": 392.00,  # G4
-    "y": 415.30,  # G#4
-    "h": 440.00,  # A4
-    "u": 466.16,  # A#4
-    "j": 493.88,  # B4
-    "k": 523.25,  # C5
-}
-
 # Pulsewidth modulation limits
 MIN_PW_PERCENTAGE_VALUE = 1
 MAX_PW_PERCENTAGE_VALUE = 99
@@ -114,6 +87,3 @@ AUDIO_FREQUENCY_KNOB_CURVE: Sequence[tuple[float, float]] = (
     (0.8, 1715.0),
     (1.0, 6000.0),
 )
-
-DEFAULT_SAMPLE_RATES: Sequence[int] = (22050, 44100, 48000, 88200, 96000)
-DEFAULT_BUFFER_SIZES: Sequence[int] = (128, 256, 512, 1024, 2048, 4096)

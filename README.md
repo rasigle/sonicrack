@@ -200,8 +200,9 @@ place shared patch/runtime logic in `sonicrack.patching` or `sonicrack.runtime`.
 ### Working With DSP
 
 Prefer thin adapters around `soniclab` objects instead of adding a new local DSP
-engine package. Keep module-specific runtime code close to the module that owns
-the controls.
+engine package. Shared buffer/CV/wave/spectrum helpers and oscillator frequency
+slewing live in `soniclab`; keep module-specific wiring close to the module that
+owns the controls.
 
 ### Documentation Status
 

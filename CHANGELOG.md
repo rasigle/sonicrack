@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Version numbers follow a calendar-style scheme (`YYYY.MINOR.PATCH`), aligned with
 the companion `soniclab` engine package.
 
+## [Unreleased]
+
+### Changed
+
+- Moved engine-domain helpers into `soniclab` (requires `soniclab>=2026.1.1`):
+  oscillator frequency slewing, silence/CV/gate helpers, MIDI Trig pulse,
+  WAV/channel utilities, spectrum FFT core, and shared audio constants.
+  SonicRack keeps thin re-exports for existing import paths.
+
 ## [2026.1.0] - 2026-07-30
 
 ### Added

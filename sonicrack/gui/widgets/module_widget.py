@@ -536,6 +536,28 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             y = output_spacing * (i + 1)
             port.setPos(self.module_width + port.radius, y)
 
+    def _refresh_attached_cables(self) -> None:
+        """Keep cable geometry in sync after this module moves or resizes."""
+        seen: set[int] = set()
+        for port in self.input_ports + self.output_ports:
+            for cable in port.cables:
+                cable_id = id(cable)
+                if cable_id in seen:
+                    continue
+                seen.add(cable_id)
+                refresh = getattr(cable, "refresh_geometry", None)
+                if callable(refresh):
+                    refresh()
+                else:
+                    cable.update()
+
+    def itemChange(self, change, value):  # noqa: N802 - Qt API
+        """Update attached cables when the module is moved on the canvas."""
+        result = super().itemChange(change, value)
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+            self._refresh_attached_cables()
+        return result
+
     # === Event Handling ===
 
     def contextMenuEvent(self, event):

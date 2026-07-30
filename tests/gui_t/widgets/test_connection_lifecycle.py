@@ -206,6 +206,56 @@ def test_key_delete_module_demotes_modulated_neighbor(qapp: Any):
     assert type(volume.component).__name__ == "Volume"
 
 
+def test_cable_geometry_tracks_module_move(qapp: Any):
+    """Moving a connected module must refresh the cable endpoint cache."""
+    del qapp
+    canvas = PatchCanvas()
+    source = OscillatorModule()
+    target = VolumeModule()
+    source.setPos(0, 0)
+    target.setPos(300, 0)
+    canvas.add_module(source)
+    canvas.add_module(target)
+
+    cable = canvas.create_connection(source.output_ports[0], target.input_ports[0])
+    assert cable is not None
+
+    start_before = cable._geom_start
+    end_before = cable._geom_end
+    assert start_before != end_before
+
+    target.setPos(500, 120)
+
+    # Cached endpoints must match live port scene positions after the move.
+    assert cable._geom_start == source.output_ports[0].get_scene_pos()
+    assert cable._geom_end == target.input_ports[0].get_scene_pos()
+    assert cable._geom_end != end_before
+    assert cable.boundingRect().contains(cable._geom_start)
+    assert cable.boundingRect().contains(cable._geom_end)
+
+
+def test_cable_temp_drag_updates_geometry_cache(qapp: Any):
+    del qapp
+    canvas = PatchCanvas()
+    source = OscillatorModule()
+    source.setPos(0, 0)
+    canvas.add_module(source)
+
+    from sonicrack.gui.widgets.cable_widget import Cable
+    from PyQt6.QtCore import QPointF
+
+    cable = Cable(source.output_ports[0])
+    canvas._scene.addItem(cable)
+
+    cable.set_temp_end_pos(QPointF(200, 80))
+    assert cable._geom_end == QPointF(200, 80)
+    assert cable.boundingRect().contains(QPointF(200, 80))
+
+    cable.set_temp_end_pos(QPointF(40, 250))
+    assert cable._geom_end == QPointF(40, 250)
+    assert cable.boundingRect().contains(QPointF(40, 250))
+
+
 def test_clear_all_disconnects_port_models(qapp: Any):
     del qapp
     canvas = PatchCanvas()

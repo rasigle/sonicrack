@@ -4,7 +4,7 @@ import contextlib
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QPainter, QPainterPath, QPen
+from PyQt6.QtGui import QPainter, QPainterPath, QPainterPathStroker, QPen
 from PyQt6.QtWidgets import QGraphicsItem
 
 from sonicrack.gui.widgets.signal_style import cable_color_for_signal
@@ -13,6 +13,10 @@ from sonicrack.patching.port import PortSignal, PortType
 if TYPE_CHECKING:
     from sonicrack.gui.widgets.port_widget import PortWidget
 
+# Padding for pen width, hover stroke, and cubic-curve bulge.
+_GEOMETRY_MARGIN = 20.0
+_HIT_STROKE_WIDTH = 15.0
+
 
 class Cable(QGraphicsItem):
     """A cable connecting two ports.
@@ -20,8 +24,9 @@ class Cable(QGraphicsItem):
     Cables route signals between module outputs and inputs. Stroke color
     follows the source port's signal kind (audio, V/Oct, gate, trigger, …).
 
-    This is a UI component that works with PortWidget (the visual representation).
-    The actual connection logic is handled by PortModel (contained in PortWidget).
+    Geometry is cached so ``prepareGeometryChange()`` still sees the previous
+    path after attached ports move (Qt only learns the old rect if we keep it
+    until prepare is called).
     """
 
     def __init__(self, start_port: PortWidget, end_port: PortWidget | None = None):
@@ -37,6 +42,8 @@ class Cable(QGraphicsItem):
         self.end_port = end_port
         self.temp_end_pos: QPointF | None = None
         self.is_hovered = False  # Track hover state
+        self._geom_start = QPointF()
+        self._geom_end = QPointF()
 
         # Make cable selectable and interactive
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
@@ -51,6 +58,9 @@ class Cable(QGraphicsItem):
         if end_port:
             end_port.add_cable(self)
 
+        # Snapshot endpoints without notifying the scene (not yet inserted).
+        self._store_live_endpoints()
+
     def set_end_port(self, port: PortWidget):
         """Set the end port of the cable.
 
@@ -63,57 +73,74 @@ class Cable(QGraphicsItem):
         self.end_port = port
         self.temp_end_pos = None
         port.add_cable(self)
+        self._store_live_endpoints()
         self.update()
 
     def set_temp_end_pos(self, pos: QPointF):
         """Set a temporary end position while dragging."""
         self.prepareGeometryChange()
         self.temp_end_pos = pos
+        self._store_live_endpoints()
         self.update()
 
     def refresh_geometry(self) -> None:
-        """Invalidate cached geometry after attached ports move."""
+        """Invalidate scene geometry after attached ports move.
+
+        Must keep the previous cached endpoints until ``prepareGeometryChange``
+        finishes so Qt can clear the old cable trail.
+        """
         self.prepareGeometryChange()
+        self._store_live_endpoints()
         self.update()
 
-    def boundingRect(self) -> QRectF:
-        """Return the bounding rectangle of the cable."""
+    def _live_endpoints(self) -> tuple[QPointF, QPointF] | None:
+        """Return current start/end positions in scene coordinates."""
         if not self.start_port:
-            return QRectF()
+            return None
 
         start = self.start_port.get_scene_pos()
         if self.end_port:
             end = self.end_port.get_scene_pos()
-        elif self.temp_end_pos:
-            end = self.temp_end_pos
+        elif self.temp_end_pos is not None:
+            end = QPointF(self.temp_end_pos)
         else:
-            end = start
+            end = QPointF(start)
+        return start, end
 
-        return QRectF(start, end).normalized().adjusted(-10, -10, 10, 10)
+    def _store_live_endpoints(self) -> None:
+        """Copy live port positions into the geometry cache."""
+        live = self._live_endpoints()
+        if live is None:
+            self._geom_start = QPointF()
+            self._geom_end = QPointF()
+            return
+        self._geom_start, self._geom_end = live
+
+    def boundingRect(self) -> QRectF:
+        """Return the bounding rectangle of the cable (item/scene coords)."""
+        rect = QRectF(self._geom_start, self._geom_end).normalized()
+        margin = _GEOMETRY_MARGIN
+        return rect.adjusted(-margin, -margin, margin, margin)
+
+    def _curve_path(self, start: QPointF, end: QPointF) -> QPainterPath:
+        """Build the cubic bezier used for painting and hit-testing."""
+        path = QPainterPath()
+        path.moveTo(start)
+
+        ctrl_offset = abs(end.x() - start.x()) * 0.5
+        ctrl1 = QPointF(start.x() + ctrl_offset, start.y())
+        ctrl2 = QPointF(end.x() - ctrl_offset, end.y())
+        path.cubicTo(ctrl1, ctrl2, end)
+        return path
 
     def paint(self, painter: QPainter | None, option, widget=None):
         """Paint the cable as a curved line."""
         if painter is None or not self.start_port:
             return
 
-        start = self.mapFromScene(self.start_port.get_scene_pos())
-        if self.end_port:
-            end = self.mapFromScene(self.end_port.get_scene_pos())
-        elif self.temp_end_pos:
-            end = self.mapFromScene(self.temp_end_pos)
-        else:
-            return
-
-        # Draw a cubic bezier curve
-        path = QPainterPath()
-        path.moveTo(start)
-
-        # Control points for smooth curve
-        ctrl_offset = abs(end.x() - start.x()) * 0.5
-        ctrl1 = QPointF(start.x() + ctrl_offset, start.y())
-        ctrl2 = QPointF(end.x() - ctrl_offset, end.y())
-
-        path.cubicTo(ctrl1, ctrl2, end)
+        start = self.mapFromScene(self._geom_start)
+        end = self.mapFromScene(self._geom_end)
+        path = self._curve_path(start, end)
 
         selected = self.isSelected()
         color = cable_color_for_signal(
@@ -154,33 +181,14 @@ class Cable(QGraphicsItem):
     def shape(self) -> QPainterPath:
         """Return the shape for collision detection (wider than visual cable)."""
         if not self.start_port:
-            path = QPainterPath()
-            return path
+            return QPainterPath()
 
-        start = self.mapFromScene(self.start_port.get_scene_pos())
-        if self.end_port:
-            end = self.mapFromScene(self.end_port.get_scene_pos())
-        elif self.temp_end_pos:
-            end = self.mapFromScene(self.temp_end_pos)
-        else:
-            path = QPainterPath()
-            return path
-
-        # Create path with same curve as visual
-        path = QPainterPath()
-        path.moveTo(start)
-
-        ctrl_offset = abs(end.x() - start.x()) * 0.5
-        ctrl1 = QPointF(start.x() + ctrl_offset, start.y())
-        ctrl2 = QPointF(end.x() - ctrl_offset, end.y())
-        path.cubicTo(ctrl1, ctrl2, end)
-
-        # Create wider stroke for easier clicking (15 pixels wide for better
-        # interaction)
-        from PyQt6.QtGui import QPainterPathStroker
+        start = self.mapFromScene(self._geom_start)
+        end = self.mapFromScene(self._geom_end)
+        path = self._curve_path(start, end)
 
         stroker = QPainterPathStroker()
-        stroker.setWidth(15)  # Increased from 10 to 15 for easier clicking
+        stroker.setWidth(_HIT_STROKE_WIDTH)
         stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
         stroker.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         return stroker.createStroke(path)

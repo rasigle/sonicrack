@@ -156,6 +156,9 @@ is centralized in `ParameterDescriptor` with:
   (`CV_Room`/`CV_Damping`/`CV_Mix`), and Compressor (`CV_Thresh`/`CV_Ratio`/`CV_Mix`)
 - **Canvas zoom/pan**: scroll-wheel zoom, middle-mouse drag to pan, View menu
   Zoom In/Out/Reset (`Ctrl+=`/`Ctrl+-`/`Ctrl+0`)
+- **Step sequencer randomize**: button to randomize step values
+- **Signal-colored ports/cables**: jacks and cables colored by signal kind
+  (audio/CV/trigger)
 
 ### Changed
 
@@ -164,6 +167,11 @@ is centralized in `ParameterDescriptor` with:
 - **Envelope gate scan**: ADSR/Decay use vectorized Schmitt edge detection
 - **Patch canvas**: `BoundingRectViewportUpdate` instead of full-viewport
   repaints during pan/zoom/cable drag
+- **VCO level control**: removed gain knob and Gain CV; amplitude fixed at
+  0 dB — use a VCA for level control
+- **Step sequencer accent/slide**: simplified to toggles only
+- **Acid Filter defaults**: knob defaults aligned with DSP and TB-303 voice
+  (cutoff, resonance, env/accent, drive, output gain)
 
 - **Enhanced Parameter System**: Complete single-source-of-truth parameter management
   - `ParameterDescriptor` now includes smoothing policies (none/linear/exponential/logarithmic)
@@ -177,8 +185,6 @@ is centralized in `ParameterDescriptor` with:
   - Comprehensive documentation in `docs/architecture/PARAMETER_SYSTEM.md`
   - Full test coverage in `tests/engine_t/test_parameter_system.py`
 
-### Changed
-
 - **Volume Component Migration**: Now uses `RuntimeParameter` system
   - `amplitude` property: LINEAR smoothing in amplitude space (unchanged behavior)
   - `gain_db` property: LOGARITHMIC smoothing in dB space (enhanced perceptual linearity)
@@ -189,6 +195,13 @@ is centralized in `ParameterDescriptor` with:
 
 ### Fixed
 
+- **Module panel heights**: panels grow/shrink so controls fit without clipping
+- **Connect/disconnect lifecycle**: notify neighbors on cable removal (including
+  module delete and bulk Delete), reject duplicate/cyclic cables, clear ports
+  only when fully disconnected, and roll back visual cables on model connect failure
+- **Connect lifecycle hardening**: clear engine output-module registry on
+  delete/clear, fully disconnect ports on canvas clear, improve port hit-testing
+  and cable geometry after moves, resync modulated modules after connect/disconnect
 - Fixed missing `self.` prefix in RuntimeParameter initialization
 - Core DSP package is separated under `src.engine`, with optional audio-device
   and MIDI concerns kept outside the base engine import surface.
@@ -213,9 +226,6 @@ is centralized in `ParameterDescriptor` with:
 - Realtime-oriented test coverage now exercises render contracts, buffer
   continuity, oscillator edge strategies, smoothing, filters, effects,
   sequencers, presets, and GUI runtime integration paths.
-
-### Fixed
-
 - Removed generated cache artifacts from `src/engine`, including the engine-local
   `.mypy_cache` and nested `__pycache__` directories, and ignored `.mypy_cache/`
   to prevent the caches from returning to source/package paths.

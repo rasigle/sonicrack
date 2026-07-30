@@ -6,13 +6,13 @@ from soniclab.dsp.effects import Reverb
 
 from sonicrack.gui.modules._modulated_base import ModulatedModuleBase
 from sonicrack.gui.modules.effects._cv_modulation import (
-    modulate_param,
-    read_optional_cv,
+    ControlRateCvSpec,
+    apply_control_rate_cv,
 )
 from sonicrack.gui.widgets import Knob
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples, silence
+from sonicrack.runtime.helpers import read_samples, silence
 from sonicrack.runtime.specs import RuntimeParameters
 
 logger = logging.getLogger(__name__)
@@ -123,11 +123,6 @@ class ReverbModule(ModulatedModuleBase):
         _ = port_name
         return -1.0, 1.0
 
-    def create_modulated_component(self, mod_comp):
-        """CV is applied in process_runtime; return the base component."""
-        _ = mod_comp
-        return self.create_unmodulated_component()
-
     def create_unmodulated_component(self):
         """Create simple Reverb without modulation."""
         room_size = self.room_size_knob.get_value()
@@ -146,26 +141,36 @@ class ReverbModule(ModulatedModuleBase):
             if self.component is None:
                 self.component = self.create_unmodulated_component()
 
-            base_room = float_parameter(
-                parameters, "room_size", self.room_size_knob.get_value
-            )
-            base_damping = float_parameter(
-                parameters, "damping", self.damping_knob.get_value
-            )
-            base_mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
-
-            room_cv = read_optional_cv(self.room_cv_port, num_samples)
-            damping_cv = read_optional_cv(self.damping_cv_port, num_samples)
-            mix_cv = read_optional_cv(self.mix_cv_port, num_samples)
-
-            self.component.room_size = modulate_param(
-                base_room, room_cv, minimum=0.0, maximum=1.0
-            )
-            self.component.damping = modulate_param(
-                base_damping, damping_cv, minimum=0.0, maximum=1.0
-            )
-            self.component.mix = modulate_param(
-                base_mix, mix_cv, minimum=0.0, maximum=1.0
+            apply_control_rate_cv(
+                self.component,
+                parameters,
+                (
+                    ControlRateCvSpec(
+                        "room_size",
+                        "room_size",
+                        self.room_size_knob.get_value,
+                        self.room_cv_port,
+                        0.0,
+                        1.0,
+                    ),
+                    ControlRateCvSpec(
+                        "damping",
+                        "damping",
+                        self.damping_knob.get_value,
+                        self.damping_cv_port,
+                        0.0,
+                        1.0,
+                    ),
+                    ControlRateCvSpec(
+                        "mix",
+                        "mix",
+                        self.mix_knob.get_value,
+                        self.mix_cv_port,
+                        0.0,
+                        1.0,
+                    ),
+                ),
+                num_samples,
             )
 
             self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

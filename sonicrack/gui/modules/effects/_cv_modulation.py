@@ -2,15 +2,30 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from sonicrack.runtime.helpers import read_samples
+from sonicrack.runtime.helpers import float_parameter, read_samples
+from sonicrack.runtime.specs import RuntimeParameters
 
 if TYPE_CHECKING:
     from sonicrack.patching.port import Port
+
+
+@dataclass(frozen=True, slots=True)
+class ControlRateCvSpec:
+    """Describe one control-rate CV-modulated parameter on a DSP component."""
+
+    attr: str
+    param_name: str
+    fallback: Callable[[], float]
+    port: Port | None
+    minimum: float
+    maximum: float
+    scale: float = 1.0
 
 
 def read_optional_cv(port: Port | None, num_samples: int) -> np.ndarray | None:
@@ -25,17 +40,17 @@ def control_rate_offset(
     *,
     scale: float = 1.0,
 ) -> float:
-    """Convert a CV buffer to a single bipolar offset (mean of the buffer).
+    """Convert a CV buffer to a single bipolar offset (first sample).
 
-    Stateful effects (delay, reverb, compressor) apply modulation at control
-    rate once per render block rather than retuning every sample.
+    Stateful effects (delay, reverb, compressor, distortion) apply modulation
+    at control rate once per render block rather than retuning every sample.
+    Using the first sample avoids a full-buffer reduction each block.
     """
     if cv is None:
         return 0.0
-    values = np.asarray(cv, dtype=np.float32).reshape(-1)
-    if values.size == 0:
+    if cv.size == 0:
         return 0.0
-    return float(np.mean(values)) * float(scale)
+    return float(cv.flat[0]) * float(scale)
 
 
 def modulate_param(
@@ -47,11 +62,32 @@ def modulate_param(
     scale: float = 1.0,
 ) -> float:
     """Apply a bipolar CV offset to a scalar parameter and clamp."""
-    return float(
-        np.clip(base + control_rate_offset(cv, scale=scale), minimum, maximum)
-    )
+    value = base + control_rate_offset(cv, scale=scale)
+    if value < minimum:
+        return minimum
+    if value > maximum:
+        return maximum
+    return float(value)
 
 
-def any_cv_connected(ports: Sequence[Port | None]) -> bool:
-    """Return True if any provided port is connected."""
-    return any(port is not None and port.is_connected for port in ports)
+def apply_control_rate_cv(
+    component: Any,
+    parameters: RuntimeParameters,
+    specs: Sequence[ControlRateCvSpec],
+    num_samples: int,
+) -> None:
+    """Apply a list of control-rate CV parameter specs to a DSP component."""
+    for spec in specs:
+        base = float_parameter(parameters, spec.param_name, spec.fallback)
+        cv = read_optional_cv(spec.port, num_samples)
+        setattr(
+            component,
+            spec.attr,
+            modulate_param(
+                base,
+                cv,
+                minimum=spec.minimum,
+                maximum=spec.maximum,
+                scale=spec.scale,
+            ),
+        )

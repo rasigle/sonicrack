@@ -192,8 +192,9 @@ class ModulatedModuleBase(ModuleWidget):
 
     Subclasses must:
     - Set self.control_knob to the main parameter knob
-    - Implement create_modulated_component(mod_comp)
     - Implement create_unmodulated_component()
+    - Optionally override create_modulated_component(mod_comp) when a
+      dedicated modulated DSP type is required (defaults to unmodulated)
     - Optionally override get_cv_range() to specify expected CV range
     """
 
@@ -431,17 +432,18 @@ class ModulatedModuleBase(ModuleWidget):
     def create_modulated_component(self, mod_comp):
         """Create the modulated version of the component.
 
+        Default: return the unmodulated component. Effects that apply CV in
+        ``process_runtime`` can keep this default. Subclasses that need a
+        dedicated modulated DSP type (Volume, Panner, Clipper) should override.
+
         Args:
-            mod_comp: The modulation component
+            mod_comp: The modulation component (ignored by the default)
 
         Returns:
-            Modulated component instance
-
-        Must be implemented by subclass.
+            Component instance
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement create_modulated_component()"
-        )
+        _ = mod_comp
+        return self.create_unmodulated_component()
 
     def create_unmodulated_component(self):
         """Create the simple (non-modulated) version of the component.

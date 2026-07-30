@@ -6,15 +6,14 @@ from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.effects import Distortion
 
 from sonicrack.gui.modules._modulated_base import ModulatedModuleBase
+from sonicrack.gui.modules.effects._cv_modulation import (
+    ControlRateCvSpec,
+    apply_control_rate_cv,
+)
 from sonicrack.gui.widgets import Knob
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import (
-    float_parameter,
-    read_samples,
-    silence,
-    str_parameter,
-)
+from sonicrack.runtime.helpers import read_samples, silence, str_parameter
 from sonicrack.runtime.specs import RuntimeParameters
 
 logger = logging.getLogger(__name__)
@@ -126,12 +125,6 @@ class DistortionModule(ModulatedModuleBase):
         self.component = self.create_engine_component()
         self.parameter_changed.emit("distortion_type", distortion_type)
 
-    # Implement abstract methods from ModulatedModuleBase
-    def create_modulated_component(self, mod_comp):
-        """CV is applied in process_runtime; return the base component."""
-        _ = mod_comp
-        return self.create_unmodulated_component()
-
     def create_unmodulated_component(self):
         """Create simple Distortion without modulation."""
         drive = self.drive_knob.get_value()
@@ -149,70 +142,31 @@ class DistortionModule(ModulatedModuleBase):
             if self.component is None:
                 self.component = self.create_unmodulated_component()
 
-            self.component.drive = float_parameter(
-                parameters, "drive", self.drive_knob.get_value
-            )
-            self.component.mix = float_parameter(
-                parameters, "mix", self.mix_knob.get_value
-            )
             self.component.distortion_type = str_parameter(
                 parameters, "distortion_type", self.distortion_combo.currentText
             )
-
-            input_signal = read_samples(self.in_port, num_samples)
-            drive_cv = (
-                read_samples(self.drive_cv_port, num_samples)
-                if self.drive_cv_port.is_connected
-                else None
-            )
-            mix_cv = (
-                read_samples(self.mix_cv_port, num_samples)
-                if self.mix_cv_port.is_connected
-                else None
-            )
-            if drive_cv is None and mix_cv is None:
-                self.out_port.write(self.component(input_signal))
-                return
-
-            self.out_port.write(
-                self._process_modulated_distortion(
-                    input_signal,
-                    base_drive=self.component.drive,
-                    base_mix=self.component.mix,
-                    drive_cv=drive_cv,
-                    mix_cv=mix_cv,
-                )
+            apply_control_rate_cv(
+                self.component,
+                parameters,
+                (
+                    ControlRateCvSpec(
+                        "drive",
+                        "drive",
+                        self.drive_knob.get_value,
+                        self.drive_cv_port,
+                        0.0,
+                        10.0,
+                    ),
+                    ControlRateCvSpec(
+                        "mix",
+                        "mix",
+                        self.mix_knob.get_value,
+                        self.mix_cv_port,
+                        0.0,
+                        1.0,
+                    ),
+                ),
+                num_samples,
             )
 
-    def _process_modulated_distortion(
-        self,
-        input_signal,
-        *,
-        base_drive: float,
-        base_mix: float,
-        drive_cv,
-        mix_cv,
-    ):
-        """Process audio while applying per-sample drive/mix CV offsets."""
-        import numpy as np
-
-        output = np.empty(len(input_signal), dtype=np.float32)
-        drive_values = (
-            np.clip(base_drive + drive_cv, 0.0, 10.0)
-            if drive_cv is not None
-            else np.full(len(input_signal), base_drive, dtype=np.float32)
-        )
-        mix_values = (
-            np.clip(base_mix + mix_cv, 0.0, 1.0)
-            if mix_cv is not None
-            else np.full(len(input_signal), base_mix, dtype=np.float32)
-        )
-
-        for index, sample in enumerate(input_signal):
-            self.component.drive = float(drive_values[index])
-            self.component.mix = float(mix_values[index])
-            output[index] = self.component(float(sample))
-
-        self.component.drive = base_drive
-        self.component.mix = base_mix
-        return output
+            self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

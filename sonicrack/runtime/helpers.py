@@ -40,6 +40,32 @@ def read_samples(port: Port, num_samples: int) -> np.ndarray:
     return as_samples(port.read(num_samples), num_samples)
 
 
+def gate_transition_indices(
+    gate_signal: np.ndarray,
+    previous_gate: float,
+    *,
+    low: float = 0.3,
+    high: float = 0.7,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Find sample indices of Schmitt gate note-on / note-off transitions.
+
+    Returns:
+        (note_on_indices, note_off_indices, final_gate_level)
+    """
+    values = np.asarray(gate_signal, dtype=np.float32).reshape(-1)
+    if values.size == 0:
+        empty = np.empty(0, dtype=np.intp)
+        return empty, empty, float(previous_gate)
+
+    prev = np.empty_like(values)
+    prev[0] = previous_gate
+    prev[1:] = values[:-1]
+
+    note_ons = np.flatnonzero((prev < low) & (values > high))
+    note_offs = np.flatnonzero((prev > high) & (values < low))
+    return note_ons, note_offs, float(values[-1])
+
+
 def parameter(
     parameters: RuntimeParameters,
     name: str,

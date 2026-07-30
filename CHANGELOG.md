@@ -157,6 +157,14 @@ is centralized in `ParameterDescriptor` with:
 - **Canvas zoom/pan**: scroll-wheel zoom, middle-mouse drag to pan, View menu
   Zoom In/Out/Reset (`Ctrl+=`/`Ctrl+-`/`Ctrl+0`)
 
+### Changed
+
+- **Effect CV path**: control-rate modulation shared via `_cv_modulation`
+  helpers; Distortion no longer uses a per-sample Python loop
+- **Envelope gate scan**: ADSR/Decay use vectorized Schmitt edge detection
+- **Patch canvas**: `BoundingRectViewportUpdate` instead of full-viewport
+  repaints during pan/zoom/cable drag
+
 - **Enhanced Parameter System**: Complete single-source-of-truth parameter management
   - `ParameterDescriptor` now includes smoothing policies (none/linear/exponential/logarithmic)
   - `ParameterDescriptor` now includes automation modes (none/control-rate/audio-rate)

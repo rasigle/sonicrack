@@ -55,7 +55,11 @@ class PatchCanvas(QGraphicsView):
         self.setSceneRect(-2000, -2000, 4000, 4000)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        # Prefer dirty-region updates; full-viewport mode was expensive during
+        # pan/zoom/cable drag with many modules and bezier cables.
+        self.setViewportUpdateMode(
+            QGraphicsView.ViewportUpdateMode.BoundingRectViewportUpdate
+        )
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setMouseTracking(True)
@@ -503,8 +507,6 @@ class PatchCanvas(QGraphicsView):
         Returns:
             List of ModuleWidget instances
         """
-        from sonicrack.gui.widgets.module_widget import ModuleWidget
-
         return [item for item in self._scene.items() if isinstance(item, ModuleWidget)]
 
     def get_modules_by_category(self, category: ModuleCategory) -> list[ModuleWidget]:

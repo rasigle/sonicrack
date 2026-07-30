@@ -13,7 +13,11 @@ from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter
+from sonicrack.runtime.helpers import (
+    float_parameter,
+    gate_transition_indices,
+    read_samples,
+)
 from sonicrack.runtime.specs import RuntimeParameters
 
 
@@ -391,32 +395,31 @@ class ADSRModule(ModuleWidget):
     ) -> np.ndarray:
         """Render ADSR output while applying gate transitions inside the buffer."""
         output = np.zeros(num_samples, dtype=np.float32)
+        note_ons, note_offs, final_gate = gate_transition_indices(
+            gate_signal, self._previous_gate
+        )
+
+        # Merge transition indices; Schmitt thresholds prevent both on one sample.
+        events: list[tuple[int, bool]] = [
+            *((int(index), True) for index in note_ons),
+            *((int(index), False) for index in note_offs),
+        ]
+        events.sort(key=lambda item: item[0])
+
         start = 0
-        previous_gate = self._previous_gate
-
-        for index, value in enumerate(gate_signal):
-            current_gate = float(value)
-            note_on = previous_gate < 0.3 and current_gate > 0.7
-            note_off = previous_gate > 0.7 and current_gate < 0.3
-            if not note_on and not note_off:
-                previous_gate = current_gate
-                continue
-
+        for index, note_on in events:
             if index > start:
                 output[start:index] = adsr.get_samples(index - start)
-
             if note_on:
                 adsr.trigger_note_on()
             else:
                 adsr.trigger_note_off()
-
             start = index
-            previous_gate = current_gate
 
         if start < num_samples:
             output[start:] = adsr.get_samples(num_samples - start)
 
-        self._previous_gate = previous_gate
+        self._previous_gate = final_gate
         return output
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
@@ -425,13 +428,7 @@ class ADSRModule(ModuleWidget):
         self._apply_runtime_parameters(adsr, parameters)
 
         if self.gate_input.is_connected:
-            gate_signal = np.asarray(
-                self.gate_input.read(num_samples), dtype=np.float32
-            ).reshape(-1)
-            if len(gate_signal) < num_samples:
-                gate_signal = np.pad(gate_signal, (0, num_samples - len(gate_signal)))
-            elif len(gate_signal) > num_samples:
-                gate_signal = gate_signal[:num_samples]
+            gate_signal = read_samples(self.gate_input, num_samples)
             samples = self._render_gate_triggered_adsr(adsr, gate_signal, num_samples)
         else:
             self._previous_gate = 0.0

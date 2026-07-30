@@ -723,23 +723,23 @@ def test_distortion_runtime_applies_drive_and_mix_cv(qapp: Any):
     del qapp
     module = DistortionModule()
     input_source = _connect_constant_input(module.in_port, 0.5)
-    input_source.write(np.full(3, 0.5, dtype=np.float32))
+    input_source.write(np.full(8, 0.5, dtype=np.float32))
+    # Control-rate CV uses the first sample of each buffer as the offset.
     drive_source = _connect_constant_input(module.drive_cv_port, 0.0)
-    drive_source.write(np.array([0.0, 1.0, 1.0], dtype=np.float32))
+    drive_source.write(np.full(8, 0.5, dtype=np.float32))
     mix_source = _connect_constant_input(module.mix_cv_port, 0.0)
-    mix_source.write(np.array([-1.0, 0.0, 0.0], dtype=np.float32))
+    mix_source.write(np.full(8, -0.25, dtype=np.float32))
 
     module.process_runtime(
-        3,
+        8,
         {"drive": 0.0, "mix": 1.0, "distortion_type": "soft"},
     )
 
+    assert module.component.drive == pytest.approx(0.5)
+    assert module.component.mix == pytest.approx(0.75)
     output = np.asarray(module.out_port.value)
-    assert output[0] == pytest.approx(0.25)
-    assert output[1] > output[0]
-    assert output[2] == pytest.approx(output[1])
-    assert module.component.drive == pytest.approx(0.0)
-    assert module.component.mix == pytest.approx(1.0)
+    assert output.shape == (8,)
+    assert np.all(np.isfinite(output))
 
 
 def test_compressor_runtime_applies_parameters(qapp: Any):

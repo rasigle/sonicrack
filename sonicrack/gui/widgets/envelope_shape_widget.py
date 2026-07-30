@@ -20,6 +20,9 @@ class EnvelopeShapeWidget(QWidget):
         self._decay = 0.2
         self._sustain = 0.7
         self._release = 0.3
+        self._points: list[tuple[float, float]] = self.shape_points(
+            self._attack, self._decay, self._sustain, self._release
+        )
 
         self.setMinimumHeight(48)
         self.setMaximumHeight(64)
@@ -51,6 +54,7 @@ class EnvelopeShapeWidget(QWidget):
         self._decay = decay
         self._sustain = sustain
         self._release = release
+        self._points = self.shape_points(attack, decay, sustain, release)
         self.update()
 
     def envelope(self) -> tuple[float, float, float, float]:
@@ -67,6 +71,8 @@ class EnvelopeShapeWidget(QWidget):
         """Return normalized (x, y) polyline points for the ADSR shape.
 
         x is in [0, 1] across the full envelope; y is level in [0, 1].
+        Values are assumed non-negative / sustain already clamped by callers
+        that store state; this method still sanitizes for direct use in tests.
         """
         attack = max(0.0, float(attack))
         decay = max(0.0, float(decay))
@@ -122,10 +128,7 @@ class EnvelopeShapeWidget(QWidget):
             int(baseline_y),
         )
 
-        points = self.shape_points(
-            self._attack, self._decay, self._sustain, self._release
-        )
-
+        points = self._points
         path = QPainterPath()
         fill = QPainterPath()
 

@@ -13,7 +13,11 @@ from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples
+from sonicrack.runtime.helpers import (
+    float_parameter,
+    gate_transition_indices,
+    read_samples,
+)
 from sonicrack.runtime.specs import RuntimeParameters
 
 
@@ -153,18 +157,20 @@ class DecayEnvelopeModule(ModuleWidget):
         self, gate_signal: np.ndarray, num_samples: int
     ) -> np.ndarray:
         output = np.zeros(num_samples, dtype=np.float32)
-        start = 0
+        note_ons, _note_offs, final_gate = gate_transition_indices(
+            gate_signal[:num_samples], self._previous_gate
+        )
 
-        for index, value in enumerate(gate_signal[:num_samples]):
-            current_gate = float(value)
-            note_on = self._previous_gate < 0.3 and current_gate > 0.7
-            if note_on:
-                if index > 0:
-                    output[start:index] = self.component.get_samples(index - start)
-                self.component.trigger_note_on()
-                start = index
-            self._previous_gate = current_gate
+        start = 0
+        for index in note_ons:
+            index = int(index)
+            if index > start:
+                output[start:index] = self.component.get_samples(index - start)
+            self.component.trigger_note_on()
+            start = index
 
         if start < num_samples:
             output[start:] = self.component.get_samples(num_samples - start)
+
+        self._previous_gate = final_gate
         return output

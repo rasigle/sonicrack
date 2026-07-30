@@ -6,8 +6,8 @@ from soniclab.dsp.effects import Compressor
 
 from sonicrack.gui.modules._modulated_base import ModulatedModuleBase
 from sonicrack.gui.modules.effects._cv_modulation import (
-    modulate_param,
-    read_optional_cv,
+    ControlRateCvSpec,
+    apply_control_rate_cv,
 )
 from sonicrack.gui.widgets import Knob
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
@@ -160,11 +160,6 @@ class CompressorModule(ModulatedModuleBase):
         _ = port_name
         return -1.0, 1.0
 
-    def create_modulated_component(self, mod_comp):
-        """CV is applied in process_runtime; return the base component."""
-        _ = mod_comp
-        return self.create_unmodulated_component()
-
     def create_unmodulated_component(self):
         """Create compressor engine component from current controls."""
         return Compressor(
@@ -187,41 +182,49 @@ class CompressorModule(ModulatedModuleBase):
             if self.component is None:
                 self.component = self.create_unmodulated_component()
 
-            base_threshold = float_parameter(
-                parameters, "threshold_db", self.threshold_knob.get_value
-            )
-            base_ratio = float_parameter(parameters, "ratio", self.ratio_knob.get_value)
-            base_attack = float_parameter(
+            self.component.attack_ms = float_parameter(
                 parameters, "attack_ms", self.attack_knob.get_value
             )
-            base_release = float_parameter(
+            self.component.release_ms = float_parameter(
                 parameters, "release_ms", self.release_knob.get_value
             )
-            base_makeup = float_parameter(
+            self.component.makeup_gain_db = float_parameter(
                 parameters, "makeup_gain_db", self.makeup_knob.get_value
             )
-            base_mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
 
-            threshold_cv = read_optional_cv(self.threshold_cv_port, num_samples)
-            ratio_cv = read_optional_cv(self.ratio_cv_port, num_samples)
-            mix_cv = read_optional_cv(self.mix_cv_port, num_samples)
-
-            # Scale CV so ±1 is a useful offset in dB / ratio units.
-            self.component.threshold_db = modulate_param(
-                base_threshold,
-                threshold_cv,
-                minimum=-60.0,
-                maximum=0.0,
-                scale=24.0,
-            )
-            self.component.ratio = modulate_param(
-                base_ratio, ratio_cv, minimum=1.0, maximum=20.0, scale=4.0
-            )
-            self.component.attack_ms = base_attack
-            self.component.release_ms = base_release
-            self.component.makeup_gain_db = base_makeup
-            self.component.mix = modulate_param(
-                base_mix, mix_cv, minimum=0.0, maximum=1.0
+            # Scale threshold/ratio CV so ±1 is a useful offset in dB / ratio.
+            apply_control_rate_cv(
+                self.component,
+                parameters,
+                (
+                    ControlRateCvSpec(
+                        "threshold_db",
+                        "threshold_db",
+                        self.threshold_knob.get_value,
+                        self.threshold_cv_port,
+                        -60.0,
+                        0.0,
+                        scale=24.0,
+                    ),
+                    ControlRateCvSpec(
+                        "ratio",
+                        "ratio",
+                        self.ratio_knob.get_value,
+                        self.ratio_cv_port,
+                        1.0,
+                        20.0,
+                        scale=4.0,
+                    ),
+                    ControlRateCvSpec(
+                        "mix",
+                        "mix",
+                        self.mix_knob.get_value,
+                        self.mix_cv_port,
+                        0.0,
+                        1.0,
+                    ),
+                ),
+                num_samples,
             )
 
             self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

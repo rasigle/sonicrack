@@ -13,7 +13,6 @@ from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules.modifier._filter_base import (
     BUTTERWORTH_TYPE_ITEMS,
     FilterModuleBase,
-    bind_parameter_knob,
     create_filter_type_combo,
     normalize_filter_type,
 )
@@ -69,13 +68,11 @@ class FilterModule(FilterModuleBase):
         )
         self.cutoff_value_label = QLabel("1000 Hz")
         self.cutoff_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        bind_parameter_knob(
-            self,
+        self.bind_parameter_knob(
             self.cutoff_knob,
             "cutoff",
             value_label=self.cutoff_value_label,
             format_value=lambda v: f"{int(v)} Hz",
-            on_change=lambda _v: self._rebuild_component(),
         )
         low_freq_layout.addWidget(self.low_freq_label)
         low_freq_layout.addWidget(self.cutoff_knob)
@@ -95,13 +92,11 @@ class FilterModule(FilterModuleBase):
         )
         self.high_cutoff_value_label = QLabel("2000 Hz")
         self.high_cutoff_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        bind_parameter_knob(
-            self,
+        self.bind_parameter_knob(
             self.high_cutoff_knob,
             "high_cutoff",
             value_label=self.high_cutoff_value_label,
             format_value=lambda v: f"{int(v)} Hz",
-            on_change=lambda _v: self._rebuild_component(),
         )
         self.high_freq_layout.addWidget(self.high_freq_label)
         self.high_freq_layout.addWidget(self.high_cutoff_knob)
@@ -143,10 +138,6 @@ class FilterModule(FilterModuleBase):
         ) = None
         self._install_sample_rate_listener()
 
-    def _rebuild_component(self) -> None:
-        """Recreate the engine component from current UI parameters."""
-        self.component = self.create_engine_component()
-
     def _set_high_cutoff_visible(self, visible: bool) -> None:
         """Show or hide the high cutoff controls."""
         for i in range(self.high_freq_layout.count()):
@@ -160,17 +151,19 @@ class FilterModule(FilterModuleBase):
             self.low_freq_label.setText("Cutoff (Hz)")
 
     def _on_type_changed(self, text: str) -> None:
-        """Handle filter type change."""
+        """Handle filter type change (UI only; audio applies on next process)."""
         filter_type = normalize_filter_type(text, allow_notch=False)
         self._set_high_cutoff_visible(filter_type == "band")
-        self._rebuild_component()
+        # Type changes need a new design; drop the cached runtime key so the next
+        # process_runtime rebuilds once instead of thrashing on every knob tick.
+        self._runtime_filter_params = None
         self.parameter_changed.emit("filter_type", filter_type)
 
     def _on_order_changed(self, value: float) -> None:
-        """Handle filter order change."""
+        """Handle filter order change (UI only; audio applies on next process)."""
         order_int = int(value)
         self.order_value_label.setText(str(order_int))
-        self._rebuild_component()
+        self._runtime_filter_params = None
         self.parameter_changed.emit("order", order_int)
 
     def _get_filter_type(self) -> Literal["low", "high", "band"]:
@@ -229,8 +222,7 @@ class FilterModule(FilterModuleBase):
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Filter the connected input for one render cycle."""
-        if not self.in_port.is_connected:
-            self._write_silence(num_samples)
+        if self._require_input_or_silence(num_samples):
             return
 
         filter_type = normalize_filter_type(  # type: ignore[assignment]
@@ -248,6 +240,10 @@ class FilterModule(FilterModuleBase):
             filter_type,
         )
 
+        # Reuse the component across buffers when parameters are stable so IIR
+        # delay state carries. Redesign only when cutoff/order/type change
+        # (Butterworth property setters also redesign + reset; a single recreate
+        # is cheaper than multi-setter thrash).
         if self.component is None or filter_params != self._runtime_filter_params:
             self.component = ButterworthFilter(
                 cutoff=filter_params[0],

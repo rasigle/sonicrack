@@ -227,6 +227,9 @@ class HeadlessPatchRenderer:
             module_type = module_data.get("type")
             module_id = module_data.get("id")
             parameters = module_data.get("parameters", {})
+            if not isinstance(module_type, str) or not isinstance(module_id, int):
+                logger.warning("Invalid module data: %s", module_data)
+                return False
 
             # Get module class
             module_class = self._registry.get(module_type)
@@ -265,6 +268,13 @@ class HeadlessPatchRenderer:
                 source_port = conn.get("source_port")
                 target_id = conn.get("target_module")
                 target_port = conn.get("target_port")
+
+                if not isinstance(source_id, int) or not isinstance(target_id, int):
+                    logger.warning("Invalid connection module IDs: %s", conn)
+                    continue
+                if not isinstance(source_port, str) or not isinstance(target_port, str):
+                    logger.warning("Invalid connection port names: %s", conn)
+                    continue
 
                 source_module = self.modules.get(source_id)
                 target_module = self.modules.get(target_id)
@@ -507,7 +517,7 @@ def validate_patch_file(filepath: str | Path) -> dict[str, Any]:
         ...     print(f"Valid patch with {info['module_count']} modules")
     """
     filepath = Path(filepath)
-    result = {
+    result: dict[str, Any] = {
         "valid": False,
         "error": None,
         "module_count": 0,

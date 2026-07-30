@@ -87,9 +87,9 @@ def validate_samples(samples: Any) -> bool:
         return False
 
     if isinstance(samples, (int, float)):
-        return np.isfinite(samples)
+        return bool(np.isfinite(samples))
 
     if isinstance(samples, np.ndarray):
-        return samples.size > 0 and np.any(np.isfinite(samples))
+        return bool(samples.size > 0 and np.any(np.isfinite(samples)))
 
     return False

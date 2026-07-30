@@ -185,7 +185,31 @@ def test_patch_canvas_enables_mouse_tracking_for_graphics_tooltips(qapp: Any):
     canvas = PatchCanvas()
 
     assert canvas.hasMouseTracking()
-    assert canvas.viewport().hasMouseTracking()
+    viewport = canvas.viewport()
+    assert viewport is not None
+    assert viewport.hasMouseTracking()
+
+
+def test_patch_canvas_cycle_description_uses_module_path(qapp: Any):
+    del qapp
+    canvas = PatchCanvas()
+    first = _ModifierWidget()
+    second = _ModifierWidget()
+    third = _ModifierWidget()
+    first.metadata = ModuleMetadata("First", ModuleCategory.MODIFIER)
+    second.metadata = ModuleMetadata("Second", ModuleCategory.MODIFIER)
+    third.metadata = ModuleMetadata("Third", ModuleCategory.MODIFIER)
+
+    canvas.add_module(first)
+    canvas.add_module(second)
+    canvas.add_module(third)
+    canvas.create_connection(first.output_ports[0], second.input_ports[0])
+    canvas.create_connection(second.output_ports[0], third.input_ports[0])
+
+    assert (
+        canvas._would_create_cycle(third.output_ports[0], first.input_ports[0])
+        == "Third -> First -> Second -> Third"
+    )
 
 
 def test_inactive_modifier_passes_required_input_through(qapp: Any):

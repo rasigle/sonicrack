@@ -12,6 +12,7 @@ from sonicrack.gui.modules.modifier.clipper_mod import ClipperModulatedModule
 from sonicrack.gui.modules.modifier.pan_mod import PannerModule
 from sonicrack.gui.modules.modifier.volume_mod import VolumeModule
 from sonicrack.gui.modules.source.oscillator import OscillatorModule
+from sonicrack.runtime.specs import RuntimeParameters
 
 
 @pytest.fixture
@@ -128,15 +129,15 @@ def test_process_runtime_does_not_create_component(qapp: Any):
     assert initial_component is not None
 
     # Process several buffers
-    params = {}
+    params: RuntimeParameters = {}
     for _ in range(10):
         audio_source.process_runtime(256, params)
         panner.process_runtime(256, params)
 
     # Component should be the same instance (not recreated)
-    assert panner.component is initial_component, (
-        "Component should not be recreated during process_runtime()"
-    )
+    assert (
+        panner.component is initial_component
+    ), "Component should not be recreated during process_runtime()"
 
 
 def test_knob_disabled_when_modulation_connected(qapp: Any):
@@ -156,9 +157,9 @@ def test_knob_disabled_when_modulation_connected(qapp: Any):
     # Knob should remain enabled but tooltip changes to indicate depth control
     assert panner.pan_knob.isEnabled(), "Knob should remain enabled when modulated"
     modulated_tooltip = panner.pan_knob.toolTip()
-    assert "Modulation Depth" in modulated_tooltip, (
-        "Tooltip should indicate depth control"
-    )
+    assert (
+        "Modulation Depth" in modulated_tooltip
+    ), "Tooltip should indicate depth control"
 
     # Disconnect modulation
     lfo.sine_port.disconnect(panner.mod_port)

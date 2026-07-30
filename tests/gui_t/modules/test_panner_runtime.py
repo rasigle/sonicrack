@@ -11,6 +11,14 @@ from sonicrack.gui.modules.modifier.pan_simple import SimplePannerModule
 from sonicrack.gui.modules.output.output import OutputModule
 from sonicrack.gui.modules.source.oscillator import OscillatorModule
 from sonicrack.runtime.engine import AudioEngine
+from sonicrack.runtime.specs import RuntimeParameters
+
+PortValue = float | np.ndarray
+
+
+def _array_value(value: PortValue) -> np.ndarray:
+    assert isinstance(value, np.ndarray)
+    return value
 
 
 def test_simple_panner_runtime_center_position(qapp: Any):
@@ -25,7 +33,7 @@ def test_simple_panner_runtime_center_position(qapp: Any):
     osc.sine_port.connect(panner.in_port)
 
     # Set up runtime parameters
-    params = {}
+    params: RuntimeParameters = {}
 
     # Set pan position to center
     panner.pan_knob.set_value(0.0)
@@ -36,7 +44,7 @@ def test_simple_panner_runtime_center_position(qapp: Any):
     panner.process_runtime(num_samples, params)
 
     # Verify output
-    output = panner.out_port.value
+    output = _array_value(panner.out_port.value)
     assert output is not None, "Output should not be None"
     assert output.shape == (
         num_samples,
@@ -58,7 +66,7 @@ def test_simple_panner_runtime_right_position(qapp: Any):
     panner = SimplePannerModule()
     osc.sine_port.connect(panner.in_port)
 
-    params = {}
+    params: RuntimeParameters = {}
     num_samples = 256
 
     # Set pan position to hard right
@@ -66,7 +74,7 @@ def test_simple_panner_runtime_right_position(qapp: Any):
     osc.process_runtime(num_samples, params)
     panner.process_runtime(num_samples, params)
 
-    output = panner.out_port.value
+    output = _array_value(panner.out_port.value)
     left = output[:, 0]
     right = output[:, 1]
 
@@ -88,7 +96,7 @@ def test_simple_panner_runtime_left_position(qapp: Any):
     panner = SimplePannerModule()
     osc.sine_port.connect(panner.in_port)
 
-    params = {}
+    params: RuntimeParameters = {}
     num_samples = 256
 
     # Set pan position to hard left
@@ -96,7 +104,7 @@ def test_simple_panner_runtime_left_position(qapp: Any):
     osc.process_runtime(num_samples, params)
     panner.process_runtime(num_samples, params)
 
-    output = panner.out_port.value
+    output = _array_value(panner.out_port.value)
     left = output[:, 0]
     right = output[:, 1]
 
@@ -120,7 +128,7 @@ def test_modulated_panner_unmodulated_runtime(qapp: Any):
     # Connect oscillator to panner (no modulation)
     osc.sine_port.connect(panner.in_port)
 
-    params = {}
+    params: RuntimeParameters = {}
     num_samples = 256
 
     # Set pan position to left
@@ -129,7 +137,7 @@ def test_modulated_panner_unmodulated_runtime(qapp: Any):
     panner.process_runtime(num_samples, params)
 
     # Verify output
-    output = panner.out_port.value
+    output = _array_value(panner.out_port.value)
     assert output is not None, "Output should not be None"
     assert output.shape == (
         num_samples,
@@ -161,7 +169,7 @@ def test_modulated_panner_with_modulation_input(qapp: Any):
     audio_osc.sine_port.connect(panner.in_port)
     lfo.sine_port.connect(panner.mod_port)
 
-    params = {}
+    params: RuntimeParameters = {}
     num_samples = 256
 
     # Set LFO to low frequency
@@ -174,7 +182,7 @@ def test_modulated_panner_with_modulation_input(qapp: Any):
     panner.process_runtime(num_samples, params)
 
     # Verify output
-    output = panner.out_port.value
+    output = _array_value(panner.out_port.value)
     assert output is not None, "Output should not be None"
     assert output.shape == (
         num_samples,
@@ -187,9 +195,9 @@ def test_modulated_panner_with_modulation_input(qapp: Any):
 
     # Channels should not be identical (due to modulation)
     # Use a more lenient check since they might be close at some samples
-    assert not np.allclose(left, right, rtol=0.001), (
-        "Channels should differ significantly with modulation"
-    )
+    assert not np.allclose(
+        left, right, rtol=0.001
+    ), "Channels should differ significantly with modulation"
 
 
 def test_simple_panner_runtime_without_input(qapp: Any):
@@ -197,13 +205,13 @@ def test_simple_panner_runtime_without_input(qapp: Any):
     del qapp
 
     panner = SimplePannerModule()
-    params = {}
+    params: RuntimeParameters = {}
     num_samples = 256
 
     # Process without connecting input
     panner.process_runtime(num_samples, params)
 
-    output = panner.out_port.value
+    output = _array_value(panner.out_port.value)
     assert output is not None, "Output should not be None"
 
     # Output should be zeros (silence)
@@ -216,13 +224,13 @@ def test_modulated_panner_runtime_without_input(qapp: Any):
     del qapp
 
     panner = PannerModule()
-    params = {}
+    params: RuntimeParameters = {}
     num_samples = 256
 
     # Process without connecting input
     panner.process_runtime(num_samples, params)
 
-    output = panner.out_port.value
+    output = _array_value(panner.out_port.value)
     assert output is not None, "Output should not be None"
 
     # Output should be zeros (silence)
@@ -239,7 +247,7 @@ def test_simple_panner_runtime_uses_engine_component(qapp: Any):
     panner = SimplePannerModule()
     osc.sine_port.connect(panner.in_port)
 
-    params = {}
+    params: RuntimeParameters = {}
     num_samples = 256
 
     # Set position via knob (this is what process_runtime will use)
@@ -249,14 +257,14 @@ def test_simple_panner_runtime_uses_engine_component(qapp: Any):
     osc.process_runtime(num_samples, params)
     panner.process_runtime(num_samples, params)
 
-    output = panner.out_port.value
+    output = _array_value(panner.out_port.value)
     left = output[:, 0]
     right = output[:, 1]
 
     # At position 0.8 (right), right should be louder
-    assert np.sum(np.abs(right)) > np.sum(np.abs(left)), (
-        "Component position should affect output"
-    )
+    assert np.sum(np.abs(right)) > np.sum(
+        np.abs(left)
+    ), "Component position should affect output"
 
 
 def test_simple_panner_position_reaches_output_render_path(qapp: Any):
@@ -295,7 +303,7 @@ def test_modulated_panner_runtime_uses_engine_component(qapp: Any):
     osc.sine_port.connect(panner.in_port)
     # No modulation connected
 
-    params = {}
+    params: RuntimeParameters = {}
     num_samples = 256
 
     # Set position
@@ -305,11 +313,11 @@ def test_modulated_panner_runtime_uses_engine_component(qapp: Any):
     osc.process_runtime(num_samples, params)
     panner.process_runtime(num_samples, params)
 
-    output = panner.out_port.value
+    output = _array_value(panner.out_port.value)
     left = output[:, 0]
     right = output[:, 1]
 
     # At position -0.8 (left), left should be louder
-    assert np.sum(np.abs(left)) > np.sum(np.abs(right)), (
-        "Component position should affect output in unmodulated mode"
-    )
+    assert np.sum(np.abs(left)) > np.sum(
+        np.abs(right)
+    ), "Component position should affect output in unmodulated mode"

@@ -7,6 +7,8 @@ This provides common functionality for modules that have:
 - Automatic CV range specification for proper signal scaling
 """
 
+from __future__ import annotations
+
 import logging
 import threading
 from typing import Any
@@ -14,6 +16,7 @@ from typing import Any
 import numpy as np
 
 from sonicrack.gui.widgets.module_widget import ModuleWidget
+from sonicrack.gui.widgets.port_widget import PortWidget
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,7 @@ class PortModulatorAdapter:
 
     def __init__(
         self,
-        port,
+        port: Any,
         num_samples: int,
         expected_range: tuple[float, float] = (0.0, 1.0),
         modulation_amount: float = 1.0,
@@ -44,20 +47,12 @@ class PortModulatorAdapter:
             expected_range: Expected CV range for the destination (default: [0, 1])
             modulation_amount: How much modulation to apply (0.0 = none, 1.0 = full)
         """
-        # Extract actual Port if we received a PortWidget
-        from sonicrack.gui.widgets.port_widget import PortWidget
-        from sonicrack.patching.port import Port
-
-        if isinstance(port, PortWidget):
-            self.port: Port = port.port
-        else:
-            self.port: Port = port
-
+        self.port: Any = port.port if isinstance(port, PortWidget) else port
         self.num_samples = num_samples
         self.expected_range = expected_range
         self.modulation_amount = modulation_amount
         self._index = 0
-        self._buffer = None
+        self._buffer: np.ndarray | None = None
 
         # Check if we need CV scaling
         self._needs_scaling = False

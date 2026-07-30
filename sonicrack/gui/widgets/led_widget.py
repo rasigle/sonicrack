@@ -34,10 +34,10 @@ class LedIndicator(QWidget):
     ) -> None:
         super().__init__(parent)
         self._on = bool(on)
-        self.style = style or LedStyle()
-        self._off_pixmap = self._load_pixmap(self.style.off_image)
-        self._on_pixmap = self._load_pixmap(self.style.on_image)
-        self.setFixedSize(self.style.size, self.style.size)
+        self.led_style = style or LedStyle()
+        self._off_pixmap = self._load_pixmap(self.led_style.off_image)
+        self._on_pixmap = self._load_pixmap(self.led_style.on_image)
+        self.setFixedSize(self.led_style.size, self.led_style.size)
 
     @staticmethod
     def _load_pixmap(path: str | Path | None) -> QPixmap | None:
@@ -68,12 +68,14 @@ class LedIndicator(QWidget):
             return
 
         rect = QRectF(1, 1, self.width() - 2, self.height() - 2)
-        painter.setPen(QPen(self.style.border_color, 1))
-        painter.setBrush(self.style.on_color if self._on else self.style.off_color)
+        painter.setPen(QPen(self.led_style.border_color, 1))
+        painter.setBrush(
+            self.led_style.on_color if self._on else self.led_style.off_color
+        )
         painter.drawEllipse(rect)
 
         if self._on:
-            glow = QColor(self.style.on_color)
+            glow = QColor(self.led_style.on_color)
             glow.setAlpha(70)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(glow)

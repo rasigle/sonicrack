@@ -56,14 +56,14 @@ class Knob(QWidget):
         self.callback = callback
         self.default_value = default_value if default_value is not None else min_value
         self._value = self.default_value
-        self.style = style or ProceduralKnobStyle.medium()
+        self.knob_style = style or ProceduralKnobStyle.medium()
 
         self._description = description
         if self._description:
             self.setToolTip(self._description)
 
         # Visual properties
-        geometry = self.style.geometry
+        geometry = self.knob_style.geometry
         self.knob_size = geometry.knob_size
         self.setMinimumSize(geometry.min_width, geometry.min_height)
         self.setMaximumSize(geometry.max_width, geometry.max_height)
@@ -237,7 +237,7 @@ class Knob(QWidget):
         """Paint the knob."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.style.paint(painter, self)
+        self.knob_style.paint(painter, self)
 
     def mousePressEvent(self, event):
         """Handle mouse press to start dragging."""

@@ -405,7 +405,7 @@ class Behringer182Module(ModuleWidget):
         values = np.zeros(8, dtype=np.float32)
         for index, knob in enumerate(knobs):
             value = parameters.get(f"{prefix}_{index + 1}", knob.get_value())
-            values[index] = float(value)
+            values[index] = float(str(value))
         return values
 
     @staticmethod

@@ -675,13 +675,15 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                     cable.start_port.remove_cable(cable)
                 if cable.end_port:
                     cable.end_port.remove_cable(cable)
-                if cable.scene():
-                    cable.scene().removeItem(cable)
+                cable_scene = cable.scene()
+                if cable_scene is not None:
+                    cable_scene.removeItem(cable)
 
         # Remove the module from the scene before notifying the main window so
         # playback recompilation sees the final canvas state.
-        with contextlib.suppress(RuntimeError):
-            scene.removeItem(self)
+        if scene is not None:
+            with contextlib.suppress(RuntimeError):
+                scene.removeItem(self)
 
         if isinstance(canvas, PatchCanvas):
             canvas.module_deleted.emit(self)

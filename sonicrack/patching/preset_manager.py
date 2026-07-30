@@ -10,8 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sonicrack.constants import PRESET_FILE_EXTENSION
-from sonicrack.constants import DEFAULT_PRESET_DIRECTORY
+from sonicrack.constants import DEFAULT_PRESET_DIRECTORY, PRESET_FILE_EXTENSION
 
 logger = logging.getLogger(__name__)
 

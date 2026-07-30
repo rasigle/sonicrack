@@ -16,11 +16,22 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypedDict, cast
 
 import numpy as np
 
 from sonicrack.runtime.engine import RenderContext
+
+
+class ModuleProfileStat(TypedDict):
+    name: str
+    count: int
+    total: float
+    avg: float
+    min: float
+    max: float
+    pct: float
 
 
 class ProfilingRenderContext(RenderContext):
@@ -61,7 +72,7 @@ class ProfilingRenderContext(RenderContext):
             elapsed_ms = (time.perf_counter_ns() - self._render_start_time) / 1e6
             self.total_time = elapsed_ms
 
-    def time_module(self, module_name: str, operation: callable) -> Any:
+    def time_module(self, module_name: str, operation: Callable[[], Any]) -> Any:
         """Time a module operation.
 
         Args:
@@ -104,7 +115,7 @@ class ProfilingRenderContext(RenderContext):
         lines.append("")
 
         # Calculate statistics
-        module_stats = []
+        module_stats: list[ModuleProfileStat] = []
         for name, times in self.timings.items():
             count = self.call_counts[name]
             total = sum(times)
@@ -159,7 +170,7 @@ class ProfilingRenderContext(RenderContext):
 
         # Budget analysis
         sample_rate = 44100  # Default
-        buffer_size = self._num_samples
+        buffer_size = self.num_samples
         budget_ms = (buffer_size / sample_rate) * 1000
         headroom_pct = 100 * (1 - self.total_time / budget_ms)
 
@@ -210,7 +221,7 @@ class ProfilingRenderContext(RenderContext):
         return {
             "total_time_ms": self.total_time,
             "module_stats": stats,
-            "buffer_size": self._num_samples,
+            "buffer_size": self.num_samples,
         }
 
     def get_top_bottlenecks(self, n: int = 5) -> list[tuple[str, float]]:
@@ -290,20 +301,20 @@ class ProfilingSession:
                 module_totals[module_stat["module"]].append(module_stat["total_ms"])
 
         # Calculate aggregates
-        stats = []
+        stats: list[dict[str, str | float]] = []
         for module_name, times in module_totals.items():
             stats.append(
                 {
                     "name": module_name,
-                    "avg": np.mean(times),
-                    "min": np.min(times),
-                    "max": np.max(times),
-                    "std": np.std(times),
-                    "total": np.sum(times),
+                    "avg": float(np.mean(times)),
+                    "min": float(np.min(times)),
+                    "max": float(np.max(times)),
+                    "std": float(np.std(times)),
+                    "total": float(np.sum(times)),
                 }
             )
 
-        stats.sort(key=lambda x: x["total"], reverse=True)
+        stats.sort(key=lambda x: cast(float, x["total"]), reverse=True)
 
         # Format table
         lines.append(

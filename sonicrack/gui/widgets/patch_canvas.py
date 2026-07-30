@@ -123,7 +123,7 @@ class PatchCanvas(QGraphicsView):
                             self,
                             "Invalid Connection",
                             "Infinite Loop Detected. This connection would create an "
-                            "infinite feedback loop:\n\n{cycle_info}\n\n"
+                            f"infinite feedback loop:\n\n{cycle_info}\n\n"
                             "Please check your connections and avoid creating cycles.",
                         )
                         # Remove the invalid cable
@@ -202,7 +202,7 @@ class PatchCanvas(QGraphicsView):
                     cycle_start = current_path.index(neighbor)
                     cycle_modules = current_path[cycle_start:] + [neighbor]
                     cycle_names = [m.metadata.title for m in cycle_modules]
-                    return " → ".join(cycle_names)
+                    return " -> ".join(cycle_names)
 
             current_path.pop()
             rec_stack.remove(module)

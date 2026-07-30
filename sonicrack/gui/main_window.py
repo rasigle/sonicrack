@@ -25,8 +25,14 @@ from PyQt6.QtWidgets import (
 
 from sonicrack import __version__
 from sonicrack.config.app_settings import app_settings
-from sonicrack.constants import APP_ICON_RESOURCE, APP_TITLE, DEFAULT_AUTOSAVE_PATCH
-from sonicrack.constants import PRESET_FILE_EXTENSION, resource, resource_path
+from sonicrack.constants import (
+    APP_ICON_RESOURCE,
+    APP_TITLE,
+    DEFAULT_AUTOSAVE_PATCH,
+    PRESET_FILE_EXTENSION,
+    resource,
+    resource_path,
+)
 from sonicrack.gui.dialogs.about_dialog import show_about
 from sonicrack.gui.dialogs.preset_library_dialog import (
     LibraryPresetBrowserDialog,
@@ -82,7 +88,7 @@ class ModularSynthWindow(QMainWindow):
         super().__init__()
 
         # Patch file tracking
-        self.current_patch_path = None  # Path to currently loaded patch file
+        self.current_patch_path: str | None = None
         self.patch_modified: bool = False  # Track if patch has unsaved changes
         self._is_shutting_down = False
         self._autosave_patch_path = Path(autosave_patch_path or DEFAULT_AUTOSAVE_PATCH)
@@ -328,6 +334,8 @@ class ModularSynthWindow(QMainWindow):
 
         # File menu
         file_menu = menubar.addMenu("&File")
+        if file_menu is None:
+            raise ValueError("No file menu available")
 
         new_action = QtGui.QAction("&New Patch", self)
         new_action.setShortcut("Ctrl+N")

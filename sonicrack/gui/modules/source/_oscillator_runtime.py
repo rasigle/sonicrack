@@ -105,7 +105,7 @@ def render_with_frequency_ramp(
         sample_rate,
         slew_time_ms,
     )
-    samples = []
+    samples: list[float] = []
     for frequency in frequencies:
         oscillator.frequency = float(frequency)
         samples.append(next(oscillator))
@@ -157,7 +157,7 @@ def render_with_clock_resets(
         )
         return samples, rendered_frequency, 0.0
 
-    samples = []
+    chunks: list[np.ndarray] = []
     start = 0
     rendered_frequency = previous_frequency
     current_previous_clock = previous_clock
@@ -185,7 +185,7 @@ def render_with_clock_resets(
                         reset_smoothing_time_ms,
                     )
                     pending_reset_previous_output = None
-                samples.append(chunk)
+                chunks.append(chunk)
                 if len(chunk) > 0:
                     previous_output = float(chunk[-1])
 
@@ -211,12 +211,12 @@ def render_with_clock_resets(
                 sample_rate,
                 reset_smoothing_time_ms,
             )
-        samples.append(chunk)
+        chunks.append(chunk)
 
-    if not samples:
+    if not chunks:
         rendered = np.empty(0, dtype=np.float32)
     else:
-        rendered = np.concatenate(samples).astype(np.float32)
+        rendered = np.concatenate(chunks).astype(np.float32)
 
     final_clock = (
         float(clock_signal[min(num_samples, len(clock_signal)) - 1])

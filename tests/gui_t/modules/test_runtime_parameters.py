@@ -12,7 +12,7 @@ from soniclab.generators.oscillators.oscillator_ramp import SawtoothOscillator
 from soniclab.generators.oscillators.oscillator_sine import SineOscillator
 from soniclab.generators.oscillators.oscillator_square import SquareOscillator
 
-from sonicrack.constants import DEFAULT_SAMPLE_RATE
+from sonicrack.constants import AUDIO_FREQUENCY_KNOB_CURVE, DEFAULT_SAMPLE_RATE
 from sonicrack.gui.modules.effects.effects_compressor import CompressorModule
 from sonicrack.gui.modules.effects.effects_distortion import DistortionModule
 from sonicrack.gui.modules.mixer import MixerModule
@@ -28,7 +28,6 @@ from sonicrack.gui.modules.source.lfo import LFOModule
 from sonicrack.gui.modules.source.oscillator import OscillatorModule
 from sonicrack.gui.modules.source.vco import ModulatedOscillatorModule
 from sonicrack.gui.modules.voice.tb303_voice import TB303VoiceModule
-from sonicrack.constants import AUDIO_FREQUENCY_KNOB_CURVE
 from sonicrack.patching.port import Port
 
 
@@ -785,7 +784,7 @@ def test_tb303_voice_runtime_applies_parameters_and_renders(qapp: Any):
     module = TB303VoiceModule()
     assert module.tune_knob.min_value == pytest.approx(-24.0)
     assert module.tune_knob.max_value == pytest.approx(24.0)
-    pitch_cv = frequency_to_pitch_cv(110.0)
+    pitch_cv = float(frequency_to_pitch_cv(110.0))
     freq_source = _connect_constant_input(module.freq_input, pitch_cv)
     freq_source.write(np.full(32, pitch_cv, dtype=np.float32))
     gate_source = _connect_constant_input(module.gate_input, 1.0)

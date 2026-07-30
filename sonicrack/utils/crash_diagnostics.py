@@ -13,7 +13,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, TextIO
 
-from PyQt6.QtCore import QtMsgType, qInstallMessageHandler
+from PyQt6.QtCore import QMessageLogContext, QtMsgType, qInstallMessageHandler
 from PyQt6.QtWidgets import QApplication
 
 from sonicrack.constants import LOG_DIRECTORY
@@ -27,6 +27,19 @@ _original_excepthook = sys.excepthook
 _original_threading_excepthook = threading.excepthook
 _original_unraisablehook = sys.unraisablehook
 _previous_qt_message_handler: Callable[..., None] | None = None
+
+
+def _exc_info(
+    exc_type: type[BaseException],
+    exc_value: BaseException | None,
+    exc_traceback: TracebackType | None,
+) -> (
+    tuple[type[BaseException], BaseException, TracebackType | None]
+    | tuple[None, None, None]
+):
+    if exc_value is None:
+        return (None, None, None)
+    return (exc_type, exc_value, exc_traceback)
 
 
 def activate_crash_diagnostics(
@@ -79,7 +92,7 @@ def activate_crash_diagnostics(
             logger.critical(
                 "Unhandled exception in thread %s",
                 getattr(args.thread, "name", "<unknown>"),
-                exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+                exc_info=_exc_info(args.exc_type, args.exc_value, args.exc_traceback),
             )
             dump_current_tracebacks("Unhandled exception in worker thread")
 
@@ -102,7 +115,7 @@ def activate_crash_diagnostics(
                 "Unraisable exception from %r: %s",
                 unraisable.object,
                 unraisable.err_msg,
-                exc_info=(exc_type, exc_value, unraisable.exc_traceback),
+                exc_info=_exc_info(exc_type, exc_value, unraisable.exc_traceback),
             )
             dump_current_tracebacks("Unraisable exception")
             _original_unraisablehook(unraisable)
@@ -205,15 +218,15 @@ def _enable_fault_trace_file(trace_path: Path) -> None:
 
 def _qt_message_handler(
     msg_type: QtMsgType,
-    context: Any,
-    message: str,
+    context: QMessageLogContext,
+    message: str | None,
 ) -> None:
     """Forward Qt diagnostic messages into the Python log."""
     try:
         source = getattr(context, "file", None) or "<unknown>"
         line = getattr(context, "line", 0)
         function = getattr(context, "function", None) or "<unknown>"
-        formatted = f"Qt: {message} ({source}:{line}, {function})"
+        formatted = f"Qt: {message or ''} ({source}:{line}, {function})"
 
         if msg_type == QtMsgType.QtDebugMsg:
             logger.debug(formatted)
@@ -270,7 +283,9 @@ def _flush_logging() -> None:
 def _last_resort_log(message: str) -> None:
     """Write diagnostics when normal logging may be broken."""
     try:
-        sys.__stderr__.write(f"{message}\n")
-        sys.__stderr__.flush()
+        stderr = sys.__stderr__
+        if stderr is not None:
+            stderr.write(f"{message}\n")
+            stderr.flush()
     except Exception:
         pass

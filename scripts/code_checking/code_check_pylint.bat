@@ -14,7 +14,7 @@ popd
 
 echo Running pylint
 pushd "%repo_root%" || exit /b 1
-uv run pylint --rcfile=.pylintrc .\src .\tests .\scripts
+uv run pylint --rcfile=.pylintrc .\sonicrack .\tests .\scripts
 set "exit_code=%errorlevel%"
 popd
 exit /b %exit_code%

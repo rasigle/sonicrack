@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import Port
-from sonicrack.runtime.engine import AudioEngine
+from sonicrack.runtime.engine import AudioEngine, AudioValue
 from sonicrack.runtime.specs import RuntimeModuleSpec
 
 
@@ -27,9 +29,9 @@ class _SourceModule:
 
     def __init__(self) -> None:
         self.out = Port("output", "Out", parent_module=self)
-        self.inputs = {}
+        self.inputs: dict[str, Port] = {}
         self.outputs = {"Out": self.out}
-        self.input_ports = []
+        self.input_ports: list[_PortWidgetStub] = []
         self.output_ports = [_PortWidgetStub(self.out)]
         self.render_count = 0
         self.gain = 1.0
@@ -42,9 +44,11 @@ class _SourceModule:
             parameter_names=("gain",),
         )
 
-    def process_runtime(self, num_samples: int, parameters: object) -> None:
+    def process_runtime(
+        self, num_samples: int, parameters: Mapping[str, object]
+    ) -> None:
         self.render_count += 1
-        gain = float(parameters["gain"])
+        gain = float(str(parameters["gain"]))
         self.out.write(np.full(num_samples, self.render_count * gain, dtype=np.float32))
 
     def get_parameters(self) -> dict[str, object]:
@@ -71,17 +75,17 @@ def test_audio_engine_reuses_and_invalidates_render_plan(qapp):
     compile_count = 0
     original_compile = engine.compile_render_plan
 
-    def counting_compile(ports):
+    def counting_compile(ports: list[Port]):
         nonlocal compile_count
         compile_count += 1
         return original_compile(ports)
 
     engine.compile_render_plan = counting_compile
 
-    first = engine.render_ports([sink], 4)[0]
-    second = engine.render_ports([sink], 4)[0]
+    first: AudioValue = engine.render_ports([sink], 4)[0]
+    second: AudioValue = engine.render_ports([sink], 4)[0]
     source.gain = 10.0
-    third = engine.render_ports([sink], 4)[0]
+    third: AudioValue = engine.render_ports([sink], 4)[0]
 
     assert compile_count == 1
     np.testing.assert_allclose(first, [1.0, 1.0, 1.0, 1.0])
@@ -89,7 +93,7 @@ def test_audio_engine_reuses_and_invalidates_render_plan(qapp):
     np.testing.assert_allclose(third, [30.0, 30.0, 30.0, 30.0])
 
     engine.mark_graph_changed()
-    fourth = engine.render_ports([sink], 4)[0]
+    fourth: AudioValue = engine.render_ports([sink], 4)[0]
 
     assert compile_count == 2
     np.testing.assert_allclose(fourth, [40.0, 40.0, 40.0, 40.0])

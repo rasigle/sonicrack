@@ -24,11 +24,15 @@ def _make_module(title: str, category: str) -> type[ModuleWidget]:
 def _library_widgets(window: ModularSynthWindow) -> list[QtWidgets.QWidget]:
     layout = window.module_library_scroll_layout
     assert layout is not None
-    return [
-        widget
-        for index in range(layout.count())
-        if (widget := layout.itemAt(index).widget()) is not None
-    ]
+    widgets: list[QtWidgets.QWidget] = []
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        if item is None:
+            continue
+        widget = item.widget()
+        if widget is not None:
+            widgets.append(widget)
+    return widgets
 
 
 def test_module_library_can_hide_and_show():

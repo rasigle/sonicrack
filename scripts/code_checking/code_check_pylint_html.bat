@@ -17,7 +17,7 @@ popd
 echo Running pylint
 if exist "%html_file%" del "%html_file%"
 pushd "%repo_root%" || exit /b 1
-uv run pylint --rcfile=.pylintrc --output-format=json --output="%json_file%" .\src .\tests .\scripts
+uv run pylint --rcfile=.pylintrc --output-format=json --output="%json_file%" .\sonicrack .\tests .\scripts
 if not exist "%json_file%" (
     popd
     echo Pylint did not create JSON report: "%json_file%"

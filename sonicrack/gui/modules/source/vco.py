@@ -23,15 +23,19 @@ from soniclab.generators.oscillators.oscillator_ramp import SawtoothMode, Triang
 from soniclab.generators.oscillators.oscillator_sine import SineWaveMode
 from soniclab.generators.oscillators.oscillator_square import SquareWaveMode
 
-from sonicrack.constants import DEFAULT_GAIN_DB
+from sonicrack.constants import (
+    AUDIO_FREQUENCY_KNOB_CURVE,
+    DEFAULT_GAIN_DB,
+    DEFAULT_PW_PERCENTAGE_VALUE,
+    MAX_PW_PERCENTAGE_VALUE,
+    MIN_PW_PERCENTAGE_VALUE,
+)
 from sonicrack.gui.modules.source._oscillator_runtime import (
     RuntimeOscillator,
     _frequency_slew_values,
     render_with_frequency_ramp,
     smooth_control_signal,
 )
-from sonicrack.constants import MIN_PW_PERCENTAGE_VALUE, MAX_PW_PERCENTAGE_VALUE, \
-    DEFAULT_PW_PERCENTAGE_VALUE, AUDIO_FREQUENCY_KNOB_CURVE
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
@@ -843,13 +847,14 @@ class ModulatedOscillatorModule(ModuleWidget):
             frequencies = apply_vcv_fm_offset(
                 frequencies, fm_signal, fm_amount, fm_mode
             )
+        frequency_buffer = _as_frequency_buffer(frequencies)
 
         # Use bulk frequency API (30-50x faster than loop!)
-        samples = self.component.process_frequency_buffer(frequencies)
+        samples = self.component.process_frequency_buffer(frequency_buffer)
 
         # Track last frequency for smooth transitions
-        if len(frequencies) > 0:
-            self._last_runtime_frequency = float(frequencies[-1])
+        if len(frequency_buffer) > 0:
+            self._last_runtime_frequency = float(frequency_buffer[-1])
 
         return samples
 

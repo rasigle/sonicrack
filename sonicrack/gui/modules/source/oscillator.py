@@ -12,9 +12,13 @@ from soniclab.generators.oscillators.oscillator import (
 )
 
 from sonicrack.config.audio_config import audio_config
+from sonicrack.constants import (
+    AUDIO_FREQUENCY_KNOB_CURVE,
+    DEFAULT_PW_PERCENTAGE_VALUE,
+    MAX_PW_PERCENTAGE_VALUE,
+    MIN_PW_PERCENTAGE_VALUE,
+)
 from sonicrack.gui.modules.source._oscillator_runtime import render_with_frequency_ramp
-from sonicrack.constants import MIN_PW_PERCENTAGE_VALUE, MAX_PW_PERCENTAGE_VALUE, \
-    DEFAULT_PW_PERCENTAGE_VALUE, AUDIO_FREQUENCY_KNOB_CURVE
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata

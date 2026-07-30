@@ -5,6 +5,10 @@ from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.effects import Reverb
 
 from sonicrack.gui.modules._modulated_base import ModulatedModuleBase
+from sonicrack.gui.modules.effects._cv_modulation import (
+    modulate_param,
+    read_optional_cv,
+)
 from sonicrack.gui.widgets import Knob
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
@@ -16,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @register_module()
 class ReverbModule(ModulatedModuleBase):
-    """Reverb module"""
+    """Reverb module with optional CV for room size, damping, and mix."""
 
     runtime_kind = "reverb"
     metadata = ModuleMetadata(
@@ -26,16 +30,19 @@ class ReverbModule(ModulatedModuleBase):
     )
 
     def __init__(self):
-        """Initialize panner module."""
+        """Initialize reverb module."""
         super().__init__(
             width=220,
-            height=240,
+            height=260,
             color=QColor(180, 80, 180),
         )
 
         # Add ports
         self.in_port = self.add_input("In")
         self.out_port = self.add_output("Out")
+        self.room_cv_port = self.add_input("CV_Room")
+        self.damping_cv_port = self.add_input("CV_Damping")
+        self.mix_cv_port = self.add_input("CV_Mix")
         self.component = None
 
         # Use helper methods for UI construction
@@ -107,17 +114,19 @@ class ReverbModule(ModulatedModuleBase):
         """Reverb requires the In port to be connected."""
         return ["In"]
 
-    def get_cv_range(self, port_name: str = "Mod") -> tuple[float, float]:
-        """Reverb expects bipolar CV range [-1, 1].
+    def get_modulation_inputs(self) -> list[str]:
+        """Reverb accepts CV modulation for room, damping, and mix."""
+        return ["CV_Room", "CV_Damping", "CV_Mix"]
 
-        Returns:
-            (-1.0, 1.0) - bipolar range
-        """
+    def get_cv_range(self, port_name: str = "CV_Room") -> tuple[float, float]:
+        """Reverb CV inputs expect bipolar offsets [-1, 1]."""
+        _ = port_name
         return -1.0, 1.0
 
-    # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
-        """Create modulated reverb (not implemented yet)."""
+        """CV is applied in process_runtime; return the base component."""
+        _ = mod_comp
+        return self.create_unmodulated_component()
 
     def create_unmodulated_component(self):
         """Create simple Reverb without modulation."""
@@ -137,14 +146,26 @@ class ReverbModule(ModulatedModuleBase):
             if self.component is None:
                 self.component = self.create_unmodulated_component()
 
-            self.component.room_size = float_parameter(
+            base_room = float_parameter(
                 parameters, "room_size", self.room_size_knob.get_value
             )
-            self.component.damping = float_parameter(
+            base_damping = float_parameter(
                 parameters, "damping", self.damping_knob.get_value
             )
-            self.component.mix = float_parameter(
-                parameters, "mix", self.mix_knob.get_value
+            base_mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
+
+            room_cv = read_optional_cv(self.room_cv_port, num_samples)
+            damping_cv = read_optional_cv(self.damping_cv_port, num_samples)
+            mix_cv = read_optional_cv(self.mix_cv_port, num_samples)
+
+            self.component.room_size = modulate_param(
+                base_room, room_cv, minimum=0.0, maximum=1.0
+            )
+            self.component.damping = modulate_param(
+                base_damping, damping_cv, minimum=0.0, maximum=1.0
+            )
+            self.component.mix = modulate_param(
+                base_mix, mix_cv, minimum=0.0, maximum=1.0
             )
 
             self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

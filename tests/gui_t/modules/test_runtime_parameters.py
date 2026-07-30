@@ -14,7 +14,9 @@ from soniclab.generators.oscillators.oscillator_square import SquareOscillator
 
 from sonicrack.constants import AUDIO_FREQUENCY_KNOB_CURVE, DEFAULT_SAMPLE_RATE
 from sonicrack.gui.modules.effects.effects_compressor import CompressorModule
+from sonicrack.gui.modules.effects.effects_delay import DelayModule
 from sonicrack.gui.modules.effects.effects_distortion import DistortionModule
+from sonicrack.gui.modules.effects.effects_reverb import ReverbModule
 from sonicrack.gui.modules.mixer import MixerModule
 from sonicrack.gui.modules.modifier.acid_filter import AcidFilterModule
 from sonicrack.gui.modules.modifier.filter import FilterModule
@@ -768,6 +770,94 @@ def test_compressor_runtime_applies_parameters(qapp: Any):
     assert output.shape == (64,)
     assert output[-1] < 1.0
     assert np.all(np.isfinite(output))
+
+
+def _effect_param_target(component: Any, attr: str) -> float:
+    """Read smoothed parameter target when RuntimeParameter is present."""
+    param = getattr(component, f"_{attr}_param", None)
+    if param is not None and hasattr(param, "target"):
+        return float(param.target)
+    return float(getattr(component, attr))
+
+
+def test_delay_runtime_applies_time_feedback_and_mix_cv(qapp: Any):
+    del qapp
+    module = DelayModule()
+    input_source = _connect_constant_input(module.in_port, 0.25)
+    input_source.write(np.full(16, 0.25, dtype=np.float32))
+    time_source = _connect_constant_input(module.time_cv_port, 0.0)
+    time_source.write(np.full(16, 0.25, dtype=np.float32))
+    feedback_source = _connect_constant_input(module.feedback_cv_port, 0.0)
+    feedback_source.write(np.full(16, 0.2, dtype=np.float32))
+    mix_source = _connect_constant_input(module.mix_cv_port, 0.0)
+    mix_source.write(np.full(16, -0.25, dtype=np.float32))
+
+    module.process_runtime(
+        16,
+        {"delay_time": 0.5, "feedback": 0.3, "mix": 0.5},
+    )
+
+    assert module.component.delay_time == pytest.approx(0.75)
+    assert _effect_param_target(module.component, "feedback") == pytest.approx(0.5)
+    assert _effect_param_target(module.component, "mix") == pytest.approx(0.25)
+    assert np.all(np.isfinite(np.asarray(module.out_port.value)))
+
+
+def test_reverb_runtime_applies_room_damping_and_mix_cv(qapp: Any):
+    del qapp
+    module = ReverbModule()
+    input_source = _connect_constant_input(module.in_port, 0.2)
+    input_source.write(np.full(16, 0.2, dtype=np.float32))
+    room_source = _connect_constant_input(module.room_cv_port, 0.0)
+    room_source.write(np.full(16, 0.3, dtype=np.float32))
+    damping_source = _connect_constant_input(module.damping_cv_port, 0.0)
+    damping_source.write(np.full(16, -0.2, dtype=np.float32))
+    mix_source = _connect_constant_input(module.mix_cv_port, 0.0)
+    mix_source.write(np.full(16, 0.1, dtype=np.float32))
+
+    module.process_runtime(
+        16,
+        {"room_size": 0.4, "damping": 0.5, "mix": 0.6},
+    )
+
+    assert _effect_param_target(module.component, "room_size") == pytest.approx(0.7)
+    assert _effect_param_target(module.component, "damping") == pytest.approx(0.3)
+    assert _effect_param_target(module.component, "mix") == pytest.approx(0.7)
+    assert np.all(np.isfinite(np.asarray(module.out_port.value)))
+
+
+def test_compressor_runtime_applies_threshold_ratio_and_mix_cv(qapp: Any):
+    del qapp
+    module = CompressorModule()
+    input_source = _connect_constant_input(module.in_port, 1.0)
+    input_source.write(np.ones(32, dtype=np.float32))
+    thresh_source = _connect_constant_input(module.threshold_cv_port, 0.0)
+    # scale=24 → +0.5 CV raises threshold by 12 dB
+    thresh_source.write(np.full(32, 0.5, dtype=np.float32))
+    ratio_source = _connect_constant_input(module.ratio_cv_port, 0.0)
+    # scale=4 → +0.5 CV raises ratio by 2
+    ratio_source.write(np.full(32, 0.5, dtype=np.float32))
+    mix_source = _connect_constant_input(module.mix_cv_port, 0.0)
+    mix_source.write(np.full(32, -0.25, dtype=np.float32))
+
+    module.process_runtime(
+        32,
+        {
+            "threshold_db": -24.0,
+            "ratio": 4.0,
+            "attack_ms": 5.0,
+            "release_ms": 50.0,
+            "makeup_gain_db": 0.0,
+            "mix": 1.0,
+        },
+    )
+
+    assert _effect_param_target(module.component, "threshold_db") == pytest.approx(
+        -12.0
+    )
+    assert _effect_param_target(module.component, "ratio") == pytest.approx(6.0)
+    assert _effect_param_target(module.component, "mix") == pytest.approx(0.75)
+    assert np.all(np.isfinite(np.asarray(module.out_port.value)))
 
 
 def test_tb303_voice_runtime_outputs_silence_without_required_inputs(qapp: Any):

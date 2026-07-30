@@ -128,7 +128,7 @@ class DistortionModule(ModulatedModuleBase):
 
     # Implement abstract methods from ModulatedModuleBase
     def create_modulated_component(self, mod_comp):
-        """Create modulated distortion (not implemented yet)."""
+        """CV is applied in process_runtime; return the base component."""
         _ = mod_comp
         return self.create_unmodulated_component()
 

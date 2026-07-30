@@ -5,6 +5,10 @@ from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.effects import Compressor
 
 from sonicrack.gui.modules._modulated_base import ModulatedModuleBase
+from sonicrack.gui.modules.effects._cv_modulation import (
+    modulate_param,
+    read_optional_cv,
+)
 from sonicrack.gui.widgets import Knob
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
@@ -16,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @register_module()
 class CompressorModule(ModulatedModuleBase):
-    """Compressor module."""
+    """Compressor module with optional CV for threshold, ratio, and mix."""
 
     runtime_kind = "compressor"
     metadata = ModuleMetadata(
@@ -28,12 +32,15 @@ class CompressorModule(ModulatedModuleBase):
     def __init__(self):
         super().__init__(
             width=260,
-            height=270,
+            height=290,
             color=QColor(160, 90, 190),
         )
 
         self.in_port = self.add_input("In")
         self.out_port = self.add_output("Out")
+        self.threshold_cv_port = self.add_input("CV_Thresh")
+        self.ratio_cv_port = self.add_input("CV_Ratio")
+        self.mix_cv_port = self.add_input("CV_Mix")
         self.component = None
 
         self.controls_widget = self._create_controls_container()
@@ -144,8 +151,17 @@ class CompressorModule(ModulatedModuleBase):
         """Compressor requires an audio input."""
         return ["In"]
 
+    def get_modulation_inputs(self) -> list[str]:
+        """Compressor accepts CV modulation for threshold, ratio, and mix."""
+        return ["CV_Thresh", "CV_Ratio", "CV_Mix"]
+
+    def get_cv_range(self, port_name: str = "CV_Thresh") -> tuple[float, float]:
+        """Compressor CV inputs expect bipolar offsets [-1, 1]."""
+        _ = port_name
+        return -1.0, 1.0
+
     def create_modulated_component(self, mod_comp):
-        """Create modulated compressor (not implemented yet)."""
+        """CV is applied in process_runtime; return the base component."""
         _ = mod_comp
         return self.create_unmodulated_component()
 
@@ -171,23 +187,41 @@ class CompressorModule(ModulatedModuleBase):
             if self.component is None:
                 self.component = self.create_unmodulated_component()
 
-            self.component.threshold_db = float_parameter(
+            base_threshold = float_parameter(
                 parameters, "threshold_db", self.threshold_knob.get_value
             )
-            self.component.ratio = float_parameter(
-                parameters, "ratio", self.ratio_knob.get_value
-            )
-            self.component.attack_ms = float_parameter(
+            base_ratio = float_parameter(parameters, "ratio", self.ratio_knob.get_value)
+            base_attack = float_parameter(
                 parameters, "attack_ms", self.attack_knob.get_value
             )
-            self.component.release_ms = float_parameter(
+            base_release = float_parameter(
                 parameters, "release_ms", self.release_knob.get_value
             )
-            self.component.makeup_gain_db = float_parameter(
+            base_makeup = float_parameter(
                 parameters, "makeup_gain_db", self.makeup_knob.get_value
             )
-            self.component.mix = float_parameter(
-                parameters, "mix", self.mix_knob.get_value
+            base_mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
+
+            threshold_cv = read_optional_cv(self.threshold_cv_port, num_samples)
+            ratio_cv = read_optional_cv(self.ratio_cv_port, num_samples)
+            mix_cv = read_optional_cv(self.mix_cv_port, num_samples)
+
+            # Scale CV so ±1 is a useful offset in dB / ratio units.
+            self.component.threshold_db = modulate_param(
+                base_threshold,
+                threshold_cv,
+                minimum=-60.0,
+                maximum=0.0,
+                scale=24.0,
+            )
+            self.component.ratio = modulate_param(
+                base_ratio, ratio_cv, minimum=1.0, maximum=20.0, scale=4.0
+            )
+            self.component.attack_ms = base_attack
+            self.component.release_ms = base_release
+            self.component.makeup_gain_db = base_makeup
+            self.component.mix = modulate_param(
+                base_mix, mix_cv, minimum=0.0, maximum=1.0
             )
 
             self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

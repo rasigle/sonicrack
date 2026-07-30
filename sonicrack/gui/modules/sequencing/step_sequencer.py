@@ -2,8 +2,18 @@
 
 from __future__ import annotations
 
+import random
+
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+)
 from soniclab.sequencing import TB303StepEvent, TB303StepSequencer
 
 from sonicrack.config.audio_config import audio_config
@@ -26,6 +36,13 @@ from sonicrack.runtime.helpers import (
 )
 from sonicrack.runtime.specs import RuntimeParameters
 
+# Bass-range minor scale offsets used when randomizing notes (root MIDI 36 / C2).
+_RANDOMIZE_ROOT = 36
+_RANDOMIZE_SCALE_INTERVALS = (0, 2, 3, 5, 7, 8, 10, 12, 15)
+_REST_PROBABILITY = 0.2
+_ACCENT_PROBABILITY = 0.3
+_SLIDE_PROBABILITY = 0.25
+
 
 @register_module()
 class StepSequencerModule(ModuleWidget):
@@ -41,7 +58,7 @@ class StepSequencerModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=340, height=365, color=QColor(120, 100, 170))
+        super().__init__(width=340, height=400, color=QColor(120, 100, 170))
 
         self.clock_input = self.add_input("Clock", signal=PortSignal.GATE)
         self.reset_input = self.add_input("Reset", signal=PortSignal.GATE)
@@ -81,6 +98,34 @@ class StepSequencerModule(ModuleWidget):
         layout.addWidget(self.slide_edit)
         layout.addLayout(self._create_step_toggle_grid())
         self._sync_step_toggles_from_text()
+
+        randomize_layout = QHBoxLayout()
+        randomize_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.randomize_button = QPushButton("Randomize")
+        self.randomize_button.setMinimumHeight(28)
+        self.randomize_button.setToolTip(
+            "Randomize notes, accents, and slides for a new pattern"
+        )
+        self.randomize_button.setStyleSheet("""
+            QPushButton {
+                background-color: #6b5a9a;
+                color: white;
+                border: 2px solid #4a3d6e;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 11px;
+                padding: 2px 12px;
+            }
+            QPushButton:hover {
+                background-color: #7d6aad;
+            }
+            QPushButton:pressed {
+                background-color: #55487a;
+            }
+        """)
+        self.randomize_button.clicked.connect(self._on_randomize_clicked)
+        randomize_layout.addWidget(self.randomize_button)
+        layout.addLayout(randomize_layout)
 
         clock_layout = QHBoxLayout()
         compact_knob_style = ProceduralKnobStyle.small()
@@ -213,6 +258,36 @@ class StepSequencerModule(ModuleWidget):
     def _on_slides_text_changed(self, value: str) -> None:
         self.parameter_changed.emit("slides", value)
         self._sync_step_toggles_from_text()
+
+    def _on_randomize_clicked(self) -> None:
+        self.randomize_pattern()
+
+    def randomize_pattern(self, rng: random.Random | None = None) -> None:
+        """Fill notes, accents, and slides with a new random pattern.
+
+        Args:
+            rng: Optional random generator for deterministic tests.
+        """
+        generator = rng if rng is not None else random.Random()
+        notes: list[str] = []
+        accents: list[bool] = []
+        slides: list[bool] = []
+
+        for _ in range(self.step_toggle_count):
+            if generator.random() < _REST_PROBABILITY:
+                notes.append("-")
+                accents.append(False)
+                slides.append(False)
+                continue
+
+            interval = generator.choice(_RANDOMIZE_SCALE_INTERVALS)
+            notes.append(str(_RANDOMIZE_ROOT + interval))
+            accents.append(generator.random() < _ACCENT_PROBABILITY)
+            slides.append(generator.random() < _SLIDE_PROBABILITY)
+
+        self.notes_edit.setText(",".join(notes))
+        self.accent_edit.setText(self._flags_to_text(accents))
+        self.slide_edit.setText(self._flags_to_text(slides))
 
     def _on_step_toggle_changed(self, kind: str, step: int, checked: bool) -> None:
         if self._syncing_step_toggles:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from typing import Any
 
 import numpy as np
@@ -113,6 +114,61 @@ def test_step_sequencer_step_toggles_update_text_parameters(qapp: Any):
 
     assert module.accent_edit.text() == "1,1,0,1,0,0,1,0"
     assert module.slide_edit.text() == "1,0,1,0,0,0,1,0"
+
+
+def test_step_sequencer_randomize_updates_pattern_and_toggles(qapp: Any):
+    del qapp
+    module = StepSequencerModule()
+    original_notes = module.notes_edit.text()
+
+    module.randomize_pattern(random.Random(42))
+
+    notes = [item.strip() for item in module.notes_edit.text().split(",") if item.strip()]
+    accents = module.accent_edit.text().split(",")
+    slides = module.slide_edit.text().split(",")
+
+    assert len(notes) == module.step_toggle_count
+    assert len(accents) == module.step_toggle_count
+    assert len(slides) == module.step_toggle_count
+    assert module.notes_edit.text() != original_notes
+    assert all(item == "-" or item.lstrip("-").isdigit() for item in notes)
+    assert all(flag in {"0", "1"} for flag in accents)
+    assert all(flag in {"0", "1"} for flag in slides)
+    assert [button.isChecked() for button in module.accent_buttons] == [
+        flag == "1" for flag in accents
+    ]
+    assert [button.isChecked() for button in module.slide_buttons] == [
+        flag == "1" for flag in slides
+    ]
+
+    # Rests should not carry accent or slide flags.
+    for index, note in enumerate(notes):
+        if note == "-":
+            assert accents[index] == "0"
+            assert slides[index] == "0"
+
+
+def test_step_sequencer_randomize_button_triggers_pattern_change(qapp: Any):
+    del qapp
+    module = StepSequencerModule()
+    module.notes_edit.setText("36,36,36,36,36,36,36,36")
+    module.accent_edit.setText("0,0,0,0,0,0,0,0")
+    module.slide_edit.setText("0,0,0,0,0,0,0,0")
+    before = (
+        module.notes_edit.text(),
+        module.accent_edit.text(),
+        module.slide_edit.text(),
+    )
+
+    module.randomize_button.click()
+
+    after = (
+        module.notes_edit.text(),
+        module.accent_edit.text(),
+        module.slide_edit.text(),
+    )
+    assert after != before
+    assert module.randomize_button.text() == "Randomize"
 
 
 def test_behringer_182_module_writes_dual_cv_and_gate_outputs(qapp: Any):

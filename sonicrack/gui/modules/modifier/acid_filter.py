@@ -49,7 +49,7 @@ class AcidFilterModule(ModuleWidget):
             description="Sets the cutoff frequency of the filter",
             min_value=20.0,
             max_value=12000.0,
-            default_value=1.0,
+            default_value=700.0,
             logarithmic=True,
         )
         self.cutoff_knob.value_changed.connect(
@@ -62,7 +62,7 @@ class AcidFilterModule(ModuleWidget):
             description="Adjusts the resonance of the filter",
             min_value=0.0,
             max_value=18.0,
-            default_value=0.1,
+            default_value=8.0,
             logarithmic=True,
         )
         self.resonance_knob.value_changed.connect(
@@ -80,7 +80,7 @@ class AcidFilterModule(ModuleWidget):
             description="Controls the envelope modulation depth",
             min_value=0.0,
             max_value=6.0,
-            default_value=0.1,
+            default_value=2.5,
         )
         self.env_mod_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -94,7 +94,7 @@ class AcidFilterModule(ModuleWidget):
             description="Controls the accent amount",
             min_value=0.0,
             max_value=4.0,
-            default_value=0.1,
+            default_value=1.0,
         )
         self.accent_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(
@@ -111,7 +111,7 @@ class AcidFilterModule(ModuleWidget):
             description="Adjusts the drive of the filter",
             min_value=0.0,
             max_value=24.0,
-            default_value=0.1,
+            default_value=6.0,
         )
         self.drive_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("drive_db", self.drive_knob.get_value())
@@ -121,9 +121,9 @@ class AcidFilterModule(ModuleWidget):
         self.output_knob = Knob(
             label="Output",
             description="Adjusts the output level of the filter",
-            min_value=0.0,
+            min_value=-24.0,
             max_value=12.0,
-            default_value=0.1,
+            default_value=-6.0,
         )
         self.output_knob.value_changed.connect(
             lambda: self.parameter_changed.emit(

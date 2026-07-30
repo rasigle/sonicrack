@@ -556,6 +556,8 @@ class ModularSynthWindow(QMainWindow):
             start_port.port.connect(target_port.port)
         except ValueError as exc:
             logger.warning("Rejected cable connection: %s", exc)
+            # Visual cable may already be on the canvas; roll it back.
+            self._rollback_cable(start_port, target_port)
             return
         self.audio_engine.mark_graph_changed()
         self._mark_patch_modified()
@@ -564,13 +566,8 @@ class ModularSynthWindow(QMainWindow):
         start_module = start_port.parent_module
         target_module = target_port.parent_module
 
-        # Notify target module (input port) about connection
-        if hasattr(target_module, "on_port_connection_changed"):
-            target_module.on_port_connection_changed(target_port.port_name, True)
-
-        # Notify source module (output port) about connection if needed
-        if hasattr(start_module, "on_port_connection_changed"):
-            start_module.on_port_connection_changed(start_port.port_name, True)
+        self._notify_port_connection_changed(target_module, target_port)
+        self._notify_port_connection_changed(start_module, start_port)
 
         # Check if this connection involves an Output module
         from sonicrack.gui.modules.output.output import OutputModule
@@ -593,21 +590,18 @@ class ModularSynthWindow(QMainWindow):
             self._mark_patch_modified()
             return
 
+        # Port models are usually already disconnected by Cable.remove(); this
+        # call is idempotent and covers any path that emits without remove().
         start_port.port.disconnect(target_port.port)
         self.audio_engine.mark_graph_changed()
         self._mark_patch_modified()
 
-        # Notify modules about disconnection
+        # Notify modules using actual remaining connection state (multi-link safe)
         start_module = start_port.parent_module
         target_module = target_port.parent_module
 
-        # Notify target module (input port) about disconnection
-        if hasattr(target_module, "on_port_connection_changed"):
-            target_module.on_port_connection_changed(target_port.port_name, False)
-
-        # Notify source module (output port) about disconnection if needed
-        if hasattr(start_module, "on_port_connection_changed"):
-            start_module.on_port_connection_changed(start_port.port_name, False)
+        self._notify_port_connection_changed(target_module, target_port)
+        self._notify_port_connection_changed(start_module, start_port)
 
         # Check if this disconnection involves an Output module
         from sonicrack.gui.modules.output.output import OutputModule
@@ -620,6 +614,32 @@ class ModularSynthWindow(QMainWindow):
                 "Disconnection from Output module detected - checking playback state"
             )
             self._start_output_playback()  # Will check connections and stop if none
+
+    @staticmethod
+    def _notify_port_connection_changed(module, port: PortWidget) -> None:
+        """Notify a module of a port's current connection state, if supported."""
+        if module is None or port is None:
+            return
+        handler = getattr(module, "on_port_connection_changed", None)
+        if not callable(handler):
+            return
+        try:
+            still_connected = bool(port.port.is_connected)
+        except (RuntimeError, AttributeError):
+            still_connected = False
+        with contextlib.suppress(RuntimeError, AttributeError):
+            handler(port.port_name, still_connected)
+
+    def _rollback_cable(self, start_port: PortWidget, target_port: PortWidget) -> None:
+        """Remove a visual cable that failed to bind at the port-model layer."""
+        try:
+            canvas = self._require_patch_canvas()
+        except RuntimeError:
+            return
+        for cable in list(getattr(start_port, "cables", []) or []):
+            if cable.end_port is target_port or cable.start_port is target_port:
+                canvas.delete_cable(cable, emit_signal=False)
+                break
 
     def _start_output_playback(self):
         """Start playback on the Output module through the shared render graph."""

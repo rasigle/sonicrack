@@ -221,6 +221,13 @@ class PatchCanvas(QGraphicsView):
                     )
                     # Remove the invalid cable
                     self.dragging_cable.remove()
+                elif self._find_cable(start_port, item) is not None:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Connection",
+                        "These ports are already connected.",
+                    )
+                    self.dragging_cable.remove()
                 else:
                     # Check if this connection would create a cycle
                     cycle_info = self._would_create_cycle(start_port, item)
@@ -343,13 +350,12 @@ class PatchCanvas(QGraphicsView):
                         if cable not in cables_to_delete:
                             cables_to_delete.append(cable)
 
-            # Now delete all cables at once WITHOUT emitting signals yet
-            disconnected_ports = []
+            # Remove cables first (port models disconnect in Cable.remove).
+            # Collect pairs so every remaining neighbor is notified after cleanup.
+            disconnected_ports: list[tuple[PortWidget, PortWidget]] = []
             for cable in cables_to_delete:
-                # Store port references for later signal emission
                 if cable.start_port and cable.end_port:
                     disconnected_ports.append((cable.start_port, cable.end_port))
-                # Remove cable WITHOUT emitting signal
                 cable.remove()
 
             # Delete all modules
@@ -368,17 +374,13 @@ class PatchCanvas(QGraphicsView):
                     # already removed
                     self._scene.removeItem(module)
 
-            # NOW emit disconnection signals (after all deletions complete)
-            # This triggers a SINGLE audio recompilation instead of many
-            if disconnected_ports:
-                # Just emit the first one - this will trigger recompilation
-                # which will discover all the changes
-                start_port, end_port = disconnected_ports[0]
-                try:
+            # Notify every disconnected pair so modulated modules (and peers)
+            # update connection-dependent component state for all cables, not
+            # only the first one.
+            for start_port, end_port in disconnected_ports:
+                with contextlib.suppress(RuntimeError, AttributeError):
                     if start_port and end_port:
                         self.cable_disconnected.emit(start_port, end_port)
-                except (RuntimeError, AttributeError):
-                    pass  # Ports might be deleted
 
             event.accept()
             return
@@ -444,7 +446,9 @@ class PatchCanvas(QGraphicsView):
             end_port: Input port (destination)
 
         Returns:
-            The created Cable object, or None if connection is invalid
+            The created Cable object, or None if connection is invalid.
+            If the same pair is already cabled, returns the existing cable
+            without emitting another connect signal.
         """
         # Validate ports
         if start_port.port_type != "output" or end_port.port_type != PortType.INPUT:
@@ -456,10 +460,29 @@ class PatchCanvas(QGraphicsView):
             logger.warning("Cannot create self-connection")
             return None
 
+        existing = self._find_cable(start_port, end_port)
+        if existing is not None:
+            logger.debug(
+                "Connection already exists: %s -> %s",
+                start_port.port_name,
+                end_port.port_name,
+            )
+            return existing
+
         if not self._ports_are_compatible(start_port, end_port):
             logger.warning(
                 "Skipping incompatible connection: %s",
                 self._incompatible_connection_message(start_port, end_port),
+            )
+            return None
+
+        cycle_info = self._would_create_cycle(start_port, end_port)
+        if cycle_info:
+            logger.warning(
+                "Skipping cyclic connection (%s): %s -> %s",
+                cycle_info,
+                start_port.port_name,
+                end_port.port_name,
             )
             return None
 
@@ -471,6 +494,19 @@ class PatchCanvas(QGraphicsView):
         self.cable_connected.emit(start_port, end_port)
 
         return cable
+
+    def _find_cable(
+        self, start_port: PortWidget, end_port: PortWidget
+    ) -> Cable | None:
+        """Return an existing cable between the given ports, if any."""
+        for item in self._scene.items():
+            if (
+                isinstance(item, Cable)
+                and item.start_port is start_port
+                and item.end_port is end_port
+            ):
+                return item
+        return None
 
     @staticmethod
     def _ports_are_compatible(start_port: PortWidget, end_port: PortWidget) -> bool:

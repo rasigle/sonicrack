@@ -90,16 +90,17 @@ class PortWidget(QGraphicsItem):
 
     @property
     def connected_to(self) -> PortWidget | None:
-        """Get connected port widget.
+        """Return one connected PortWidget if any, else None.
 
-        Note: This returns the PortWidget wrapper, not the PortModel.
-        For internal use, access self.model.connected_to for the model.
+        Uses cable UI links first. For multi-connection ports only the first
+        cable peer is returned; use ``port.connected_to`` / ``cables`` for the
+        full set.
         """
-        if self.port.connected_to is None:
-            return None
-        # Find the PortWidget that wraps this PortModel
-        # This is a bit tricky - we need to maintain a registry or search
-        # For now, we'll return None and rely on cable tracking
+        for cable in self.cables:
+            if cable.start_port is self and cable.end_port is not None:
+                return cable.end_port
+            if cable.end_port is self and cable.start_port is not None:
+                return cable.start_port
         return None
 
     @property

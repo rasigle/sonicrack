@@ -209,35 +209,49 @@ class Port:
         """Disconnect from a specific connected port (bidirectional), or all if other
         is None.
 
+        Port data is cleared only when a port has no remaining connections after
+        the disconnect. This preserves live multi-fanout signals while still
+        clearing both ends of a fully severed link (no stale audio).
+
         Args:
             other: Specific port to disconnect from, or None to disconnect all
         """
         if other is None:
             if self.connected_to:
                 logger.debug(f"Port disconnected (all): {self.port_name}")
-                # Remove this port from all connected ports
-                for connected_port in self.connected_to:
+                peers = list(self.connected_to)
+                for connected_port in peers:
                     with contextlib.suppress(ValueError):
                         connected_port.connected_to.remove(self)
+                    # Clear peers that no longer have any remaining links.
+                    if not connected_port.connected_to:
+                        connected_port.clear()
+                        connected_port._sync_tap_history_subscription()
             self.connected_to.clear()
-            # Clear port data to prevent stale audio
             self.clear()
             self._sync_tap_history_subscription()
             return
 
         try:
             self.connected_to.remove(other)
-            # Also remove from other side (bidirectional)
-            if self in other.connected_to:
-                other.connected_to.remove(self)
-                other._sync_tap_history_subscription()
-            logger.debug(f"Port disconnected: {self.port_name} <-/-> {other.port_name}")
-            # Clear port data to prevent stale audio
-            self.clear()
-            self._sync_tap_history_subscription()
         except ValueError:
             # Port not in list; no-op
-            pass
+            return
+
+        # Also remove from other side (bidirectional)
+        if self in other.connected_to:
+            other.connected_to.remove(self)
+
+        logger.debug(f"Port disconnected: {self.port_name} <-/-> {other.port_name}")
+
+        # Clear only ports that no longer participate in any connection.
+        if not self.connected_to:
+            self.clear()
+        self._sync_tap_history_subscription()
+
+        if not other.connected_to:
+            other.clear()
+        other._sync_tap_history_subscription()
 
     def clear(self) -> None:
         """Clear the port's data value.

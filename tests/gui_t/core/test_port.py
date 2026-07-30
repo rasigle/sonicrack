@@ -398,6 +398,28 @@ class TestPortIntegration:
 
         assert input1.read() == 0.0
         assert input2.read() == 5.0
+        # Multi-fanout source must keep its value for remaining peers.
+        assert output.value == 5.0
+        assert output.is_connected
+
+    def test_specific_disconnect_clears_only_fully_disconnected_ports(self):
+        """Clear each end only when it has no remaining connections."""
+        output = Port("output", "output", mock_parent())
+        input1 = Port("input", "input1", mock_parent())
+        input2 = Port("input", "input2", mock_parent())
+
+        output.connect(input1)
+        output.connect(input2)
+        output.value = 0.5
+        input1.value = 9.0
+        input2.value = 8.0
+
+        output.disconnect(input1)
+
+        assert output.value == 0.5
+        assert input1.value == 0.0
+        assert input2.value == 8.0
+        assert input2 in output.connected_to
 
     def test_reconnect_after_value_change(self):
         """Test reconnecting after value changes."""

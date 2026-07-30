@@ -57,9 +57,10 @@ class SimpleVolumeModule(SimpleModifierBase):
 
     def _on_gain_changed(self, value: float) -> None:
         """Handle gain knob changes by updating Volume component."""
-        # Historical quirk: earlier code set amplitude; runtime uses gain_db.
-        self.component.amplitude = value
-        logger.debug(f"Volume: gain set to {value:.3f}")
+        # Knob is calibrated in dB; Volume.amplitude expects linear gain >= 0.
+        if self.component is not None:
+            self.component.gain_db = value
+        logger.debug(f"Volume: gain set to {value:.3f} dB")
 
     def create_engine_component(
         self,

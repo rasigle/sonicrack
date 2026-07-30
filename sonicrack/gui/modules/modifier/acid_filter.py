@@ -32,7 +32,7 @@ class AcidFilterModule(FilterModuleBase):
 
     metadata = ModuleMetadata(
         title="Acid Filter",
-        category=ModuleCategory.MODIFIER,
+        category=ModuleCategory.FILTER,
         description="Acid-style resonant low-pass filter with drive",
     )
 

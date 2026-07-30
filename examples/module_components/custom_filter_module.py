@@ -71,7 +71,7 @@ class SimpleFilterModule(ModuleWidget):
 
     metadata = ModuleMetadata(
         title="Simple Filter",
-        category=ModuleCategory.MODIFIER,
+        category=ModuleCategory.FILTER,
         description="Simple volume/gain control",
     )
 

@@ -9,6 +9,7 @@ from soniclab.dsp.filters.butterworth import BiquadResonantFilter, ButterworthFi
 from sonicrack.gui.modules.modifier.acid_filter import AcidFilterModule
 from sonicrack.gui.modules.modifier.filter import FilterModule
 from sonicrack.gui.modules.modifier.resonant_filter import ResonantFilterModule
+from sonicrack.patching.module import ModuleCategory
 from sonicrack.patching.port import Port
 from sonicrack.runtime.specs import process_runtime_module
 
@@ -468,3 +469,74 @@ def test_acid_filter_smooths_large_parameter_changes(app):
 
     assert boundary_jump < 0.05
     assert boundary_jump <= float(np.percentile(ordinary_jumps, 95)) * 4.0
+
+def test_normalize_filter_type_maps_ui_and_engine_labels():
+    from sonicrack.gui.modules.modifier._filter_base import normalize_filter_type
+
+    assert normalize_filter_type("Low-pass") == "low"
+    assert normalize_filter_type("High-pass") == "high"
+    assert normalize_filter_type("Band-pass") == "band"
+    assert normalize_filter_type("Notch", allow_notch=False) == "low"
+    assert normalize_filter_type("Notch", allow_notch=True) == "notch"
+    assert normalize_filter_type("notch", allow_notch=True) == "notch"
+    assert normalize_filter_type("unknown") == "low"
+    assert normalize_filter_type("band") == "band"
+
+
+def test_resonant_filter_notch_create_engine_component(app):
+    module = ResonantFilterModule()
+    module.type_combo.setCurrentText("Notch")
+    module.cutoff_knob.set_value(1500.0)
+    module.resonance_knob.set_value(3.0)
+
+    component = module.create_engine_component()
+
+    assert isinstance(component, BiquadResonantFilter)
+    assert component.filter_type == "notch"
+    assert component.cutoff == 1500.0
+    assert component.resonance == 3.0
+
+def test_filter_bandpass_equal_cutoffs_at_max_expand_downward(app):
+    module = FilterModule()
+    module.type_combo.setCurrentText("Band-pass")
+    max_value = module.high_cutoff_knob.max_value
+    module.cutoff_knob.set_value(max_value)
+    module.high_cutoff_knob.set_value(max_value)
+
+    component = module.create_engine_component()
+    low, high = component.cutoff
+    assert high == max_value
+    assert low < high
+
+
+def test_filter_and_acid_required_inputs(app):
+    assert FilterModule().get_required_inputs() == ["In"]
+    assert AcidFilterModule().get_required_inputs() == ["In"]
+    assert ResonantFilterModule().get_required_inputs() == ["In"]
+
+
+def test_filter_modules_share_filter_category(app):
+    """All filter product modules should group under ModuleCategory.FILTER."""
+    modules = (FilterModule(), ResonantFilterModule(), AcidFilterModule())
+    for module in modules:
+        assert module.metadata.category == ModuleCategory.FILTER
+        assert module.metadata.category.is_audio_processor()
+
+
+def test_filter_sample_rate_change_clears_runtime_params(app):
+    module = FilterModule()
+    module._runtime_filter_params = (1000.0, 4, "low")
+    previous = module.component
+    module._on_global_sample_rate_changed(48000)
+    assert module.component is not None
+    assert module.component is not previous or module._runtime_filter_params is None
+    assert module._runtime_filter_params is None
+
+def test_filter_bandpass_equal_cutoffs_expand_upward(app):
+    module = FilterModule()
+    module.type_combo.setCurrentText("Band-pass")
+    module.cutoff_knob.set_value(1000.0)
+    module.high_cutoff_knob.set_value(1000.0)
+    low, high = module._build_cutoff_param(1000.0, 1000.0, "band")
+    assert low == 1000.0
+    assert high == 1001.0

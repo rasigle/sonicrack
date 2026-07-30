@@ -31,7 +31,7 @@ class FilterModule(FilterModuleBase):
 
     metadata = ModuleMetadata(
         title="Filter",
-        category=ModuleCategory.MODIFIER,
+        category=ModuleCategory.FILTER,
         description="Butterworth filter (low-pass, high-pass, band-pass)",
     )
 

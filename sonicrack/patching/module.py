@@ -24,6 +24,9 @@ class ModuleCategory(StrEnum):
         MODIFIER: Represents modules that modify an audio signal,
             typically with one audio input and optional modulation inputs
             (e.g., Volume, Pan, Clipper).
+        FILTER: Represents frequency-domain filter modules that process
+            audio (e.g., Butterworth Filter, Resonant Filter, Acid Filter).
+            Behaves like a modifier for routing and inactive pass-through.
         MIXER: Represents modules that combine multiple audio inputs into
             a single output.
         VISUALIZATION: Represents modules that display audio signals visually
@@ -42,6 +45,9 @@ class ModuleCategory(StrEnum):
     # Volume, Pan, Clipper - single audio input + optional modulation
     MODIFIER = "Modifier"
 
+    # Frequency filters - audio in/out (utility, resonant, acid, …)
+    FILTER = "Filter"
+
     # Combines multiple audio inputs
     MIXER = "Mixer"
 
@@ -50,6 +56,13 @@ class ModuleCategory(StrEnum):
 
     # Terminal node
     OUTPUT = "Output"
+
+    def is_audio_processor(self) -> bool:
+        """True for categories that transform a primary audio input.
+
+        Used for inactive pass-through and similar modifier-like routing.
+        """
+        return self in (ModuleCategory.MODIFIER, ModuleCategory.FILTER)
 
 
 @dataclass(frozen=True)

@@ -81,7 +81,7 @@ def process_runtime_module(
 
 
 def _process_inactive(module: RuntimeWidget, num_samples: int) -> None:
-    if module.metadata.category == ModuleCategory.MODIFIER:
+    if module.metadata.category.is_audio_processor():
         required_inputs = module.get_required_inputs()
         if required_inputs:
             input_port = module._find_port_by_name(required_inputs[0])

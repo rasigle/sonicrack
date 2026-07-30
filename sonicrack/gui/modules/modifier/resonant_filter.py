@@ -14,15 +14,18 @@ from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules.modifier._filter_base import (
     RESONANT_TYPE_ITEMS,
     FilterModuleBase,
-    bind_parameter_knob,
     create_filter_type_combo,
     normalize_filter_type,
-    ramp_if_changed,
 )
 from sonicrack.gui.widgets import Knob
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples, str_parameter
+from sonicrack.runtime.helpers import (
+    float_parameter,
+    ramp_if_changed,
+    read_samples,
+    str_parameter,
+)
 from sonicrack.runtime.specs import RuntimeParameters
 
 
@@ -34,7 +37,7 @@ class ResonantFilterModule(FilterModuleBase):
 
     metadata = ModuleMetadata(
         title="Resonant Filter",
-        category=ModuleCategory.MODIFIER,
+        category=ModuleCategory.FILTER,
         description="Resonant synth filter with cutoff CV, drive, and output gain",
     )
 
@@ -68,8 +71,7 @@ class ResonantFilterModule(FilterModuleBase):
         )
         self.cutoff_value_label = QLabel("1200 Hz")
         self.cutoff_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        bind_parameter_knob(
-            self,
+        self.bind_parameter_knob(
             self.cutoff_knob,
             "cutoff",
             value_label=self.cutoff_value_label,
@@ -92,8 +94,7 @@ class ResonantFilterModule(FilterModuleBase):
         )
         self.resonance_value_label = QLabel("0.71")
         self.resonance_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        bind_parameter_knob(
-            self,
+        self.bind_parameter_knob(
             self.resonance_knob,
             "resonance",
             value_label=self.resonance_value_label,
@@ -115,8 +116,7 @@ class ResonantFilterModule(FilterModuleBase):
         )
         self.cv_depth_value_label = QLabel("0.0 oct")
         self.cv_depth_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        bind_parameter_knob(
-            self,
+        self.bind_parameter_knob(
             self.cv_depth_knob,
             "cv_depth_octaves",
             value_label=self.cv_depth_value_label,
@@ -135,8 +135,7 @@ class ResonantFilterModule(FilterModuleBase):
         )
         self.drive_value_label = QLabel("0 dB")
         self.drive_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        bind_parameter_knob(
-            self,
+        self.bind_parameter_knob(
             self.drive_knob,
             "drive_db",
             value_label=self.drive_value_label,
@@ -153,8 +152,7 @@ class ResonantFilterModule(FilterModuleBase):
         )
         self.output_gain_value_label = QLabel("-6 dB")
         self.output_gain_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        bind_parameter_knob(
-            self,
+        self.bind_parameter_knob(
             self.output_gain_knob,
             "output_gain_db",
             value_label=self.output_gain_value_label,
@@ -206,8 +204,7 @@ class ResonantFilterModule(FilterModuleBase):
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Filter the connected input for one render cycle."""
-        if not self.in_port.is_connected:
-            self._write_silence(num_samples)
+        if self._require_input_or_silence(num_samples):
             return
 
         filter_type = normalize_filter_type(

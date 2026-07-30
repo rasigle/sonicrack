@@ -83,7 +83,7 @@ class LowPassFilterModule(ModuleWidget):
 
     metadata = ModuleMetadata(
         title="Low-Pass Filter",
-        category=ModuleCategory.MODIFIER,
+        category=ModuleCategory.FILTER,
         description="Simple volume/gain control",
     )
 
@@ -241,7 +241,7 @@ class ModulatedLowPassFilterModule(ModuleWidget):
 
     metadata = ModuleMetadata(
         title="Mod Filter",
-        category=ModuleCategory.MODIFIER,
+        category=ModuleCategory.FILTER,
         description="Simple volume/gain control",
     )
 

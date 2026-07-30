@@ -1,6 +1,7 @@
 """Widgets package for modular synth interface."""
 
 from sonicrack.gui.widgets.button_widget import ImageButtonStyle, ImagePushButton
+from sonicrack.gui.widgets.envelope_shape_widget import EnvelopeShapeWidget
 from sonicrack.gui.widgets.knob_style import (
     ImageKnobStyle,
     KnobGeometry,
@@ -12,6 +13,7 @@ from sonicrack.gui.widgets.port_widget import PortWidget
 from sonicrack.gui.widgets.slider_widget import HSlider, VSlider
 
 __all__ = [
+    "EnvelopeShapeWidget",
     "ImageButtonStyle",
     "ImageKnobStyle",
     "ImagePushButton",

@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLa
 from soniclab.dsp.modulators import ADSREnvelope, GateTriggeredADSR
 
 from sonicrack.gui.widgets import Knob
+from sonicrack.gui.widgets.envelope_shape_widget import EnvelopeShapeWidget
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
@@ -43,7 +44,7 @@ class ADSRModule(ModuleWidget):
         """Initialize ADSR module."""
         super().__init__(
             width=220,
-            height=325,
+            height=390,
             color=QColor(120, 180, 80),
         )
 
@@ -56,6 +57,10 @@ class ADSRModule(ModuleWidget):
         # Use helper methods for UI construction
         self.controls_widget = self._create_controls_container()
         layout = self._create_standard_layout(spacing=6)
+
+        # Live ADSR shape preview
+        self.shape_widget = EnvelopeShapeWidget()
+        layout.addWidget(self.shape_widget)
 
         # ADSR controls
         knobs_layout = QHBoxLayout()
@@ -72,8 +77,8 @@ class ADSRModule(ModuleWidget):
             "Attack time (seconds)\nRange: 0.005-5.0s\nLower values may cause clicks"
         )
         self.attack_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "attack_duration", self.attack_knob.get_value()
+            lambda *_: self._on_envelope_knob_changed(
+                "attack_duration", self.attack_knob
             )
         )
         knobs_layout.addWidget(self.attack_knob)
@@ -86,8 +91,8 @@ class ADSRModule(ModuleWidget):
             default_value=0.2,
         )
         self.decay_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "decay_duration", self.decay_knob.get_value()
+            lambda *_: self._on_envelope_knob_changed(
+                "decay_duration", self.decay_knob
             )
         )
         knobs_layout.addWidget(self.decay_knob)
@@ -105,8 +110,8 @@ class ADSRModule(ModuleWidget):
             default_value=0.7,
         )
         self.sustain_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "sustain_level", self.sustain_knob.get_value()
+            lambda *_: self._on_envelope_knob_changed(
+                "sustain_level", self.sustain_knob
             )
         )
         knobs_layout2.addWidget(self.sustain_knob)
@@ -119,8 +124,8 @@ class ADSRModule(ModuleWidget):
             default_value=0.3,
         )
         self.release_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "release_duration", self.release_knob.get_value()
+            lambda *_: self._on_envelope_knob_changed(
+                "release_duration", self.release_knob
             )
         )
         knobs_layout2.addWidget(self.release_knob)
@@ -223,6 +228,26 @@ class ADSRModule(ModuleWidget):
         self._previous_gate = 0.0
 
         self.component = self.create_engine_component()
+        self._update_shape_display()
+
+    def _on_envelope_knob_changed(self, param_name: str, knob: Knob) -> None:
+        """Refresh the shape preview and emit the changed parameter signal."""
+        self._update_shape_display()
+        self.parameter_changed.emit(param_name, knob.get_value())
+
+    def _update_shape_display(self) -> None:
+        """Sync the shape widget with the current ADSR knobs."""
+        self.shape_widget.set_envelope(
+            self.attack_knob.get_value(),
+            self.decay_knob.get_value(),
+            self.sustain_knob.get_value(),
+            self.release_knob.get_value(),
+        )
+
+    def set_parameters(self, params: dict[str, Any]) -> None:
+        """Restore parameters and refresh the envelope shape preview."""
+        super().set_parameters(params)
+        self._update_shape_display()
 
     def _trigger_adsr(self, note_on: bool) -> None:
         """Trigger ADSR note on/off if available."""

@@ -99,7 +99,7 @@ class TB303VoiceModule(ModuleWidget):
         self.resonance_knob = Knob(
             label="Resonance",
             description="Adjusts the resonance of the filter",
-            min_value=0.0,
+            min_value=0.1,
             max_value=18.0,
             default_value=8.0,
             logarithmic=True,

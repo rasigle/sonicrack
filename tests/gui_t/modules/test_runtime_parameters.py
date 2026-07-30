@@ -895,10 +895,41 @@ def test_tb303_voice_runtime_applies_parameters_and_renders(qapp: Any):
     assert module.component.pulsewidth == pytest.approx(0.35)
     assert module.component.cutoff == pytest.approx(600.0)
     assert module.component.decay == pytest.approx(0.12)
+    assert module.resonance_knob.min_value == pytest.approx(0.1)
     output = np.asarray(module.out_port.value)
     assert output.shape == (32,)
     assert np.all(np.isfinite(output))
     assert np.max(np.abs(output)) > 0.0
+
+
+def test_tb303_voice_runtime_clamps_subminimum_resonance(qapp: Any):
+    """Resonance below the biquad Q floor must not crash the audio path."""
+    del qapp
+    module = TB303VoiceModule()
+    pitch_cv = float(frequency_to_pitch_cv(110.0))
+    freq_source = _connect_constant_input(module.freq_input, pitch_cv)
+    freq_source.write(np.full(32, pitch_cv, dtype=np.float32))
+    gate_source = _connect_constant_input(module.gate_input, 1.0)
+    gate_source.write(np.ones(32, dtype=np.float32))
+
+    module.process_runtime(
+        32,
+        {
+            "waveform": "Sawtooth",
+            "cutoff": 700.0,
+            "resonance": 0.06,
+            "env_amount": 2.5,
+            "decay": 0.18,
+            "accent": 0.7,
+            "slide_time": 0.08,
+            "drive_db": 6.0,
+            "volume": 0.8,
+        },
+    )
+
+    output = np.asarray(module.out_port.value)
+    assert output.shape == (32,)
+    assert np.all(np.isfinite(output))
 
 
 def test_vco_runtime_applies_oscillator_parameters(qapp: Any):

@@ -14,8 +14,6 @@ from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
-from sonicrack.patching.module import ModuleCategory
-
 if TYPE_CHECKING:
     from sonicrack.gui.widgets.port_widget import PortWidget
     from sonicrack.patching.module import ModuleMetadata

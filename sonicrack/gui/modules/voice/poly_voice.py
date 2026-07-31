@@ -20,7 +20,10 @@ from PyQt6.QtWidgets import (
 )
 from soniclab import ADSREnvelope, Chain, SawtoothOscillator, SineOscillator
 from soniclab.dsp.modifiers import ModulatedVolume
-from soniclab.generators.oscillators.oscillator import SquareOscillator, TriangleOscillator
+from soniclab.generators.oscillators.oscillator import (
+    SquareOscillator,
+    TriangleOscillator,
+)
 from soniclab.midi_io import (
     NoteOffMessage,
     NoteOnMessage,
@@ -101,7 +104,7 @@ class PolyVoiceModule(ModuleWidget):
         self._lock = threading.RLock()
         self._pressed_note_offsets: dict[int, int] = {}
         self._midi_held_notes: set[int] = set()
-        self._voice_params = {
+        self._voice_params: dict[str, float | str] = {
             "waveform": "Sine",
             "attack": 0.01,
             "decay": 0.15,
@@ -585,7 +588,16 @@ class PolyVoiceModule(ModuleWidget):
         }
         voices = max(
             1,
-            min(16, int(round(float_parameter(parameters, "voices", self.voices_knob.get_value)))),
+            min(
+                16,
+                int(
+                    round(
+                        float_parameter(
+                            parameters, "voices", self.voices_knob.get_value
+                        )
+                    )
+                ),
+            ),
         )
         with self._lock:
             if voices != self._max_voices:

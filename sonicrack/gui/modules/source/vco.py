@@ -383,7 +383,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         # Force runtime shape rebuild on next process so phase/mode stay coherent.
         self._runtime_oscillator_shape = None
 
-
     def _update_pulsewidth_visibility(self) -> None:
         """Pulse width only applies to square waves."""
         is_square = self._waveform == "Square"
@@ -477,18 +476,14 @@ class ModulatedOscillatorModule(ModuleWidget):
             self.freq_knob.setToolTip("Manual base frequency control (Hz)")
 
         if has_fm:
-            self.fm_amount_knob.setToolTip(
-                "Signed FM depth for the connected FM input"
-            )
+            self.fm_amount_knob.setToolTip("Signed FM depth for the connected FM input")
         else:
             self.fm_amount_knob.setToolTip(
                 "Signed FM depth. In 1V/octave mode this scales pitch CV; "
                 "in Linear mode this scales C4 Hz per volt."
             )
 
-        logger.debug(
-            "VCO update_knob_state: V/Oct=%s FM=%s", has_freq_cv, has_fm
-        )
+        logger.debug("VCO update_knob_state: V/Oct=%s FM=%s", has_freq_cv, has_fm)
 
     def create_engine_component(
         self,
@@ -521,9 +516,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         has_freq_mod = freq_modulator is not None
         has_fm_mod = fm_modulator is not None and fm_amount != 0.0
 
-        osc = create_vco_oscillator(
-            wave_type, mode, base_freq, pulsewidth=pulsewidth
-        )
+        osc = create_vco_oscillator(wave_type, mode, base_freq, pulsewidth=pulsewidth)
 
         if not (has_freq_mod or has_fm_mod):
             return osc
@@ -532,9 +525,7 @@ class ModulatedOscillatorModule(ModuleWidget):
             return apply_v_oct_offset(base_freq_val, pitch_cv)
 
         def fm_mod_func(current_freq, fm_signal):
-            return apply_vcv_fm_offset(
-                current_freq, fm_signal, fm_amount, fm_mode
-            )
+            return apply_vcv_fm_offset(current_freq, fm_signal, fm_amount, fm_mode)
 
         modulators = []
         freq_mod = None

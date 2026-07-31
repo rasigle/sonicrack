@@ -33,14 +33,14 @@ def test_midi_poly_cv_independent_voice_outputs(qapp: Any):
 
     module.process_runtime(8, {})
 
-    pitches = sorted(float(module.voice_pitch_ports[i].value[0]) for i in range(3))
-    expected = sorted(
-        float(midi_note_to_pitch_cv(n)) for n in (60, 64, 67)
+    pitches = sorted(
+        float(np.asarray(module.voice_pitch_ports[i].value)[0]) for i in range(3)
     )
+    expected = sorted(float(midi_note_to_pitch_cv(n)) for n in (60, 64, 67))
     for got, want in zip(pitches, expected, strict=True):
         assert got == pytest.approx(want, abs=1e-5)
 
-    gates = [float(module.voice_gate_ports[i].value[0]) for i in range(3)]
+    gates = [float(np.asarray(module.voice_gate_ports[i].value)[0]) for i in range(3)]
     assert all(g == pytest.approx(1.0) for g in gates)
 
     # Fourth voice free
@@ -61,9 +61,7 @@ def test_midi_poly_cv_trigger_on_note_on(qapp: Any):
     np.testing.assert_allclose(module.trig_port.value, expected)
 
     module.process_runtime(4, {})
-    np.testing.assert_allclose(
-        module.trig_port.value, np.zeros(4, dtype=np.float32)
-    )
+    np.testing.assert_allclose(module.trig_port.value, np.zeros(4, dtype=np.float32))
 
 
 def test_midi_poly_cv_note_off_frees_voice(qapp: Any):

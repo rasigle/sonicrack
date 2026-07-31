@@ -415,6 +415,7 @@ def test_render_plan_resolves_runtime_parameters_at_render_time(qapp: Any):
     assert modifier_node.spec.parameter_names == ("gain_db",)
     assert modifier_node.module.get_parameters()["gain_db"] == -3.0
 
+
 def test_module_widget_bind_parameter_knob_emits_and_formats(qapp: Any):
     del qapp
 
@@ -423,13 +424,16 @@ def test_module_widget_bind_parameter_knob_emits_and_formats(qapp: Any):
 
         def __init__(self):
             super().__init__()
-            from sonicrack.gui.widgets import Knob
             from PyQt6.QtWidgets import QLabel
+
+            from sonicrack.gui.widgets import Knob
 
             self.in_port = self.add_input("In")
             self.out_port = self.add_output("Out")
             layout = self._begin_controls()
-            self.knob = Knob(label="K", min_value=0.0, max_value=10.0, default_value=1.0)
+            self.knob = Knob(
+                label="K", min_value=0.0, max_value=10.0, default_value=1.0
+            )
             self.label = QLabel("1.0")
             self.seen: list[tuple[str, float]] = []
             self.parameter_changed.connect(lambda n, v: self.seen.append((n, float(v))))
@@ -447,7 +451,9 @@ def test_module_widget_bind_parameter_knob_emits_and_formats(qapp: Any):
     module = _Probe()
     module.knob.set_value(4.5)
     assert module.label.text() == "4.5x"
-    assert any(name == "cutoff" and abs(value - 4.5) < 1e-6 for name, value in module.seen)
+    assert any(
+        name == "cutoff" and abs(value - 4.5) < 1e-6 for name, value in module.seen
+    )
 
 
 def test_module_widget_require_input_or_silence(qapp: Any):
@@ -467,7 +473,6 @@ def test_module_widget_require_input_or_silence(qapp: Any):
     assert module._require_input_or_silence(8) is True
     assert np.allclose(module.out_port.value, np.zeros(8, dtype=np.float32))
 
-    source = type("S", (), {})()
     # Connect via Port
     from sonicrack.patching.port import Port
 
@@ -475,6 +480,7 @@ def test_module_widget_require_input_or_silence(qapp: Any):
     src.write(np.ones(8, dtype=np.float32))
     src.connect(module.in_port)
     assert module._require_input_or_silence(8) is False
+
 
 def test_register_menu_choice_serializes_and_emits(qapp: Any):
     del qapp

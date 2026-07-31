@@ -2,7 +2,6 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
@@ -187,7 +186,8 @@ class SpectrumModule(ModuleWidget):
 class SpectrumAnalyzer(QWidget):
     """Widget for displaying real-time frequency spectrum.
 
-    FFT/bucket analysis is delegated to ``soniclab.utils.spectrum.SpectrumAnalyzerCore``.
+    FFT/bucket analysis is delegated to
+    ``soniclab.utils.spectrum.SpectrumAnalyzerCore`.
     paintEvent() only draws cached bars and cached grid/background.
     """
 

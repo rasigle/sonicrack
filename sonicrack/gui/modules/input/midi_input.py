@@ -334,10 +334,7 @@ class MIDIInputModule(ModuleWidget):
             if (
                 self.cv_converter.gate > 0.0
                 and self.cv_converter.current_note is not None
-                and (
-                    prior_gate == 0.0
-                    or self.cv_converter.current_note != prior_note
-                )
+                and (prior_gate == 0.0 or self.cv_converter.current_note != prior_note)
             ):
                 self.trigger_output.arm()
             self._refresh_note_display()
@@ -378,7 +375,7 @@ class MIDIInputModule(ModuleWidget):
             if self.cv_converter.note_priority != wanted:
                 self.cv_converter.note_priority = wanted
         bend_range = parameters.get("pitch_bend_range")
-        if bend_range is not None:
+        if isinstance(bend_range, (int, float, str)):
             self.cv_converter.pitch_bend_range = float(bend_range)
 
         self.freq_port.write(self.freq_output.get_samples(num_samples))

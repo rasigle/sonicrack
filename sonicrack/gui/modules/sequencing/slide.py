@@ -70,7 +70,6 @@ class SlideModule(ModuleWidget):
         self.component.sample_rate = new_sample_rate
         self.component.reset()
 
-
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         if not self.freq_input.is_connected:
             self.freq_output.write(silence(num_samples))

@@ -470,6 +470,7 @@ def test_acid_filter_smooths_large_parameter_changes(app):
     assert boundary_jump < 0.05
     assert boundary_jump <= float(np.percentile(ordinary_jumps, 95)) * 4.0
 
+
 def test_normalize_filter_type_maps_ui_and_engine_labels():
     from sonicrack.gui.modules.modifier._filter_base import normalize_filter_type
 
@@ -495,6 +496,7 @@ def test_resonant_filter_notch_create_engine_component(app):
     assert component.filter_type == "notch"
     assert component.cutoff == 1500.0
     assert component.resonance == 3.0
+
 
 def test_filter_bandpass_equal_cutoffs_at_max_expand_downward(app):
     module = FilterModule()
@@ -531,6 +533,7 @@ def test_filter_sample_rate_change_clears_runtime_params(app):
     assert module.component is not None
     assert module.component is not previous or module._runtime_filter_params is None
     assert module._runtime_filter_params is None
+
 
 def test_filter_bandpass_equal_cutoffs_expand_upward(app):
     module = FilterModule()

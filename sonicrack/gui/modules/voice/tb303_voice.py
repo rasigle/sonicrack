@@ -218,7 +218,6 @@ class TB303VoiceModule(ModuleWidget):
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component = TB303Voice(sample_rate=new_sample_rate)
 
-
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         if not self.freq_input.is_connected or not self.gate_input.is_connected:
             self.out_port.write(silence(num_samples))

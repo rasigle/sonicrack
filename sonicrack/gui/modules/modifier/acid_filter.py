@@ -199,13 +199,9 @@ class AcidFilterModule(FilterModuleBase):
         if accent_cv is not None:
             cutoff_values = cutoff_values * np.power(2.0, accent_cv * accent_amount)
 
-        cutoff_values = np.clip(
-            cutoff_values, 20.0, audio_config.sample_rate * 0.45
-        )
+        cutoff_values = np.clip(cutoff_values, 20.0, audio_config.sample_rate * 0.45)
 
-        resonance_values = ramp_if_changed(
-            self._last_resonance, resonance, num_samples
-        )
+        resonance_values = ramp_if_changed(self._last_resonance, resonance, num_samples)
         drive_db_values = ramp_if_changed(self._last_drive_db, drive_db, num_samples)
         output_gain_db_values = ramp_if_changed(
             self._last_output_gain_db, output_gain_db, num_samples

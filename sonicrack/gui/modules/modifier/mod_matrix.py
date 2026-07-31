@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QGridLayout, QLabel
-
 from soniclab.dsp.modifiers import ModMatrix
+
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata

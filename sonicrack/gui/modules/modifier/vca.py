@@ -129,7 +129,7 @@ class VCAModule(ModuleWidget):
             if port.port_name != "CV In":
                 continue
             cables = getattr(port, "cables", None)
-            return bool(cables) and len(cables) > 0
+            return bool(cables) and len(cables or ()) > 0
         return False
 
     def update_knob_state(self) -> None:
@@ -200,9 +200,7 @@ class VCAModule(ModuleWidget):
             return
 
         input_signal = read_samples(self.in_port, num_samples)
-        manual_gain = float_parameter(
-            parameters, "amplitude", self.gain_knob.get_value
-        )
+        manual_gain = float_parameter(parameters, "amplitude", self.gain_knob.get_value)
         manual_gain = float(np.clip(manual_gain, 0.0, 1.0))
 
         # Dezipper Gain knob changes so abrupt UI moves do not click.

@@ -178,9 +178,7 @@ def test_midi_keyboard_trigger_is_one_sample_pulse_on_note_on(qapp: Any):
 
     # Subsequent buffers stay low while the note remains held.
     module.process_runtime(8, {})
-    np.testing.assert_allclose(
-        module.trigger_port.value, np.zeros(8, dtype=np.float32)
-    )
+    np.testing.assert_allclose(module.trigger_port.value, np.zeros(8, dtype=np.float32))
 
 
 def test_midi_keyboard_legato_note_change_rearms_trigger(qapp: Any):
@@ -435,8 +433,12 @@ def test_vca_update_knob_state_updates_tooltips(qapp: Any):
     assert not vca.cv_attn_knob.isEnabled()
 
     # update_knob_state inspects PortWidget cables, not model Port.connect().
+    from unittest.mock import MagicMock
+
+    from sonicrack.gui.widgets.cable_widget import Cable
+
     cv_widget = next(p for p in vca.input_ports if p.port_name == "CV In")
-    cv_widget.cables.append(object())
+    cv_widget.cables.append(MagicMock(spec=Cable))
     vca.update_knob_state()
     assert "0 = Gain only" in vca.cv_attn_knob.toolTip()
     assert "after CV modulation" in vca.gain_knob.toolTip()
@@ -509,9 +511,7 @@ def test_vca_create_engine_component_with_cv_influence(qapp: Any):
     vca.cv_attn_knob.set_value(0.5)
     cv_source = _CvSource()
 
-    component = vca.create_engine_component(
-        modulation_components={"CV In": cv_source}
-    )
+    component = vca.create_engine_component(modulation_components={"CV In": cv_source})
 
     assert isinstance(component, ModulatedVolume)
     # Adapter blends gain with CV and exposes iterator / bulk sample APIs.

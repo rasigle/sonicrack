@@ -60,9 +60,7 @@ def test_midi_input_note_on_arms_one_sample_trigger(qapp: Any):
 
     # Held notes do not keep pulsing.
     module.process_runtime(8, {})
-    np.testing.assert_allclose(
-        module.trigger_port.value, np.zeros(8, dtype=np.float32)
-    )
+    np.testing.assert_allclose(module.trigger_port.value, np.zeros(8, dtype=np.float32))
 
 
 def test_midi_input_legato_note_change_rearms_trigger(qapp: Any):
@@ -96,9 +94,7 @@ def test_midi_input_note_off_does_not_arm_trigger(qapp: Any):
     module._on_midi_message(NoteOffMessage(timestamp=0.0, channel=0, note=60))
     module.process_runtime(4, {})
 
-    np.testing.assert_allclose(
-        module.trigger_port.value, np.zeros(4, dtype=np.float32)
-    )
+    np.testing.assert_allclose(module.trigger_port.value, np.zeros(4, dtype=np.float32))
     assert module.cv_converter.gate == pytest.approx(0.0)
 
 
@@ -186,7 +182,7 @@ def test_midi_input_pitch_bend_affects_pitch_and_bend_cv(qapp: Any):
         np.full(4, expected_pitch, dtype=np.float32),
         atol=0.02,
     )
-    assert float(module.bend_port.value[0]) == pytest.approx(1.0, abs=0.01)
+    assert float(np.asarray(module.bend_port.value)[0]) == pytest.approx(1.0, abs=0.01)
 
 
 def test_midi_input_is_registered_under_midi_category(qapp: Any):

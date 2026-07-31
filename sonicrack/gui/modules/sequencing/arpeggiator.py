@@ -8,6 +8,8 @@ driven by an internal or external step clock. Built for experimenting with
 
 from __future__ import annotations
 
+from typing import cast
+
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
@@ -320,7 +322,9 @@ class ArpeggiatorModule(ModuleWidget):
         )
         self.play_led = LedIndicator(style=playhead_style)
         self.play_led.set_on(False)
-        status_grid.addWidget(self.play_led, 0, 0, alignment=Qt.AlignmentFlag.AlignCenter)
+        status_grid.addWidget(
+            self.play_led, 0, 0, alignment=Qt.AlignmentFlag.AlignCenter
+        )
 
         self.note_label = QLabel("--")
         self.note_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -394,7 +398,9 @@ class ArpeggiatorModule(ModuleWidget):
         return int(round(self.transpose_knob.get_value()))
 
     def set_transpose(self, value: int | float) -> None:
-        self.transpose_knob.set_value(float(max(-24, min(24, int(round(float(value)))))))
+        self.transpose_knob.set_value(
+            float(max(-24, min(24, int(round(float(value))))))
+        )
 
     def _on_notes_changed(self, value: str) -> None:
         self.parameter_changed.emit("notes", value)
@@ -435,7 +441,9 @@ class ArpeggiatorModule(ModuleWidget):
                 octave = int(self.root_octave_combo.currentText())
             except ValueError:
                 octave = 4
-        chord_quality = quality if quality is not None else self.chord_combo.currentText()
+        chord_quality = (
+            quality if quality is not None else self.chord_combo.currentText()
+        )
         intervals = _CHORD_INTERVALS.get(chord_quality, (0, 4, 7))
         root_pc = _NOTE_NAMES.index(root_name) if root_name in _NOTE_NAMES else 0
         root_midi = max(0, min(127, (int(octave) + 1) * 12 + root_pc))
@@ -502,7 +510,9 @@ class ArpeggiatorModule(ModuleWidget):
 
         octaves_raw = parameters.get("octaves", self.get_octaves())
         try:
-            self.component.octaves = max(1, min(4, int(round(float(octaves_raw)))))  # type: ignore[arg-type]
+            self.component.octaves = max(
+                1, min(4, int(round(float(cast(float | int | str, octaves_raw)))))
+            )
         except (TypeError, ValueError):
             self.component.octaves = self.get_octaves()
 
@@ -512,7 +522,9 @@ class ArpeggiatorModule(ModuleWidget):
 
         transpose_raw = parameters.get("transpose", self.get_transpose())
         try:
-            self.component.transpose = int(round(float(transpose_raw)))  # type: ignore[arg-type]
+            self.component.transpose = int(
+                round(float(cast(float | int | str, transpose_raw)))
+            )
         except (TypeError, ValueError):
             self.component.transpose = self.get_transpose()
 
@@ -544,9 +556,7 @@ class ArpeggiatorModule(ModuleWidget):
         else:
             self._previous_clock = 0.0
             clock_pulses = None
-        frame = self.component.process(
-            num_samples, clock_pulses, running=running
-        )
+        frame = self.component.process(num_samples, clock_pulses, running=running)
 
         # Pitch CV (1V/oct, 0V = C4) — same convention as MIDI modules / VCO V/Oct.
         self.freq_port.write(frame.pitch_cv)
@@ -558,10 +568,7 @@ class ArpeggiatorModule(ModuleWidget):
         # so we do not re-queue the same step every buffer.
         current_note = self.component._current_note  # noqa: SLF001 — display only
         step_index = int(self.component._step_index)  # noqa: SLF001
-        if current_note is None:
-            label = "--"
-        else:
-            label = _midi_label(int(current_note))
+        label = "--" if current_note is None else _midi_label(int(current_note))
         if step_index != self._displayed_step or label != self._displayed_note:
             self._displayed_step = step_index
             self._displayed_note = label

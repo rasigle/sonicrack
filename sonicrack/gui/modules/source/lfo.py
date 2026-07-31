@@ -81,12 +81,6 @@ class LFOModule(ModuleWidget):
 
         self.lfos: list[LFO] = []
         self.ports: list[Port] = []
-        port_attrs = {
-            "Sine": "sine_port",
-            "Triangle": "triangle_port",
-            "Square": "square_port",
-            "Random": "random_port",
-        }
         for port_name, shape in _LFO_OUTPUT_SHAPES:
             lfo = LFO(
                 rate_hz=LFO_DEFAULT_RATE,
@@ -104,7 +98,12 @@ class LFOModule(ModuleWidget):
                 signal=PortSignal.CONTROL_CV,
             )
             self.ports.append(port)
-            setattr(self, port_attrs[port_name], port)
+
+        # Named outputs used by tests and patch call sites.
+        self.sine_port: Port = self.ports[0]
+        self.triangle_port: Port = self.ports[1]
+        self.square_port: Port = self.ports[2]
+        self.random_port: Port = self.ports[3]
 
         # Convenience aliases used by tests and call sites.
         self._sine_lfo = self.lfos[0]

@@ -168,9 +168,7 @@ class FilterModule(FilterModuleBase):
 
     def _get_filter_type(self) -> Literal["low", "high", "band"]:
         """Map UI filter type text to engine filter type."""
-        return normalize_filter_type(  # type: ignore[return-value]
-            self.type_combo.currentText(), allow_notch=False
-        )
+        return normalize_filter_type(self.type_combo.currentText(), allow_notch=False)
 
     def _get_cutoff_param(self) -> float | tuple[float, float]:
         """Get the current cutoff parameter in engine format."""
@@ -225,7 +223,7 @@ class FilterModule(FilterModuleBase):
         if self._require_input_or_silence(num_samples):
             return
 
-        filter_type = normalize_filter_type(  # type: ignore[assignment]
+        filter_type = normalize_filter_type(
             str_parameter(parameters, "filter_type", self.type_combo.currentText),
             allow_notch=False,
         )

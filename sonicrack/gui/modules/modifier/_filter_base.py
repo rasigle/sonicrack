@@ -7,7 +7,7 @@ centralizing duplicated port setup, type mapping, and filter-specific wiring.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Literal
+from typing import Any, Literal, overload
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel
@@ -43,6 +43,22 @@ RESONANT_TYPE_ITEMS: tuple[str, ...] = (
 )
 
 
+@overload
+def normalize_filter_type(
+    text: str,
+    *,
+    allow_notch: Literal[False] = False,
+) -> ButterworthFilterType: ...
+
+
+@overload
+def normalize_filter_type(
+    text: str,
+    *,
+    allow_notch: Literal[True],
+) -> ResonantFilterType: ...
+
+
 def normalize_filter_type(
     text: str,
     *,
@@ -53,7 +69,9 @@ def normalize_filter_type(
     if mapped == "notch" and not allow_notch:
         return "low"
     if allow_notch:
-        return mapped  # type: ignore[return-value]
+        if mapped in ("low", "high", "band", "notch"):
+            return mapped  # type: ignore[return-value]
+        return "low"
     if mapped in ("low", "high", "band"):
         return mapped  # type: ignore[return-value]
     return "low"
@@ -80,6 +98,9 @@ def create_filter_type_combo(
 
 class FilterModuleBase(ModuleWidget):
     """Common filter wiring: audio ports, sample-rate rebuild, type param."""
+
+    # Subclasses narrow this to their concrete runtime-param tuple type.
+    _runtime_filter_params: Any = None
 
     def _setup_filter_ports(
         self,

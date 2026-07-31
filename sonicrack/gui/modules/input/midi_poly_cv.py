@@ -290,10 +290,10 @@ class MIDIPolyCVModule(ModuleWidget):
 
         if isinstance(msg, NoteOnMessage) and msg.velocity > 0:
             # Arm shared Trig when a new note is allocated or re-triggered.
-            if msg.note not in prior_notes or self.poly_cv.active_voice_count > prior_active:
-                self._global_trigger.arm()
-            # Also arm on re-press of an already-held note (voice re-trigger).
-            elif msg.note in prior_notes:
+            if (
+                msg.note not in prior_notes
+                or self.poly_cv.active_voice_count > prior_active
+            ) or msg.note in prior_notes:
                 self._global_trigger.arm()
         elif isinstance(msg, NoteOffMessage):
             pass
@@ -320,7 +320,8 @@ class MIDIPolyCVModule(ModuleWidget):
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,
-    ) -> PolyphonicMIDIToCV:
+    ) -> Any:
+        """Return the poly CV converter (not an AudioComponent; multi-output)."""
         del input_components, modulation_components
         return self.poly_cv
 
@@ -341,7 +342,7 @@ class MIDIPolyCVModule(ModuleWidget):
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         bend_range = parameters.get("pitch_bend_range") if parameters else None
-        if bend_range is not None:
+        if isinstance(bend_range, (int, float, str)):
             self.poly_cv.pitch_bend_range = float(bend_range)
 
         for index in range(MAX_VOICES):

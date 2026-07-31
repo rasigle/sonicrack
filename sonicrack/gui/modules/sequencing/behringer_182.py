@@ -314,9 +314,7 @@ class Behringer182Module(ModuleWidget):
             self.register_parameter(f"cv_a_{step}", knob)
         for step, knob in enumerate(self.cv_b_knobs, start=1):
             self.register_parameter(f"cv_b_{step}", knob)
-        self.register_parameter(
-            "gates", self, getter="get_gates", setter="set_gates"
-        )
+        self.register_parameter("gates", self, getter="get_gates", setter="set_gates")
         self.register_parameter(
             "running", self.run_button, getter="isChecked", setter="setChecked"
         )
@@ -391,9 +389,7 @@ class Behringer182Module(ModuleWidget):
 
     def get_gates(self) -> str:
         """Serialize gate step toggles for parameters and presets."""
-        return self._flags_to_text(
-            [button.isChecked() for button in self.gate_buttons]
-        )
+        return self._flags_to_text([button.isChecked() for button in self.gate_buttons])
 
     def set_gates(self, value: str) -> None:
         """Load gate step toggles from a comma-separated flag string."""

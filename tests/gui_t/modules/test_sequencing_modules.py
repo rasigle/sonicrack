@@ -160,8 +160,9 @@ def test_step_sequencer_advances_once_per_wide_clock_pulse(qapp: Any):
     module.process_runtime(8, params)
     assert module.component._active_step == 1
     # Samples before edge stay on step 0; after edge on step 1 (MIDI 48 → -1.0).
-    np.testing.assert_allclose(module.freq_port.value[:2], [-2.0, -2.0])
-    np.testing.assert_allclose(module.freq_port.value[2:], np.full(6, -1.0))
+    freq = np.asarray(module.freq_port.value)
+    np.testing.assert_allclose(freq[:2], [-2.0, -2.0])
+    np.testing.assert_allclose(freq[2:], np.full(6, -1.0))
 
 
 def test_clock_module_drives_step_sequencer_through_pattern(qapp: Any):
@@ -207,7 +208,7 @@ def test_clock_module_drives_step_sequencer_through_pattern(qapp: Any):
     assert len(unique) >= 4, f"expected multi-step advance, saw {steps_seen}"
     # Consecutive clock ticks should advance sequentially (mod 8).
     advances = [s for i, s in enumerate(steps_seen) if i == 0 or s != steps_seen[i - 1]]
-    for prev, cur in zip(advances, advances[1:]):
+    for prev, cur in zip(advances, advances[1:], strict=True):
         assert cur == (prev + 1) % 8
 
 
@@ -345,7 +346,9 @@ def test_step_sequencer_randomize_updates_pattern_and_toggles(qapp: Any):
 
     module.randomize_pattern(random.Random(42))
 
-    notes = [item.strip() for item in module.notes_edit.text().split(",") if item.strip()]
+    notes = [
+        item.strip() for item in module.notes_edit.text().split(",") if item.strip()
+    ]
     accents = module.get_accents().split(",")
     slides = module.get_slides().split(",")
 
@@ -437,12 +440,15 @@ def test_behringer_182_uses_compact_panel_controls(qapp: Any):
     assert all(knob.knob_size == 28 for knob in module.cv_b_knobs)
     assert all(knob.label == "" for knob in module.cv_a_knobs)
     assert all(knob.label == "" for knob in module.cv_b_knobs)
-    assert all(knob.knob_size == 34 for knob in (
-        module.bpm_knob,
-        module.gate_length_knob,
-        module.range_a_knob,
-        module.range_b_knob,
-    ))
+    assert all(
+        knob.knob_size == 34
+        for knob in (
+            module.bpm_knob,
+            module.gate_length_knob,
+            module.range_a_knob,
+            module.range_b_knob,
+        )
+    )
     assert len(module.step_leds) == 8
     assert len(module.gate_buttons) == 8
     assert module.get_gates() == "1,1,1,1,1,1,1,1"
@@ -751,7 +757,6 @@ def test_arpeggiator_pattern_and_octaves_expand_sequence(qapp: Any):
     # Two octaves of C-E-G expanded then reversed: G5 … C4.
     notes = module.component.sequence_notes
     assert notes == [79, 76, 72, 67, 64, 60]
-
 
 
 def test_arpeggiator_parameters_round_trip(qapp: Any):

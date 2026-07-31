@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
+from soniclab.generators.oscillators import WavetableOscillator
 from soniclab.utils.cv import pitch_cv_to_frequency
 
 from sonicrack.config.audio_config import audio_config
 from sonicrack.constants import AUDIO_FREQUENCY_KNOB_CURVE
-from soniclab.generators.oscillators import WavetableOscillator
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata

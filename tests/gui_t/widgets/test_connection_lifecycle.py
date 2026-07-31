@@ -60,7 +60,9 @@ def test_create_connection_rejects_cycles(qapp: Any):
     assert canvas.create_connection(first.output_ports[0], second.input_ports[0])
     cycle = canvas._would_create_cycle(second.output_ports[0], first.input_ports[0])
     assert cycle is not None
-    assert canvas.create_connection(second.output_ports[0], first.input_ports[0]) is None
+    assert (
+        canvas.create_connection(second.output_ports[0], first.input_ports[0]) is None
+    )
     assert len(canvas.get_connections()) == 1
 
 
@@ -102,7 +104,9 @@ def test_bulk_cable_delete_notifies_all_modulated_targets(qapp: Any):
     c1.setSelected(True)
     c2.setSelected(True)
     canvas.keyPressEvent(
-        QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Delete, Qt.KeyboardModifier.NoModifier)
+        QKeyEvent(
+            QEvent.Type.KeyPress, Qt.Key.Key_Delete, Qt.KeyboardModifier.NoModifier
+        )
     )
 
     assert vol1._is_modulated is False
@@ -199,7 +203,9 @@ def test_key_delete_module_demotes_modulated_neighbor(qapp: Any):
 
     lfo.setSelected(True)
     canvas.keyPressEvent(
-        QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Delete, Qt.KeyboardModifier.NoModifier)
+        QKeyEvent(
+            QEvent.Type.KeyPress, Qt.Key.Key_Delete, Qt.KeyboardModifier.NoModifier
+        )
     )
 
     assert volume._is_modulated is False
@@ -241,8 +247,9 @@ def test_cable_temp_drag_updates_geometry_cache(qapp: Any):
     source.setPos(0, 0)
     canvas.add_module(source)
 
-    from sonicrack.gui.widgets.cable_widget import Cable
     from PyQt6.QtCore import QPointF
+
+    from sonicrack.gui.widgets.cable_widget import Cable
 
     cable = Cable(source.output_ports[0])
     canvas._scene.addItem(cable)
@@ -281,7 +288,6 @@ def test_clear_all_disconnects_port_models(qapp: Any):
 
 def test_runtime_demotes_volume_when_mod_disconnected_without_notify(qapp: Any):
     del qapp
-    from sonicrack.runtime.specs import RuntimeParameters
 
     volume = VolumeModule()
     lfo = OscillatorModule()

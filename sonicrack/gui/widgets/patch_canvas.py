@@ -573,9 +573,7 @@ class PatchCanvas(QGraphicsView):
 
         return cable
 
-    def _find_cable(
-        self, start_port: PortWidget, end_port: PortWidget
-    ) -> Cable | None:
+    def _find_cable(self, start_port: PortWidget, end_port: PortWidget) -> Cable | None:
         """Return an existing cable between the given ports, if any."""
         for item in self._scene.items():
             if (

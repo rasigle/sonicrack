@@ -129,7 +129,7 @@ class EnvelopeShapeWidget(QWidget):
             active: Force visibility; defaults to hidden only for idle/ended.
         """
         if hasattr(phase, "value"):
-            phase_key = str(getattr(phase, "value")).lower().strip()
+            phase_key = str(phase.value).lower().strip()
         else:
             phase_key = str(phase or "idle").lower().strip()
 

@@ -108,7 +108,6 @@ class AccentModule(ModuleWidget):
         self.component.sample_rate = new_sample_rate
         self.component.reset()
 
-
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         if not self.accent_input.is_connected:
             self.amp_port.write(silence(num_samples))

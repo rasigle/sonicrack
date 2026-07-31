@@ -47,17 +47,22 @@ def main() -> None:
         width = module.module_width
         height = module.module_height
         title_h = module._title_bar_height()
-        content_h = height - title_h
 
         controls = getattr(module, "controls_widget", None)
         if controls is None:
-            print(f"{name:24} {width:4} {height:4} {'—':>6} {'—':>5} {'—':>6} {'—':>7} NO_CONTROLS")
+            print(
+                f"{name:24} {width:4} {height:4} {'—':>6} {'—':>5} {'—':>6} "
+                f"{'—':>7} NO_CONTROLS"
+            )
             continue
 
         controls.setFixedWidth(width)
         layout = controls.layout()
         if layout is None:
-            print(f"{name:24} {width:4} {height:4} {'—':>6} {'—':>5} {'—':>6} {'—':>7} NO_LAYOUT")
+            print(
+                f"{name:24} {width:4} {height:4} "
+                f"{'—':>6} {'—':>5} {'—':>6} {'—':>7} NO_LAYOUT"
+            )
             continue
 
         layout.activate()

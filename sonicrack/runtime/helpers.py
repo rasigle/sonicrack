@@ -45,7 +45,9 @@ _GATE_LOW = 0.3
 _GATE_HIGH = 0.7
 
 
-def min_trigger_samples(sample_rate: float, seconds: float = DEFAULT_MIN_TRIGGER_SECONDS) -> int:
+def min_trigger_samples(
+    sample_rate: float, seconds: float = DEFAULT_MIN_TRIGGER_SECONDS
+) -> int:
     """Return sample count for a minimum trigger/gate pulse width."""
     rate = max(1.0, float(sample_rate))
     return max(1, int(round(max(0.0, float(seconds)) * rate)))

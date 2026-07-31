@@ -330,7 +330,9 @@ def test_knob_double_click_with_min_default():
     assert knob.get_value() == 0.0
 
 
-def _make_wheel_event(delta_y: int, modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier):
+def _make_wheel_event(
+    delta_y: int, modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier
+):
     """Build a QWheelEvent for unit tests."""
     from PyQt6.QtCore import QPoint, QPointF
     from PyQt6.QtGui import QWheelEvent
@@ -371,9 +373,7 @@ def test_knob_wheel_ctrl_fine_tune():
     """Ctrl + scroll wheel uses a finer step than plain scroll."""
     knob = Knob(label="Test", min_value=0.0, max_value=100.0, default_value=50.0)
 
-    knob.wheelEvent(
-        _make_wheel_event(120, Qt.KeyboardModifier.ControlModifier)
-    )
+    knob.wheelEvent(_make_wheel_event(120, Qt.KeyboardModifier.ControlModifier))
     fine_value = knob.get_value()
     # Fine ≈ 0.2% of range per notch → +0.2
     assert fine_value == pytest.approx(50.2)

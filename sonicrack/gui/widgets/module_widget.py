@@ -308,7 +308,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         if previous is not None and previous is not listener:
             audio_config.remove_sample_rate_listener(previous)
 
-        self._sample_rate_listener = listener
+        self._sample_rate_listener: Callable[[int], None] | None = listener
         audio_config.add_sample_rate_listener(listener)
         if not getattr(self, "_sample_rate_cleanup_connected", False):
             self.destroyed.connect(self._cleanup_audio_config_listeners)
@@ -337,9 +337,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
     def _write_silence(self, num_samples: int, output_port: Any | None = None) -> None:
         """Write a silent buffer to the module output port."""
         port = (
-            output_port
-            if output_port is not None
-            else getattr(self, "out_port", None)
+            output_port if output_port is not None else getattr(self, "out_port", None)
         )
         if port is None:
             return
@@ -357,9 +355,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             input_port if input_port is not None else getattr(self, "in_port", None)
         )
         out_port = (
-            output_port
-            if output_port is not None
-            else getattr(self, "out_port", None)
+            output_port if output_port is not None else getattr(self, "out_port", None)
         )
         if in_port is None or out_port is None:
             return False
@@ -493,6 +489,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             current = choice.get_value()
             for option in choice.choices:
                 action = submenu.addAction(option)
+                if action is None:
+                    continue
                 action.setCheckable(True)
                 action.setChecked(option == current)
                 group.addAction(action)
@@ -918,7 +916,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         from sonicrack.gui.widgets.patch_canvas import PatchCanvas
 
         canvas = scene.parent()
-        is_canvas = isinstance(canvas, PatchCanvas)
+        patch_canvas = canvas if isinstance(canvas, PatchCanvas) else None
 
         # Collect unique cables attached to this module.
         cables_to_remove: list = []
@@ -934,9 +932,9 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         # Disconnect each cable and notify peers before removing the module.
         for cable in cables_to_remove:
             with contextlib.suppress(RuntimeError, AttributeError):
-                if is_canvas:
+                if patch_canvas is not None:
                     # Emits cable_disconnected so neighbors demote modulated state.
-                    canvas.delete_cable(cable, emit_signal=True)
+                    patch_canvas.delete_cable(cable, emit_signal=True)
                 else:
                     cable.remove()
 
@@ -952,8 +950,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             with contextlib.suppress(RuntimeError):
                 scene.removeItem(self)
 
-        if is_canvas:
-            canvas.module_deleted.emit(self)
+        if patch_canvas is not None:
+            patch_canvas.module_deleted.emit(self)
 
     def create_engine_component(
         self,

@@ -247,7 +247,7 @@ def test_cv_utilities_and_mod_matrix(qapp: Any) -> None:
 
     # Quantizer snaps to chromatic
     quant = QuantizerModule()
-    # MIDI 60.5 ≈ +0.0417V → should snap toward C4 (0V) or C# 
+    # MIDI 60.5 ≈ +0.0417V → should snap toward C4 (0V) or C#
     _connect_signal(quant.in_port, np.full(8, 0.5 / 12.0, dtype=np.float32))
     quant.process_runtime(8, {"scale": "Chromatic", "root": "C"})
     qout = np.asarray(quant.out_port.value)

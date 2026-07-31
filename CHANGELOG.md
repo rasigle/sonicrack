@@ -56,7 +56,7 @@ All notable changes to SonicRack will be documented in this file.
 - PyPI-oriented packaging metadata: project URLs, desktop/Qt classifiers, and
   `Typing :: Typed`.
 - Console entry point `sonicrack` for a standard `uv tool install sonicrack`
-  (or `uv pip install sonicrack`) launch path.
+  launch path.
 - GitHub Actions publish workflow (Trusted Publishing to TestPyPI / PyPI).
 - **MIDI Trig outputs**: MIDI Input and MIDI Keyboard emit a one-sample
   `Trig` pulse on every note-on (including legato retriggers while Gate stays

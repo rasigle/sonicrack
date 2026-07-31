@@ -33,8 +33,7 @@ classifiers = [
 
 requires-python = ">=3.11"
 # Desktop app: GUI + device audio ship in the base install so
-# `uv tool install sonicrack` / `uv pip install sonicrack` + `sonicrack`
-# works out of the box.
+# `uv tool install sonicrack` + `sonicrack` works out of the box.
 dependencies = [
     "numpy>=2.4.6",
     "scipy>=1.11",

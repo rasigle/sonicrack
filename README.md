@@ -27,9 +27,6 @@ That installs the desktop app stack (PyQt6, device audio via `sounddevice`/`numb
 and the `soniclab` engine). Alternatives:
 
 ```bash
-# into the active environment
-uv pip install sonicrack
-
 # as a project dependency
 uv add sonicrack
 
@@ -49,7 +46,6 @@ Optional extras:
 uv tool install "sonicrack[midi]"       # MIDI ports via soniclab[midi]
 uv tool install "sonicrack[examples]"   # analysis notebooks / live-input demos
 uv tool install "sonicrack[full]"       # midi + examples
-# or: uv pip install "sonicrack[midi]" / "sonicrack[examples]" / "sonicrack[full]"
 ```
 
 Notes:

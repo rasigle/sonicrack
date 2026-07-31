@@ -13,11 +13,13 @@ from soniclab.utils.spectrum import SpectrumAnalyzerCore
 from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules.visualization.visualizer_utils import (
     get_visualizer_samples,
+    process_visualizer_passthrough,
     stop_visualizer_timer,
 )
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
+from sonicrack.runtime.specs import RuntimeParameters
 
 logger = logging.getLogger(__name__)
 
@@ -36,22 +38,21 @@ class SpectrumModule(ModuleWidget):
     """Spectrum analyzer module for real-time frequency visualization.
 
     Runtime behavior:
-    - Passive sink in the render graph; it does not process upstream modules.
-    - When audio output is playing, it displays samples tapped from the shared
-      render path.
+    - Display peeks rendered tap history (does not drive upstream DSP itself).
+    - When audio output is playing, samples come from the shared render path.
     - Without active audio output, AudioEngine's monitor timer renders only the
       connected visualizer sink ports so sources still animate silently.
+    - ``Out`` is a pass-through of ``In`` for inline patching
+      (``Source -> Spectrum -> next``).
     """
 
-    runtime_kind = "passive_sink"
+    runtime_kind = "visualizer_thru"
 
     metadata = ModuleMetadata(
         title="Spectrum",
         category=ModuleCategory.VISUALIZATION,
-        description="Real-time frequency spectrum display (FFT analyzer)",
+        description="FFT spectrum display with pass-through output",
     )
-
-    is_processing_module = False
 
     def __init__(self):
         """Initialize spectrum analyzer module."""
@@ -62,6 +63,7 @@ class SpectrumModule(ModuleWidget):
         )
 
         self.in_port = self.add_input("In")
+        self.out_port = self.add_output("Out")
 
         self._sample_rate = int(audio_config.sample_rate)
         self._fft_size = 2048
@@ -160,8 +162,13 @@ class SpectrumModule(ModuleWidget):
             label.setText(text)
 
     def get_required_inputs(self) -> list[str]:
-        """Spectrum has optional input and shows 'No Signal' when disconnected."""
-        return []
+        """Pass-through needs In; display still shows 'No Signal' when empty."""
+        return ["In"]
+
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
+        """Copy In to Out unchanged for inline monitoring."""
+        del parameters
+        process_visualizer_passthrough(self.in_port, self.out_port, num_samples)
 
     def shutdown(self, graceful: bool = True) -> None:
         """Stop visualization updates before the module is deleted."""

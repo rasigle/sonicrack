@@ -81,11 +81,14 @@ class ModuleCategory(StrEnum):
         """True for categories that transform a primary audio input.
 
         Used for inactive pass-through and similar modifier-like routing.
+        Visualization modules are included because they route In→Out unchanged
+        and must keep the signal flowing when bypassed.
         """
         return self in (
             ModuleCategory.MODIFIER,
             ModuleCategory.FILTER,
             ModuleCategory.EFFECT,
+            ModuleCategory.VISUALIZATION,
         )
 
 

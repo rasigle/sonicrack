@@ -1,10 +1,14 @@
-"""Shared utilities for passive visualization modules.
+"""Shared utilities for visualization modules.
 
-Visualizer widgets never render upstream modules themselves. Audio output and
-the monitor timer both render through ``AudioEngine``; visualizers only read
-recent tap history from connected ports. This keeps scopes/meters from changing
-oscillator, envelope, or effect state while still allowing silent patches such
-as ``Oscillator -> Waveform`` to animate without an Output module.
+Visualizer widgets never render upstream modules themselves for display.
+Audio output and the monitor timer both render through ``AudioEngine``;
+scopes only read recent tap history from connected ports. That keeps meters
+from advancing oscillator/effect state while silent patches such as
+``Oscillator -> Waveform`` still animate without an Output module.
+
+When used inline (``Source -> Waveform -> next``), the same modules also act
+as pass-through processors: ``process_visualizer_passthrough`` copies the
+input buffer to the output unchanged so the signal can be picked again.
 """
 
 from __future__ import annotations
@@ -16,6 +20,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from PyQt6.QtCore import QTimer
+
+from sonicrack.runtime.helpers import read_samples, write_silence_if_disconnected
 
 if TYPE_CHECKING:
     from sonicrack.patching.port import Port
@@ -79,6 +85,27 @@ def get_visualizer_samples(
         logger.debug("Error reading cached visualizer samples", exc_info=True)
 
     return None
+
+
+def process_visualizer_passthrough(
+    input_port: Port,
+    output_port: Port,
+    num_samples: int,
+) -> None:
+    """Route the input signal to the output unchanged.
+
+    Used by Waveform/Spectrum when they sit inline in a patch. Display still
+    reads tap history separately; this only provides a pickable thru jack.
+    """
+    if write_silence_if_disconnected(input_port, output_port, num_samples):
+        return
+
+    samples = read_samples(input_port, num_samples)
+    # Own the output buffer so later modules cannot mutate the input port value.
+    if isinstance(samples, np.ndarray):
+        output_port.write(samples.copy())
+    else:
+        output_port.write(samples)
 
 
 def validate_samples(samples: Any) -> bool:

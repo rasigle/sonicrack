@@ -22,12 +22,14 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from sonicrack.gui.modules.visualization.visualizer_utils import (
     get_visualizer_samples,
+    process_visualizer_passthrough,
     stop_visualizer_timer,
 )
 from sonicrack.gui.widgets.knob_widget import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
+from sonicrack.runtime.specs import RuntimeParameters
 
 logger = logging.getLogger(__name__)
 
@@ -102,21 +104,20 @@ class WaveformStats:
 class WaveformModule(ModuleWidget):
     """Professional waveform display module for real-time audio visualization.
 
-    This is a passive visualizer. It never renders upstream modules itself.
-    Audio output and AudioEngine's monitor timer render the graph and write tap
-    history to ports; this widget only reads recent cached tap samples.
+    Display is passive: Audio output and AudioEngine's monitor timer render the
+    graph and write tap history; this widget only peeks recent cached samples.
+
+    The ``Out`` jack is a true pass-through of ``In`` (unchanged samples) so the
+    module can sit inline: ``Source -> Waveform -> next module / Output``.
     """
 
-    runtime_kind = "passive_sink"
+    runtime_kind = "visualizer_thru"
 
     metadata = ModuleMetadata(
         title="Waveform",
         category=ModuleCategory.VISUALIZATION,
-        description="Professional oscilloscope-style waveform display",
+        description="Oscilloscope-style waveform display with pass-through output",
     )
-
-    # Passive sink: receives rendered buffers without running as a processor.
-    is_processing_module = False
 
     def __init__(self):
         """Initialize enhanced waveform display module."""
@@ -127,6 +128,7 @@ class WaveformModule(ModuleWidget):
         )
 
         self.in_port = self.add_input("In")
+        self.out_port = self.add_output("Out")
         # Backward-compatible attributes for older code that looked up the
         # previous two-input shape. Only one visible/serializable input is used.
         self.in_port_l = self.in_port
@@ -328,8 +330,13 @@ class WaveformModule(ModuleWidget):
             label.setText(text)
 
     def get_required_inputs(self) -> list[str]:
-        """Waveform has optional inputs and shows 'No Signal' when disconnected."""
-        return []
+        """Pass-through needs In; display still shows 'No Signal' when empty."""
+        return ["In"]
+
+    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
+        """Copy In to Out unchanged for inline monitoring."""
+        del parameters
+        process_visualizer_passthrough(self.in_port, self.out_port, num_samples)
 
     def _update_display(self) -> None:
         """Update waveform from rendered port tap history."""

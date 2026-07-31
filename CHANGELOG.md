@@ -6,13 +6,19 @@ All notable changes to SonicRack will be documented in this file.
 
 ### Added
 
+- **Waveform / Spectrum pass-through output**: both visualizers expose an
+  **Out** jack that routes **In** unchanged, so they can sit inline
+  (`Source → Waveform/Spectrum → next`) for monitoring while still
+  picking the same signal. Display remains a passive tap of render
+  history; bypass keeps the signal flowing.
 - **Module context-menu options**: discrete setup modes can register via
   `register_menu_choice()` and appear as exclusive submenus on the module
-  right-click menu (header). VCO **FM Mode** and ADSR **Retrigger** /
-  **Trig Mode** moved off the faceplate so panels stay focused on play
-  controls; patch parameter names/values are unchanged.
+  right-click menu (header). VCO **FM Mode**, ADSR **Retrigger** /
+  **Trig Mode**, LFO **Range**, and MIDI **Priority** (Input + Keyboard)
+  moved off the faceplate so panels stay focused on play controls; patch
+  parameter names/values are unchanged.
 - **Knob scroll-wheel control**: hover a knob and use the mouse wheel to change
-  its value; hold **Alt** for fine-tune steps. Canvas zoom is suppressed while
+  its value; hold **Ctrl** for fine-tune steps. Canvas zoom is suppressed while
   the cursor is over interactive module controls.
 - File open/save dialogs remember the last used directory across sessions
 - Visual Step Sequencer: per-step note grid, playhead LEDs, click/wheel edit

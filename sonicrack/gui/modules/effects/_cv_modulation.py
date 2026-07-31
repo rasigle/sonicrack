@@ -78,18 +78,37 @@ def apply_control_rate_cv(
     specs: Sequence[ControlRateCvSpec],
     num_samples: int,
 ) -> None:
-    """Apply a list of control-rate CV parameter specs to a DSP component."""
+    """Apply a list of control-rate CV parameter specs to a DSP component.
+
+    Hot-path notes:
+    - Unconnected CV ports skip the buffer read entirely.
+    - ``setattr`` is only issued when the resolved value changed, avoiding
+      redundant RuntimeParameter target updates every audio block.
+    """
     for spec in specs:
         base = float_parameter(parameters, spec.param_name, spec.fallback)
-        cv = read_optional_cv(spec.port, num_samples)
-        setattr(
-            component,
-            spec.attr,
-            modulate_param(
+        port = spec.port
+        if port is not None and getattr(port, "is_connected", False):
+            cv = read_optional_cv(port, num_samples)
+            value = modulate_param(
                 base,
                 cv,
                 minimum=spec.minimum,
                 maximum=spec.maximum,
                 scale=spec.scale,
-            ),
-        )
+            )
+        else:
+            # No CV: clamp base into the parameter range without a port read.
+            value = base
+            if value < spec.minimum:
+                value = spec.minimum
+            elif value > spec.maximum:
+                value = spec.maximum
+            value = float(value)
+
+        try:
+            current = getattr(component, spec.attr)
+        except AttributeError:
+            current = None
+        if current is None or current != value:
+            setattr(component, spec.attr, value)

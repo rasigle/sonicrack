@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -142,6 +142,10 @@ class StepSequencerModule(ModuleWidget):
     runtime_kind = "step_sequencer"
     step_toggle_count = 8
 
+    # Emitted from the audio render path; Qt queues delivery to the GUI thread
+    # so LED widgets are never touched inside process_runtime.
+    active_step_changed = pyqtSignal(int)
+
     metadata = ModuleMetadata(
         title="Step Sequencer",
         category=ModuleCategory.SEQUENCER,
@@ -163,6 +167,7 @@ class StepSequencerModule(ModuleWidget):
         self._previous_reset = 0.0
         self._syncing_step_toggles = False
         self._syncing_notes = False
+        self._displayed_active_step = -1
         self._step_notes: list[int | None] = list(_DEFAULT_NOTES)
         self.accent_buttons: list[ImagePushButton] = []
         self.accent_leds: list[LedIndicator] = []
@@ -170,6 +175,8 @@ class StepSequencerModule(ModuleWidget):
         self.slide_leds: list[LedIndicator] = []
         self.step_leds: list[LedIndicator] = []
         self.note_buttons: list[StepNoteButton] = []
+
+        self.active_step_changed.connect(self._update_step_leds)
 
         layout = self._begin_controls(spacing=6)
 
@@ -610,10 +617,16 @@ class StepSequencerModule(ModuleWidget):
         self.accent_port.write(frame.accent)
         self.slide_port.write(frame.slide)
 
+        # Defer LED updates off the audio path: only emit when the step changes.
         active_step = getattr(self.component, "_active_step", -1)
-        self._update_step_leds(active_step if isinstance(active_step, int) else -1)
+        if not isinstance(active_step, int):
+            active_step = -1
+        if active_step != self._displayed_active_step:
+            self._displayed_active_step = active_step
+            self.active_step_changed.emit(active_step)
 
     def _update_step_leds(self, active_step: int) -> None:
+        """Update step LEDs on the GUI thread (slot for active_step_changed)."""
         for index, led in enumerate(self.step_leds):
             led.set_on(active_step == index)
 

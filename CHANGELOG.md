@@ -33,6 +33,11 @@ the companion `soniclab` engine package.
   zero mid-decay and `AccentProcessor` snapping CV on rising accents. Fixed in
   `soniclab>=2026.1.2` (envelope continues from current level; accent rises
   over ~2 ms).
+- **demo_trance_arp** is realtime-safe in the GUI. Step Sequencer playhead
+  LEDs update via a queued signal (no Qt LED work on the audio path), control-
+  rate effect CV skips disconnected ports and unchanged values, and the demo
+  patch keeps Delay/Reverb mono before the auto-panner (with analog saw).
+  Requires soniclab stereo Numba Delay/Reverb and VCV saw speedups.
 
 ### Changed
 

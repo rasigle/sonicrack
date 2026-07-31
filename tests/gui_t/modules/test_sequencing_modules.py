@@ -130,6 +130,87 @@ def test_step_sequencer_module_writes_all_cv_outputs(qapp: Any):
     np.testing.assert_allclose(module.slide_port.value, [0, 0, 1, 1])
 
 
+def test_step_sequencer_advances_once_per_wide_clock_pulse(qapp: Any):
+    """Clock module emits multi-sample triggers; sequencer must advance once each."""
+    del qapp
+    module = StepSequencerModule()
+    # Wide pulse (as from ensure_min_pulse_width), then idle, then another pulse.
+    clock_out = _connect_signal(
+        module.clock_input,
+        np.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32),
+    )
+
+    params = {
+        "notes": "36,48,60,72",
+        "accents": "0,0,0,0",
+        "slides": "0,0,0,0",
+        "gate_length": 1.0,
+        "bpm": 120.0,
+        "division": "1/16",
+    }
+    module.process_runtime(8, params)
+    # First wide pulse → one advance (step 0 = MIDI 36 → -2.0 V/oct).
+    assert module.component._active_step == 0
+    np.testing.assert_allclose(module.freq_port.value, np.full(8, -2.0))
+
+    # Second buffer: still low (no advance), then rising edge mid-buffer.
+    clock_out.write(
+        np.array([0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    )
+    module.process_runtime(8, params)
+    assert module.component._active_step == 1
+    # Samples before edge stay on step 0; after edge on step 1 (MIDI 48 → -1.0).
+    np.testing.assert_allclose(module.freq_port.value[:2], [-2.0, -2.0])
+    np.testing.assert_allclose(module.freq_port.value[2:], np.full(6, -1.0))
+
+
+def test_clock_module_drives_step_sequencer_through_pattern(qapp: Any):
+    """End-to-end: Clock → Step Sequencer advances through successive steps."""
+    del qapp
+    clock = ClockModule()
+    seq = StepSequencerModule()
+    clock.clock_port.connect(seq.clock_input)
+
+    # Fast step rate so several steps fit in a short render.
+    clock.component.sample_rate = 1000.0
+    clock.component.reset()
+    clock._pulse_hold = 0
+    clock._previous_level = 0.0
+    seq.component.sample_rate = 1000.0
+    seq.component.clock.sample_rate = 1000.0
+    seq.component.reset()
+    seq._previous_clock = 0.0
+
+    steps_seen: list[int] = []
+    n = 64
+    # 60 BPM 1/4 → 1 step/sec → 1000 samples/step; with n=64 we need many buffers.
+    # Use 240 BPM 1/4 → 4 steps/sec → 250 samples/step → ~1 step every 4 buffers.
+    for _ in range(24):
+        clock.process_runtime(
+            n, {"bpm": 240.0, "division": "1/4", "swing": 0.0, "running": True}
+        )
+        seq.process_runtime(
+            n,
+            {
+                "notes": "36,48,60,72,37,49,61,73",
+                "accents": "0,0,0,0,0,0,0,0",
+                "slides": "0,0,0,0,0,0,0,0",
+                "gate_length": 1.0,
+                "bpm": 120.0,
+                "division": "1/16",
+            },
+        )
+        steps_seen.append(int(seq.component._active_step))
+
+    # Should walk multiple distinct steps rather than sticking on one.
+    unique = set(steps_seen)
+    assert len(unique) >= 4, f"expected multi-step advance, saw {steps_seen}"
+    # Consecutive clock ticks should advance sequentially (mod 8).
+    advances = [s for i, s in enumerate(steps_seen) if i == 0 or s != steps_seen[i - 1]]
+    for prev, cur in zip(advances, advances[1:]):
+        assert cur == (prev + 1) % 8
+
+
 def test_step_sequencer_step_toggles_follow_set_parameters(qapp: Any):
     del qapp
     module = StepSequencerModule()

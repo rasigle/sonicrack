@@ -31,6 +31,7 @@ from sonicrack.patching.registry import register_module
 from sonicrack.runtime.helpers import (
     float_parameter,
     read_samples,
+    rising_edge_pulses,
     str_parameter,
 )
 from sonicrack.runtime.specs import RuntimeParameters
@@ -131,6 +132,7 @@ class ArpeggiatorModule(ModuleWidget):
 
         self._previous_notes = _DEFAULT_NOTES
         self._previous_reset = 0.0
+        self._previous_clock = 0.0
         self._displayed_step = -1
         self._displayed_note = ""
 
@@ -484,6 +486,8 @@ class ArpeggiatorModule(ModuleWidget):
         self.component.sample_rate = new_sample_rate
         self.component.clock.sample_rate = new_sample_rate
         self.component.reset()
+        self._previous_clock = 0.0
+        self._previous_reset = 0.0
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         notes_text = str_parameter(parameters, "notes", self.notes_edit.text)
@@ -531,11 +535,15 @@ class ArpeggiatorModule(ModuleWidget):
             self._previous_reset = current_reset
 
         running = bool(parameters.get("running", self.run_checkbox.isChecked()))
-        clock_pulses = (
-            read_samples(self.clock_input, num_samples)
-            if self.clock_input.is_connected
-            else None
-        )
+        # Collapse multi-sample Clock triggers to one edge per step.
+        if self.clock_input.is_connected:
+            clock_pulses, self._previous_clock = rising_edge_pulses(
+                read_samples(self.clock_input, num_samples),
+                self._previous_clock,
+            )
+        else:
+            self._previous_clock = 0.0
+            clock_pulses = None
         frame = self.component.process(
             num_samples, clock_pulses, running=running
         )

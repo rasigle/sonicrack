@@ -18,6 +18,7 @@ from sonicrack.runtime.helpers import (
     parameter,
     ramp_if_changed,
     read_optional_port,
+    rising_edge_pulses,
     silence,
     str_parameter,
     write_silence_if_disconnected,
@@ -167,6 +168,28 @@ class TestGateAndParameters:
         )
         np.testing.assert_allclose(out2, [1, 1, 1, 0])
         assert hold == 0
+
+    def test_rising_edge_pulses_collapses_wide_triggers(self):
+        wide = np.array([0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0], dtype=np.float32)
+        edges, final = rising_edge_pulses(wide, previous_level=0.0)
+        np.testing.assert_allclose(edges, [0, 1, 0, 0, 0, 1, 0])
+        assert final == pytest.approx(1.0)
+
+    def test_rising_edge_pulses_tracks_across_buffers(self):
+        first = np.array([0.0, 1.0, 1.0], dtype=np.float32)
+        edges1, prev = rising_edge_pulses(first, previous_level=0.0)
+        np.testing.assert_allclose(edges1, [0, 1, 0])
+
+        # Still high at start of next buffer — not a new edge.
+        second = np.array([1.0, 1.0, 0.0], dtype=np.float32)
+        edges2, prev = rising_edge_pulses(second, previous_level=prev)
+        np.testing.assert_allclose(edges2, [0, 0, 0])
+        assert prev == pytest.approx(0.0)
+
+        third = np.array([0.0, 1.0], dtype=np.float32)
+        edges3, prev = rising_edge_pulses(third, previous_level=prev)
+        np.testing.assert_allclose(edges3, [0, 1])
+        assert prev == pytest.approx(1.0)
 
     def test_parameter_helpers(self):
         params = {"cutoff": "440", "mode": "low"}

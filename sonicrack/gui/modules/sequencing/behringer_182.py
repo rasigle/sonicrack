@@ -32,6 +32,7 @@ from sonicrack.patching.registry import register_module
 from sonicrack.runtime.helpers import (
     float_parameter,
     read_samples,
+    rising_edge_pulses,
     str_parameter,
 )
 from sonicrack.runtime.specs import RuntimeParameters
@@ -68,6 +69,7 @@ class Behringer182Module(ModuleWidget):
         self.component = Behringer182Sequencer(sample_rate=audio_config.sample_rate)
         self._previous_structure_key: tuple[int, str] | None = None
         self._previous_running = True
+        self._previous_clock = 0.0
         self._syncing_gate_toggles = False
         self.step_leds: list[LedIndicator] = []
         self.gate_buttons: list[ImagePushButton] = []
@@ -448,6 +450,7 @@ class Behringer182Module(ModuleWidget):
         self.component.sample_rate = new_sample_rate
         self.component.clock.sample_rate = new_sample_rate
         self.component.reset()
+        self._previous_clock = 0.0
 
     def _on_running_changed(self, running: bool) -> None:
         self.run_button.setText("Stop" if running else "Start")
@@ -498,11 +501,15 @@ class Behringer182Module(ModuleWidget):
             swing=0.0,
         )
 
-        clock_pulses = (
-            read_samples(self.clock_input, num_samples)
-            if self.clock_input.is_connected
-            else None
-        )
+        # Collapse multi-sample Clock triggers to one edge per step.
+        if self.clock_input.is_connected:
+            clock_pulses, self._previous_clock = rising_edge_pulses(
+                read_samples(self.clock_input, num_samples),
+                self._previous_clock,
+            )
+        else:
+            self._previous_clock = 0.0
+            clock_pulses = None
         reset_pulses = (
             read_samples(self.reset_input, num_samples)
             if self.reset_input.is_connected

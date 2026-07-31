@@ -13,7 +13,9 @@ Edge-driven consumers (decay envelopes, S&H, sequencer clock inputs) only need
 the rising edge. Sustain-driven consumers (ADSR, voices) need a usable high
 duration. Single-sample triggers are too short for the latter — use
 :func:`ensure_min_pulse_width` (or emit wider pulses at the source) so
-Trigger→Gate patches produce audible notes.
+Trigger→Gate patches produce audible notes. Sequencer engines that treat
+``level > 0.5`` as a step advance must first call :func:`rising_edge_pulses`
+when reading stretched Clock triggers, or they will race many steps per beat.
 """
 
 from __future__ import annotations
@@ -97,6 +99,35 @@ def ensure_min_pulse_width(
         prev = level
 
     return out, hold
+
+
+def rising_edge_pulses(
+    signal: np.ndarray,
+    previous_level: float,
+    *,
+    low: float = _GATE_LOW,
+    high: float = _GATE_HIGH,
+) -> tuple[np.ndarray, float]:
+    """Convert a gate/trigger stream into single-sample rising-edge markers.
+
+    ``StepClock`` and the sequencer engines treat a sample ``> 0.5`` as a step
+    advance (level, not edge). Clock outputs are stretched into multi-sample
+    triggers for Gate consumers — feeding those wide pulses straight into a
+    sequencer advances many times per beat. Call this first so each trigger
+    becomes one edge, matching internal clock markers.
+
+    Returns:
+        ``(edge_pulses, final_level)`` where ``edge_pulses`` is 1.0 only on
+        rising edges and ``final_level`` is the last sample of ``signal``.
+    """
+    note_ons, _note_offs, final_level = gate_transition_indices(
+        signal, previous_level, low=low, high=high
+    )
+    values = np.asarray(signal, dtype=np.float32).reshape(-1)
+    edges = np.zeros(values.size, dtype=np.float32)
+    if note_ons.size:
+        edges[note_ons] = 1.0
+    return edges, final_level
 
 
 def read_samples(port: Port, num_samples: int) -> np.ndarray:
@@ -183,6 +214,7 @@ __all__ = [
     "read_optional_cv",
     "read_optional_port",
     "read_samples",
+    "rising_edge_pulses",
     "silence",
     "str_parameter",
     "write_output",

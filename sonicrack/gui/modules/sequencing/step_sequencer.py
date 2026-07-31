@@ -33,6 +33,7 @@ from sonicrack.patching.registry import register_module
 from sonicrack.runtime.helpers import (
     float_parameter,
     read_samples,
+    rising_edge_pulses,
     str_parameter,
 )
 from sonicrack.runtime.specs import RuntimeParameters
@@ -165,6 +166,7 @@ class StepSequencerModule(ModuleWidget):
         self.component = TB303StepSequencer(sample_rate=audio_config.sample_rate)
         self._previous_pattern_key: tuple[str, str, str, str, float] | None = None
         self._previous_reset = 0.0
+        self._previous_clock = 0.0
         self._syncing_step_toggles = False
         self._syncing_notes = False
         self._displayed_active_step = -1
@@ -572,6 +574,8 @@ class StepSequencerModule(ModuleWidget):
         self.component.sample_rate = new_sample_rate
         self.component.clock.sample_rate = new_sample_rate
         self.component.reset()
+        self._previous_clock = 0.0
+        self._previous_reset = 0.0
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         notes = str_parameter(parameters, "notes", self.notes_edit.text)
@@ -606,11 +610,16 @@ class StepSequencerModule(ModuleWidget):
                 self.component.reset()
             self._previous_reset = current_reset
 
-        clock_pulses = (
-            read_samples(self.clock_input, num_samples)
-            if self.clock_input.is_connected
-            else None
-        )
+        # External clocks (Clock module) are multi-sample triggers. The engine
+        # advances on level > 0.5, so collapse each pulse to a rising-edge tick.
+        if self.clock_input.is_connected:
+            clock_pulses, self._previous_clock = rising_edge_pulses(
+                read_samples(self.clock_input, num_samples),
+                self._previous_clock,
+            )
+        else:
+            self._previous_clock = 0.0
+            clock_pulses = None
         frame = self.component.process(num_samples, clock_pulses)
         self.freq_port.write(frame.frequency)
         self.gate_port.write(frame.gate)

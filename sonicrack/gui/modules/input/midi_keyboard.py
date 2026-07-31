@@ -19,12 +19,13 @@ from soniclab.midi_io import (
     CVGateOutput,
     CVVelocityOutput,
     MIDIToCV,
+    MIDITriggerOutput,
     NoteOffMessage,
     NoteOnMessage,
     midi_to_note_name,
 )
 
-from sonicrack.gui.modules.input.midi_trigger import MIDITriggerOutput
+from sonicrack.gui.modules.input.midi_cv_helpers import priority_from_label
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
@@ -73,33 +74,31 @@ COMPUTER_KEY_OFFSETS: dict[int, int] = {
 
 @register_module()
 class MIDIKeyboardModule(ModuleWidget):
-    """On-screen MIDI keyboard with frequency, gate, trigger, and velocity CV outputs.
+    """On-screen monophonic MIDI keyboard with full note-stack priority.
 
-    Use this module as a local monophonic note source when no external MIDI
-    hardware is needed. Patch ``1V/Oct`` into a VCO frequency input, ``Gate``
-    into an ADSR gate input, ``Trig`` into decay/percussive envelopes or clocked
-    inputs that need a short pulse on each note-on (including legato retriggers),
-    and optionally ``Vel`` into a VCA CV input for velocity-sensitive level
-    control. The generated oscillator signal can be routed to audio outputs,
-    passive visualizers, or both in parallel. When the module has focus, the
-    computer keyboard layout ``A W S E D F T G Y H U J`` plays one chromatic
-    octave from C to B.
+    Multi-key (polyphonic) input is accepted: all held notes stay in the
+    soniclab ``MIDIToCV`` stack, and the selected **Priority** (Last / High /
+    Low) chooses which note drives pitch, gate, and velocity. Use
+    **MIDI Poly CV** when independent per-voice CV is required.
     """
 
     runtime_kind = "midi"
 
     metadata = ModuleMetadata(
         title="MIDI Keyboard",
-        category=ModuleCategory.SOURCE,
-        description="On-screen MIDI keyboard source for local patch playing",
-        version="1.0.0",
+        category=ModuleCategory.MIDI,
+        description=(
+            "On-screen keyboard with mono note-stack priority "
+            "(accepts multi-key / polyphonic input)"
+        ),
+        version="1.1.0",
         author="SonicRack",
     )
 
     def __init__(self) -> None:
         super().__init__(
             width=360,
-            height=290,
+            height=310,
             color=QColor(190, 120, 80),
         )
 
@@ -108,11 +107,12 @@ class MIDIKeyboardModule(ModuleWidget):
         self.trigger_port = self.add_output("Trig", signal=PortSignal.TRIGGER)
         self.vel_port = self.add_output("Vel", signal=PortSignal.CONTROL_CV)
 
-        self.cv_converter = MIDIToCV()
+        self.cv_converter = MIDIToCV(note_priority="last")
         self.freq_output = CVFrequencyOutput(self.cv_converter)
         self.gate_output = CVGateOutput(self.cv_converter)
         self.trigger_output = MIDITriggerOutput()
         self.vel_output = CVVelocityOutput(self.cv_converter)
+        # offset → MIDI note for UI key state (supports multi-key hold)
         self._pressed_note_offsets: dict[int, int] = {}
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsFocusable)
@@ -129,6 +129,15 @@ class MIDIKeyboardModule(ModuleWidget):
             lambda value: self.parameter_changed.emit("octave", value)
         )
         settings_layout.addWidget(self.octave_combo)
+
+        settings_layout.addWidget(QLabel("Priority:"))
+        self.priority_combo = QComboBox()
+        self.priority_combo.addItems(["Last", "High", "Low"])
+        self.priority_combo.setToolTip(
+            "Which held key drives pitch/gate when several are down"
+        )
+        self.priority_combo.currentTextChanged.connect(self._on_priority_changed)
+        settings_layout.addWidget(self.priority_combo)
 
         self.velocity_knob = Knob(
             label="Velocity",
@@ -167,7 +176,20 @@ class MIDIKeyboardModule(ModuleWidget):
             getter="currentText",
             setter="setCurrentText",
         )
+        self.register_parameter(
+            "priority",
+            self.priority_combo,
+            getter="currentText",
+            setter="setCurrentText",
+        )
         self.register_parameter("velocity", self.velocity_knob)
+
+    def _on_priority_changed(self, label: str) -> None:
+        self.cv_converter.note_priority = priority_from_label(label)
+        if self.cv_converter.held_notes:
+            self.cv_converter._update_from_stack()  # noqa: SLF001
+            self._refresh_note_display()
+        self.parameter_changed.emit("priority", label)
 
     def _add_keyboard_buttons(self, layout: QGridLayout) -> None:
         for index, note_offset in enumerate(WHITE_KEYS):
@@ -224,49 +246,54 @@ class MIDIKeyboardModule(ModuleWidget):
     def _midi_note_for_offset(self, note_offset: int) -> int:
         return max(0, min(127, self._base_note() + note_offset))
 
-    def _note_on(self, note_offset: int) -> None:
-        note = self._midi_note_for_offset(note_offset)
-        velocity = int(self.velocity_knob.get_value())
-        self._pressed_note_offsets.pop(note_offset, None)
-        self._pressed_note_offsets[note_offset] = note
-        self.cv_converter.process_message(
-            NoteOnMessage(timestamp=0.0, channel=0, note=note, velocity=velocity)
-        )
-        # Arm a one-sample trigger pulse for the next process_runtime() call.
-        # Fires on every note-on, including legato changes while gate stays high.
-        self.trigger_output.arm()
-        self.key_buttons[note_offset].setDown(True)
-        self.note_label.setText(f"{midi_to_note_name(note)} ({note})")
-        self.note_label.setStyleSheet(
-            "color: #00ff00; font-size: 14px; font-weight: bold;"
-        )
-
-    def _note_off(self, note_offset: int) -> None:
-        note = self._pressed_note_offsets.pop(
-            note_offset, self._midi_note_for_offset(note_offset)
-        )
-        self.cv_converter.process_message(
-            NoteOffMessage(timestamp=0.0, channel=0, note=note)
-        )
-        self.key_buttons[note_offset].setDown(False)
-        if self._pressed_note_offsets:
-            fallback_note = next(reversed(self._pressed_note_offsets.values()))
-            self.cv_converter.process_message(
-                NoteOnMessage(
-                    timestamp=0.0,
-                    channel=0,
-                    note=fallback_note,
-                    velocity=int(self.velocity_knob.get_value()),
-                )
-            )
-            self.note_label.setText(
-                f"{midi_to_note_name(fallback_note)} ({fallback_note})"
+    def _refresh_note_display(self) -> None:
+        note = self.cv_converter.current_note
+        if note is not None and self.cv_converter.gate > 0.0:
+            held = len(self.cv_converter.held_notes)
+            suffix = f" +{held - 1}" if held > 1 else ""
+            self.note_label.setText(f"{midi_to_note_name(note)} ({note}){suffix}")
+            self.note_label.setStyleSheet(
+                "color: #00ff00; font-size: 14px; font-weight: bold;"
             )
         else:
             self.note_label.setText("--")
             self.note_label.setStyleSheet(
                 "color: white; font-size: 14px; font-weight: bold;"
             )
+
+    def _note_on(self, note_offset: int) -> None:
+        note = self._midi_note_for_offset(note_offset)
+        velocity = int(self.velocity_knob.get_value())
+        prior_note = self.cv_converter.current_note
+        prior_gate = self.cv_converter.gate
+
+        self._pressed_note_offsets[note_offset] = note
+        self.cv_converter.process_message(
+            NoteOnMessage(timestamp=0.0, channel=0, note=note, velocity=velocity)
+        )
+
+        # Arm Trig when priority note becomes active or changes (legato / re-press).
+        if (
+            self.cv_converter.gate > 0.0
+            and self.cv_converter.current_note is not None
+            and (prior_gate == 0.0 or self.cv_converter.current_note != prior_note)
+        ):
+            self.trigger_output.arm()
+
+        self.key_buttons[note_offset].setDown(True)
+        self._refresh_note_display()
+
+    def _note_off(self, note_offset: int) -> None:
+        note = self._pressed_note_offsets.pop(
+            note_offset, self._midi_note_for_offset(note_offset)
+        )
+        # Let MIDIToCV's note stack select the next priority note — do not
+        # re-inject NoteOn (that would break high/low priority and stack order).
+        self.cv_converter.process_message(
+            NoteOffMessage(timestamp=0.0, channel=0, note=note)
+        )
+        self.key_buttons[note_offset].setDown(False)
+        self._refresh_note_display()
 
     def mousePressEvent(self, event: Any) -> None:
         self.setFocus(Qt.FocusReason.MouseFocusReason)
@@ -313,7 +340,12 @@ class MIDIKeyboardModule(ModuleWidget):
         return outputs.get(port_name, self.freq_output)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        del parameters
+        priority = parameters.get("priority") if parameters else None
+        if isinstance(priority, str):
+            wanted = priority_from_label(priority)
+            if self.cv_converter.note_priority != wanted:
+                self.cv_converter.note_priority = wanted
+
         self.freq_port.write(self.freq_output.get_samples(num_samples))
         self.gate_port.write(self.gate_output.get_samples(num_samples))
         self.trigger_port.write(self.trigger_output.get_samples(num_samples))

@@ -3216,9 +3216,9 @@ dependencies = [
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/bc/5f5e7a8820c084e2233e2b363231aa2cbee27d98c207576796d1619e233a/soniclab-2026.1.2.tar.gz", hash = "sha256:67876f91c4f65294bc7688cfa87dbb6d33b0de9bb449591ee2a3ce06f9d3caff", size = 245963, upload-time = "2026-07-30T21:48:05.845Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/85/840cd135a252e1fb61c4bb8c444e3dd945c9417043880bc291aa3512ac47/soniclab-2026.1.3.tar.gz", hash = "sha256:48f439daf286fb59a82fe2778e1986fa1d9db6b8df5dad614171e0ed9a22aa94", size = 283093, upload-time = "2026-07-31T06:11:33.8Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ac/55/73b40351ba9e2519d0637a70b2c9464adaf5c5318e7ebdcea9f5ca5bc229/soniclab-2026.1.2-py3-none-any.whl", hash = "sha256:9f19fb39cb174edf77453ec42573544a3b4594c0670363f5de6c282f2f7cd635", size = 199619, upload-time = "2026-07-30T21:48:04.254Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/23/141b9ec798f63fca206d7df1452112c80a3620129f2b968b16c8f90c158b/soniclab-2026.1.3-py3-none-any.whl", hash = "sha256:ca98de1454fc019cd21c2dfd0a95de56224eba15ce5f09ec93b60bc402b4e3eb", size = 234781, upload-time = "2026-07-31T06:11:32.107Z" },
 ]
 
 [package.optional-dependencies]

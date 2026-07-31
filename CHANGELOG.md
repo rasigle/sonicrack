@@ -16,6 +16,12 @@ All notable changes to SonicRack will be documented in this file.
 - LFO depth/polarity/offset/phase plus **Random** (S&H) and tempo sync;
   ADSR optional **Vel** depth
 - Additional demo showcase patches under `examples/patches/`
+- **MIDI** module library category (separate from Source)
+- **MIDI Poly CV**: 4-voice independent 1V/oct / Gate / Vel via
+  `soniclab.PolyphonicMIDIToCV`, plus shared Mod and Trig
+- MIDI Input controller CV: **Mod** (CC1), **Expr** (CC11), **Bend**
+  (bipolar), note **Priority** (Last/High/Low), pitch-bend range
+- MIDI Keyboard note **Priority** (Last/High/Low) using soniclab note-stack
 
 ### Fixed
 
@@ -35,6 +41,9 @@ All notable changes to SonicRack will be documented in this file.
 
 ### Changed
 
+- MIDI Input and MIDI Keyboard moved from **Source** → **MIDI** category
+- MIDI Keyboard multi-key hold now relies on `MIDIToCV` note-stack (no
+  manual re-NoteOn on release) so High/Low priority stay correct
 - Moved engine-domain helpers into `soniclab` (requires `soniclab>=2026.1.2`):
   oscillator frequency slewing, silence/CV/gate helpers, MIDI Trig pulse,
   WAV/channel utilities, spectrum FFT core, and shared audio constants.

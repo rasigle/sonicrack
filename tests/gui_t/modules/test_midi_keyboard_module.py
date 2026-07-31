@@ -13,8 +13,15 @@ from sonicrack.gui.modules.input.midi_keyboard import MIDIKeyboardModule
 from sonicrack.gui.modules.modifier.vca import VCAModule
 from sonicrack.gui.modules.modulated_source.envelope_adsr import ADSRModule
 from sonicrack.gui.modules.source.vco import ModulatedOscillatorModule
+from sonicrack.patching.module import ModuleCategory
 from sonicrack.patching.port import Port, PortSignal
 from sonicrack.patching.registry import initialize_module_registry
+
+
+def test_midi_keyboard_category_is_midi(qapp: Any):
+    del qapp
+    module = MIDIKeyboardModule()
+    assert module.metadata.category == ModuleCategory.MIDI
 
 
 def test_midi_keyboard_note_press_updates_cv_outputs(qapp: Any):
@@ -30,7 +37,7 @@ def test_midi_keyboard_note_press_updates_cv_outputs(qapp: Any):
     assert module.cv_converter.pitch_cv == pytest.approx(midi_note_to_pitch_cv(60))
     assert module.cv_converter.frequency == pytest.approx(midi_to_frequency(60))
     assert module.cv_converter.velocity == pytest.approx(64 / 127)
-    assert module.note_label.text() == "C4 (60)"
+    assert "C4 (60)" in module.note_label.text()
 
 
 def test_midi_keyboard_note_release_clears_gate(qapp: Any):
@@ -62,7 +69,7 @@ def test_midi_keyboard_computer_keys_trigger_notes(qapp: Any):
     assert module.cv_converter.gate == pytest.approx(1.0)
     assert module.cv_converter.pitch_cv == pytest.approx(midi_note_to_pitch_cv(60))
     assert module.cv_converter.frequency == pytest.approx(midi_to_frequency(60))
-    assert module.note_label.text() == "C4 (60)"
+    assert "C4 (60)" in module.note_label.text()
     assert module.key_buttons[0].isDown()
 
     module.keyReleaseEvent(
@@ -107,7 +114,29 @@ def test_midi_keyboard_computer_keys_keep_last_held_note(qapp: Any):
 
     assert module.cv_converter.current_note == 60
     assert module.cv_converter.gate == pytest.approx(1.0)
-    assert module.note_label.text() == "C4 (60)"
+    assert "C4 (60)" in module.note_label.text()
+
+
+def test_midi_keyboard_polyphonic_input_uses_note_stack(qapp: Any):
+    """Multiple simultaneous keys stay held; priority selects the driving note."""
+    del qapp
+    module = MIDIKeyboardModule()
+    module.octave_combo.setCurrentText("4")
+    module.priority_combo.setCurrentText("Last")
+
+    module._note_on(0)  # C4 = 60
+    module._note_on(4)  # E4 = 64
+    module._note_on(7)  # G4 = 67
+
+    assert set(module.cv_converter.held_notes) == {60, 64, 67}
+    assert module.cv_converter.current_note == 67
+
+    module.priority_combo.setCurrentText("Low")
+    assert module.cv_converter.current_note == 60
+
+    module._note_off(0)
+    assert module.cv_converter.current_note == 64
+    assert module.cv_converter.gate == pytest.approx(1.0)
 
 
 def test_midi_keyboard_runtime_writes_frequency_gate_velocity(qapp: Any):

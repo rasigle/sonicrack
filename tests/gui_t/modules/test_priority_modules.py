@@ -6,8 +6,8 @@ from typing import Any
 
 import numpy as np
 import pytest
+from soniclab import Quantizer, SampleAndHold, SlewLimiter
 
-from soniclab.dsp.modifiers import Quantizer, SampleAndHold, SlewLimiter
 from sonicrack.gui.modules.effects.effects_chorus import ChorusModule
 from sonicrack.gui.modules.effects.effects_eq import EQModule
 from sonicrack.gui.modules.effects.effects_limiter import LimiterModule

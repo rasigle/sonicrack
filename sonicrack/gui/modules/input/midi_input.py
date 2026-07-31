@@ -1,56 +1,24 @@
 """MIDI Input module for the modular synthesizer GUI.
 
-This module provides real-time MIDI input from connected controllers and keyboards.
-It converts MIDI messages to control voltages (CV) that can control oscillators
-and other synthesis parameters.
+Real-time MIDI from connected controllers, converted to modular CV via
+``soniclab.midi_io.MIDIToCV`` (monophonic note-stack with last/high/low
+priority, sustain pedal, pitch bend, mod wheel, and expression).
 
 Outputs:
-    - Freq: 1V/oct pitch CV based on MIDI note
-    - Gate: Gate signal (1.0 = note on, 0.0 = note off)
-    - Trig: One-sample trigger pulse on each note-on (including legato)
-    - Vel: Velocity CV (0.0 to 1.0)
+    - 1V/Oct: pitch CV (1V/oct, 0V = MIDI 60 / C4) including pitch bend
+    - Gate: held high while any note is active (incl. sustain)
+    - Trig: one-sample pulse on each note-on (including legato)
+    - Vel: velocity 0–1 of the priority note
+    - Mod: CC#1 mod wheel 0–1
+    - Expr: CC#11 expression 0–1
+    - Bend: pitch bend as bipolar CV [-1, 1]
 
-Pitch CV convention:
-    SonicRack uses 1V/oct for pitch control signals globally. The Freq
-    output is a control voltage in volts, not a frequency in Hz.
-
-    - 0V is MIDI note 60 (C4, about 261.63 Hz)
-    - +1V is one octave up, so it doubles frequency
-    - -1V is one octave down, so it halves frequency
-    - One semitone is 1/12V
-
-    Conversion:
-        pitch_cv = (midi_note - 60) / 12
-        frequency_hz = 261.6255653005986 * 2 ** pitch_cv
-
-    Examples:
-        C3 / MIDI 48 -> -1.000V
-        C4 / MIDI 60 ->  0.000V
-        A4 / MIDI 69 ->  0.750V -> 440 Hz
-        C5 / MIDI 72 ->  1.000V
-
-    Modules that generate pitch should output this voltage convention. Modules
-    that consume pitch, such as VCO and TB-303 Voice, convert the incoming CV to
-    Hz internally at the oscillator/voice boundary.
-
-Features:
-    - Device selection from available MIDI inputs
-    - Real-time message processing
-    - Visual feedback (active note display)
-    - Polyphonic support via last-note-priority
-    - Pitch bend support
-
-Usage:
-    1. Add MIDI Input module to patch
-    2. Select MIDI device from dropdown
-    3. Connect outputs to oscillator/envelope inputs
-    4. Play notes on your MIDI controller
-
-Example Patch:
-    MIDI Input (Freq) â†’ Oscillator (Freq)
-    MIDI Input (Gate) â†’ ADSR Envelope â†’ Volume (Mod)
-    MIDI Input (Vel)  â†’ [Future: velocity-sensitive parameter]
+Polyphonic chords are accepted on the input stream; monophonic priority
+selects which held note drives pitch/gate/velocity. For independent
+per-voice CV, use the **MIDI Poly CV** module.
 """
+
+from __future__ import annotations
 
 import logging
 from contextlib import suppress
@@ -70,12 +38,20 @@ from soniclab.midi_io import (
     CVVelocityOutput,
     MIDIMessage,
     MIDIToCV,
+    MIDITriggerOutput,
     NoteOffMessage,
     NoteOnMessage,
+    midi_to_note_name,
 )
 
-from sonicrack.gui.modules.input.midi_trigger import MIDITriggerOutput
+from sonicrack.gui.modules.input.midi_cv_helpers import (
+    make_expression_output,
+    make_mod_wheel_output,
+    make_pitch_bend_output,
+    priority_from_label,
+)
 from sonicrack.gui.modules.input.midi_worker_thread import MIDIWorkerThread
+from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
@@ -87,58 +63,53 @@ logger = logging.getLogger(__name__)
 
 @register_module()
 class MIDIInputModule(ModuleWidget):
-    """MIDI Input module with device selection and CV outputs.
-
-    This module receives MIDI messages from a connected controller/keyboard
-    and converts them to control voltages for modulating synthesis parameters.
-
-    The module runs a background thread to receive MIDI messages and updates
-    the CV converter in real-time.
-    """
+    """Hardware MIDI input → monophonic CV with full soniclab MIDIToCV API."""
 
     runtime_kind = "midi"
 
     metadata = ModuleMetadata(
         title="MIDI Input",
-        category=ModuleCategory.SOURCE,
-        description="Real-time MIDI input from controllers and keyboards",
-        version="1.0.0",
+        category=ModuleCategory.MIDI,
+        description=(
+            "Real-time MIDI input with mono note-stack priority, "
+            "sustain, mod wheel, expression, and pitch bend"
+        ),
+        version="1.1.0",
         author="SonicRack",
     )
 
-    # Signal for thread-safe UI updates
     midi_message_received = pyqtSignal(object)  # MIDIMessage
-    device_status_changed = pyqtSignal(str)  # Status message
+    device_status_changed = pyqtSignal(str)
 
-    def __init__(self):
-        """Initialize MIDI input module."""
+    def __init__(self) -> None:
         super().__init__(
-            width=240,
-            height=180,
+            width=260,
+            height=260,
             color=QColor(200, 100, 150),
         )
 
-        # Add output ports
         self.freq_port = self.add_output("1V/Oct", signal=PortSignal.PITCH_CV)
         self.gate_port = self.add_output("Gate", signal=PortSignal.GATE)
         self.trigger_port = self.add_output("Trig", signal=PortSignal.TRIGGER)
         self.vel_port = self.add_output("Vel", signal=PortSignal.CONTROL_CV)
+        self.mod_port = self.add_output("Mod", signal=PortSignal.CONTROL_CV)
+        self.expr_port = self.add_output("Expr", signal=PortSignal.CONTROL_CV)
+        self.bend_port = self.add_output("Bend", signal=PortSignal.CONTROL_CV)
 
-        # MIDI components
         self.midi_worker: MIDIWorkerThread | None = None
-        self.cv_converter = MIDIToCV()
-
-        # Create specialized output components for each port
+        self.cv_converter = MIDIToCV(note_priority="last")
         self.freq_output = CVFrequencyOutput(self.cv_converter)
         self.gate_output = CVGateOutput(self.cv_converter)
         self.trigger_output = MIDITriggerOutput()
         self.vel_output = CVVelocityOutput(self.cv_converter)
+        self.mod_output = make_mod_wheel_output(self.cv_converter)
+        self.expr_output = make_expression_output(self.cv_converter)
+        self.bend_output = make_pitch_bend_output(self.cv_converter)
         self._is_running = False
+        self._last_note_display = "--"
 
-        # UI setup
         layout = self._begin_controls()
 
-        # Device selection
         device_layout = QHBoxLayout()
         device_layout.addWidget(QLabel("Device:"))
         self.device_combo = QComboBox()
@@ -146,7 +117,30 @@ class MIDIInputModule(ModuleWidget):
         device_layout.addWidget(self.device_combo)
         layout.addLayout(device_layout)
 
-        # Refresh button
+        priority_layout = QHBoxLayout()
+        priority_layout.addWidget(QLabel("Priority:"))
+        self.priority_combo = QComboBox()
+        self.priority_combo.addItems(["Last", "High", "Low"])
+        self.priority_combo.setToolTip(
+            "Which held note drives pitch/gate when several keys are down "
+            "(soniclab MIDIToCV note-stack)"
+        )
+        self.priority_combo.currentTextChanged.connect(self._on_priority_changed)
+        priority_layout.addWidget(self.priority_combo)
+        layout.addLayout(priority_layout)
+
+        bend_layout = QHBoxLayout()
+        self.bend_range_knob = Knob(
+            label="PB ±",
+            description="Pitch bend range in semitones",
+            min_value=1,
+            max_value=24,
+            default_value=2,
+        )
+        self.bend_range_knob.value_changed.connect(self._on_bend_range_changed)
+        bend_layout.addWidget(self.bend_range_knob)
+        layout.addLayout(bend_layout)
+
         btn_layout = QHBoxLayout()
         self.refresh_btn = QPushButton("Refresh")
         self.refresh_btn.clicked.connect(self._refresh_devices)
@@ -157,12 +151,10 @@ class MIDIInputModule(ModuleWidget):
         btn_layout.addWidget(self.start_btn)
         layout.addLayout(btn_layout)
 
-        # Status display
         self.status_label = QLabel("Idle")
         self.status_label.setStyleSheet("color: gray; font-size: 10px;")
         layout.addWidget(self.status_label)
 
-        # Current note display
         self.note_label = QLabel("--")
         self.note_label.setStyleSheet(
             "color: white; font-size: 14px; font-weight: bold;"
@@ -171,24 +163,60 @@ class MIDIInputModule(ModuleWidget):
 
         self._finish_controls(layout)
 
-        # Connect signals
         self.midi_message_received.connect(self._on_midi_message)
         self.device_status_changed.connect(self._on_status_changed)
 
-        # Register parameters
         self.register_parameter(
             "device", self.device_combo, getter="currentText", setter="setCurrentText"
         )
+        self.register_parameter(
+            "priority",
+            self.priority_combo,
+            getter="currentText",
+            setter="setCurrentText",
+        )
+        self.register_parameter("pitch_bend_range", self.bend_range_knob)
 
-        # Initial device refresh
         self._refresh_devices()
-
         logger.info("MIDI Input module initialized")
 
-    def _refresh_devices(self):
-        """Refresh the list of available MIDI devices."""
+    def _on_priority_changed(self, label: str) -> None:
+        self.cv_converter.note_priority = priority_from_label(label)
+        # Re-evaluate active note under the new priority rule.
+        if self.cv_converter.held_notes:
+            self.cv_converter._update_from_stack()  # noqa: SLF001 — public stack API
+            self._refresh_note_display()
+        self.parameter_changed.emit("priority", label)
+
+    def _on_bend_range_changed(self) -> None:
+        self.cv_converter.pitch_bend_range = float(self.bend_range_knob.get_value())
+        if self.cv_converter.current_note is not None:
+            self.cv_converter._update_pitch_cv()  # noqa: SLF001
+        self.parameter_changed.emit(
+            "pitch_bend_range", int(self.bend_range_knob.get_value())
+        )
+
+    def _refresh_note_display(self) -> None:
+        note = self.cv_converter.current_note
+        if note is not None and self.cv_converter.gate > 0.0:
+            name = midi_to_note_name(note)
+            held = len(self.cv_converter.held_notes)
+            suffix = f" +{held - 1}" if held > 1 else ""
+            text = f"{name} ({note}){suffix}"
+            self.note_label.setText(text)
+            self.note_label.setStyleSheet(
+                "color: #00ff00; font-size: 14px; font-weight: bold;"
+            )
+            self._last_note_display = text
+        else:
+            self.note_label.setText("--")
+            self.note_label.setStyleSheet(
+                "color: white; font-size: 14px; font-weight: bold;"
+            )
+            self._last_note_display = "--"
+
+    def _refresh_devices(self) -> None:
         try:
-            # Import MIDIInput only for device listing
             from soniclab.midi_io import MIDIInput
             from soniclab.midi_io.input import MIDO_AVAILABLE
 
@@ -197,197 +225,150 @@ class MIDIInputModule(ModuleWidget):
                 logger.warning("mido library not available")
                 return
 
-            # Get devices (quick operation)
             devices = MIDIInput.list_devices()
+            current = self.device_combo.currentText()
+            self.device_combo.blockSignals(True)
             self.device_combo.clear()
             self.device_combo.addItem("(No Device)")
             self.device_combo.addItems(devices)
+            idx = self.device_combo.findText(current)
+            if idx >= 0:
+                self.device_combo.setCurrentIndex(idx)
+            self.device_combo.blockSignals(False)
 
             if devices:
                 self.device_status_changed.emit(f"Found {len(devices)} device(s)")
             else:
                 self.device_status_changed.emit("No MIDI devices found")
-
-            logger.info(f"Refreshed MIDI devices: {devices}")
+            logger.info("Refreshed MIDI devices: %s", devices)
         except ImportError:
             self.device_status_changed.emit("MIDI library not installed")
             logger.warning("Could not import MIDI modules")
         except Exception as e:
-            self.device_status_changed.emit(f"Error: {str(e)}")
-            logger.error(f"Failed to list MIDI devices: {e}", exc_info=True)
+            self.device_status_changed.emit(f"Error: {e}")
+            logger.error("Failed to list MIDI devices: %s", e, exc_info=True)
 
-    def _toggle_midi(self):
-        """Start or stop MIDI input."""
+    def _toggle_midi(self) -> None:
         if self._is_running:
             self._stop_midi()
         else:
             self._start_midi()
 
-    def _start_midi(self):
-        """Start receiving MIDI messages using worker thread."""
-        logger.info("_start_midi called")
+    def _start_midi(self) -> None:
         device = self.device_combo.currentText()
-        logger.info(f"Selected device: {device}")
-
         if device == "(No Device)":
             self.device_status_changed.emit("Please select a device")
-            logger.warning("No device selected")
             return
 
         try:
-            # Create worker thread (does NOT block UI)
-            logger.info("Creating MIDI worker thread...")
             self.midi_worker = MIDIWorkerThread(device)
-
-            # Connect worker signals to our slots (thread-safe communication)
             self.midi_worker.message_received.connect(self._on_midi_message)
             self.midi_worker.status_changed.connect(self._on_worker_status_changed)
             self.midi_worker.error_occurred.connect(self._on_worker_error)
-
-            # Start the worker thread (non-blocking!)
-            logger.info("Starting worker thread...")
             self.midi_worker.start()
-
             self._is_running = True
             self.start_btn.setText("Stop")
             self.device_status_changed.emit("Connecting...")
-
-            logger.info("Worker thread started successfully")
         except Exception as e:
-            self.device_status_changed.emit(f"Error: {str(e)}")
-            logger.error(f"Failed to start MIDI worker: {e}", exc_info=True)
+            self.device_status_changed.emit(f"Error: {e}")
+            logger.error("Failed to start MIDI worker: %s", e, exc_info=True)
 
-    def _stop_midi(self):
-        """Stop receiving MIDI messages."""
+    def _stop_midi(self) -> None:
         if self.midi_worker:
             try:
-                logger.info("Stopping MIDI worker thread...")
                 self.midi_worker.stop()
-                # Wait for thread to finish (with timeout)
-                self.midi_worker.wait(2000)  # 2 second timeout
-                logger.info("MIDI worker thread stopped")
+                self.midi_worker.wait(2000)
             except Exception as e:
-                logger.error(f"Error stopping MIDI worker: {e}")
+                logger.error("Error stopping MIDI worker: %s", e)
             finally:
                 self.midi_worker = None
 
         self._is_running = False
         self.start_btn.setText("Start")
-        self.note_label.setText("--")
-
-        # Reset CV converter and any armed trigger pulse
         self.cv_converter.reset()
         self.trigger_output.reset()
-
+        self._refresh_note_display()
         logger.info("Stopped MIDI input")
 
-    def shutdown(self, graceful: bool = True):
-        """Release MIDI resources before application shutdown.
-
-        Args:
-            graceful: Accepted for a common module shutdown interface. MIDI input has
-                no fade-out phase, so it always stops promptly.
-        """
+    def shutdown(self, graceful: bool = True) -> None:
         del graceful
         self._stop_midi()
 
-    def _on_worker_status_changed(self, status: str):
-        """Handle status change from worker thread (thread-safe).
-
-        Args:
-            status: Status message from worker
-        """
+    def _on_worker_status_changed(self, status: str) -> None:
         self.device_status_changed.emit(status)
 
-    def _on_worker_error(self, error: str):
-        """Handle error from worker thread (thread-safe).
-
-        Args:
-            error: Error message from worker
-        """
-        logger.error(f"Worker error: {error}")
+    def _on_worker_error(self, error: str) -> None:
+        logger.error("Worker error: %s", error)
         self.device_status_changed.emit(f"Error: {error}")
-        # Auto-stop on error
         self._stop_midi()
 
-    def _on_midi_message(self, msg: MIDIMessage):
-        """Handle received MIDI message (runs in UI thread).
+    def _on_midi_message(self, msg: MIDIMessage) -> None:
+        """Handle received MIDI (UI thread); arm Trig on note-on including legato."""
+        prior_note = self.cv_converter.current_note
+        prior_gate = self.cv_converter.gate
 
-        Args:
-            msg: Received MIDI message
-        """
-        # Update CV converter (no lock needed - we're in UI thread)
         self.cv_converter.process_message(msg)
 
-        # Update UI
-        if isinstance(msg, NoteOnMessage):
-            if msg.velocity > 0:
-                from soniclab.midi_io import midi_to_note_name
-
-                # One-sample pulse on every note-on, including legato changes.
-                self.trigger_output.arm()
-                note_name = midi_to_note_name(msg.note)
-                self.note_label.setText(f"{note_name} ({msg.note})")
-                self.note_label.setStyleSheet(
-                    "color: #00ff00; font-size: 14px; font-weight: bold;"
+        if isinstance(msg, NoteOnMessage) and msg.velocity > 0:
+            # Fire on new notes and priority changes while other keys stay held.
+            if (
+                self.cv_converter.gate > 0.0
+                and self.cv_converter.current_note is not None
+                and (
+                    prior_gate == 0.0
+                    or self.cv_converter.current_note != prior_note
                 )
-        elif isinstance(msg, NoteOffMessage) and self.cv_converter.gate == 0.0:
-            # Only clear the display when no notes remain active.
-            self.note_label.setText("--")
-            self.note_label.setStyleSheet(
-                "color: white; font-size: 14px; font-weight: bold;"
-            )
+            ):
+                self.trigger_output.arm()
+            self._refresh_note_display()
+        elif isinstance(msg, NoteOffMessage):
+            self._refresh_note_display()
+        else:
+            # CC / pitch bend — keep note label, no trig
+            pass
 
-    def _on_status_changed(self, status: str):
-        """Update status label.
-
-        Args:
-            status: Status message to display
-        """
+    def _on_status_changed(self, status: str) -> None:
         self.status_label.setText(status)
 
     def create_engine_component(
         self,
         input_components: list[Any] | None = None,
         modulation_components: dict[str, Any] | None = None,
-    ):
-        """Create the MIDI to CV component.
-
-        Returns:
-            MIDIToCV component that generates control voltages
-        """
+    ) -> MIDIToCV:
+        del input_components, modulation_components
         return self.cv_converter
 
     def get_output_component(self, port_name: str) -> Any:
-        """Get the component for a specific output port.
-
-        The MIDI module has multiple outputs (Freq, Gate, Trig, Vel) each with
-        a specialized adapter component.
-
-        Args:
-            port_name: Name of the output port
-
-        Returns:
-            The specialized CV output component for that port
-        """
         outputs = {
             "1V/Oct": self.freq_output,
             "Freq": self.freq_output,
             "Gate": self.gate_output,
             "Trig": self.trigger_output,
             "Vel": self.vel_output,
+            "Mod": self.mod_output,
+            "Expr": self.expr_output,
+            "Bend": self.bend_output,
         }
         return outputs.get(port_name, self.freq_output)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        """Render MIDI CV outputs for the current engine cycle."""
-        del parameters
+        priority = parameters.get("priority")
+        if isinstance(priority, str):
+            wanted = priority_from_label(priority)
+            if self.cv_converter.note_priority != wanted:
+                self.cv_converter.note_priority = wanted
+        bend_range = parameters.get("pitch_bend_range")
+        if bend_range is not None:
+            self.cv_converter.pitch_bend_range = float(bend_range)
+
         self.freq_port.write(self.freq_output.get_samples(num_samples))
         self.gate_port.write(self.gate_output.get_samples(num_samples))
         self.trigger_port.write(self.trigger_output.get_samples(num_samples))
         self.vel_port.write(self.vel_output.get_samples(num_samples))
+        self.mod_port.write(self.mod_output.get_samples(num_samples))
+        self.expr_port.write(self.expr_output.get_samples(num_samples))
+        self.bend_port.write(self.bend_output.get_samples(num_samples))
 
-    def __del__(self):
-        """Destructor - ensure MIDI input is stopped."""
+    def __del__(self) -> None:
         with suppress(Exception):
             self._stop_midi()

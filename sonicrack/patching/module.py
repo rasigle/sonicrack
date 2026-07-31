@@ -17,8 +17,9 @@ class ModuleCategory(StrEnum):
 
     Attributes:
         SOURCE: Free-running or continuously generating modules that do not
-            need a primary audio input (e.g., Oscillators, VCO, LFO, Noise,
-            MIDI input).
+            need a primary audio input (e.g., Oscillators, VCO, LFO, Noise).
+        MIDI: MIDI input, on-screen keyboards, and MIDI→CV converters
+            (mono and polyphonic). Produce pitch/gate/control CV, not audio.
         MODULATED_SOURCE: Gate/pitch-driven generators that need control
             inputs to produce their main output (e.g., monophonic voices such
             as TB-303).
@@ -43,8 +44,11 @@ class ModuleCategory(StrEnum):
             chain (e.g., speakers, audio output).
     """
 
-    # Oscillators, VCO, LFO, noise, MIDI — no primary audio input
+    # Oscillators, VCO, LFO, noise — no primary audio input
     SOURCE = "Source"
+
+    # MIDI hardware/on-screen keyboards and MIDI→CV (mono / poly)
+    MIDI = "MIDI"
 
     # Gate/pitch-driven audio generators (monophonic voices)
     MODULATED_SOURCE = "Modulated Source"

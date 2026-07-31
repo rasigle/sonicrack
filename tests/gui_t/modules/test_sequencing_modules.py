@@ -211,6 +211,91 @@ def test_clock_module_drives_step_sequencer_through_pattern(qapp: Any):
         assert cur == (prev + 1) % 8
 
 
+def test_step_sequencer_gate_length_change_does_not_reset_step(qapp: Any):
+    """Gate knob scrubbing must update live without reset() or UI work on audio path."""
+    del qapp
+    module = StepSequencerModule()
+    clock_out = _connect_signal(
+        module.clock_input,
+        np.array([1.0, 0.0, 1.0, 0.0], dtype=np.float32),
+    )
+
+    base_params = {
+        "notes": "36,48,60,72",
+        "accents": "0,0,0,0",
+        "slides": "0,0,0,0",
+        "gate_length": 0.8,
+        "bpm": 120.0,
+        "division": "1/16",
+    }
+    module.process_runtime(4, base_params)
+    assert module.component._active_step == 1
+
+    # Advance further, then change only gate length — playhead must not jump back.
+    clock_out.write(np.array([1.0, 0.0, 1.0, 0.0], dtype=np.float32))
+    module.process_runtime(4, {**base_params, "gate_length": 0.8})
+    step_before = int(module.component._active_step)
+    assert step_before == 3
+
+    clock_out.write(np.zeros(4, dtype=np.float32))
+    module.process_runtime(4, {**base_params, "gate_length": 0.25})
+    assert module.component._active_step == step_before
+    assert all(
+        abs(event.gate_length - 0.25) < 1e-9 for event in module.component.pattern
+    )
+    assert abs(module.component._current_event.gate_length - 0.25) < 1e-9
+
+
+def test_step_sequencer_gate_length_affects_gate_output(qapp: Any):
+    """Shorter gate_length should release the gate within a long step."""
+    del qapp
+    module = StepSequencerModule()
+    module.component.sample_rate = 100.0
+    module.component.clock.sample_rate = 100.0
+    module.component.reset()
+    module._previous_structure_key = None
+    module._previous_gate_length = None
+    module._previous_clock = 0.0
+
+    # Internal clock: 60 BPM 1/4 → 1 step/sec → 100 samples/step at sr=100.
+    params = {
+        "notes": "36",
+        "accents": "0",
+        "slides": "0",
+        "gate_length": 0.2,
+        "bpm": 60.0,
+        "division": "1/4",
+    }
+    module.process_runtime(100, params)
+    gate = np.asarray(module.gate_port.value)
+    # 0.2 * 100 samples → gate high for first 20 samples, then low.
+    assert float(gate[0]) == 1.0
+    assert float(gate[19]) == 1.0
+    assert float(gate[20]) == 0.0
+    assert float(gate[-1]) == 0.0
+
+
+def test_step_sequencer_process_runtime_does_not_mutate_note_buttons(qapp: Any):
+    """Audio path must not rewrite note button widgets (thread-safety)."""
+    del qapp
+    module = StepSequencerModule()
+    labels_before = [button.text() for button in module.note_buttons]
+
+    module.process_runtime(
+        4,
+        {
+            "notes": "60,61,62,63,64,65,66,67",
+            "accents": "0,0,0,0,0,0,0,0",
+            "slides": "0,0,0,0,0,0,0,0",
+            "gate_length": 0.5,
+            "bpm": 120.0,
+            "division": "1/16",
+        },
+    )
+
+    assert [button.text() for button in module.note_buttons] == labels_before
+
+
 def test_step_sequencer_step_toggles_follow_set_parameters(qapp: Any):
     del qapp
     module = StepSequencerModule()

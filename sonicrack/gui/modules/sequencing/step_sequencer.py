@@ -74,6 +74,41 @@ def _midi_to_label(note: int | None) -> str:
     return f"{_NOTE_NAMES[note % 12]}{note // 12 - 1}"
 
 
+# Precompiled once — re-setStyleSheet on every refresh was expensive and could
+# warn/crash when process_runtime (audio thread) touched the widgets.
+_NOTE_BUTTON_STYLE = (
+    "QPushButton {"
+    "background-color: #2a2440;"
+    "color: #e8e4ff;"
+    "border: 1px solid #5a4d80;"
+    "border-radius: 4px;"
+    "font-size: 10px;"
+    "font-weight: bold;"
+    "}"
+    "QPushButton:hover {"
+    "background-color: #3a3358;"
+    "border-color: #8a7ab8;"
+    "}"
+    "QPushButton:pressed {"
+    "background-color: #1e1a30;"
+    "}"
+)
+_REST_BUTTON_STYLE = (
+    "QPushButton {"
+    "background-color: #1a1824;"
+    "color: #6a6578;"
+    "border: 1px solid #3a3548;"
+    "border-radius: 4px;"
+    "font-size: 10px;"
+    "font-weight: bold;"
+    "}"
+    "QPushButton:hover {"
+    "background-color: #2a2440;"
+    "border-color: #5a4d80;"
+    "}"
+)
+
+
 class StepNoteButton(QPushButton):
     """Compact pitch cell: click cycles, wheel ±semitone, right-click rest."""
 
@@ -82,6 +117,7 @@ class StepNoteButton(QPushButton):
         super().__init__("—")
         self._step_index = step_index
         self._owner = owner
+        self._is_rest = True
         self.setFixedSize(36, 28)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setToolTip(
@@ -90,25 +126,17 @@ class StepNoteButton(QPushButton):
             "Mouse wheel: ±1 semitone\n"
             "Shift+click: rest"
         )
-        self.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #2a2440;
-                color: #e8e4ff;
-                border: 1px solid #5a4d80;
-                border-radius: 4px;
-                font-size: 10px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #3a3358;
-                border-color: #8a7ab8;
-            }
-            QPushButton:pressed {
-                background-color: #1e1a30;
-            }
-            """
-        )
+        self.setStyleSheet(_REST_BUTTON_STYLE)
+
+    def set_note(self, note: int | None) -> None:
+        """Update label and rest/active style only when the note changes."""
+        label = _midi_to_label(note)
+        is_rest = note is None
+        if self.text() != label:
+            self.setText(label)
+        if is_rest != self._is_rest:
+            self._is_rest = is_rest
+            self.setStyleSheet(_REST_BUTTON_STYLE if is_rest else _NOTE_BUTTON_STYLE)
 
     def mousePressEvent(self, event: QMouseEvent | None) -> None:
         if event is None:
@@ -164,7 +192,10 @@ class StepSequencerModule(ModuleWidget):
         self.slide_port = self.add_output("Slide", signal=PortSignal.CONTROL_CV)
 
         self.component = TB303StepSequencer(sample_rate=audio_config.sample_rate)
-        self._previous_pattern_key: tuple[str, str, str, str, float] | None = None
+        # Structure (notes/accents/slides) rebuilds the pattern; gate_length is
+        # applied in-place so knob scrubbing does not reset playback or touch UI.
+        self._previous_structure_key: tuple[str, str, str] | None = None
+        self._previous_gate_length: float | None = None
         self._previous_reset = 0.0
         self._previous_clock = 0.0
         self._syncing_step_toggles = False
@@ -505,46 +536,9 @@ class StepSequencerModule(ModuleWidget):
         self.parameter_changed.emit("notes", text)
 
     def _refresh_note_buttons(self) -> None:
+        """Update note-button labels/styles. GUI thread only — never from audio."""
         for index, button in enumerate(self.note_buttons):
-            note = self._step_notes[index]
-            button.setText(_midi_to_label(note))
-            if note is None:
-                button.setStyleSheet(
-                    """
-                    QPushButton {
-                        background-color: #1a1824;
-                        color: #6a6578;
-                        border: 1px solid #3a3548;
-                        border-radius: 4px;
-                        font-size: 10px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #2a2440;
-                        border-color: #5a4d80;
-                    }
-                    """
-                )
-            else:
-                button.setStyleSheet(
-                    """
-                    QPushButton {
-                        background-color: #2a2440;
-                        color: #e8e4ff;
-                        border: 1px solid #5a4d80;
-                        border-radius: 4px;
-                        font-size: 10px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #3a3358;
-                        border-color: #8a7ab8;
-                    }
-                    QPushButton:pressed {
-                        background-color: #1e1a30;
-                    }
-                    """
-                )
+            button.set_note(self._step_notes[index])
 
     @staticmethod
     def _notes_to_text(notes: list[int | None]) -> str:
@@ -581,19 +575,34 @@ class StepSequencerModule(ModuleWidget):
         notes = str_parameter(parameters, "notes", self.notes_edit.text)
         accents = str_parameter(parameters, "accents", self.get_accents)
         slides = str_parameter(parameters, "slides", self.get_slides)
-        gate_length = float_parameter(
-            parameters, "gate_length", self.gate_length_knob.get_value
+        gate_length = max(
+            0.0,
+            min(
+                1.0,
+                float_parameter(
+                    parameters, "gate_length", self.gate_length_knob.get_value
+                ),
+            ),
         )
-        pattern_key = (notes, accents, slides, "", gate_length)
-        if pattern_key != self._previous_pattern_key:
+
+        structure_key = (notes, accents, slides)
+        if structure_key != self._previous_structure_key:
+            # Notes/accent/slide changes rebuild the pattern. Never touch Qt
+            # widgets here — process_runtime runs on the audio callback thread.
             self.component.pattern = self._parse_pattern(
                 notes, accents, slides, gate_length
             )
             self.component.reset()
-            self._previous_pattern_key = pattern_key
-            # Keep visual grid aligned when parameters are applied externally.
-            self._step_notes = self._parse_note_list(notes, self.step_toggle_count)
-            self._refresh_note_buttons()
+            self._previous_structure_key = structure_key
+            self._previous_gate_length = gate_length
+        elif (
+            self._previous_gate_length is None
+            or abs(gate_length - self._previous_gate_length) > 1e-9
+        ):
+            # Live gate-length update: mutate events in place so the playhead
+            # and clock phase keep running while the knob is scrubbed.
+            self._apply_gate_length(gate_length)
+            self._previous_gate_length = gate_length
 
         self.component.configure_clock(
             bpm=float_parameter(parameters, "bpm", self.bpm_knob.get_value),
@@ -633,6 +642,14 @@ class StepSequencerModule(ModuleWidget):
         if active_step != self._displayed_active_step:
             self._displayed_active_step = active_step
             self.active_step_changed.emit(active_step)
+
+    def _apply_gate_length(self, gate_length: float) -> None:
+        """Update gate_length on the active pattern without resetting position."""
+        for event in self.component.pattern:
+            event.gate_length = gate_length
+        current = getattr(self.component, "_current_event", None)
+        if current is not None:
+            current.gate_length = gate_length
 
     def _update_step_leds(self, active_step: int) -> None:
         """Update step LEDs on the GUI thread (slot for active_step_changed)."""

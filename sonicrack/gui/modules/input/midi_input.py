@@ -83,7 +83,7 @@ class MIDIInputModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(
             width=260,
-            height=260,
+            height=230,
             color=QColor(200, 100, 150),
         )
 
@@ -121,18 +121,6 @@ class MIDIInputModule(ModuleWidget):
         device_layout.addWidget(self.device_combo)
         layout.addLayout(device_layout)
 
-        priority_layout = QHBoxLayout()
-        priority_layout.addWidget(QLabel("Priority:"))
-        self.priority_combo = QComboBox()
-        self.priority_combo.addItems(["Last", "High", "Low"])
-        self.priority_combo.setToolTip(
-            "Which held note drives pitch/gate when several keys are down "
-            "(soniclab MIDIToCV note-stack)"
-        )
-        self.priority_combo.currentTextChanged.connect(self._on_priority_changed)
-        priority_layout.addWidget(self.priority_combo)
-        layout.addLayout(priority_layout)
-
         bend_layout = QHBoxLayout()
         self.bend_range_knob = Knob(
             label="PB ±",
@@ -160,14 +148,21 @@ class MIDIInputModule(ModuleWidget):
         self.midi_message_received.connect(self._on_midi_message)
         self.device_status_changed.connect(self._on_status_changed)
 
+        # Setup option: right-click module header → Priority
+        self.priority_param = self.register_menu_choice(
+            "priority",
+            "Priority",
+            ["Last", "High", "Low"],
+            "Last",
+            on_changed=self._on_priority_changed,
+            tooltip=(
+                "Which held note drives pitch/gate when several keys are down "
+                "(soniclab MIDIToCV note-stack)"
+            ),
+        )
+
         self.register_parameter(
             "device", self.device_combo, getter="currentText", setter="setCurrentText"
-        )
-        self.register_parameter(
-            "priority",
-            self.priority_combo,
-            getter="currentText",
-            setter="setCurrentText",
         )
         self.register_parameter("pitch_bend_range", self.bend_range_knob)
 
@@ -180,7 +175,6 @@ class MIDIInputModule(ModuleWidget):
         if self.cv_converter.held_notes:
             self.cv_converter._update_from_stack()  # noqa: SLF001 — public stack API
             self._refresh_note_display()
-        self.parameter_changed.emit("priority", label)
 
     def _on_bend_range_changed(self) -> None:
         self.cv_converter.pitch_bend_range = float(self.bend_range_knob.get_value())

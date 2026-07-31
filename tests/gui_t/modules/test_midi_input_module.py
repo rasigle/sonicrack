@@ -106,7 +106,7 @@ def test_midi_input_polyphonic_stack_last_priority(qapp: Any):
     """Multiple simultaneous notes use MIDIToCV note-stack (last priority)."""
     del qapp
     module = MIDIInputModule()
-    module.priority_combo.setCurrentText("Last")
+    module.priority_param.set_value("Last")
 
     module._on_midi_message(
         NoteOnMessage(timestamp=0.0, channel=0, note=60, velocity=100)
@@ -130,7 +130,7 @@ def test_midi_input_polyphonic_stack_last_priority(qapp: Any):
 def test_midi_input_high_priority_selects_highest_note(qapp: Any):
     del qapp
     module = MIDIInputModule()
-    module.priority_combo.setCurrentText("High")
+    module.priority_param.set_value("High")
 
     module._on_midi_message(
         NoteOnMessage(timestamp=0.0, channel=0, note=64, velocity=100)

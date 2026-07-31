@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.modulators import LFO, LFOShape
 
 from sonicrack.config.audio_config import audio_config
@@ -70,7 +70,7 @@ class LFOModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(
             width=200,
-            height=255,
+            height=230,
             color=QColor(100, 140, 200),
         )
 
@@ -180,41 +180,25 @@ class LFOModule(ModuleWidget):
         secondary.addWidget(self.pulsewidth_knob)
         layout.addLayout(secondary)
 
-        # --- Polarity: range mode for all outputs ---
-        polarity_row = QHBoxLayout()
-        polarity_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        polarity_row.setSpacing(4)
-        range_label = QLabel("Range")
-        range_label.setStyleSheet("color: #c2c8ce; font-size: 10px;")
-        polarity_row.addWidget(range_label)
-        self.polarity_combo = QComboBox()
-        self.polarity_combo.addItems(["Bipolar", "Unipolar"])
-        self.polarity_combo.setToolTip(
-            "Bipolar: −1…+1 before depth\nUnipolar: 0…1 before depth"
-        )
-        self.polarity_combo.setMinimumWidth(96)
-        self.polarity_combo.currentTextChanged.connect(
-            lambda value: self.parameter_changed.emit("polarity", value)
-        )
-        polarity_row.addWidget(self.polarity_combo)
-        layout.addLayout(polarity_row)
-
         # Push content slightly so knobs sit closer to the port column.
         layout.addStretch(1)
 
         self._finish_controls(layout)
+
+        # Setup option: right-click module header → Range (bipolar/unipolar)
+        self.polarity_param = self.register_menu_choice(
+            "polarity",
+            "Range",
+            ["Bipolar", "Unipolar"],
+            "Bipolar",
+            tooltip="Bipolar: −1…+1 before depth\nUnipolar: 0…1 before depth",
+        )
 
         # Parameter names keep patch compatibility (frequency / amount / pulsewidth).
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("amount", self.amount_knob)
         self.register_parameter("offset", self.offset_knob)
         self.register_parameter("pulsewidth", self.pulsewidth_knob)
-        self.register_parameter(
-            "polarity",
-            self.polarity_combo,
-            getter="currentText",
-            setter="setCurrentText",
-        )
 
         self._install_sample_rate_listener()
 
@@ -240,7 +224,7 @@ class LFOModule(ModuleWidget):
             parameters, "pulsewidth", self.pulsewidth_knob.get_value
         )
         polarity = str_parameter(
-            parameters, "polarity", self.polarity_combo.currentText
+            parameters, "polarity", self.polarity_param.get_value
         ).lower()
         bipolar = not polarity.startswith("uni")
 
@@ -309,7 +293,7 @@ class LFOModule(ModuleWidget):
         Returns the unit range before offset for CV scaling helpers:
         ``(-1.0, 1.0)`` bipolar or ``(0.0, 1.0)`` unipolar.
         """
-        polarity = self.polarity_combo.currentText().lower()
+        polarity = self.polarity_param.get_value().lower()
         if polarity.startswith("uni"):
             return 0.0, 1.0
         return -1.0, 1.0

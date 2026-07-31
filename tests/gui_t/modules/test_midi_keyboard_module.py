@@ -122,7 +122,7 @@ def test_midi_keyboard_polyphonic_input_uses_note_stack(qapp: Any):
     del qapp
     module = MIDIKeyboardModule()
     module.octave_combo.setCurrentText("4")
-    module.priority_combo.setCurrentText("Last")
+    module.priority_param.set_value("Last")
 
     module._note_on(0)  # C4 = 60
     module._note_on(4)  # E4 = 64
@@ -131,7 +131,7 @@ def test_midi_keyboard_polyphonic_input_uses_note_stack(qapp: Any):
     assert set(module.cv_converter.held_notes) == {60, 64, 67}
     assert module.cv_converter.current_note == 67
 
-    module.priority_combo.setCurrentText("Low")
+    module.priority_param.set_value("Low")
     assert module.cv_converter.current_note == 60
 
     module._note_off(0)

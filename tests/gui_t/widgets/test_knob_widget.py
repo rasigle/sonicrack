@@ -367,12 +367,12 @@ def test_knob_wheel_changes_value():
     assert knob.get_value() == pytest.approx(50.0)
 
 
-def test_knob_wheel_alt_fine_tune():
-    """Alt + scroll wheel uses a finer step than plain scroll."""
+def test_knob_wheel_ctrl_fine_tune():
+    """Ctrl + scroll wheel uses a finer step than plain scroll."""
     knob = Knob(label="Test", min_value=0.0, max_value=100.0, default_value=50.0)
 
     knob.wheelEvent(
-        _make_wheel_event(120, Qt.KeyboardModifier.AltModifier)
+        _make_wheel_event(120, Qt.KeyboardModifier.ControlModifier)
     )
     fine_value = knob.get_value()
     # Fine ≈ 0.2% of range per notch → +0.2

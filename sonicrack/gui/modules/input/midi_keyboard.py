@@ -130,15 +130,6 @@ class MIDIKeyboardModule(ModuleWidget):
         )
         settings_layout.addWidget(self.octave_combo)
 
-        settings_layout.addWidget(QLabel("Priority:"))
-        self.priority_combo = QComboBox()
-        self.priority_combo.addItems(["Last", "High", "Low"])
-        self.priority_combo.setToolTip(
-            "Which held key drives pitch/gate when several are down"
-        )
-        self.priority_combo.currentTextChanged.connect(self._on_priority_changed)
-        settings_layout.addWidget(self.priority_combo)
-
         self.velocity_knob = Knob(
             label="Velocity",
             description="Sets the MIDI velocity for notes played on the keyboard",
@@ -170,15 +161,19 @@ class MIDIKeyboardModule(ModuleWidget):
 
         self._finish_controls(layout)
 
+        # Setup option: right-click module header → Priority
+        self.priority_param = self.register_menu_choice(
+            "priority",
+            "Priority",
+            ["Last", "High", "Low"],
+            "Last",
+            on_changed=self._on_priority_changed,
+            tooltip="Which held key drives pitch/gate when several are down",
+        )
+
         self.register_parameter(
             "octave",
             self.octave_combo,
-            getter="currentText",
-            setter="setCurrentText",
-        )
-        self.register_parameter(
-            "priority",
-            self.priority_combo,
             getter="currentText",
             setter="setCurrentText",
         )
@@ -189,7 +184,6 @@ class MIDIKeyboardModule(ModuleWidget):
         if self.cv_converter.held_notes:
             self.cv_converter._update_from_stack()  # noqa: SLF001
             self._refresh_note_display()
-        self.parameter_changed.emit("priority", label)
 
     def _add_keyboard_buttons(self, layout: QGridLayout) -> None:
         for index, note_offset in enumerate(WHITE_KEYS):

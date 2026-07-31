@@ -302,7 +302,7 @@ class Knob(QWidget):
             event.accept()
 
     def wheelEvent(self, event):
-        """Handle mouse wheel while hovered: coarse adjust, Alt for fine-tune."""
+        """Handle mouse wheel while hovered: coarse adjust, Ctrl for fine-tune."""
         if event is None:
             return
 
@@ -315,9 +315,10 @@ class Knob(QWidget):
             return
 
         # One typical wheel notch is 120 eighth-degrees. Scale so a notch is a
-        # fixed fraction of the range; Alt reduces the step for fine tuning.
+        # fixed fraction of the range; Ctrl reduces the step for fine tuning.
+        # (Alt is avoided: it often pans/moves the view on some platforms.)
         notches = delta / 120.0
-        fine = bool(event.modifiers() & Qt.KeyboardModifier.AltModifier)
+        fine = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
         # Coarse ≈ 2% of range per notch; fine ≈ 0.2% of range per notch.
         step_fraction = 0.002 if fine else 0.02
         norm_delta = notches * step_fraction

@@ -7,13 +7,13 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 from soniclab.dsp.modulators import ADSREnvelope, GateTriggeredADSR
 
+from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.envelope_shape_widget import EnvelopeShapeWidget
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
-from sonicrack.config.audio_config import audio_config
 from sonicrack.runtime.helpers import (
     ensure_min_pulse_width,
     float_parameter,
@@ -87,6 +87,14 @@ class ADSRModule(ModuleWidget):
             min_value=0.0,
             max_value=5.0,
             default_value=0.01,
+            # Dense control for short (plucky) attacks; full range still reaches 5s.
+            # Half travel ≈ 0–100 ms; then log-spaced out to max.
+            curve_points=(
+                (0.0, 0.0),
+                (0.5, 0.1),
+                (0.8, 1.0),
+                (1.0, 5.0),
+            ),
         )
         self.attack_knob.setToolTip(
             "Attack time (seconds)\nRange: 0.005-5.0s\nLower values may cause clicks"
@@ -295,7 +303,6 @@ class ADSRModule(ModuleWidget):
         super().set_parameters(params)
         self._update_shape_display()
 
-
     def _trigger_adsr(self, note_on: bool) -> None:
         """Trigger ADSR note on/off if available."""
         if self._adsr_component is None:
@@ -424,9 +431,7 @@ class ADSRModule(ModuleWidget):
         adsr.release_duration = float_parameter(
             parameters, "release_duration", self.release_knob.get_value
         )
-        mode_value = parameters.get(
-            "retrigger_mode", self.retrigger_param.get_value()
-        )
+        mode_value = parameters.get("retrigger_mode", self.retrigger_param.get_value())
         adsr.retrigger_mode = self._normalize_retrigger_mode(str(mode_value))
 
     @staticmethod

@@ -50,6 +50,10 @@ All notable changes to SonicRack will be documented in this file.
 
 ### Changed
 
+- **Envelope attack knobs**: denser control for short attack times without
+  changing min/max ranges. ADSR Attack uses a custom curve (half travel ≈
+  0–100 ms, then log-spaced to 5 s); Decay Envelope Attack is logarithmic
+  over 0.001–0.2 s.
 - Module panel sizing pass: heights grown where controls clipped (ADSR, EQ,
   Limiter, MIDI Input, Mod Matrix, Poly Voice) and shrunk where large empty
   space remained (Arpeggiator, sequencers, LFO, single-knob utilities, etc.)

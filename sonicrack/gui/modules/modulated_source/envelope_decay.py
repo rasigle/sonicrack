@@ -65,6 +65,8 @@ class DecayEnvelopeModule(ModuleWidget):
             min_value=0.001,
             max_value=0.2,
             default_value=0.001,
+            # Log scale for finer control of short attack times (limits unchanged).
+            logarithmic=True,
         )
         self.attack_knob.value_changed.connect(
             lambda *_: self._on_envelope_knob_changed(
@@ -81,9 +83,7 @@ class DecayEnvelopeModule(ModuleWidget):
             default_value=0.001,
         )
         self.decay_knob.value_changed.connect(
-            lambda *_: self._on_envelope_knob_changed(
-                "decay_duration", self.decay_knob
-            )
+            lambda *_: self._on_envelope_knob_changed("decay_duration", self.decay_knob)
         )
         timing_row.addWidget(self.decay_knob)
         layout.addLayout(timing_row)

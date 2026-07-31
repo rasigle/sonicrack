@@ -48,7 +48,14 @@ class PortType(StrEnum):
 
 
 class PortSignal(StrEnum):
-    """Signal/unit contract for patch-cable compatibility checks."""
+    """Signal/unit contract for patch-cable compatibility checks.
+
+    Timing family (same 0/1 voltage convention, free cross-patching):
+    - ``GATE``: sustained high while a note/step is held; falling edge = off.
+    - ``TRIGGER``: short pulse on an event (note-on, clock step, reset). Clock
+      outputs are triggers. Both may drive each other; sustain-style consumers
+      should widen micro-pulses (see ``ensure_min_pulse_width``).
+    """
 
     UNKNOWN = "unknown"
     AUDIO = "audio"
@@ -58,6 +65,9 @@ class PortSignal(StrEnum):
     TRIGGER = "trigger"
     CONTROL_CV = "control_cv"
 
+
+# Gate and Trigger share logic-level semantics and always patch together.
+_TIMING_SIGNALS = frozenset({PortSignal.GATE, PortSignal.TRIGGER})
 
 _ANALOG_PATCH_SIGNALS = frozenset(
     {
@@ -101,6 +111,9 @@ def _signals_are_patch_compatible(
     if source_signal == target_signal:
         return True
     if source_signal == PortSignal.UNKNOWN or target_signal == PortSignal.UNKNOWN:
+        return True
+    # Gate ↔ Trigger: same timing family (clock, MIDI trig, envelopes, etc.).
+    if source_signal in _TIMING_SIGNALS and target_signal in _TIMING_SIGNALS:
         return True
     if (
         source_signal == PortSignal.FREQUENCY_HZ

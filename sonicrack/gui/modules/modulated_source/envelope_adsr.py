@@ -13,9 +13,12 @@ from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
+from sonicrack.config.audio_config import audio_config
 from sonicrack.runtime.helpers import (
+    ensure_min_pulse_width,
     float_parameter,
     gate_transition_indices,
+    min_trigger_samples,
     read_samples,
 )
 from sonicrack.runtime.specs import RuntimeParameters
@@ -232,7 +235,10 @@ class ADSRModule(ModuleWidget):
 
         # Track ADSR component for manual triggering
         self._adsr_component: ADSREnvelope | GateTriggeredADSR | None = None
-        self._previous_gate = 0.0
+        self._previous_gate = 0.0  # last sample of stretched gate (for edge events)
+        self._previous_raw_gate = 0.0  # last sample of connected source
+        # Extends trigger-like micro-pulses so Gate consumers get a usable high time.
+        self._gate_hold = 0
 
         self.component = self.create_engine_component()
         self._update_shape_display()
@@ -465,10 +471,22 @@ class ADSRModule(ModuleWidget):
         self._apply_runtime_parameters(adsr, parameters)
 
         if self.gate_input.is_connected:
-            gate_signal = read_samples(self.gate_input, num_samples)
+            # Accept Gate or Trigger sources. Short triggers (Clock, MIDI Trig)
+            # are stretched to a minimum high time so attack can develop.
+            raw_gate = read_samples(self.gate_input, num_samples)
+            gate_signal, self._gate_hold = ensure_min_pulse_width(
+                raw_gate,
+                self._previous_raw_gate,
+                min_trigger_samples(audio_config.sample_rate),
+                self._gate_hold,
+            )
+            if num_samples > 0:
+                self._previous_raw_gate = float(raw_gate[-1])
             samples = self._render_gate_triggered_adsr(adsr, gate_signal, num_samples)
         else:
             self._previous_gate = 0.0
+            self._previous_raw_gate = 0.0
+            self._gate_hold = 0
             samples = adsr.get_samples(num_samples)
 
         samples = np.asarray(samples, dtype=np.float32)

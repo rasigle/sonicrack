@@ -1616,6 +1616,18 @@ class TestPortSignalCompatibility:
         assert trigger in gate_input.connected_to
         assert trigger in clock_input.connected_to
 
+    def test_gate_can_drive_trigger_and_clock_inputs(self):
+        """Timing family is bidirectional: Gate ↔ Trigger."""
+        gate = Port("output", "Gate", signal=PortSignal.GATE)
+        trig_input = Port("input", "Trig", signal=PortSignal.TRIGGER)
+        clock_input = Port("input", "Clock", signal=PortSignal.TRIGGER)
+
+        trig_input.connect(gate)
+        clock_input.connect(gate)
+
+        assert gate in trig_input.connected_to
+        assert gate in clock_input.connected_to
+
 
 class TestPortCopyOptimization:
     """Test that port copying is optimized correctly."""

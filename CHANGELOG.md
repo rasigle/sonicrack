@@ -4,6 +4,11 @@ All notable changes to SonicRack will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Clock → envelope Gate**: Clock is a Trigger stream; pulses are widened to
+  ~2 ms and ADSR Gate accepts triggers so clocked envelopes work.
+
 ### Added
 
 - **Waveform / Spectrum pass-through output**: both visualizers expose an

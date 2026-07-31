@@ -1,4 +1,11 @@
-"""Clock source module for synced sequencing."""
+"""Clock source module for synced sequencing.
+
+The **Clock** jack is a :class:`~sonicrack.patching.port.PortSignal.TRIGGER`
+stream: one short high pulse per step. Internally ``StepClock`` marks step
+boundaries with single-sample spikes; this module stretches those spikes to a
+Eurorack-style trigger width so the same cable can drive Gate inputs
+(envelopes, voices) as well as edge-clocked sequencers.
+"""
 
 from __future__ import annotations
 
@@ -11,28 +18,39 @@ from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
+from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, str_parameter
+from sonicrack.runtime.helpers import (
+    ensure_min_pulse_width,
+    float_parameter,
+    min_trigger_samples,
+    str_parameter,
+)
 from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()
 class ClockModule(ModuleWidget):
-    """Musical clock pulse source."""
+    """Musical clock / trigger pulse source."""
 
     runtime_kind = "clock"
 
     metadata = ModuleMetadata(
         title="Clock",
         category=ModuleCategory.SEQUENCER,
-        description="BPM-synced pulse source for sequencers",
+        description="BPM-synced trigger pulses for sequencers and envelopes",
     )
 
     def __init__(self) -> None:
         super().__init__(width=220, height=205, color=QColor(150, 125, 70))
 
-        self.clock_port = self.add_output("Clock")
+        # Clock is a trigger stream (not a sustained gate). Name still "Clock"
+        # for patching familiarity; signal kind is TRIGGER for cable color and
+        # Gate/Trigger compatibility.
+        self.clock_port = self.add_output("Clock", signal=PortSignal.TRIGGER)
         self.component = StepClock(sample_rate=audio_config.sample_rate)
+        self._pulse_hold = 0
+        self._previous_level = 0.0
 
         layout = self._begin_controls()
 
@@ -96,6 +114,8 @@ class ClockModule(ModuleWidget):
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component.sample_rate = new_sample_rate
         self.component.reset()
+        self._pulse_hold = 0
+        self._previous_level = 0.0
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         self.component.bpm = float_parameter(parameters, "bpm", self.bpm_knob.get_value)
@@ -106,4 +126,20 @@ class ClockModule(ModuleWidget):
             parameters, "swing", self.swing_knob.get_value
         )
         running = bool(parameters.get("running", self.run_checkbox.isChecked()))
-        self.clock_port.write(self.component.process(num_samples, running=running))
+        edges = self.component.process(num_samples, running=running)
+
+        # Stretch single-sample step markers into usable trigger pulses.
+        # Cap width below one step so consecutive steps never merge into a
+        # sustained high (sequencers need a rising edge per step).
+        width = min_trigger_samples(self.component.sample_rate)
+        max_width = max(1, int(self.component.step_samples) - 1)
+        width = min(width, max_width)
+        pulses, self._pulse_hold = ensure_min_pulse_width(
+            edges,
+            self._previous_level,
+            width,
+            self._pulse_hold,
+        )
+        if num_samples > 0:
+            self._previous_level = float(edges[-1])
+        self.clock_port.write(pulses)

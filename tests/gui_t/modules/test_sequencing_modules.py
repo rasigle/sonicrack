@@ -49,6 +49,58 @@ def test_clock_module_writes_pulses(qapp: Any):
     output = np.asarray(module.clock_port.value)
     assert output.shape == (8,)
     assert output[0] == 1.0
+    # Clock is a trigger stream (cable color / compatibility), not a gate.
+    from sonicrack.patching.port import PortSignal
+
+    assert module.clock_port.signal == PortSignal.TRIGGER
+
+
+def test_clock_module_stretches_triggers_for_gate_consumers(qapp: Any):
+    """Single-sample StepClock edges become multi-sample trigger pulses."""
+    del qapp
+    module = ClockModule()
+    # Force a known sample rate on the clock component for deterministic width.
+    module.component.sample_rate = 1000.0
+    module.component.reset()
+    module._pulse_hold = 0
+    module._previous_level = 0.0
+
+    # 60 BPM, 1/4 → 1 step per second → 1000 samples/step at sr=1000.
+    # Min trigger is 2 ms → 2 samples; cap is step_samples - 1.
+    module.process_runtime(
+        16, {"bpm": 60.0, "division": "1/4", "swing": 0.0, "running": True}
+    )
+    output = np.asarray(module.clock_port.value)
+    assert output[0] == 1.0
+    assert output[1] == 1.0  # stretched beyond a single sample
+    # Still returns low before the next step so sequencers see rising edges.
+    assert np.any(output[2:] == 0.0)
+
+
+def test_clock_can_trigger_adsr_gate(qapp: Any):
+    del qapp
+    from sonicrack.gui.modules.modulated_source.envelope_adsr import ADSRModule
+
+    clock = ClockModule()
+    adsr = ADSRModule()
+    clock.clock_port.connect(adsr.gate_input)
+
+    n = 512
+    clock.process_runtime(
+        n, {"bpm": 120.0, "division": "1/4", "swing": 0.0, "running": True}
+    )
+    # Without a render context, the ADSR reads the connected port's last write.
+    adsr.process_runtime(
+        n,
+        {
+            "attack_duration": 0.01,
+            "decay_duration": 0.05,
+            "sustain_level": 0.7,
+            "release_duration": 0.1,
+        },
+    )
+    out = np.asarray(adsr.out_port.value)
+    assert float(out.max()) > 0.05
 
 
 def test_step_sequencer_module_writes_all_cv_outputs(qapp: Any):

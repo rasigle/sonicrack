@@ -11,8 +11,10 @@ from sonicrack.runtime.helpers import (
     EMPTY_PARAMETERS,
     apply_cv_influence,
     as_samples,
+    ensure_min_pulse_width,
     float_parameter,
     gate_transition_indices,
+    min_trigger_samples,
     parameter,
     ramp_if_changed,
     read_optional_port,
@@ -136,6 +138,35 @@ class TestGateAndParameters:
         assert ons.tolist() == [2]
         assert offs.tolist() == [4]
         assert final == pytest.approx(0.0)
+
+    def test_min_trigger_samples_scales_with_rate(self):
+        assert min_trigger_samples(48_000, 0.002) == 96
+        assert min_trigger_samples(10, 0.002) == 1
+
+    def test_ensure_min_pulse_width_stretches_single_sample_trigger(self):
+        edges = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+        out, hold = ensure_min_pulse_width(edges, previous_level=0.0, width_samples=4)
+        np.testing.assert_allclose(out, [1, 1, 1, 1, 0, 0])
+        assert hold == 0
+
+    def test_ensure_min_pulse_width_preserves_long_gates(self):
+        gate = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 0.0], dtype=np.float32)
+        out, hold = ensure_min_pulse_width(gate, previous_level=0.0, width_samples=3)
+        np.testing.assert_allclose(out, [1, 1, 1, 1, 1, 0])
+        assert hold == 0
+
+    def test_ensure_min_pulse_width_carries_across_buffers(self):
+        first = np.array([1.0, 0.0], dtype=np.float32)
+        out1, hold = ensure_min_pulse_width(first, previous_level=0.0, width_samples=5)
+        np.testing.assert_allclose(out1, [1, 1])
+        assert hold == 3
+
+        second = np.zeros(4, dtype=np.float32)
+        out2, hold = ensure_min_pulse_width(
+            second, previous_level=0.0, width_samples=5, hold_remaining=hold
+        )
+        np.testing.assert_allclose(out2, [1, 1, 1, 0])
+        assert hold == 0
 
     def test_parameter_helpers(self):
         params = {"cutoff": "440", "mode": "low"}

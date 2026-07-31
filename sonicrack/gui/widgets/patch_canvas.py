@@ -600,7 +600,7 @@ class PatchCanvas(QGraphicsView):
             f"outputs {start_port.port.signal}\n"
             f"{end_port.parent_module.get_display_name()}:{end_port.port_name} "
             f"expects {end_port.port.signal}\n\n"
-            "Use a matching pitch-CV, gate/CV, or audio port."
+            "Use a matching pitch-CV, gate/trigger, control CV, or audio port."
         )
 
     def get_connections(self) -> list[tuple[PortWidget, PortWidget]]:

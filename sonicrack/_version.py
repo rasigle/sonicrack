@@ -1,5 +1,5 @@
 major = 2026
-minor = 1
+minor = 2
 micro = 0
 
 version_info = (major, minor, micro)

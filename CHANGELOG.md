@@ -13,20 +13,36 @@ the companion `soniclab` engine package.
 - File open/save dialogs remember the last used directory across sessions
 - **Priority synth coverage** (see `docs/SYNTH_MODULE_RECOMMENDATIONS.md`):
   - Visual Step Sequencer: per-step note grid, playhead LEDs, click/wheel edit
-  - **Poly Voice**: polyphonic keyboard instrument with voice allocation
+  - **Poly Voice**: polyphonic keyboard + optional **MIDI device** routing
   - Effects: **Chorus**, **Phaser**, **Limiter**, **EQ**
   - Source: morphable **Wavetable** oscillator
-  - Utilities: **Attenuverter**, **Mult** (signal product / ring-mod style)
-  - LFO polarity (bipolar/unipolar) + amount; ADSR optional **Vel** depth
+  - CV utilities: **Attenuverter**, **Mult**, **Multiple** (1→4), **Sample &
+    Hold**, **Slew** (general glide), **Quantizer**, **Mod Matrix** (2×4)
+  - LFO polarity/amount plus **Ramp**, **Random** (S&H), **Smooth** random;
+    ADSR optional **Vel** depth
   - Factory patches: `factory_tb303_voice.apr`, `factory_tb303_modular.apr`
-  - Lightweight DSP package `sonicrack.dsp` for modules not yet in soniclab
+  - Additional demo showcase patches under `examples/patches/`
+
+### Fixed
+
+- Loading patches with a simple **Volume** module at negative `gain_db` (e.g.
+  `demo_wobble_bass.apr`) no longer crashes. The gain knob callback was writing
+  dB into `Volume.amplitude` (linear, must be ≥ 0); it now sets `gain_db`.
+- Factory TB-303 presets (`factory_tb303_voice`, `factory_tb303_modular`):
+  clicks on step retriggers from soniclab `DecayEnvelope` hard-resetting to
+  zero mid-decay and `AccentProcessor` snapping CV on rising accents. Fixed in
+  `soniclab>=2026.1.2` (envelope continues from current level; accent rises
+  over ~2 ms).
 
 ### Changed
 
-- Moved engine-domain helpers into `soniclab` (requires `soniclab>=2026.1.1`):
+- Moved engine-domain helpers into `soniclab` (requires `soniclab>=2026.1.2`):
   oscillator frequency slewing, silence/CV/gate helpers, MIDI Trig pulse,
   WAV/channel utilities, spectrum FFT core, and shared audio constants.
   SonicRack keeps thin re-exports for existing import paths.
+- Removed `sonicrack.dsp` (engine feature). Chorus, phaser, limiter, parametric
+  EQ, wavetable oscillator, and CV utilities (attenuverter, mult, slew, S&H,
+  quantizer, mod matrix) now come from `soniclab>=2026.1.3`.
 
 ## [2026.1.0] - 2026-07-30
 

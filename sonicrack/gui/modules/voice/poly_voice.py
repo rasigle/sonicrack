@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import threading
+from contextlib import suppress
 from typing import Any
 
 import numpy as np
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QKeyEvent
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -19,9 +21,15 @@ from PyQt6.QtWidgets import (
 from soniclab import ADSREnvelope, Chain, SawtoothOscillator, SineOscillator
 from soniclab.dsp.modifiers import ModulatedVolume
 from soniclab.generators.oscillators.oscillator import SquareOscillator, TriangleOscillator
-from soniclab.midi_io import PolyphonicSynth, midi_to_note_name
+from soniclab.midi_io import (
+    NoteOffMessage,
+    NoteOnMessage,
+    PolyphonicSynth,
+    midi_to_note_name,
+)
 
 from sonicrack.config.audio_config import audio_config
+from sonicrack.gui.modules.input.midi_worker_thread import MIDIWorkerThread
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
@@ -29,6 +37,8 @@ from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
 from sonicrack.runtime.helpers import float_parameter, str_parameter
 from sonicrack.runtime.specs import RuntimeParameters
+
+logger = logging.getLogger(__name__)
 
 WHITE_KEYS = (0, 2, 4, 5, 7, 9, 11)
 BLACK_KEYS = (1, 3, 6, 8, 10)
@@ -68,24 +78,29 @@ class PolyVoiceModule(ModuleWidget):
     """Polyphonic keyboard instrument with voice allocation.
 
     Uses ``soniclab.PolyphonicSynth`` for free → releasing → oldest-active
-    voice stealing. Play via the on-screen keys or computer keyboard
-    (``A W S E D F T G Y H U J``).
+    voice stealing. Play via the on-screen keys, computer keyboard
+    (``A W S E D F T G Y H U J``), or an optional MIDI input device for
+    true multi-note controller routing.
     """
 
     runtime_kind = "poly_voice"
 
+    # Thread-safe UI updates from the MIDI worker
+    midi_status_changed = pyqtSignal(str)
+
     metadata = ModuleMetadata(
         title="Poly Voice",
         category=ModuleCategory.MODULATED_SOURCE,
-        description="Polyphonic subtractive voice with keyboard and ADSR",
+        description="Polyphonic subtractive voice with keyboard, MIDI, and ADSR",
     )
 
     def __init__(self) -> None:
-        super().__init__(width=380, height=420, color=QColor(90, 140, 160))
+        super().__init__(width=400, height=480, color=QColor(90, 140, 160))
 
         self.out_port = self.add_output("Out", signal=PortSignal.AUDIO)
         self._lock = threading.RLock()
         self._pressed_note_offsets: dict[int, int] = {}
+        self._midi_held_notes: set[int] = set()
         self._voice_params = {
             "waveform": "Sine",
             "attack": 0.01,
@@ -96,11 +111,38 @@ class PolyVoiceModule(ModuleWidget):
         }
         self._max_voices = 8
         self.synth = self._build_synth()
+        self.midi_worker: MIDIWorkerThread | None = None
+        self._midi_running = False
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsFocusable)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         layout = self._begin_controls(spacing=6)
+
+        # Optional MIDI device for polyphonic controller input
+        midi_row = QHBoxLayout()
+        midi_row.addWidget(QLabel("MIDI:"))
+        self.midi_device_combo = QComboBox()
+        self.midi_device_combo.addItem("(No Device)")
+        self.midi_device_combo.setToolTip(
+            "Select a MIDI keyboard/controller for polyphonic note input"
+        )
+        midi_row.addWidget(self.midi_device_combo)
+        self.midi_refresh_btn = QPushButton("↻")
+        self.midi_refresh_btn.setMaximumWidth(28)
+        self.midi_refresh_btn.setToolTip("Refresh MIDI device list")
+        self.midi_refresh_btn.clicked.connect(self._refresh_midi_devices)
+        midi_row.addWidget(self.midi_refresh_btn)
+        self.midi_start_btn = QPushButton("Start")
+        self.midi_start_btn.setMaximumWidth(52)
+        self.midi_start_btn.clicked.connect(self._toggle_midi)
+        midi_row.addWidget(self.midi_start_btn)
+        layout.addLayout(midi_row)
+
+        self.midi_status_label = QLabel("MIDI idle")
+        self.midi_status_label.setStyleSheet("color: gray; font-size: 10px;")
+        layout.addWidget(self.midi_status_label)
+        self.midi_status_changed.connect(self._on_midi_status)
 
         settings = QHBoxLayout()
         settings.addWidget(QLabel("Oct:"))
@@ -215,7 +257,118 @@ class PolyVoiceModule(ModuleWidget):
         self.register_parameter("sustain", self.sustain_knob)
         self.register_parameter("release", self.release_knob)
         self.register_parameter("velocity", self.velocity_knob)
+        self.register_parameter(
+            "midi_device",
+            self.midi_device_combo,
+            getter="currentText",
+            setter="setCurrentText",
+        )
         self._install_sample_rate_listener()
+        self._refresh_midi_devices()
+
+    def _refresh_midi_devices(self) -> None:
+        """Refresh available MIDI input devices."""
+        try:
+            from soniclab.midi_io import MIDIInput
+            from soniclab.midi_io.input import MIDO_AVAILABLE
+
+            if not MIDO_AVAILABLE:
+                self.midi_status_changed.emit("MIDI library not installed")
+                return
+            devices = MIDIInput.list_devices()
+            current = self.midi_device_combo.currentText()
+            self.midi_device_combo.blockSignals(True)
+            self.midi_device_combo.clear()
+            self.midi_device_combo.addItem("(No Device)")
+            self.midi_device_combo.addItems(devices)
+            idx = self.midi_device_combo.findText(current)
+            if idx >= 0:
+                self.midi_device_combo.setCurrentIndex(idx)
+            self.midi_device_combo.blockSignals(False)
+            if devices:
+                self.midi_status_changed.emit(f"Found {len(devices)} MIDI device(s)")
+            else:
+                self.midi_status_changed.emit("No MIDI devices found")
+        except Exception as exc:  # pragma: no cover - hardware dependent
+            logger.warning("Poly Voice MIDI device list failed: %s", exc)
+            self.midi_status_changed.emit(f"MIDI error: {exc}")
+
+    def _toggle_midi(self) -> None:
+        if self._midi_running:
+            self._stop_midi()
+        else:
+            self._start_midi()
+
+    def _start_midi(self) -> None:
+        device = self.midi_device_combo.currentText()
+        if device == "(No Device)":
+            self.midi_status_changed.emit("Select a MIDI device first")
+            return
+        try:
+            self.midi_worker = MIDIWorkerThread(device)
+            self.midi_worker.message_received.connect(self._on_midi_message)
+            self.midi_worker.status_changed.connect(self.midi_status_changed.emit)
+            self.midi_worker.error_occurred.connect(self._on_midi_error)
+            self.midi_worker.start()
+            self._midi_running = True
+            self.midi_start_btn.setText("Stop")
+            self.midi_status_changed.emit(f"Connecting: {device}")
+        except Exception as exc:  # pragma: no cover
+            logger.error("Failed to start Poly Voice MIDI: %s", exc, exc_info=True)
+            self.midi_status_changed.emit(f"Error: {exc}")
+
+    def _stop_midi(self) -> None:
+        if self.midi_worker is not None:
+            with suppress(Exception):
+                self.midi_worker.stop()
+                self.midi_worker.wait(2000)
+            self.midi_worker = None
+        self._midi_running = False
+        self.midi_start_btn.setText("Start")
+        with self._lock:
+            for note in list(self._midi_held_notes):
+                self.synth.note_off(note)
+            self._midi_held_notes.clear()
+        self.midi_status_changed.emit("MIDI idle")
+
+    def _on_midi_status(self, status: str) -> None:
+        self.midi_status_label.setText(status)
+
+    def _on_midi_error(self, error: str) -> None:
+        logger.error("Poly Voice MIDI error: %s", error)
+        self.midi_status_changed.emit(f"Error: {error}")
+        self._stop_midi()
+
+    def _on_midi_message(self, msg: Any) -> None:
+        """Route polyphonic note on/off from the MIDI worker into the voice pool."""
+        if isinstance(msg, NoteOnMessage):
+            if msg.velocity > 0:
+                with self._lock:
+                    self.synth.note_on(int(msg.note), int(msg.velocity))
+                    self._midi_held_notes.add(int(msg.note))
+                self.note_label.setText(f"{midi_to_note_name(msg.note)} ({msg.note})")
+                self.note_label.setStyleSheet(
+                    "color: #00ff00; font-size: 13px; font-weight: bold;"
+                )
+            else:
+                # Note-on with velocity 0 = note off
+                with self._lock:
+                    self.synth.note_off(int(msg.note))
+                    self._midi_held_notes.discard(int(msg.note))
+        elif isinstance(msg, NoteOffMessage):
+            with self._lock:
+                self.synth.note_off(int(msg.note))
+                self._midi_held_notes.discard(int(msg.note))
+            if not self._midi_held_notes and not self._pressed_note_offsets:
+                self.note_label.setText("--")
+                self.note_label.setStyleSheet(
+                    "color: white; font-size: 13px; font-weight: bold;"
+                )
+
+    def shutdown(self, graceful: bool = True) -> None:
+        """Release MIDI resources on app/module teardown."""
+        del graceful
+        self._stop_midi()
 
     def _add_keyboard_buttons(self, layout: QGridLayout) -> None:
         for index, note_offset in enumerate(WHITE_KEYS):
@@ -425,6 +578,7 @@ class PolyVoiceModule(ModuleWidget):
         if not active:
             with self._lock:
                 self.synth.reset()
+                self._midi_held_notes.clear()
             for offset in list(self._pressed_note_offsets):
                 self.key_buttons[offset].setDown(False)
             self._pressed_note_offsets.clear()

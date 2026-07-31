@@ -1,0 +1,193 @@
+{
+  "metadata": {
+    "name": "Demo: Wobble Bass",
+    "author": "SonicRack",
+    "description": "Dubstep-style wobble bass. Fat sawtooth into a high-resonance low-pass filter, cutoff swept by a unipolar LFO, then soft distortion grit.",
+    "tags": ["demo", "bass", "wobble", "dubstep", "filter"],
+    "category": "Demo",
+    "created": "2026-07-30T12:00:00",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Oscillator",
+      "custom_name": "Sub Saw",
+      "module_category": "Source",
+      "position": { "x": -700.0, "y": -160.0 },
+      "parameters": {
+        "active": true,
+        "frequency": 55.0,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 1,
+      "type": "Oscillator",
+      "custom_name": "Fifth",
+      "module_category": "Source",
+      "position": { "x": -700.0, "y": 100.0 },
+      "parameters": {
+        "active": true,
+        "frequency": 82.5,
+        "pulsewidth": 0.4
+      }
+    },
+    {
+      "id": 2,
+      "type": "Mixer",
+      "custom_name": "Stack",
+      "module_category": "Mixer",
+      "position": { "x": -400.0, "y": -40.0 },
+      "parameters": {
+        "active": true,
+        "gain1": 0.75,
+        "gain2": 0.35,
+        "gain3": 0.0,
+        "gain4": 0.0
+      }
+    },
+    {
+      "id": 3,
+      "type": "LFO",
+      "custom_name": "Wobble",
+      "module_category": "Source",
+      "position": { "x": -400.0, "y": 200.0 },
+      "parameters": {
+        "active": true,
+        "frequency": 3.75,
+        "pulsewidth": 0.5,
+        "amount": 1.0,
+        "polarity": "Unipolar"
+      }
+    },
+    {
+      "id": 4,
+      "type": "Resonant Filter",
+      "custom_name": "Growl",
+      "module_category": "Filter",
+      "position": { "x": -80.0, "y": -80.0 },
+      "parameters": {
+        "active": true,
+        "cutoff": 180.0,
+        "resonance": 7.5,
+        "cv_depth_octaves": 4.5,
+        "drive_db": 6.0,
+        "output_gain_db": -3.0,
+        "filter_type": "Low-pass"
+      }
+    },
+    {
+      "id": 5,
+      "type": "Distortion",
+      "custom_name": "Grit",
+      "module_category": "Effect",
+      "position": { "x": 260.0, "y": -60.0 },
+      "parameters": {
+        "active": true,
+        "drive": 0.42,
+        "mix": 0.38,
+        "distortion_type": "soft"
+      }
+    },
+    {
+      "id": 6,
+      "type": "Compressor",
+      "custom_name": "Glue",
+      "module_category": "Effect",
+      "position": { "x": 520.0, "y": -40.0 },
+      "parameters": {
+        "active": true,
+        "threshold_db": -18.0,
+        "ratio": 4.0,
+        "attack_ms": 8.0,
+        "release_ms": 120.0,
+        "makeup_gain_db": 4.0,
+        "mix": 1.0
+      }
+    },
+    {
+      "id": 7,
+      "type": "Volume",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": { "x": 760.0, "y": -20.0 },
+      "parameters": {
+        "active": true,
+        "gain_db": -8.0
+      }
+    },
+    {
+      "id": 8,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": { "x": 980.0, "y": 0.0 },
+      "parameters": { "active": true }
+    },
+    {
+      "id": 9,
+      "type": "Spectrum",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": { "x": 520.0, "y": 180.0 },
+      "parameters": { "active": true }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 0,
+      "source_port": "Sawtooth",
+      "target_module": 2,
+      "target_port": "In 1"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Square",
+      "target_module": 2,
+      "target_port": "In 2"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Sine",
+      "target_module": 4,
+      "target_port": "Cutoff CV"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 5,
+      "target_port": "In"
+    },
+    {
+      "source_module": 5,
+      "source_port": "Out",
+      "target_module": 6,
+      "target_port": "In"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Out",
+      "target_module": 7,
+      "target_port": "In"
+    },
+    {
+      "source_module": 7,
+      "source_port": "Out",
+      "target_module": 8,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 5,
+      "source_port": "Out",
+      "target_module": 9,
+      "target_port": "In"
+    }
+  ]
+}

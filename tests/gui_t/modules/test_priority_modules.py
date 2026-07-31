@@ -6,12 +6,18 @@ from typing import Any
 
 import numpy as np
 
+from soniclab.dsp.modifiers import Quantizer, SampleAndHold, SlewLimiter
 from sonicrack.gui.modules.effects.effects_chorus import ChorusModule
 from sonicrack.gui.modules.effects.effects_eq import EQModule
 from sonicrack.gui.modules.effects.effects_limiter import LimiterModule
 from sonicrack.gui.modules.effects.effects_phaser import PhaserModule
 from sonicrack.gui.modules.modifier.attenuverter import AttenuverterModule
+from sonicrack.gui.modules.modifier.mod_matrix import ModMatrixModule
 from sonicrack.gui.modules.modifier.mult import MultModule
+from sonicrack.gui.modules.modifier.multiple import MultipleModule
+from sonicrack.gui.modules.modifier.quantizer import QuantizerModule
+from sonicrack.gui.modules.modifier.sample_hold import SampleHoldModule
+from sonicrack.gui.modules.modifier.slew import SlewModule
 from sonicrack.gui.modules.sequencing.step_sequencer import StepSequencerModule
 from sonicrack.gui.modules.source.lfo import LFOModule
 from sonicrack.gui.modules.source.wavetable import WavetableModule
@@ -40,6 +46,11 @@ def test_priority_modules_are_discoverable(qapp: Any) -> None:
         "Poly Voice",
         "Attenuverter",
         "Mult",
+        "Multiple",
+        "Sample & Hold",
+        "Slew",
+        "Quantizer",
+        "Mod Matrix",
     ):
         assert title in registered
 
@@ -166,3 +177,143 @@ def test_lfo_polarity_and_amount(qapp: Any) -> None:
     assert samples.shape == (128,)
     assert float(np.min(samples)) >= -0.01
     assert float(np.max(samples)) <= 0.51
+
+
+def test_lfo_extra_shapes(qapp: Any) -> None:
+    del qapp
+    module = LFOModule()
+    params = {
+        "frequency": 4.0,
+        "pulsewidth": 0.5,
+        "amount": 1.0,
+        "polarity": "Bipolar",
+    }
+    # Frequency slews in; render twice so classic shapes reach full depth.
+    module.process_runtime(512, params)
+    module.process_runtime(512, params)
+    ramp = np.asarray(module.ramp_port.value)
+    saw = np.asarray(module.sawtooth_port.value)
+    random = np.asarray(module.random_port.value)
+    smooth = np.asarray(module.smooth_port.value)
+    assert ramp.shape == (512,)
+    assert random.shape == (512,)
+    assert smooth.shape == (512,)
+    # Ramp is inverted sawtooth.
+    np.testing.assert_allclose(ramp, -saw, atol=1e-5)
+    assert float(np.std(smooth)) > 0.001
+
+
+def test_cv_utilities_and_mod_matrix(qapp: Any) -> None:
+    del qapp
+    # Multiple fans one signal to four outs
+    mult = MultipleModule()
+    src = np.linspace(-1, 1, 32, dtype=np.float32)
+    _connect_signal(mult.in_port, src)
+    mult.process_runtime(32, {})
+    for port in mult.out_ports:
+        np.testing.assert_allclose(port.value, src)
+
+    # Sample & hold on rising edges
+    sh = SampleHoldModule()
+    signal = np.array([0.1, 0.2, 0.9, 0.3, 0.4], dtype=np.float32)
+    clock = np.array([0.0, 0.0, 1.0, 0.0, 1.0], dtype=np.float32)
+    _connect_signal(sh.in_port, signal)
+    _connect_signal(sh.clock_port, clock)
+    sh.process_runtime(5, {})
+    held = np.asarray(sh.out_port.value)
+    assert float(held[0]) == 0.0  # nothing held yet until first edge
+    assert float(held[2]) == float(signal[2])  # sampled on rising edge
+    assert float(held[3]) == float(signal[2])  # held
+    assert float(held[4]) == float(signal[4])  # re-sampled
+
+    # Slew limits step response
+    slew = SlewModule()
+    step = np.concatenate(
+        [np.zeros(8, dtype=np.float32), np.ones(24, dtype=np.float32)]
+    )
+    _connect_signal(slew.in_port, step)
+    slew.process_runtime(32, {"rise_ms": 50.0, "fall_ms": 50.0})
+    out = np.asarray(slew.out_port.value)
+    assert float(out[8]) < 1.0  # not an instant jump
+
+    # Quantizer snaps to chromatic
+    quant = QuantizerModule()
+    # MIDI 60.5 ≈ +0.0417V → should snap toward C4 (0V) or C# 
+    _connect_signal(quant.in_port, np.full(8, 0.5 / 12.0, dtype=np.float32))
+    quant.process_runtime(8, {"scale": "Chromatic", "root": "C"})
+    qout = np.asarray(quant.out_port.value)
+    assert np.allclose(qout, qout[0])  # constant
+    # Nearest semitone to 60.5 is 60 or 61
+    midi = qout[0] * 12.0 + 60.0
+    assert abs(midi - round(midi)) < 1e-4
+
+    # Mod matrix mixes A and B
+    matrix = ModMatrixModule()
+    _connect_signal(matrix.src_ports[0], np.ones(16, dtype=np.float32))
+    _connect_signal(matrix.src_ports[1], np.full(16, 0.5, dtype=np.float32))
+    matrix.process_runtime(
+        16,
+        {
+            "amt_a_0": 1.0,
+            "amt_b_0": 0.0,
+            "offset_0": 0.0,
+            "amt_a_1": 0.0,
+            "amt_b_1": 1.0,
+            "offset_1": 0.25,
+            "amt_a_2": 0.5,
+            "amt_b_2": 0.5,
+            "offset_2": 0.0,
+            "amt_a_3": 0.0,
+            "amt_b_3": 0.0,
+            "offset_3": -0.5,
+        },
+    )
+    np.testing.assert_allclose(matrix.dest_ports[0].value, 1.0)
+    np.testing.assert_allclose(matrix.dest_ports[1].value, 0.75)
+    np.testing.assert_allclose(matrix.dest_ports[2].value, 0.75)
+    np.testing.assert_allclose(matrix.dest_ports[3].value, -0.5)
+
+
+def test_dsp_utility_units() -> None:
+    sh = SampleAndHold()
+    x = np.array([0.0, 1.0, 0.5], dtype=np.float32)
+    clk = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+    y = sh(x, clk)
+    assert float(y[1]) == 1.0
+    assert float(y[2]) == 1.0
+
+    slew = SlewLimiter(sample_rate=1000.0, rise_ms=10.0, fall_ms=10.0)
+    step = np.ones(20, dtype=np.float32)
+    out = slew(step)
+    assert float(out[0]) < 1.0
+    assert float(out[-1]) <= 1.0 + 1e-5
+
+    quant = Quantizer(scale="Octaves", root=0)
+    # A4 = 69 → 0.75V → nearest octave to C (…48, 60, 72…)
+    q = quant(np.array([0.75], dtype=np.float32))
+    midi = float(q[0]) * 12.0 + 60.0
+    assert abs(midi - 72.0) < 0.01 or abs(midi - 60.0) < 0.01
+
+
+def test_poly_voice_has_midi_controls(qapp: Any) -> None:
+    del qapp
+    module = PolyVoiceModule()
+    assert hasattr(module, "midi_device_combo")
+    assert hasattr(module, "midi_start_btn")
+    assert module.midi_device_combo.count() >= 1
+    # note_on_midi still works without a hardware device
+    module.note_on_midi(60, 100)
+    module.process_runtime(
+        512,
+        {
+            "waveform": "Sine",
+            "attack": 0.005,
+            "decay": 0.1,
+            "sustain": 0.8,
+            "release": 0.2,
+            "voices": 8.0,
+        },
+    )
+    assert np.std(module.out_port.value) > 0.001
+    module.note_off_midi(60)
+    module.shutdown()

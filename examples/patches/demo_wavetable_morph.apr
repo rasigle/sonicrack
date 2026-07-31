@@ -1,0 +1,216 @@
+{
+  "metadata": {
+    "name": "Demo: Wavetable Morph Lead",
+    "author": "SonicRack",
+    "description": "Morphing wavetable lead with animated filter, chorus thickness, and tempo-friendly delay trails. Twist Morph for sine→triangle→saw→square evolution.",
+    "tags": ["demo", "wavetable", "lead", "morph", "chorus"],
+    "category": "Demo",
+    "created": "2026-07-30T12:00:00",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Wavetable",
+      "custom_name": "Morph OSC",
+      "module_category": "Source",
+      "position": { "x": -640.0, "y": -140.0 },
+      "parameters": {
+        "active": true,
+        "frequency": 165.0,
+        "morph": 0.42,
+        "gain": 0.55
+      }
+    },
+    {
+      "id": 1,
+      "type": "LFO",
+      "custom_name": "Filter LFO",
+      "module_category": "Source",
+      "position": { "x": -640.0, "y": 140.0 },
+      "parameters": {
+        "active": true,
+        "frequency": 0.45,
+        "pulsewidth": 0.5,
+        "amount": 0.9,
+        "polarity": "Unipolar"
+      }
+    },
+    {
+      "id": 2,
+      "type": "LFO",
+      "custom_name": "Trem Gate",
+      "module_category": "Source",
+      "position": { "x": -340.0, "y": 220.0 },
+      "parameters": {
+        "active": true,
+        "frequency": 2.0,
+        "pulsewidth": 0.4,
+        "amount": 1.0,
+        "polarity": "Bipolar"
+      }
+    },
+    {
+      "id": 3,
+      "type": "ADSR Envelope",
+      "custom_name": "Amp Env",
+      "module_category": "Envelope",
+      "position": { "x": -80.0, "y": 160.0 },
+      "parameters": {
+        "active": true,
+        "attack_duration": 0.02,
+        "decay_duration": 0.25,
+        "sustain_level": 0.65,
+        "release_duration": 0.35,
+        "retrigger_mode": "Punch",
+        "trigger_mode": "On/Off"
+      }
+    },
+    {
+      "id": 4,
+      "type": "Resonant Filter",
+      "custom_name": "Moving LP",
+      "module_category": "Filter",
+      "position": { "x": -320.0, "y": -140.0 },
+      "parameters": {
+        "active": true,
+        "cutoff": 800.0,
+        "resonance": 3.5,
+        "cv_depth_octaves": 2.8,
+        "drive_db": 1.5,
+        "output_gain_db": 0.0,
+        "filter_type": "Low-pass"
+      }
+    },
+    {
+      "id": 5,
+      "type": "VCA",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": { "x": 0.0, "y": -100.0 },
+      "parameters": {
+        "active": true,
+        "amplitude": 0.7,
+        "cv_attenuation": 1.0
+      }
+    },
+    {
+      "id": 6,
+      "type": "Chorus",
+      "custom_name": "Thickness",
+      "module_category": "Effect",
+      "position": { "x": 280.0, "y": -80.0 },
+      "parameters": {
+        "active": true,
+        "rate": 0.7,
+        "depth": 3.8,
+        "delay": 11.0,
+        "mix": 0.45
+      }
+    },
+    {
+      "id": 7,
+      "type": "Delay",
+      "custom_name": "Trails",
+      "module_category": "Effect",
+      "position": { "x": 540.0, "y": -60.0 },
+      "parameters": {
+        "active": true,
+        "delay_time": 0.28,
+        "feedback": 0.4,
+        "mix": 0.32
+      }
+    },
+    {
+      "id": 8,
+      "type": "Reverb",
+      "custom_name": "Room",
+      "module_category": "Effect",
+      "position": { "x": 800.0, "y": -40.0 },
+      "parameters": {
+        "active": true,
+        "room_size": 0.6,
+        "damping": 0.45,
+        "mix": 0.28
+      }
+    },
+    {
+      "id": 9,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": { "x": 1040.0, "y": -20.0 },
+      "parameters": { "active": true }
+    },
+    {
+      "id": 10,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": { "x": 280.0, "y": 180.0 },
+      "parameters": { "active": true }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 0,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Sine",
+      "target_module": 4,
+      "target_port": "Cutoff CV"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 5,
+      "target_port": "In"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Square",
+      "target_module": 3,
+      "target_port": "Gate"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 5,
+      "target_port": "CV In"
+    },
+    {
+      "source_module": 5,
+      "source_port": "Out",
+      "target_module": 6,
+      "target_port": "In"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Out",
+      "target_module": 7,
+      "target_port": "In"
+    },
+    {
+      "source_module": 7,
+      "source_port": "Out",
+      "target_module": 8,
+      "target_port": "In"
+    },
+    {
+      "source_module": 8,
+      "source_port": "Out",
+      "target_module": 9,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 0,
+      "source_port": "Out",
+      "target_module": 10,
+      "target_port": "In"
+    }
+  ]
+}

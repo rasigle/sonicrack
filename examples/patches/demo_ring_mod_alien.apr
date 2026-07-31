@@ -1,0 +1,188 @@
+{
+  "metadata": {
+    "name": "Demo: Ring Mod Alien",
+    "author": "SonicRack",
+    "description": "Metallic sci-fi tones from ring modulation. Inharmonic sine × triangle through a band-pass scream, delay trails, and jet phaser.",
+    "tags": ["demo", "ringmod", "sci-fi", "metallic", "phaser"],
+    "category": "Demo",
+    "created": "2026-07-30T12:00:00",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Oscillator",
+      "custom_name": "Carrier",
+      "module_category": "Source",
+      "position": { "x": -720.0, "y": -180.0 },
+      "parameters": {
+        "active": true,
+        "frequency": 196.0,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 1,
+      "type": "Oscillator",
+      "custom_name": "Modulator",
+      "module_category": "Source",
+      "position": { "x": -720.0, "y": 100.0 },
+      "parameters": {
+        "active": true,
+        "frequency": 311.0,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 2,
+      "type": "Mult",
+      "custom_name": "Ring Mod",
+      "module_category": "Modifier",
+      "position": { "x": -400.0, "y": -40.0 },
+      "parameters": {
+        "active": true,
+        "amount": 1.15
+      }
+    },
+    {
+      "id": 3,
+      "type": "LFO",
+      "custom_name": "Sweep",
+      "module_category": "Source",
+      "position": { "x": -400.0, "y": 220.0 },
+      "parameters": {
+        "active": true,
+        "frequency": 0.28,
+        "pulsewidth": 0.5,
+        "amount": 1.0,
+        "polarity": "Unipolar"
+      }
+    },
+    {
+      "id": 4,
+      "type": "Resonant Filter",
+      "custom_name": "Scream BP",
+      "module_category": "Filter",
+      "position": { "x": -80.0, "y": -60.0 },
+      "parameters": {
+        "active": true,
+        "cutoff": 1200.0,
+        "resonance": 9.0,
+        "cv_depth_octaves": 3.5,
+        "drive_db": 3.0,
+        "output_gain_db": -2.0,
+        "filter_type": "Band-pass"
+      }
+    },
+    {
+      "id": 5,
+      "type": "Delay",
+      "custom_name": "Echo",
+      "module_category": "Effect",
+      "position": { "x": 260.0, "y": -40.0 },
+      "parameters": {
+        "active": true,
+        "delay_time": 0.375,
+        "feedback": 0.48,
+        "mix": 0.42
+      }
+    },
+    {
+      "id": 6,
+      "type": "Phaser",
+      "custom_name": "Jet",
+      "module_category": "Effect",
+      "position": { "x": 520.0, "y": -20.0 },
+      "parameters": {
+        "active": true,
+        "rate": 0.22,
+        "depth": 0.85,
+        "feedback": 0.55,
+        "mix": 0.55
+      }
+    },
+    {
+      "id": 7,
+      "type": "Volume",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": { "x": 760.0, "y": 0.0 },
+      "parameters": {
+        "active": true,
+        "gain_db": -12.0
+      }
+    },
+    {
+      "id": 8,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": { "x": 980.0, "y": 20.0 },
+      "parameters": { "active": true }
+    },
+    {
+      "id": 9,
+      "type": "Spectrum",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": { "x": 260.0, "y": 220.0 },
+      "parameters": { "active": true }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 0,
+      "source_port": "Sine",
+      "target_module": 2,
+      "target_port": "A"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Triangle",
+      "target_module": 2,
+      "target_port": "B"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Triangle",
+      "target_module": 4,
+      "target_port": "Cutoff CV"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 5,
+      "target_port": "In"
+    },
+    {
+      "source_module": 5,
+      "source_port": "Out",
+      "target_module": 6,
+      "target_port": "In"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Out",
+      "target_module": 7,
+      "target_port": "In"
+    },
+    {
+      "source_module": 7,
+      "source_port": "Out",
+      "target_module": 8,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 9,
+      "target_port": "In"
+    }
+  ]
+}

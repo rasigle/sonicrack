@@ -41,11 +41,95 @@ LFO_FREQUENCY_SLEW_TIME_MS = 250.0  # 250ms for click-free frequency changes
 LFO_CLOCK_RESET_SMOOTHING_MS = 2.0
 
 
+class _RandomLfo:
+    """Free-running / clocked sample-and-hold random LFO generator."""
+
+    def __init__(self, sample_rate: float = 44100.0) -> None:
+        self.sample_rate = float(sample_rate)
+        self.phase = 0.0
+        self.value = 0.0
+        self._prev_clock = 0.0
+        self._rng = np.random.default_rng()
+
+    def reset(self) -> None:
+        self.phase = 0.0
+        self.value = 0.0
+        self._prev_clock = 0.0
+
+    def process(
+        self,
+        frequency: float,
+        num_samples: int,
+        clock: np.ndarray | None = None,
+        prev_clock: float = 0.0,
+    ) -> tuple[np.ndarray, float]:
+        n = int(num_samples)
+        out = np.empty(n, dtype=np.float32)
+        freq = max(0.0, float(frequency))
+        phase = self.phase
+        value = self.value
+        sr = max(1.0, self.sample_rate)
+
+        if clock is not None:
+            c = np.asarray(clock, dtype=np.float32).reshape(-1)
+            if c.size < n:
+                c = np.pad(c, (0, n - c.size))
+            prev = float(prev_clock)
+            for i in range(n):
+                clk = float(c[i])
+                if prev < 0.5 <= clk:
+                    value = float(self._rng.uniform(-1.0, 1.0))
+                out[i] = value
+                prev = clk
+            self._prev_clock = prev
+        else:
+            # Free-run: new random sample every cycle of `frequency`.
+            for i in range(n):
+                phase += freq / sr
+                if phase >= 1.0:
+                    phase -= int(phase)
+                    value = float(self._rng.uniform(-1.0, 1.0))
+                out[i] = value
+        self.phase = phase
+        self.value = value
+        return out, value
+
+
+class _SmoothRandomLfo:
+    """Low-pass filtered random walk (smooth random / noise LFO)."""
+
+    def __init__(self, sample_rate: float = 44100.0) -> None:
+        self.sample_rate = float(sample_rate)
+        self.state = 0.0
+        self._rng = np.random.default_rng()
+
+    def reset(self) -> None:
+        self.state = 0.0
+
+    def process(self, frequency: float, num_samples: int) -> np.ndarray:
+        n = int(num_samples)
+        out = np.empty(n, dtype=np.float32)
+        sr = max(1.0, self.sample_rate)
+        # Cutoff roughly tracks LFO rate; higher rate = faster wander.
+        cutoff = max(0.01, min(20.0, float(frequency)))
+        # One-pole coefficient from cutoff.
+        coeff = 1.0 - np.exp(-2.0 * np.pi * cutoff / sr)
+        state = self.state
+        noise = self._rng.uniform(-1.0, 1.0, size=n).astype(np.float32)
+        for i in range(n):
+            state += coeff * (float(noise[i]) - state)
+            out[i] = state
+        self.state = state
+        return out
+
+
 @register_module()
 class LFOModule(ModuleWidget):
     """LFO (Low Frequency Oscillator) module for modulation.
 
-    Similar to Oscillator but optimized for modulation (0.01 Hz - 20 Hz).
+    Classic shapes (sine/tri/saw/square) plus ramp, sample-and-hold random,
+    and smooth random. Clock input resets classic oscillators and re-samples
+    the random output.
     """
 
     runtime_kind = "multi_oscillator"
@@ -53,14 +137,14 @@ class LFOModule(ModuleWidget):
     metadata = ModuleMetadata(
         title="LFO",
         category=ModuleCategory.SOURCE,
-        description="Low-frequency 1V/oct control-voltage source",
+        description="Low-frequency modulation source with classic + random shapes",
     )
 
     def __init__(self):
         """Initialize LFO module."""
         super().__init__(
-            width=240,
-            height=300,
+            width=260,
+            height=340,
             color=QColor(100, 140, 200),
         )
 
@@ -101,9 +185,10 @@ class LFOModule(ModuleWidget):
             sample_rate=sample_rate,
             mode="vcv",
         )
+        self._random_lfo = _RandomLfo(sample_rate=sample_rate)
+        self._smooth_random_lfo = _SmoothRandomLfo(sample_rate=sample_rate)
 
-        # Add four output ports - one for each waveform
-        # Pass component references so ports know their associated engine components
+        # Classic waveform ports
         self.sine_port: Port = self.add_output(
             "Sine",
             component=self._sine_oscillator,
@@ -119,21 +204,32 @@ class LFOModule(ModuleWidget):
             component=self._sawtooth_oscillator,
             signal=PortSignal.CONTROL_CV,
         )
+        self.ramp_port: Port = self.add_output(
+            "Ramp",
+            component=self._sawtooth_oscillator,
+            signal=PortSignal.CONTROL_CV,
+        )
         self.square_port: Port = self.add_output(
             "Square",
             component=self._square_oscillator,
             signal=PortSignal.CONTROL_CV,
         )
+        self.random_port: Port = self.add_output(
+            "Random",
+            signal=PortSignal.CONTROL_CV,
+        )
+        self.smooth_port: Port = self.add_output(
+            "Smooth",
+            signal=PortSignal.CONTROL_CV,
+        )
 
-        # Store ports for easy iteration
+        # Classic oscillator ports/oscs iterated together
         self.ports = [
             self.sine_port,
             self.triangle_port,
             self.sawtooth_port,
             self.square_port,
         ]
-
-        # Store oscillators for easy iteration
         self.oscs = [
             self._sine_oscillator,
             self._triangle_oscillator,
@@ -143,6 +239,7 @@ class LFOModule(ModuleWidget):
         self._last_runtime_frequencies = [freq] * len(self.oscs)
         self._previous_clock = 0.0
         self._last_output_values: list[float | None] = [None] * len(self.oscs)
+        self._last_saw_samples: np.ndarray | None = None
 
         # Use helper methods for UI construction
         layout = self._begin_controls()
@@ -233,6 +330,8 @@ class LFOModule(ModuleWidget):
             self._sawtooth_oscillator.sample_rate = new_sample_rate
         if self._square_oscillator:
             self._square_oscillator.sample_rate = new_sample_rate
+        self._random_lfo.sample_rate = float(new_sample_rate)
+        self._smooth_random_lfo.sample_rate = float(new_sample_rate)
 
     def _on_frequency_changed(self):
         """Handle frequency control changes."""
@@ -244,6 +343,13 @@ class LFOModule(ModuleWidget):
         pulsewidth = self.pulsewidth_knob.get_value()
         self._square_oscillator.pulsewidth = pulsewidth
         self.parameter_changed.emit("pulsewidth", pulsewidth)
+
+    def _scale_polarity(
+        self, samples: np.ndarray, *, unipolar: bool, amount: float
+    ) -> np.ndarray:
+        if unipolar:
+            return (samples * 0.5 + 0.5) * amount
+        return samples * amount
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render each LFO output for the current engine cycle."""
@@ -265,25 +371,29 @@ class LFOModule(ModuleWidget):
             else None
         )
 
-        # Only render live (connected) outputs. When nothing is connected yet
-        # (unit tests / offline), fall back to all oscillators so state advances.
+        all_outs = (
+            *self.ports,
+            self.ramp_port,
+            self.random_port,
+            self.smooth_port,
+        )
+        any_connected = any(p.is_connected for p in all_outs)
+        # When nothing is patched (tests / offline), advance every shape.
+        force_all = not any_connected
+
         active = [
             (index, port, osc)
             for index, (port, osc) in enumerate(
                 zip(self.ports, self.oscs, strict=False)
             )
-            if osc is not None and port.is_connected
+            if osc is not None and (force_all or port.is_connected)
         ]
-        if not active:
-            active = [
-                (index, port, osc)
-                for index, (port, osc) in enumerate(
-                    zip(self.ports, self.oscs, strict=False)
-                )
-                if osc is not None
-            ]
+        need_saw = force_all or self.sawtooth_port.is_connected or self.ramp_port.is_connected
+        if need_saw and not any(i == 2 for i, _, _ in active):
+            active.append((2, self.sawtooth_port, self._sawtooth_oscillator))
 
         final_clock = self._previous_clock if clock_signal is not None else 0.0
+        saw_samples: np.ndarray | None = None
         for index, port, osc in active:
             samples, rendered_frequency, final_clock = render_with_clock_resets(
                 osc,
@@ -297,16 +407,44 @@ class LFOModule(ModuleWidget):
                 LFO_FREQUENCY_SLEW_TIME_MS,
             )
             samples = np.asarray(samples, dtype=np.float32)
-            if unipolar:
-                # Map bipolar [-1, 1] → [0, 1], then scale by amount.
-                samples = (samples * 0.5 + 0.5) * amount
-            else:
-                samples = samples * amount
-            port.write(samples)
+            if index == 2:
+                saw_samples = samples
+            if force_all or port.is_connected:
+                port.write(
+                    self._scale_polarity(samples, unipolar=unipolar, amount=amount)
+                )
             self._last_runtime_frequencies[index] = rendered_frequency
             if len(samples) > 0:
                 self._last_output_values[index] = float(samples[-1])
         self._previous_clock = final_clock
+        self._last_saw_samples = saw_samples
+
+        # Ramp = inverted sawtooth
+        if force_all or self.ramp_port.is_connected:
+            if saw_samples is None:
+                saw_samples = np.zeros(num_samples, dtype=np.float32)
+            self.ramp_port.write(
+                self._scale_polarity(-saw_samples, unipolar=unipolar, amount=amount)
+            )
+
+        # Random sample-and-hold (free-run at Freq, or clocked)
+        if force_all or self.random_port.is_connected:
+            random_samples, _ = self._random_lfo.process(
+                frequency,
+                num_samples,
+                clock=clock_signal,
+                prev_clock=0.0,
+            )
+            self.random_port.write(
+                self._scale_polarity(random_samples, unipolar=unipolar, amount=amount)
+            )
+
+        # Smooth random walk
+        if force_all or self.smooth_port.is_connected:
+            smooth = self._smooth_random_lfo.process(frequency, num_samples)
+            self.smooth_port.write(
+                self._scale_polarity(smooth, unipolar=unipolar, amount=amount)
+            )
 
     def get_cv_output_range(self) -> tuple[float, float]:
         """LFO output range depends on polarity mode.

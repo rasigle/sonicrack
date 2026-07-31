@@ -7,7 +7,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 
 from sonicrack.config.audio_config import audio_config
-from sonicrack.dsp.dynamics_eq import ParametricEQ
+from soniclab.dsp.effects import ParametricEQ
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata

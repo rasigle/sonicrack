@@ -8,7 +8,7 @@ from soniclab.utils.cv import pitch_cv_to_frequency
 
 from sonicrack.config.audio_config import audio_config
 from sonicrack.constants import AUDIO_FREQUENCY_KNOB_CURVE
-from sonicrack.dsp.wavetable import WavetableOscillator
+from soniclab.generators.oscillators import WavetableOscillator
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata

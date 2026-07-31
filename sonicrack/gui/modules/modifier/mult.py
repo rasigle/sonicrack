@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from PyQt6.QtGui import QColor
 
-from sonicrack.dsp.utilities import SignalMult
+from soniclab.dsp.modifiers import SignalMult
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata

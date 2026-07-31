@@ -65,10 +65,11 @@ def test_audio_rate_frequency_knobs_use_custom_curve(qapp: Any):
     assert vco.freq_knob.max_value == pytest.approx(6000.0)
 
 
-def test_lfo_frequency_knob_uses_logarithmic_pitch_control(qapp: Any):
+def test_lfo_rate_knob_uses_logarithmic_pitch_control(qapp: Any):
     del qapp
     module = LFOModule()
 
+    assert module.freq_knob.label == "Rate"
     assert module.freq_knob.logarithmic is True
     assert module.freq_knob.min_value == pytest.approx(0.01)
     assert module.freq_knob.max_value == pytest.approx(20.0)
@@ -80,37 +81,41 @@ def test_lfo_runtime_applies_frequency_and_pulsewidth(qapp: Any):
 
     module.process_runtime(8, {"frequency": 4.0, "pulsewidth": 0.75})
 
-    assert 1.0 < module._sine_oscillator.frequency < 4.0
-    assert 1.0 < module._triangle_oscillator.frequency < 4.0
-    assert 1.0 < module._sawtooth_oscillator.frequency < 4.0
-    assert 1.0 < module._square_oscillator.frequency < 4.0
-    assert module._square_oscillator.pulsewidth == pytest.approx(0.75)
+    for lfo in module.lfos:
+        assert lfo.rate_hz == pytest.approx(4.0)
+        assert lfo.pulse_width == pytest.approx(0.75)
+    assert module._square_lfo.pulse_width == pytest.approx(0.75)
 
 
 def test_lfo_clock_input_resets_cycle_on_trigger(qapp: Any):
     del qapp
     module = LFOModule()
     clock_source = _connect_constant_input(module.clock_input, 0.0)
+    # High rate so pre-reset samples leave zero; rising edge at index 4 resets.
     clock_source.write(
         np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32)
     )
 
-    module.process_runtime(8, {"frequency": 1.0, "pulsewidth": 0.5})
+    module.process_runtime(8, {"frequency": 20.0, "pulsewidth": 0.5})
 
     output = np.asarray(module.sine_port.value)
-    assert module._sine_oscillator._sample_index == 4
-    assert abs(float(output[4] - output[3])) < 1e-4
+    # After reset, sine starts at phase 0 → sample ≈ 0.
+    assert float(output[4]) == pytest.approx(0.0, abs=1e-4)
+    # Phase advanced from reset for remaining samples.
+    assert abs(float(output[7])) > abs(float(output[4]))
 
 
-def test_lfo_clock_reset_is_smoothed_across_buffer_boundary(qapp: Any):
+def test_lfo_clock_reset_restarts_phase_on_rising_edge(qapp: Any):
     del qapp
     module = LFOModule()
     clock_source = _connect_constant_input(module.clock_input, 0.0)
     clock_source.write(np.zeros(128, dtype=np.float32))
 
     module.process_runtime(128, {"frequency": 20.0, "pulsewidth": 0.5})
-    first = np.asarray(module.sawtooth_port.value)
+    first = np.asarray(module.sine_port.value)
+    assert abs(float(first[-1])) > 0.01  # advanced away from zero
 
+    # Rising edge at sample 0 of next buffer → hard phase reset.
     clock_source.write(
         np.concatenate(
             (
@@ -120,9 +125,9 @@ def test_lfo_clock_reset_is_smoothed_across_buffer_boundary(qapp: Any):
         )
     )
     module.process_runtime(128, {"frequency": 20.0, "pulsewidth": 0.5})
-    second = np.asarray(module.sawtooth_port.value)
+    second = np.asarray(module.sine_port.value)
 
-    assert second[0] == pytest.approx(first[-1], abs=1e-7)
+    assert float(second[0]) == pytest.approx(0.0, abs=1e-4)
 
 
 def test_oscillator_frequency_changes_are_ramped_across_buffer(qapp: Any):
@@ -140,7 +145,7 @@ def test_oscillator_frequency_changes_are_ramped_across_buffer(qapp: Any):
     assert module._triangle_oscillator.frequency > 120.0
 
 
-def test_lfo_frequency_changes_are_ramped_across_buffer(qapp: Any):
+def test_lfo_frequency_changes_are_phase_continuous(qapp: Any):
     del qapp
     module = LFOModule()
 
@@ -149,24 +154,21 @@ def test_lfo_frequency_changes_are_ramped_across_buffer(qapp: Any):
     module.process_runtime(128, {"frequency": 12.0, "pulsewidth": 0.5})
     second = np.asarray(module.sine_port.value)
 
+    # soniclab.LFO keeps phase continuous across rate changes (no hard jump).
     boundary_jump = abs(float(second[0] - first[-1]))
-    # Allow a small first-sample step while still rejecting hard discontinuities.
     assert boundary_jump < 0.03
-    assert module._sine_oscillator.frequency < 12.0
-    assert module._sine_oscillator.frequency > 1.0
+    assert module._sine_lfo.rate_hz == pytest.approx(12.0)
 
 
-def test_lfo_frequency_ramp_state_is_tracked_per_waveform(qapp: Any):
+def test_lfo_instances_share_rate_after_runtime(qapp: Any):
     del qapp
     module = LFOModule()
 
     module.process_runtime(128, {"frequency": 1.0, "pulsewidth": 0.5})
     module.process_runtime(128, {"frequency": 12.0, "pulsewidth": 0.5})
 
-    for index, oscillator in enumerate(module.oscs):
-        assert module._last_runtime_frequencies[index] == pytest.approx(
-            oscillator.frequency
-        )
+    for lfo in module.lfos:
+        assert lfo.rate_hz == pytest.approx(12.0)
 
 
 def test_lfo_can_drive_vco_without_click_on_lfo_frequency_change(qapp: Any):
@@ -338,7 +340,7 @@ def test_vco_lfo_fm_differs_from_v_oct_pitch_input(qapp: Any):
     assert np.max(np.abs(pitch_output - fm_output)) > 0.01
 
 
-def test_lfo_frequency_changes_are_ramped_with_clock_input_connected(qapp: Any):
+def test_lfo_frequency_changes_are_continuous_with_clock_input_connected(qapp: Any):
     del qapp
     module = LFOModule()
     clock_source = _connect_constant_input(module.clock_input, 0.0)
@@ -350,10 +352,19 @@ def test_lfo_frequency_changes_are_ramped_with_clock_input_connected(qapp: Any):
     module.process_runtime(128, {"frequency": 12.0, "pulsewidth": 0.5})
     second = np.asarray(module.sine_port.value)
 
+    # Idle clock (no rising edges) must not force a phase reset.
     boundary_jump = abs(float(second[0] - first[-1]))
     assert boundary_jump < 0.03
-    assert module._sine_oscillator.frequency < 1.2
-    assert module._sine_oscillator.frequency > 1.0
+    assert module._sine_lfo.rate_hz == pytest.approx(12.0)
+
+
+def test_lfo_control_labels_match_usage(qapp: Any):
+    del qapp
+    module = LFOModule()
+    assert module.freq_knob.label == "Rate"
+    assert module.amount_knob.label == "Depth"
+    assert module.offset_knob.label == "Offset"
+    assert module.pulsewidth_knob.label == "Width"
 
 
 def test_frequency_slew_continues_across_buffers():

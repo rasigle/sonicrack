@@ -2,26 +2,20 @@
 
 All notable changes to SonicRack will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Version numbers follow a calendar-style scheme (`YYYY.MINOR.PATCH`), aligned with
-the companion `soniclab` engine package.
-
 ## [Unreleased]
 
 ### Added
 
 - File open/save dialogs remember the last used directory across sessions
-- **Priority synth coverage** (see `docs/SYNTH_MODULE_RECOMMENDATIONS.md`):
-  - Visual Step Sequencer: per-step note grid, playhead LEDs, click/wheel edit
-  - **Poly Voice**: polyphonic keyboard + optional **MIDI device** routing
-  - Effects: **Chorus**, **Phaser**, **Limiter**, **EQ**
-  - Source: morphable **Wavetable** oscillator
-  - CV utilities: **Attenuverter**, **Mult**, **Multiple** (1→4), **Sample &
-    Hold**, **Slew** (general glide), **Quantizer**, **Mod Matrix** (2×4)
-  - LFO polarity/amount plus **Ramp**, **Random** (S&H), **Smooth** random;
-    ADSR optional **Vel** depth
-  - Factory patches: `factory_tb303_voice.apr`, `factory_tb303_modular.apr`
-  - Additional demo showcase patches under `examples/patches/`
+- Visual Step Sequencer: per-step note grid, playhead LEDs, click/wheel edit
+- **Poly Voice**: polyphonic keyboard + optional **MIDI device** routing
+- Effects: **Chorus**, **Phaser**, **Limiter**, **EQ**
+- Source: morphable **Wavetable** oscillator
+- CV utilities: **Attenuverter**, **Mult**, **Multiple** (1→4), **Sample &
+  Hold**, **Slew** (general glide), **Quantizer**, **Mod Matrix** (2×4)
+- LFO depth/polarity/offset/phase plus **Random** (S&H) and tempo sync;
+  ADSR optional **Vel** depth
+- Additional demo showcase patches under `examples/patches/`
 
 ### Fixed
 
@@ -33,11 +27,11 @@ the companion `soniclab` engine package.
   zero mid-decay and `AccentProcessor` snapping CV on rising accents. Fixed in
   `soniclab>=2026.1.2` (envelope continues from current level; accent rises
   over ~2 ms).
-- **demo_trance_arp** is realtime-safe in the GUI. Step Sequencer playhead
+- **`demo_trance_arp`** is realtime-safe in the GUI. Step Sequencer playhead
   LEDs update via a queued signal (no Qt LED work on the audio path), control-
   rate effect CV skips disconnected ports and unchanged values, and the demo
   patch keeps Delay/Reverb mono before the auto-panner (with analog saw).
-  Requires soniclab stereo Numba Delay/Reverb and VCV saw speedups.
+  Requires `soniclab` stereo Numba Delay/Reverb and VCV saw speedups.
 
 ### Changed
 
@@ -48,6 +42,12 @@ the companion `soniclab` engine package.
 - Removed `sonicrack.dsp` (engine feature). Chorus, phaser, limiter, parametric
   EQ, wavetable oscillator, and CV utilities (attenuverter, mult, slew, S&H,
   quantizer, mod matrix) now come from `soniclab>=2026.1.3`.
+- **LFO module** now wraps `soniclab.LFO` (requires `soniclab>=2026.1.3`)
+  instead of audio oscillators + custom random generators. Outputs are sine,
+  triangle, square, and sample-and-hold Random (shared rate / depth / polarity /
+  clock reset). Compact layout: **Rate** + **Depth** (primary), **Offset** +
+  **Width** (secondary), **Range** bipolar/unipolar. Removed Sawtooth / Ramp /
+  Smooth ports and phase / tempo-sync controls.
 
 ## [2026.1.0] - 2026-07-30
 

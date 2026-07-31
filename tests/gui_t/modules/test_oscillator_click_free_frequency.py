@@ -1,7 +1,8 @@
 """Test cases for click-free frequency transitions in oscillator modules.
 
-This test verifies that oscillators (including LFO) use proper frequency
-slewing to prevent clicking/popping artifacts when frequency changes.
+This test verifies that oscillators use proper frequency slewing to prevent
+clicking/popping artifacts when frequency changes, and that the LFO (backed by
+soniclab.LFO) keeps phase-continuous output across rate changes.
 """
 
 import numpy as np
@@ -23,16 +24,15 @@ def osc_module(app):
     return OscillatorModule()
 
 
-class TestLFOClickFreeFrequency:
-    """Test that LFO uses frequency slewing for click-free transitions."""
+class TestLFOPhaseContinuousFrequency:
+    """Test that LFO rate changes stay phase-continuous (no hard jumps)."""
 
-    def test_lfo_has_frequency_slewing(self, lfo_module):
-        """Test that LFO has frequency slewing constant defined."""
-        from sonicrack.gui.modules.source.lfo import LFO_FREQUENCY_SLEW_TIME_MS
+    def test_lfo_uses_soniclab_lfo(self, lfo_module):
+        """LFO module is backed by soniclab.LFO instances."""
+        from soniclab.dsp.modulators import LFO
 
-        # Should have a substantial slew time to prevent clicks
-        assert LFO_FREQUENCY_SLEW_TIME_MS > 100.0  # At least 100ms
-        assert isinstance(LFO_FREQUENCY_SLEW_TIME_MS, float)
+        assert len(lfo_module.lfos) == 4
+        assert all(isinstance(lfo, LFO) for lfo in lfo_module.lfos)
 
     def test_lfo_frequency_changes_are_smooth(self, lfo_module):
         """Test that LFO frequency changes produce smooth output transitions."""
@@ -44,16 +44,15 @@ class TestLFOClickFreeFrequency:
         lfo_module.process_runtime(256, {"frequency": 5.0, "pulsewidth": 0.5})
         second_buffer = np.asarray(lfo_module.sine_port.value)
 
-        # The transition between buffers should be smooth (no large jumps)
-        # Due to frequency slewing, the jump should be small
+        # Phase-continuous rate change: sample values stay continuous.
         transition_jump = abs(second_buffer[0] - first_buffer[-1])
         assert transition_jump < 0.3  # Reasonable continuity threshold
 
-    def test_lfo_tracks_last_frequency(self, lfo_module):
-        """Test that LFO tracks the last rendered frequency for continuity."""
-        assert hasattr(lfo_module, "_last_runtime_frequencies")
-        assert isinstance(lfo_module._last_runtime_frequencies, list)
-        assert len(lfo_module._last_runtime_frequencies) == 4  # One per waveform
+    def test_lfo_tracks_rate_on_all_instances(self, lfo_module):
+        """All shape instances receive the same free-running rate."""
+        lfo_module.process_runtime(64, {"frequency": 3.5, "pulsewidth": 0.5})
+        for lfo in lfo_module.lfos:
+            assert lfo.rate_hz == pytest.approx(3.5)
 
 
 class TestOscillatorClickFreeFrequency:

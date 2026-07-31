@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+import pytest
 
 from soniclab.dsp.modifiers import Quantizer, SampleAndHold, SlewLimiter
 from sonicrack.gui.modules.effects.effects_chorus import ChorusModule
@@ -177,30 +178,38 @@ def test_lfo_polarity_and_amount(qapp: Any) -> None:
     assert samples.shape == (128,)
     assert float(np.min(samples)) >= -0.01
     assert float(np.max(samples)) <= 0.51
+    assert module._sine_lfo.depth == pytest.approx(0.5)
+    assert module._sine_lfo.bipolar is False
 
 
-def test_lfo_extra_shapes(qapp: Any) -> None:
+def test_lfo_engine_shapes(qapp: Any) -> None:
     del qapp
     module = LFOModule()
     params = {
-        "frequency": 4.0,
+        "frequency": 20.0,
         "pulsewidth": 0.5,
         "amount": 1.0,
         "polarity": "Bipolar",
     }
-    # Frequency slews in; render twice so classic shapes reach full depth.
     module.process_runtime(512, params)
     module.process_runtime(512, params)
-    ramp = np.asarray(module.ramp_port.value)
-    saw = np.asarray(module.sawtooth_port.value)
-    random = np.asarray(module.random_port.value)
-    smooth = np.asarray(module.smooth_port.value)
-    assert ramp.shape == (512,)
-    assert random.shape == (512,)
-    assert smooth.shape == (512,)
-    # Ramp is inverted sawtooth.
-    np.testing.assert_allclose(ramp, -saw, atol=1e-5)
-    assert float(np.std(smooth)) > 0.001
+    sine = np.asarray(module.sine_port.value)
+    triangle = np.asarray(module.triangle_port.value)
+    square = np.asarray(module.square_port.value)
+    assert sine.shape == triangle.shape == square.shape == (512,)
+    assert float(np.max(np.abs(sine))) > 0.5
+    assert float(np.max(np.abs(triangle))) > 0.5
+    assert float(np.max(np.abs(square))) > 0.5
+
+    # S&H hold length at 20 Hz is ~sample_rate/20 samples; collect enough
+    # buffers to span multiple holds and confirm stepped random output.
+    random_chunks: list[np.ndarray] = []
+    for _ in range(12):
+        module.process_runtime(512, params)
+        random_chunks.append(np.asarray(module.random_port.value).copy())
+    random = np.concatenate(random_chunks)
+    assert random.shape[0] == 12 * 512
+    assert float(np.std(random)) > 0.01
 
 
 def test_cv_utilities_and_mod_matrix(qapp: Any) -> None:

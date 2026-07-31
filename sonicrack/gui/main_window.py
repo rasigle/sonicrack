@@ -889,14 +889,13 @@ class ModularSynthWindow(QMainWindow):
             )
             return
 
-        # Default to Documents directory
-        default_dir = str(Path.home() / "Documents")
+        start_dir = app_settings.file_dialog_start_dir(self.current_patch_path)
 
         # Show file dialog with proper filter format
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Patch As",
-            default_dir,
+            start_dir,
             f"Patch Files (*{PRESET_FILE_EXTENSION});;All Files (*.*)",
         )
 
@@ -942,6 +941,7 @@ class ModularSynthWindow(QMainWindow):
         self.current_patch_path = file_path
         self.patch_modified = False
         self._update_window_title()
+        app_settings.remember_file_directory(file_path)
 
         self._require_statusbar().showMessage(f"Patch saved: {Path(file_path).name}")
         logger.info(f"Patch saved to {file_path}")
@@ -965,14 +965,13 @@ class ModularSynthWindow(QMainWindow):
             elif reply == QMessageBox.StandardButton.Cancel:
                 return
 
-        # Default to Documents directory
-        default_dir = str(Path.home() / "Documents")
+        start_dir = app_settings.file_dialog_start_dir(self.current_patch_path)
 
         # Show file dialog with proper filter format
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open Patch",
-            default_dir,
+            start_dir,
             f"Patch Files (*{PRESET_FILE_EXTENSION});;All Files (*.*)",
         )
 
@@ -1003,6 +1002,7 @@ class ModularSynthWindow(QMainWindow):
             self.current_patch_path = file_path
             self.patch_modified = False
             self._update_window_title()
+            app_settings.remember_file_directory(file_path)
 
             self._require_statusbar().showMessage(
                 f"Patch loaded: {Path(file_path).name}"

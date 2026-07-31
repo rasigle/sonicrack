@@ -10,6 +10,7 @@ the companion `soniclab` engine package.
 
 ### Added
 
+- File open/save dialogs remember the last used directory across sessions
 - **Priority synth coverage** (see `docs/SYNTH_MODULE_RECOMMENDATIONS.md`):
   - Visual Step Sequencer: per-step note grid, playhead LEDs, click/wheel edit
   - **Poly Voice**: polyphonic keyboard instrument with voice allocation

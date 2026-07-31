@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from sonicrack.config.app_settings import app_settings
 from sonicrack.patching.preset_manager import PresetManager
 
 logger = logging.getLogger(__name__)
@@ -356,13 +357,18 @@ class LibraryPresetBrowserDialog(QDialog):
 
     def _on_import_clicked(self) -> None:
         """Handle import button click."""
+        start_dir = app_settings.file_dialog_start_dir()
         filepath, _ = QFileDialog.getOpenFileName(
-            self, "Import Preset", "", "JSON Files (*.json);;All Files (*)"
+            self,
+            "Import Preset",
+            start_dir,
+            "JSON Files (*.json);;All Files (*)",
         )
 
         if filepath:
             result = self.preset_manager.import_preset(Path(filepath))
             if result:
+                app_settings.remember_file_directory(filepath)
                 self._load_presets()
                 QMessageBox.information(self, "Success", "Preset imported.")
             else:
@@ -375,9 +381,13 @@ class LibraryPresetBrowserDialog(QDialog):
             return
 
         name = preset_meta.get("name", "preset")
+        start_path = str(Path(app_settings.file_dialog_start_dir()) / f"{name}.json")
 
         filepath, _ = QFileDialog.getSaveFileName(
-            self, "Export Preset", f"{name}.json", "JSON Files (*.json);;All Files (*)"
+            self,
+            "Export Preset",
+            start_path,
+            "JSON Files (*.json);;All Files (*)",
         )
 
         if filepath:
@@ -386,6 +396,7 @@ class LibraryPresetBrowserDialog(QDialog):
                 QMessageBox.critical(self, "Error", "Preset metadata has no file path.")
                 return
             if self.preset_manager.export_preset(source, Path(filepath)):
+                app_settings.remember_file_directory(filepath)
                 QMessageBox.information(self, "Success", "Preset exported.")
             else:
                 QMessageBox.critical(self, "Error", "Failed to export preset.")

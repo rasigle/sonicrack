@@ -4,13 +4,26 @@ All notable changes to SonicRack will be documented in this file.
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- **Clock → envelope Gate**: Clock is a Trigger stream; pulses are widened to
-  ~2 ms and ADSR Gate accepts triggers so clocked envelopes work.
+- **Envelope curve (right-click menu)**: ADSR and Decay modules can choose
+  segment interpolation — **Linear**, **Exponential** (default, analog RC /
+  best VCA feel), or **Polynomial** (smooth S-curve). Right-click the module
+  header → **Curve**. Shape preview updates to match. Requires
+  `soniclab>=2026.1.4`.
+
+## [2026.2.0] - 2026-07-31
+
+First public release on PyPI. DSP remains provided by the separate
+[`soniclab`](https://pypi.org/project/soniclab/) distribution.
 
 ### Added
 
+- PyPI-oriented packaging metadata: project URLs, desktop/Qt classifiers, and
+  `Typing :: Typed`.
+- Console entry point `sonicrack` for a standard `uv tool install sonicrack`
+  launch path.
+- GitHub Actions publish workflow (Trusted Publishing to TestPyPI / PyPI).
 - **Waveform / Spectrum pass-through output**: both visualizers expose an
   **Out** jack that routes **In** unchanged, so they can sit inline
   (`Source → Waveform/Spectrum → next`) for monitoring while still
@@ -47,9 +60,27 @@ All notable changes to SonicRack will be documented in this file.
 - MIDI Input controller CV: **Mod** (CC1), **Expr** (CC11), **Bend**
   (bipolar), note **Priority** (Last/High/Low), pitch-bend range
 - MIDI Keyboard note **Priority** (Last/High/Low) using soniclab note-stack
+- **MIDI Trig outputs**: MIDI Input and MIDI Keyboard emit a one-sample
+  `Trig` pulse on every note-on (including legato retriggers while Gate stays
+  high), alongside existing `1V/Oct` / Gate / Vel ports.
+- **RD-8 / Behringer 182 pattern controls**: per-step gate toggle buttons and a
+  **Randomize** action that scrambles CV A, CV B, and the gate pattern.
+- **Envelope shape previews**: ADSR and Decay Envelope show live curve previews
+  with a glowing playhead for the current phase/level.
+- Shared module helpers: `SimpleModifierBase`, modulated I/O setup,
+  `bind_parameter_knob`, sample-rate listener install/cleanup, and runtime
+  utilities (`read_optional_port`, silence cache, CV influence blend, ramps).
 
 ### Changed
 
+- Base install depends on `soniclab>=2026.1.3` plus the desktop runtime stack
+  (`pyqt6`, `sounddevice`, `numba`) so the app starts without optional extras.
+  Notebook/analysis packages are no longer pulled in by the base install.
+- `gui` / `audio-io` extras are kept as empty compatibility aliases.
+- `midi` extra delegates to `soniclab[midi]` (mido / python-rtmidi).
+- Wheel/sdist exclude marketing screenshots and icon/splash generator scripts.
+- README documents `uv`-first PyPI and development install; package version
+  snapshot set to `2026.2.0`.
 - **Envelope attack knobs**: denser control for short attack times without
   changing min/max ranges. ADSR Attack uses a custom curve (half travel ≈
   0–100 ms, then log-spaced to 5 s); Decay Envelope Attack is logarithmic
@@ -59,25 +90,6 @@ All notable changes to SonicRack will be documented in this file.
   space remained (Arpeggiator, sequencers, LFO, single-knob utilities, etc.)
 - Denser default control layout: margins `10/8` and spacing `6` (was `12/10`
   and `10`)
-
-### Fixed
-
-- Loading patches with a simple **Volume** module at negative `gain_db` (e.g.
-  `demo_wobble_bass.apr`) no longer crashes. The gain knob callback was writing
-  dB into `Volume.amplitude` (linear, must be ≥ 0); it now sets `gain_db`.
-- Factory TB-303 presets (`factory_tb303_voice`, `factory_tb303_modular`):
-  clicks on step retriggers from soniclab `DecayEnvelope` hard-resetting to
-  zero mid-decay and `AccentProcessor` snapping CV on rising accents. Fixed in
-  `soniclab>=2026.1.2` (envelope continues from current level; accent rises
-  over ~2 ms).
-- **`demo_trance_arp`** is realtime-safe in the GUI. Step Sequencer playhead
-  LEDs update via a queued signal (no Qt LED work on the audio path), control-
-  rate effect CV skips disconnected ports and unchanged values, and the demo
-  patch keeps Delay/Reverb mono before the auto-panner (with analog saw).
-  Requires `soniclab` stereo Numba Delay/Reverb and VCV saw speedups.
-
-### Changed
-
 - **MIDI device modules** (MIDI Input, MIDI Poly CV, Poly Voice): selecting a
   device opens it immediately; clearing the selection stops it. Removed the
   Start/Stop and Refresh buttons — refresh is on the module right-click menu
@@ -98,36 +110,6 @@ All notable changes to SonicRack will be documented in this file.
   clock reset). Compact layout: **Rate** + **Depth** (primary), **Offset** +
   **Width** (secondary), **Range** bipolar/unipolar. Removed Sawtooth / Ramp /
   Smooth ports and phase / tempo-sync controls.
-
-## [2026.1.0] - 2026-07-30
-
-### Added
-
-- PyPI-oriented packaging metadata: project URLs, desktop/Qt classifiers, and
-  `Typing :: Typed`.
-- Console entry point `sonicrack` for a standard `uv tool install sonicrack`
-  launch path.
-- GitHub Actions publish workflow (Trusted Publishing to TestPyPI / PyPI).
-- **MIDI Trig outputs**: MIDI Input and MIDI Keyboard emit a one-sample
-  `Trig` pulse on every note-on (including legato retriggers while Gate stays
-  high), alongside existing `1V/Oct` / Gate / Vel ports.
-- **RD-8 / Behringer 182 pattern controls**: per-step gate toggle buttons and a
-  **Randomize** action that scrambles CV A, CV B, and the gate pattern.
-- **Envelope shape previews**: ADSR and Decay Envelope show live curve previews
-  with a glowing playhead for the current phase/level.
-- Shared module helpers: `SimpleModifierBase`, modulated I/O setup,
-  `bind_parameter_knob`, sample-rate listener install/cleanup, and runtime
-  utilities (`read_optional_port`, silence cache, CV influence blend, ramps).
-
-### Changed
-
-- Base install now includes the desktop runtime stack (`pyqt6`, `sounddevice`,
-  `numba`) so the app starts without optional extras.
-- `gui` / `audio-io` extras are kept as empty compatibility aliases.
-- `midi` extra delegates to `soniclab[midi]`.
-- Wheel/sdist exclude marketing screenshots and icon/splash generator scripts.
-- README documents `uv`-first PyPI and development install; package version
-  snapshot set to `2026.1.0`.
 - Module library categories reorganized:
   - VCO is **Source** (with oscillators, LFO, noise, MIDI).
   - All sequencing modules use **Sequencer** (Clock, Step Sequencer,
@@ -145,12 +127,22 @@ All notable changes to SonicRack will be documented in this file.
 
 ### Fixed
 
+- **Clock → envelope Gate**: Clock is a Trigger stream; pulses are widened to
+  ~2 ms and ADSR Gate accepts triggers so clocked envelopes work.
+- Loading patches with a simple **Volume** module at negative `gain_db` (e.g.
+  `demo_wobble_bass.apr`) no longer crashes. The gain knob callback was writing
+  dB into `Volume.amplitude` (linear, must be ≥ 0); it now sets `gain_db`.
+- Factory TB-303 presets (`factory_tb303_voice`, `factory_tb303_modular`):
+  clicks on step retriggers from soniclab `DecayEnvelope` hard-resetting to
+  zero mid-decay and `AccentProcessor` snapping CV on rising accents. Fixed in
+  `soniclab>=2026.1.2` (envelope continues from current level; accent rises
+  over ~2 ms).
+- **`demo_trance_arp`** is realtime-safe in the GUI. Step Sequencer playhead
+  LEDs update via a queued signal (no Qt LED work on the audio path), control-
+  rate effect CV skips disconnected ports and unchanged values, and the demo
+  patch keeps Delay/Reverb mono before the auto-panner (with analog saw).
+  Requires `soniclab` stereo Numba Delay/Reverb and VCV saw speedups.
 - Coverage report batch script package path (`fatlife` → `sonicrack`).
-
-### Notes
-
-- First public packaging target for the modular rack application.
-- DSP remains provided by the separate `soniclab` distribution on PyPI.
 
 ## [2026-07-06] - Performance Optimization Sprint
 

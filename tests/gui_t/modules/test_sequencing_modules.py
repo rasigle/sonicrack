@@ -208,7 +208,8 @@ def test_clock_module_drives_step_sequencer_through_pattern(qapp: Any):
     assert len(unique) >= 4, f"expected multi-step advance, saw {steps_seen}"
     # Consecutive clock ticks should advance sequentially (mod 8).
     advances = [s for i, s in enumerate(steps_seen) if i == 0 or s != steps_seen[i - 1]]
-    for prev, cur in zip(advances, advances[1:], strict=True):
+    assert len(advances) >= 2, f"expected at least two advances, saw {steps_seen}"
+    for prev, cur in zip(advances[:-1], advances[1:], strict=True):
         assert cur == (prev + 1) % 8
 
 
@@ -672,13 +673,15 @@ def test_slide_module_processes_frequency_cv(qapp: Any):
 def test_accent_module_writes_scaled_cv_outputs(qapp: Any):
     del qapp
     module = AccentModule()
-    _connect_signal(
-        module.accent_input,
-        np.array([1.0, 1.0, 0.0, 0.0], dtype=np.float32),
-    )
+    # soniclab AccentProcessor rises over ~2 ms on a rising accent so a short
+    # buffer only captures the start of the ramp. Render long enough to settle.
+    n = 256
+    accent = np.zeros(n, dtype=np.float32)
+    accent[:128] = 1.0
+    _connect_signal(module.accent_input, accent)
 
     module.process_runtime(
-        4,
+        n,
         {
             "amount": 1.0,
             "decay": 0.0,
@@ -688,9 +691,18 @@ def test_accent_module_writes_scaled_cv_outputs(qapp: Any):
         },
     )
 
-    np.testing.assert_allclose(module.amp_port.value, [0.25, 0.25, 0.0, 0.0])
-    np.testing.assert_allclose(module.cutoff_port.value, [0.5, 0.5, 0.0, 0.0])
-    np.testing.assert_allclose(module.env_port.value, [0.75, 0.75, 0.0, 0.0])
+    amp = np.asarray(module.amp_port.value, dtype=np.float32)
+    cutoff = np.asarray(module.cutoff_port.value, dtype=np.float32)
+    env = np.asarray(module.env_port.value, dtype=np.float32)
+    assert amp.shape == (n,)
+    # After the ~2 ms accent rise (≈88 samples @ 44.1 kHz), depths settle.
+    np.testing.assert_allclose(amp[100:120], 0.25, atol=1e-2)
+    np.testing.assert_allclose(cutoff[100:120], 0.5, atol=1e-2)
+    np.testing.assert_allclose(env[100:120], 0.75, atol=1e-2)
+    # After accent falls (and decay=0), outputs return toward zero.
+    assert float(amp[-1]) < 0.05
+    assert float(cutoff[-1]) < 0.05
+    assert float(env[-1]) < 0.05
 
 
 def test_parse_notes_skips_rests_and_clamps() -> None:

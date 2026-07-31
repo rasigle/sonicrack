@@ -233,6 +233,19 @@ class ADSRModule(ModuleWidget):
                 "On/Off: hold trig down to gate on, release it to gate off."
             ),
         )
+        self.curve_param = self.register_menu_choice(
+            "curve",
+            "Curve",
+            ["Linear", "Exponential", "Polynomial"],
+            "Exponential",
+            on_changed=self._on_curve_changed,
+            tooltip=(
+                "Segment interpolation for attack, decay, and release.\n"
+                "Linear: straight ramps.\n"
+                "Exponential: analog RC shape — natural VCA feel (recommended).\n"
+                "Polynomial: smooth S-curve (Hermite smoothstep)."
+            ),
+        )
 
         # Register parameters for automatic get/set
         self.register_parameter("attack_duration", self.attack_knob)
@@ -257,13 +270,19 @@ class ADSRModule(ModuleWidget):
         self.parameter_changed.emit(param_name, knob.get_value())
 
     def _update_shape_display(self) -> None:
-        """Sync the shape widget with the current ADSR knobs."""
+        """Sync the shape widget with the current ADSR knobs and curve."""
         self.shape_widget.set_envelope(
             self.attack_knob.get_value(),
             self.decay_knob.get_value(),
             self.sustain_knob.get_value(),
             self.release_knob.get_value(),
+            curve=self._normalize_curve(self.curve_param.get_value()),
         )
+
+    def _on_curve_changed(self, value: str) -> None:
+        """Refresh the shape preview when the curve menu choice changes."""
+        del value
+        self._update_shape_display()
 
     def _update_live_position(self) -> None:
         """Refresh the shape playhead from the active ADSR component state."""
@@ -393,6 +412,7 @@ class ADSRModule(ModuleWidget):
             retrigger_mode=self._normalize_retrigger_mode(
                 self.retrigger_param.get_value()
             ),
+            curve=self._normalize_curve(self.curve_param.get_value()),
         )
 
         # If gate input is connected, wrap with gate-triggered version
@@ -433,10 +453,23 @@ class ADSRModule(ModuleWidget):
         )
         mode_value = parameters.get("retrigger_mode", self.retrigger_param.get_value())
         adsr.retrigger_mode = self._normalize_retrigger_mode(str(mode_value))
+        curve_value = parameters.get("curve", self.curve_param.get_value())
+        adsr.curve = self._normalize_curve(str(curve_value))
 
     @staticmethod
     def _normalize_retrigger_mode(value: str) -> Literal["legato", "punch"]:
         return "legato" if value.lower() == "legato" else "punch"
+
+    @staticmethod
+    def _normalize_curve(
+        value: str,
+    ) -> Literal["linear", "exponential", "polynomial"]:
+        lowered = value.lower().strip()
+        if lowered == "polynomial":
+            return "polynomial"
+        if lowered == "linear":
+            return "linear"
+        return "exponential"
 
     def _render_gate_triggered_adsr(
         self, adsr: ADSREnvelope, gate_signal: np.ndarray, num_samples: int

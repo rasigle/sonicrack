@@ -1,17 +1,22 @@
 # SonicRack
 
+[![CI](https://github.com/rasigle/sonicrack/actions/workflows/ci.yml/badge.svg)](https://github.com/rasigle/sonicrack/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/sonicrack)](https://pypi.org/project/sonicrack/)
+[![Python versions](https://img.shields.io/pypi/pyversions/sonicrack)](https://pypi.org/project/sonicrack/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 SonicRack is a PyQt6 modular synthesizer application for building audio patches
 visually. The app owns the patching UI, runtime graph, presets, and packaged
 assets; DSP, realtime audio, and MIDI primitives come from [`soniclab`](https://pypi.org/project/soniclab/).
 
 ## Snapshot
 
-- Package version: `2026.1.0`
+- Package version: `2026.2.0`
 - Python: `>=3.11`
 - CLI entry point: `sonicrack`
 - Module entry point: `python -m sonicrack.modular_synth_app`
 - Main package: `sonicrack`
-- DSP dependency: `soniclab`
+- DSP dependency: `soniclab>=2026.1.3`
 - License: MIT
 
 ## Install (PyPI)
@@ -29,6 +34,9 @@ and the `soniclab` engine). Alternatives:
 ```bash
 # as a project dependency
 uv add sonicrack
+
+# classic pip
+pip install sonicrack
 
 # one-off run without a permanent install
 uvx sonicrack
@@ -178,11 +186,62 @@ $env:QT_QPA_PLATFORM="offscreen"
 uv run pytest tests/gui_t -q
 ```
 
-## Publishing
+## Publishing a release
 
-Release builds use Hatchling (`uv build`). CI can publish via Trusted Publishing
-on GitHub release (PyPI) or `workflow_dispatch` (TestPyPI). See
-`.github/workflows/publish.yml`.
+Version is read from `sonicrack/_version.py` (CalVer-style `YYYY.MINOR.MICRO`).
+Publishing uses GitHub Actions (Trusted Publisher) on a GitHub **Release**.
+
+### One-time setup (PyPI + GitHub)
+
+1. Create the project on [PyPI](https://pypi.org/) (and optionally
+   [TestPyPI](https://test.pypi.org/)) under the owner that will publish.
+2. Add a **Trusted Publisher** for this repo:
+   - Owner: `rasigle`
+   - Repository: `sonicrack`
+   - Workflow: `publish.yml`
+   - Environment: `pypi` (and `testpypi` for TestPyPI)
+3. In GitHub → **Settings → Environments**, create `pypi` and `testpypi`
+   (optional protection rules / required reviewers).
+4. Ensure the default branch is `main` and CI (`.github/workflows/ci.yml`) is
+   green before cutting a release.
+
+### Release steps
+
+1. **Prep**
+   - Bump `major` / `minor` / `micro` in `sonicrack/_version.py`.
+   - Move the matching section in `CHANGELOG.md` from *Unreleased* to a dated
+     heading (e.g. `## [2026.2.0] - 2026-07-31`).
+   - Update the Snapshot version in this README if it is listed explicitly.
+   - Commit on `main` and push so CI is green (`pytest`, `ruff`, `mypy`).
+
+2. **Local sanity (optional but recommended)**
+
+   ```powershell
+   uv run pytest tests -q
+   uv run ruff check sonicrack tests
+   uv run mypy sonicrack tests
+   uv build
+   uvx twine check dist/*
+   ```
+
+3. **Tag & release** (triggers PyPI publish)
+
+   ```powershell
+   git tag 2026.2.0
+   git push origin main --tags
+   # Then publish a GitHub Release for that tag (UI or gh):
+   # gh release create 2026.2.0 --title "2026.2.0" --notes-file CHANGELOG.md
+   ```
+
+   The `Publish to PyPI` workflow builds the sdist/wheel and uploads to PyPI
+   when the release is **published**. For a dry run, use
+   **Actions → Publish to PyPI → Run workflow** with target `testpypi`.
+
+4. **Verify** — [pypi.org/project/sonicrack](https://pypi.org/project/sonicrack/)
+   shows the new version; `uv tool install sonicrack` / `pip install -U sonicrack`
+   installs it and `sonicrack --help` works.
+
+Do not upload the same version twice to PyPI (versions are immutable).
 
 ## Development Notes
 

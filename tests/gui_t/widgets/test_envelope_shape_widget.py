@@ -183,3 +183,36 @@ def test_decay_module_live_position_tracks_component(qapp: Any):
     indicator = module.shape_widget.indicator()
     assert indicator is not None
     assert indicator[1] > 0.0
+
+def test_shape_points_exponential_differs_from_linear():
+    linear = EnvelopeShapeWidget.shape_points(0.2, 0.2, 0.5, 0.2, curve="linear")
+    expo = EnvelopeShapeWidget.shape_points(0.2, 0.2, 0.5, 0.2, curve="exponential")
+    assert len(expo) > len(linear)
+    assert expo[0] == (0.0, 0.0)
+    assert expo[-1][1] == pytest.approx(0.0)
+
+
+def test_adsr_module_curve_menu_updates_shape_and_engine(qapp: Any):
+    del qapp
+    module = ADSRModule()
+    assert module.curve_param.get_value() == "Exponential"
+    assert module.shape_widget.curve() == "exponential"
+
+    module.curve_param.set_value("Linear")
+    assert module.shape_widget.curve() == "linear"
+
+    module.curve_param.set_value("Polynomial")
+    assert module.shape_widget.curve() == "polynomial"
+
+    adsr = module._current_adsr()
+    module._apply_runtime_parameters(adsr, {"curve": "Linear"})
+    assert adsr.curve == "linear"
+
+
+def test_decay_module_curve_menu(qapp: Any):
+    del qapp
+    module = DecayEnvelopeModule()
+    assert module.curve_param.get_value() == "Exponential"
+    module.curve_param.set_value("Linear")
+    assert module.shape_widget.curve() == "linear"
+

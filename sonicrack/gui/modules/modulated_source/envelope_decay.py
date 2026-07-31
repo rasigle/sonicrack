@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
@@ -43,7 +43,7 @@ class DecayEnvelopeModule(ModuleWidget):
         self.accent_input = self.add_input("Accent", signal=PortSignal.CONTROL_CV)
         self.out_port = self.add_output("Out", signal=PortSignal.CONTROL_CV)
 
-        self.component = DecayEnvelope()
+        self.component = DecayEnvelope(curve="exponential")
         self._previous_gate = 0.0
 
         layout = self._begin_controls(spacing=6)
@@ -128,6 +128,20 @@ class DecayEnvelopeModule(ModuleWidget):
         self.register_parameter("amount", self.amount_knob)
         self.register_parameter("accent_amount", self.accent_knob)
 
+        self.curve_param = self.register_menu_choice(
+            "curve",
+            "Curve",
+            ["Linear", "Exponential", "Polynomial"],
+            "Exponential",
+            on_changed=self._on_curve_changed,
+            tooltip=(
+                "Segment interpolation for attack and decay.\n"
+                "Linear: straight ramps.\n"
+                "Exponential: analog RC shape — natural pluck tails (recommended).\n"
+                "Polynomial: smooth S-curve (Hermite smoothstep)."
+            ),
+        )
+
         self._update_shape_display()
 
     def _on_envelope_knob_changed(self, param_name: str, knob: Knob) -> None:
@@ -136,12 +150,29 @@ class DecayEnvelopeModule(ModuleWidget):
         self.parameter_changed.emit(param_name, knob.get_value())
 
     def _update_shape_display(self) -> None:
-        """Sync the shape widget with attack/decay/amount knobs."""
+        """Sync the shape widget with attack/decay/amount knobs and curve."""
         self.shape_widget.set_ad_envelope(
             self.attack_knob.get_value(),
             self.decay_knob.get_value(),
             self.amount_knob.get_value(),
+            curve=self._normalize_curve(self.curve_param.get_value()),
         )
+
+    def _on_curve_changed(self, value: str) -> None:
+        """Refresh the shape preview when the curve menu choice changes."""
+        del value
+        self._update_shape_display()
+
+    @staticmethod
+    def _normalize_curve(
+        value: str,
+    ) -> Literal["linear", "exponential", "polynomial"]:
+        lowered = value.lower().strip()
+        if lowered == "polynomial":
+            return "polynomial"
+        if lowered == "linear":
+            return "linear"
+        return "exponential"
 
     def _update_live_position(self) -> None:
         """Refresh the shape playhead from the decay envelope component."""
@@ -189,6 +220,8 @@ class DecayEnvelopeModule(ModuleWidget):
         self.component.amount = float_parameter(
             parameters, "amount", self.amount_knob.get_value
         )
+        curve_value = parameters.get("curve", self.curve_param.get_value())
+        self.component.curve = self._normalize_curve(str(curve_value))
 
         gate_signal = (
             read_samples(self.gate_input, num_samples)

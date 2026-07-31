@@ -27,7 +27,7 @@ class LimiterModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=220, height=220, color=QColor(160, 90, 90))
+        super().__init__(width=220, height=235, color=QColor(160, 90, 90))
         self.in_port = self.add_input("In")
         self.out_port = self.add_output("Out")
         self.component = Limiter(sample_rate=audio_config.sample_rate)

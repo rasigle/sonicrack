@@ -199,7 +199,7 @@ class ModulatedOscillatorModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(
             width=280,
-            height=275,
+            height=245,
             color=QColor(100, 140, 220),
         )
 
@@ -208,7 +208,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         self._base_frequency = VCO_DEFAULT_FREQUENCY
         self._pulsewidth = DEFAULT_PW_PERCENTAGE_VALUE / 100
         self._fm_amount = VCO_DEFAULT_FM_AMOUNT_PERCENT
-        self._fm_mode = VCO_FM_MODE_V_OCT
 
         self.component = create_vco_oscillator(
             self._waveform,
@@ -223,6 +222,18 @@ class ModulatedOscillatorModule(ModuleWidget):
             "Out",
             component=self.component,
             signal=PortSignal.AUDIO,
+        )
+
+        # Setup option: right-click module header → FM Mode
+        self.fm_mode_param = self.register_menu_choice(
+            "fm_mode",
+            "FM Mode",
+            [VCO_FM_MODE_V_OCT, VCO_FM_MODE_LINEAR],
+            VCO_FM_MODE_V_OCT,
+            tooltip=(
+                "1V/octave: pitch-style exponential FM depth.\n"
+                "Linear: Hz offset scaled by C4 reference frequency."
+            ),
         )
 
         layout = self._begin_controls(spacing=6)
@@ -245,16 +256,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         self._refresh_mode_options(self._waveform, preserve_current=False)
         mode_layout.addWidget(self.mode_combo)
         layout.addLayout(mode_layout)
-
-        fm_mode_layout = QHBoxLayout()
-        fm_mode_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        fm_mode_layout.addWidget(QLabel("FM Mode:"))
-        self.fm_mode_combo = QtWidgets.QComboBox()
-        self.fm_mode_combo.addItems([VCO_FM_MODE_V_OCT, VCO_FM_MODE_LINEAR])
-        self.fm_mode_combo.setCurrentText(self._fm_mode)
-        self.fm_mode_combo.currentTextChanged.connect(self._on_fm_mode_changed)
-        fm_mode_layout.addWidget(self.fm_mode_combo)
-        layout.addLayout(fm_mode_layout)
 
         knobs_layout = QHBoxLayout()
         knobs_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -302,12 +303,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         )
         self.register_parameter(
             "mode", self.mode_combo, getter="currentText", setter="setCurrentText"
-        )
-        self.register_parameter(
-            "fm_mode",
-            self.fm_mode_combo,
-            getter="currentText",
-            setter="setCurrentText",
         )
         self.register_parameter("frequency", self.freq_knob)
         self.register_parameter("fm_amount", self.fm_amount_knob)
@@ -441,10 +436,6 @@ class ModulatedOscillatorModule(ModuleWidget):
         self._fm_amount = self.fm_amount_knob.get_value()
         self.parameter_changed.emit("fm_amount", self._fm_amount)
 
-    def _on_fm_mode_changed(self, fm_mode: str) -> None:
-        self._fm_mode = fm_mode
-        self.parameter_changed.emit("fm_mode", fm_mode)
-
     def _on_pulsewidth_changed(self) -> None:
         pulsewidth = self.pulsewidth_knob.get_value()
         self._pulsewidth = pulsewidth
@@ -515,7 +506,7 @@ class ModulatedOscillatorModule(ModuleWidget):
         )
         base_freq = self.freq_knob.get_value()
         fm_amount = self.fm_amount_knob.get_value()
-        fm_mode = self.fm_mode_combo.currentText()
+        fm_mode = self.fm_mode_param.get_value()
         pulsewidth = self.pulsewidth_knob.get_value()
 
         freq_modulator = (
@@ -577,7 +568,7 @@ class ModulatedOscillatorModule(ModuleWidget):
             wave_type,
             str_parameter(parameters, "mode", self.mode_combo.currentText),
         )
-        fm_mode = str_parameter(parameters, "fm_mode", self.fm_mode_combo.currentText)
+        fm_mode = str_parameter(parameters, "fm_mode", self.fm_mode_param.get_value)
         frequency = float_parameter(parameters, "frequency", self.freq_knob.get_value)
         phase = (
             float_parameter(parameters, "phase", lambda: 0.0)

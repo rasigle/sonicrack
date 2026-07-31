@@ -31,7 +31,7 @@ class SimpleVolumeModule(SimpleModifierBase):
         """Initialize simple volume module."""
         super().__init__(
             width=140,
-            height=175,
+            height=150,
             color=QColor(160, 100, 60),
         )
 

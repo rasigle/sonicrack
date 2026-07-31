@@ -95,7 +95,7 @@ class PolyVoiceModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=400, height=480, color=QColor(90, 140, 160))
+        super().__init__(width=400, height=495, color=QColor(90, 140, 160))
 
         self.out_port = self.add_output("Out", signal=PortSignal.AUDIO)
         self._lock = threading.RLock()
@@ -119,24 +119,17 @@ class PolyVoiceModule(ModuleWidget):
 
         layout = self._begin_controls(spacing=6)
 
-        # Optional MIDI device for polyphonic controller input
+        # Optional MIDI device for polyphonic controller input (active while selected)
         midi_row = QHBoxLayout()
         midi_row.addWidget(QLabel("MIDI:"))
         self.midi_device_combo = QComboBox()
         self.midi_device_combo.addItem("(No Device)")
         self.midi_device_combo.setToolTip(
-            "Select a MIDI keyboard/controller for polyphonic note input"
+            "MIDI keyboard/controller for polyphonic note input "
+            "(active while selected). Right-click module to refresh the list."
         )
+        self.midi_device_combo.currentTextChanged.connect(self._on_midi_device_changed)
         midi_row.addWidget(self.midi_device_combo)
-        self.midi_refresh_btn = QPushButton("↻")
-        self.midi_refresh_btn.setMaximumWidth(28)
-        self.midi_refresh_btn.setToolTip("Refresh MIDI device list")
-        self.midi_refresh_btn.clicked.connect(self._refresh_midi_devices)
-        midi_row.addWidget(self.midi_refresh_btn)
-        self.midi_start_btn = QPushButton("Start")
-        self.midi_start_btn.setMaximumWidth(52)
-        self.midi_start_btn.clicked.connect(self._toggle_midi)
-        midi_row.addWidget(self.midi_start_btn)
         layout.addLayout(midi_row)
 
         self.midi_status_label = QLabel("MIDI idle")
@@ -266,6 +259,11 @@ class PolyVoiceModule(ModuleWidget):
         self._install_sample_rate_listener()
         self._refresh_midi_devices()
 
+    def _populate_context_menu(self, menu) -> None:
+        menu.addSeparator()
+        refresh_action = menu.addAction("Refresh MIDI Devices")
+        refresh_action.triggered.connect(self._refresh_midi_devices)
+
     def _refresh_midi_devices(self) -> None:
         """Refresh available MIDI input devices."""
         try:
@@ -284,6 +282,8 @@ class PolyVoiceModule(ModuleWidget):
             idx = self.midi_device_combo.findText(current)
             if idx >= 0:
                 self.midi_device_combo.setCurrentIndex(idx)
+            else:
+                self.midi_device_combo.setCurrentIndex(0)
             self.midi_device_combo.blockSignals(False)
             if devices:
                 self.midi_status_changed.emit(f"Found {len(devices)} MIDI device(s)")
@@ -292,17 +292,38 @@ class PolyVoiceModule(ModuleWidget):
         except Exception as exc:  # pragma: no cover - hardware dependent
             logger.warning("Poly Voice MIDI device list failed: %s", exc)
             self.midi_status_changed.emit(f"MIDI error: {exc}")
+        finally:
+            self._sync_midi_device()
 
-    def _toggle_midi(self) -> None:
+    def _on_midi_device_changed(self, device: str) -> None:
+        self.parameter_changed.emit("midi_device", device)
+        self._sync_midi_device(device)
+
+    def _sync_midi_device(self, device: str | None = None) -> None:
+        """Keep the MIDI worker active exactly while a real device is selected."""
+        if device is None:
+            device = self.midi_device_combo.currentText()
+
+        if not device or device == "(No Device)":
+            if self._midi_running:
+                self._stop_midi()
+            return
+
+        if (
+            self._midi_running
+            and self.midi_worker is not None
+            and self.midi_worker.device_name == device
+        ):
+            return
+
         if self._midi_running:
             self._stop_midi()
-        else:
-            self._start_midi()
+        self._start_midi(device)
 
-    def _start_midi(self) -> None:
-        device = self.midi_device_combo.currentText()
-        if device == "(No Device)":
-            self.midi_status_changed.emit("Select a MIDI device first")
+    def _start_midi(self, device: str | None = None) -> None:
+        if device is None:
+            device = self.midi_device_combo.currentText()
+        if not device or device == "(No Device)":
             return
         try:
             self.midi_worker = MIDIWorkerThread(device)
@@ -311,9 +332,10 @@ class PolyVoiceModule(ModuleWidget):
             self.midi_worker.error_occurred.connect(self._on_midi_error)
             self.midi_worker.start()
             self._midi_running = True
-            self.midi_start_btn.setText("Stop")
             self.midi_status_changed.emit(f"Connecting: {device}")
         except Exception as exc:  # pragma: no cover
+            self._midi_running = False
+            self.midi_worker = None
             logger.error("Failed to start Poly Voice MIDI: %s", exc, exc_info=True)
             self.midi_status_changed.emit(f"Error: {exc}")
 
@@ -324,7 +346,6 @@ class PolyVoiceModule(ModuleWidget):
                 self.midi_worker.wait(2000)
             self.midi_worker = None
         self._midi_running = False
-        self.midi_start_btn.setText("Start")
         with self._lock:
             for note in list(self._midi_held_notes):
                 self.synth.note_off(note)
@@ -336,8 +357,8 @@ class PolyVoiceModule(ModuleWidget):
 
     def _on_midi_error(self, error: str) -> None:
         logger.error("Poly Voice MIDI error: %s", error)
-        self.midi_status_changed.emit(f"Error: {error}")
         self._stop_midi()
+        self.midi_status_changed.emit(f"Error: {error}")
 
     def _on_midi_message(self, msg: Any) -> None:
         """Route polyphonic note on/off from the MIDI worker into the voice pool."""

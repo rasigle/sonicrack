@@ -17,7 +17,6 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
-    QPushButton,
 )
 from soniclab.midi_io import (
     MIDIMessage,
@@ -73,7 +72,7 @@ class MIDIPolyCVModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(
             width=300,
-            height=360,
+            height=240,
             color=QColor(170, 80, 140),
         )
 
@@ -119,6 +118,11 @@ class MIDIPolyCVModule(ModuleWidget):
         device_layout.addWidget(QLabel("Device:"))
         self.device_combo = QComboBox()
         self.device_combo.addItem("(No Device)")
+        self.device_combo.setToolTip(
+            "MIDI input device (active while selected). "
+            "Right-click module to refresh the list."
+        )
+        self.device_combo.currentTextChanged.connect(self._on_device_changed)
         device_layout.addWidget(self.device_combo)
         layout.addLayout(device_layout)
 
@@ -133,15 +137,6 @@ class MIDIPolyCVModule(ModuleWidget):
         self.bend_range_knob.value_changed.connect(self._on_bend_range_changed)
         bend_row.addWidget(self.bend_range_knob)
         layout.addLayout(bend_row)
-
-        btn_layout = QHBoxLayout()
-        self.refresh_btn = QPushButton("Refresh")
-        self.refresh_btn.clicked.connect(self._refresh_devices)
-        btn_layout.addWidget(self.refresh_btn)
-        self.start_btn = QPushButton("Start")
-        self.start_btn.clicked.connect(self._toggle_midi)
-        btn_layout.addWidget(self.start_btn)
-        layout.addLayout(btn_layout)
 
         self.status_label = QLabel("Idle")
         self.status_label.setStyleSheet("color: gray; font-size: 10px;")
@@ -179,6 +174,11 @@ class MIDIPolyCVModule(ModuleWidget):
             "pitch_bend_range", int(self.bend_range_knob.get_value())
         )
 
+    def _populate_context_menu(self, menu) -> None:
+        menu.addSeparator()
+        refresh_action = menu.addAction("Refresh MIDI Devices")
+        refresh_action.triggered.connect(self._refresh_devices)
+
     def _refresh_devices(self) -> None:
         try:
             from soniclab.midi_io import MIDIInput
@@ -197,6 +197,8 @@ class MIDIPolyCVModule(ModuleWidget):
             idx = self.device_combo.findText(current)
             if idx >= 0:
                 self.device_combo.setCurrentIndex(idx)
+            else:
+                self.device_combo.setCurrentIndex(0)
             self.device_combo.blockSignals(False)
 
             if devices:
@@ -206,17 +208,38 @@ class MIDIPolyCVModule(ModuleWidget):
         except Exception as e:
             self.device_status_changed.emit(f"Error: {e}")
             logger.error("MIDI Poly CV device list failed: %s", e, exc_info=True)
+        finally:
+            self._sync_midi_device()
 
-    def _toggle_midi(self) -> None:
+    def _on_device_changed(self, device: str) -> None:
+        self.parameter_changed.emit("device", device)
+        self._sync_midi_device(device)
+
+    def _sync_midi_device(self, device: str | None = None) -> None:
+        """Keep the MIDI worker active exactly while a real device is selected."""
+        if device is None:
+            device = self.device_combo.currentText()
+
+        if not device or device == "(No Device)":
+            if self._is_running:
+                self._stop_midi()
+            return
+
+        if (
+            self._is_running
+            and self.midi_worker is not None
+            and self.midi_worker.device_name == device
+        ):
+            return
+
         if self._is_running:
             self._stop_midi()
-        else:
-            self._start_midi()
+        self._start_midi(device)
 
-    def _start_midi(self) -> None:
-        device = self.device_combo.currentText()
-        if device == "(No Device)":
-            self.device_status_changed.emit("Please select a device")
+    def _start_midi(self, device: str | None = None) -> None:
+        if device is None:
+            device = self.device_combo.currentText()
+        if not device or device == "(No Device)":
             return
         try:
             self.midi_worker = MIDIWorkerThread(device)
@@ -225,9 +248,10 @@ class MIDIPolyCVModule(ModuleWidget):
             self.midi_worker.error_occurred.connect(self._on_worker_error)
             self.midi_worker.start()
             self._is_running = True
-            self.start_btn.setText("Stop")
             self.device_status_changed.emit("Connecting...")
         except Exception as e:
+            self._is_running = False
+            self.midi_worker = None
             self.device_status_changed.emit(f"Error: {e}")
             logger.error("Failed to start MIDI Poly CV: %s", e, exc_info=True)
 
@@ -241,10 +265,10 @@ class MIDIPolyCVModule(ModuleWidget):
             finally:
                 self.midi_worker = None
         self._is_running = False
-        self.start_btn.setText("Start")
         self.poly_cv.reset()
         self._global_trigger.reset()
         self._refresh_voice_display()
+        self.device_status_changed.emit("Idle")
 
     def shutdown(self, graceful: bool = True) -> None:
         del graceful
@@ -252,8 +276,8 @@ class MIDIPolyCVModule(ModuleWidget):
 
     def _on_worker_error(self, error: str) -> None:
         logger.error("MIDI Poly CV worker error: %s", error)
-        self.device_status_changed.emit(f"Error: {error}")
         self._stop_midi()
+        self.device_status_changed.emit(f"Error: {error}")
 
     def _on_status_changed(self, status: str) -> None:
         self.status_label.setText(status)

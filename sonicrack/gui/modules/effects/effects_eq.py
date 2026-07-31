@@ -28,7 +28,7 @@ class EQModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=220, height=260, color=QColor(130, 130, 100))
+        super().__init__(width=220, height=290, color=QColor(130, 130, 100))
         self.in_port = self.add_input("In")
         self.out_port = self.add_output("Out")
         self.component = ParametricEQ(sample_rate=audio_config.sample_rate)

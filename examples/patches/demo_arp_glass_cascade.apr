@@ -1,0 +1,192 @@
+{
+  "metadata": {
+    "name": "Demo: Glass Cascade Arp",
+    "author": "SonicRack",
+    "description": "Shimmering ambient cascade. E-maj9 floats Up-Down across two octaves with long gates, soft sine, gentle chorus, and a cavernous reverb.",
+    "tags": ["demo", "arpeggiator", "ambient", "chorus", "reverb"],
+    "category": "Demo",
+    "created": "2026-07-31T12:00:00",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Arpeggiator",
+      "custom_name": "Glass Cascade",
+      "module_category": "Sequencer",
+      "position": { "x": -760.0, "y": -60.0 },
+      "parameters": {
+        "active": true,
+        "notes": "64,68,71,75,78",
+        "root": "E",
+        "root_octave": "4",
+        "chord": "Maj9",
+        "pattern": "Up-Down",
+        "octaves": 2,
+        "gate_length": 0.88,
+        "transpose": 0,
+        "swing": 0.0,
+        "bpm": 78.0,
+        "division": "1/8",
+        "latch": true,
+        "running": true
+      }
+    },
+    {
+      "id": 1,
+      "type": "VCO",
+      "custom_name": "Glass Sine",
+      "module_category": "Source",
+      "position": { "x": -380.0, "y": -160.0 },
+      "parameters": {
+        "active": true,
+        "waveform": "Sine",
+        "mode": "pure",
+        "fm_mode": "1V/octave",
+        "frequency": 261.63,
+        "fm_amount": 0.0,
+        "pulsewidth": 0.5
+      }
+    },
+    {
+      "id": 2,
+      "type": "ADSR Envelope",
+      "custom_name": "Bloom",
+      "module_category": "Envelope",
+      "position": { "x": -380.0, "y": 80.0 },
+      "parameters": {
+        "active": true,
+        "attack_duration": 0.08,
+        "decay_duration": 0.55,
+        "sustain_level": 0.55,
+        "release_duration": 0.9,
+        "retrigger_mode": "Legato",
+        "trigger_mode": "On/Off"
+      }
+    },
+    {
+      "id": 3,
+      "type": "VCA",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": { "x": -40.0, "y": -80.0 },
+      "parameters": {
+        "active": true,
+        "amplitude": 0.65,
+        "cv_attenuation": 1.0
+      }
+    },
+    {
+      "id": 4,
+      "type": "Chorus",
+      "custom_name": "Shimmer",
+      "module_category": "Effect",
+      "position": { "x": 240.0, "y": -100.0 },
+      "parameters": {
+        "active": true,
+        "rate": 0.35,
+        "depth": 4.5,
+        "delay": 14.0,
+        "mix": 0.55
+      }
+    },
+    {
+      "id": 5,
+      "type": "Reverb",
+      "custom_name": "Cathedral",
+      "module_category": "Effect",
+      "position": { "x": 500.0, "y": -80.0 },
+      "parameters": {
+        "active": true,
+        "room_size": 0.9,
+        "damping": 0.28,
+        "mix": 0.58
+      }
+    },
+    {
+      "id": 6,
+      "type": "Limiter",
+      "custom_name": "",
+      "module_category": "Effect",
+      "position": { "x": 760.0, "y": -60.0 },
+      "parameters": {
+        "active": true,
+        "threshold": 0.85,
+        "release": 90.0,
+        "makeup": 1.0
+      }
+    },
+    {
+      "id": 7,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": { "x": 1020.0, "y": -40.0 },
+      "parameters": { "active": true }
+    },
+    {
+      "id": 8,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": { "x": 500.0, "y": 160.0 },
+      "parameters": { "active": true }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 0,
+      "source_port": "Freq",
+      "target_module": 1,
+      "target_port": "V/Oct"
+    },
+    {
+      "source_module": 0,
+      "source_port": "Gate",
+      "target_module": 2,
+      "target_port": "Gate"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "In"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "CV In"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "In"
+    },
+    {
+      "source_module": 4,
+      "source_port": "Out",
+      "target_module": 5,
+      "target_port": "In"
+    },
+    {
+      "source_module": 5,
+      "source_port": "Out",
+      "target_module": 6,
+      "target_port": "In"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Out",
+      "target_module": 7,
+      "target_port": "Left/Mono"
+    },
+    {
+      "source_module": 6,
+      "source_port": "Out",
+      "target_module": 8,
+      "target_port": "In"
+    }
+  ]
+}

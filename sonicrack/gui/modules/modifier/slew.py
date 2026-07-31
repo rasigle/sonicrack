@@ -28,7 +28,7 @@ class SlewModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=200, height=200, color=QColor(100, 130, 110))
+        super().__init__(width=200, height=150, color=QColor(100, 130, 110))
         self.in_port = self.add_input("In", signal=PortSignal.CONTROL_CV)
         self.out_port = self.add_output("Out", signal=PortSignal.CONTROL_CV)
         self.component = SlewLimiter(sample_rate=audio_config.sample_rate)

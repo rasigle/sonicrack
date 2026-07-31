@@ -32,7 +32,7 @@ class VolumeModule(ModulatedModuleBase):
         """Initialize volume module."""
         super().__init__(
             width=140,
-            height=180,
+            height=150,
             color=QColor(180, 120, 80),
         )
 

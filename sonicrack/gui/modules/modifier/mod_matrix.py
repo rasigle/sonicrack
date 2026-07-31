@@ -35,7 +35,7 @@ class ModMatrixModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=320, height=320, color=QColor(85, 100, 125))
+        super().__init__(width=320, height=405, color=QColor(85, 100, 125))
         self.src_ports = [
             self.add_input("Src A", signal=PortSignal.CONTROL_CV),
             self.add_input("Src B", signal=PortSignal.CONTROL_CV),

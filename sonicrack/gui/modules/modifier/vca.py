@@ -61,7 +61,7 @@ class VCAModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(
             width=220,
-            height=180,
+            height=150,
             color=QColor(100, 140, 180),
         )
 

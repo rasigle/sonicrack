@@ -330,5 +330,74 @@ def test_knob_double_click_with_min_default():
     assert knob.get_value() == 0.0
 
 
+def _make_wheel_event(delta_y: int, modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier):
+    """Build a QWheelEvent for unit tests."""
+    from PyQt6.QtCore import QPoint, QPointF
+    from PyQt6.QtGui import QWheelEvent
+
+    return QWheelEvent(
+        QPointF(10, 10),
+        QPointF(10, 10),
+        QPoint(0, 0),
+        QPoint(0, delta_y),
+        Qt.MouseButton.NoButton,
+        modifiers,
+        Qt.ScrollPhase.NoScrollPhase,
+        False,
+    )
+
+
+def test_knob_wheel_changes_value():
+    """Scroll wheel over a knob adjusts its value (coarse step)."""
+    callback = Mock()
+    knob = Knob(
+        label="Test",
+        min_value=0.0,
+        max_value=100.0,
+        default_value=50.0,
+        callback=callback,
+    )
+
+    # One typical notch (+120) should move ~2% of the range (+2.0).
+    knob.wheelEvent(_make_wheel_event(120))
+    assert knob.get_value() == pytest.approx(52.0)
+    callback.assert_called_with(52.0)
+
+    knob.wheelEvent(_make_wheel_event(-120))
+    assert knob.get_value() == pytest.approx(50.0)
+
+
+def test_knob_wheel_alt_fine_tune():
+    """Alt + scroll wheel uses a finer step than plain scroll."""
+    knob = Knob(label="Test", min_value=0.0, max_value=100.0, default_value=50.0)
+
+    knob.wheelEvent(
+        _make_wheel_event(120, Qt.KeyboardModifier.AltModifier)
+    )
+    fine_value = knob.get_value()
+    # Fine ≈ 0.2% of range per notch → +0.2
+    assert fine_value == pytest.approx(50.2)
+
+    knob.set_value(50.0)
+    knob.wheelEvent(_make_wheel_event(120))
+    coarse_value = knob.get_value()
+    assert coarse_value == pytest.approx(52.0)
+    assert abs(coarse_value - 50.0) > abs(fine_value - 50.0)
+
+
+def test_knob_wheel_logarithmic_uses_normalized_space():
+    """Wheel adjustment on log knobs steps in normalized space."""
+    knob = Knob(
+        label="Freq",
+        min_value=20.0,
+        max_value=20000.0,
+        default_value=20.0,
+        logarithmic=True,
+    )
+    start_norm = knob.get_normalized_value()
+    knob.wheelEvent(_make_wheel_event(120))
+    assert knob.get_normalized_value() == pytest.approx(start_norm + 0.02)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

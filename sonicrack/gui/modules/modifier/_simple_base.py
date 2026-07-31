@@ -36,7 +36,7 @@ class SimpleModifierBase(ModuleWidget):
         param_name: str,
         *,
         on_change: Callable[[float], None] | None = None,
-        spacing: int = 10,
+        spacing: int = 6,
     ) -> QVBoxLayout:
         """Create controls with one centered parameter knob and register it."""
         layout = self._begin_controls(spacing=spacing)

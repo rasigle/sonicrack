@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from sonicrack.gui.modules.sequencing.accent import AccentModule
+from sonicrack.gui.modules.sequencing.arpeggiator import ArpeggiatorModule, _parse_notes
 from sonicrack.gui.modules.sequencing.behringer_182 import Behringer182Module
 from sonicrack.gui.modules.sequencing.clock import ClockModule
 from sonicrack.gui.modules.sequencing.slide import SlideModule
@@ -31,6 +32,7 @@ def test_sequencing_modules_are_discoverable(qapp: Any):
 
     assert "Clock" in registered
     assert "Step Sequencer" in registered
+    assert "Arpeggiator" in registered
     assert "Slide" in registered
     assert "Accent" in registered
     assert "Behringer 182" in registered
@@ -465,3 +467,101 @@ def test_accent_module_writes_scaled_cv_outputs(qapp: Any):
     np.testing.assert_allclose(module.amp_port.value, [0.25, 0.25, 0.0, 0.0])
     np.testing.assert_allclose(module.cutoff_port.value, [0.5, 0.5, 0.0, 0.0])
     np.testing.assert_allclose(module.env_port.value, [0.75, 0.75, 0.0, 0.0])
+
+
+def test_parse_notes_skips_rests_and_clamps() -> None:
+    assert _parse_notes("60, 64, -, 67, rest, 200") == [60, 64, 67, 127]
+    assert _parse_notes("") == []
+
+
+def test_arpeggiator_module_writes_cv_outputs(qapp: Any):
+    del qapp
+    module = ArpeggiatorModule()
+    # External clock: two steps across the buffer.
+    _connect_signal(
+        module.clock_input,
+        np.array([1.0, 0.0, 1.0, 0.0], dtype=np.float32),
+    )
+
+    module.process_runtime(
+        4,
+        {
+            "notes": "60,72",
+            "pattern": "Up",
+            "octaves": 1,
+            "gate_length": 1.0,
+            "transpose": 0,
+            "swing": 0.0,
+            "bpm": 120.0,
+            "division": "1/16",
+            "latch": False,
+            "running": True,
+        },
+    )
+
+    freq = np.asarray(module.freq_port.value)
+    gate = np.asarray(module.gate_port.value)
+    trig = np.asarray(module.trigger_port.value)
+    vel = np.asarray(module.vel_port.value)
+
+    assert freq.shape == (4,)
+    # MIDI 60 → 0V, MIDI 72 → +1V (1V/oct, C4 reference).
+    np.testing.assert_allclose(freq, [0.0, 0.0, 1.0, 1.0], atol=1e-5)
+    np.testing.assert_allclose(gate, [1.0, 1.0, 1.0, 1.0])
+    np.testing.assert_allclose(trig, [1.0, 0.0, 1.0, 0.0])
+    assert np.all(vel >= 0.0)
+
+
+def test_arpeggiator_apply_chord_updates_notes(qapp: Any):
+    del qapp
+    module = ArpeggiatorModule()
+
+    text = module.apply_chord("A", 3, "Min7")
+
+    assert text == "57,60,64,67"
+    assert module.notes_edit.text() == text
+
+
+def test_arpeggiator_pattern_and_octaves_expand_sequence(qapp: Any):
+    del qapp
+    module = ArpeggiatorModule()
+    module.notes_edit.setText("60,64,67")
+    module.set_octaves(2)
+    module.pattern_combo.setCurrentText("Down")
+    module._refresh_sequence_preview()
+
+    # Two octaves of C-E-G expanded then reversed: G5 … C4.
+    notes = module.component.sequence_notes
+    assert notes == [79, 76, 72, 67, 64, 60]
+
+
+
+def test_arpeggiator_parameters_round_trip(qapp: Any):
+    del qapp
+    module = ArpeggiatorModule()
+    module.set_parameters(
+        {
+            "notes": "48,55,60",
+            "pattern": "Random",
+            "octaves": 3,
+            "gate_length": 0.33,
+            "transpose": -5,
+            "bpm": 140.0,
+            "division": "1/8",
+            "latch": True,
+            "running": False,
+            "chord": "Power",
+            "root": "G",
+            "root_octave": "2",
+        }
+    )
+    params = module.get_parameters()
+
+    assert params["notes"] == "48,55,60"
+    assert params["pattern"] == "Random"
+    assert params["octaves"] == 3
+    assert abs(float(params["gate_length"]) - 0.33) < 1e-6
+    assert params["transpose"] == -5
+    assert params["division"] == "1/8"
+    assert params["latch"] is True
+    assert params["running"] is False

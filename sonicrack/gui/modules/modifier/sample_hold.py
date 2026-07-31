@@ -25,7 +25,8 @@ class SampleHoldModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=180, height=180, color=QColor(120, 100, 130))
+        # Port-only utility: height sized for 3 jacks, not empty controls.
+        super().__init__(width=140, height=140, color=QColor(120, 100, 130))
         self.in_port = self.add_input("In", signal=PortSignal.CONTROL_CV)
         self.clock_port = self.add_input("Clock", signal=PortSignal.TRIGGER)
         self.out_port = self.add_output("Out", signal=PortSignal.CONTROL_CV)

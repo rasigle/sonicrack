@@ -54,7 +54,7 @@ class Behringer182Module(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=280, height=760, color=QColor(115, 135, 80))
+        super().__init__(width=280, height=690, color=QColor(115, 135, 80))
 
         self.clock_input = self.add_input("Clock")
         self.reset_input = self.add_input("Reset")

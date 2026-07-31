@@ -27,7 +27,7 @@ class AttenuverterModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=200, height=200, color=QColor(100, 110, 120))
+        super().__init__(width=200, height=150, color=QColor(100, 110, 120))
         self.in_port = self.add_input("In", signal=PortSignal.CONTROL_CV)
         self.out_port = self.add_output("Out", signal=PortSignal.CONTROL_CV)
         self.component = Attenuverter()

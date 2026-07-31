@@ -70,7 +70,7 @@ class LFOModule(ModuleWidget):
     def __init__(self) -> None:
         super().__init__(
             width=200,
-            height=290,
+            height=255,
             color=QColor(100, 140, 200),
         )
 

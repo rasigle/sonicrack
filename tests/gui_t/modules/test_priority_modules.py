@@ -308,7 +308,8 @@ def test_poly_voice_has_midi_controls(qapp: Any) -> None:
     del qapp
     module = PolyVoiceModule()
     assert hasattr(module, "midi_device_combo")
-    assert hasattr(module, "midi_start_btn")
+    assert not hasattr(module, "midi_start_btn")
+    assert not hasattr(module, "midi_refresh_btn")
     assert module.midi_device_combo.count() >= 1
     # note_on_midi still works without a hardware device
     module.note_on_midi(60, 100)

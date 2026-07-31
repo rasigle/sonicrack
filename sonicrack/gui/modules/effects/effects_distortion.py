@@ -37,7 +37,7 @@ class DistortionModule(ModulatedModuleBase):
         """Initialize panner module."""
         super().__init__(
             width=220,
-            height=240,
+            height=205,
             color=QColor(180, 80, 180),
         )
 

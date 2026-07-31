@@ -195,3 +195,26 @@ def test_midi_input_is_registered_under_midi_category(qapp: Any):
     assert registry.get("MIDI Input") is MIDIInputModule
     by_cat = registry.get_by_category(ModuleCategory.MIDI)
     assert "MIDI Input" in by_cat
+
+
+def test_midi_input_device_selection_controls_worker_without_buttons(qapp: Any):
+    """Selecting a device auto-starts; clearing it stops. No Start/Refresh buttons."""
+    del qapp
+    module = MIDIInputModule()
+    assert not hasattr(module, "start_btn")
+    assert not hasattr(module, "refresh_btn")
+
+    # No device selected → idle
+    assert module.device_combo.currentText() == "(No Device)"
+    assert module._is_running is False
+
+    # Sync with no device is a no-op (does not error)
+    module._sync_midi_device("(No Device)")
+    assert module._is_running is False
+
+    # Selecting a missing/virtual name still attempts start path safely when
+    # mocked: stop path after a fake running state.
+    module._is_running = True
+    module.midi_worker = None
+    module._sync_midi_device("(No Device)")
+    assert module._is_running is False

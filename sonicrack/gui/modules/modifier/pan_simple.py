@@ -36,7 +36,7 @@ class SimplePannerModule(SimpleModifierBase):
         """Initialize simple panner module."""
         super().__init__(
             width=140,
-            height=175,
+            height=150,
             color=QColor(160, 60, 160),
         )
 

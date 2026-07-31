@@ -4,7 +4,7 @@ from typing import Any, Literal, cast
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 from soniclab.dsp.modulators import ADSREnvelope, GateTriggeredADSR
 
 from sonicrack.gui.widgets import Knob
@@ -48,7 +48,7 @@ class ADSRModule(ModuleWidget):
         """Initialize ADSR module."""
         super().__init__(
             width=220,
-            height=480,
+            height=440,
             color=QColor(120, 180, 80),
         )
 
@@ -157,39 +157,7 @@ class ADSRModule(ModuleWidget):
         )
         layout.addWidget(self.vel_depth_knob, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        retrigger_layout = QVBoxLayout()
-        retrigger_label = QLabel("Retrigger")
-        self.retrigger_combo = QComboBox()
-        self.retrigger_combo.addItems(["Punch", "Legato"])
-        self.retrigger_combo.setToolTip(
-            "Punch: briefly ramps to zero, then attacks for a stronger rhythmic "
-            "chop without clicks.\n"
-            "Legato: attacks from the current envelope level for smoother overlap."
-        )
-        self.retrigger_combo.currentTextChanged.connect(
-            lambda value: self.parameter_changed.emit("retrigger_mode", value)
-        )
-        retrigger_layout.addWidget(retrigger_label)
-        retrigger_layout.addWidget(self.retrigger_combo)
-        layout.addLayout(retrigger_layout)
-
-        trigger_mode_layout = QVBoxLayout()
-        trigger_mode_label = QLabel("Trig Mode")
-        self.trigger_mode_combo = QComboBox()
-        self.trigger_mode_combo.addItems(["Latched", "On/Off"])
-        self.trigger_mode_combo.setToolTip(
-            "Latched: click trig once to hold the envelope gate on, click again "
-            "to release.\n"
-            "On/Off: hold trig down to gate on, release it to gate off."
-        )
-        self.trigger_mode_combo.currentTextChanged.connect(
-            self._on_trigger_mode_changed
-        )
-        trigger_mode_layout.addWidget(trigger_mode_label)
-        trigger_mode_layout.addWidget(self.trigger_mode_combo)
-        layout.addLayout(trigger_mode_layout)
-
-        # Manual trigger button
+        # Manual trigger button (play control; mode is in the context menu)
         trigger_layout = QHBoxLayout()
         trigger_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.trigger_button = QPushButton("trig")
@@ -219,7 +187,8 @@ class ADSRModule(ModuleWidget):
         self.trigger_button.setToolTip(
             "Manual trig\n"
             "Latched: click to toggle note on/off\n"
-            "On/Off: press to start attack, release for release phase"
+            "On/Off: press to start attack, release for release phase\n"
+            "Right-click module header to change Retrigger / Trig Mode"
         )
         self.trigger_button.toggled.connect(self._on_trigger_toggled)
         self.trigger_button.pressed.connect(self._on_trigger_pressed)
@@ -229,24 +198,37 @@ class ADSRModule(ModuleWidget):
 
         self._finish_controls(layout)
 
+        # Setup options: right-click module header → Retrigger / Trig Mode
+        self.retrigger_param = self.register_menu_choice(
+            "retrigger_mode",
+            "Retrigger",
+            ["Punch", "Legato"],
+            "Punch",
+            tooltip=(
+                "Punch: briefly ramps to zero, then attacks for a stronger rhythmic "
+                "chop without clicks.\n"
+                "Legato: attacks from the current envelope level for smoother overlap."
+            ),
+        )
+        self.trigger_mode_param = self.register_menu_choice(
+            "trigger_mode",
+            "Trig Mode",
+            ["Latched", "On/Off"],
+            "Latched",
+            on_changed=self._on_trigger_mode_changed,
+            tooltip=(
+                "Latched: click trig once to hold the envelope gate on, click again "
+                "to release.\n"
+                "On/Off: hold trig down to gate on, release it to gate off."
+            ),
+        )
+
         # Register parameters for automatic get/set
         self.register_parameter("attack_duration", self.attack_knob)
         self.register_parameter("decay_duration", self.decay_knob)
         self.register_parameter("sustain_level", self.sustain_knob)
         self.register_parameter("release_duration", self.release_knob)
         self.register_parameter("velocity_depth", self.vel_depth_knob)
-        self.register_parameter(
-            "retrigger_mode",
-            self.retrigger_combo,
-            getter="currentText",
-            setter="setCurrentText",
-        )
-        self.register_parameter(
-            "trigger_mode",
-            self.trigger_mode_combo,
-            getter="currentText",
-            setter="setCurrentText",
-        )
 
         # Track ADSR component for manual triggering
         self._adsr_component: ADSREnvelope | GateTriggeredADSR | None = None
@@ -359,10 +341,8 @@ class ADSRModule(ModuleWidget):
             self.trigger_button.setCheckable(False)
             self.trigger_button.setText("trig")
 
-        self.parameter_changed.emit("trigger_mode", value)
-
     def _trigger_mode(self) -> Literal["latched", "on/off"]:
-        return self._normalize_trigger_mode(self.trigger_mode_combo.currentText())
+        return self._normalize_trigger_mode(self.trigger_mode_param.get_value())
 
     @staticmethod
     def _normalize_trigger_mode(value: str) -> Literal["latched", "on/off"]:
@@ -398,7 +378,7 @@ class ADSRModule(ModuleWidget):
             sustain_level=self.sustain_knob.get_value(),
             release_duration=self.release_knob.get_value(),
             retrigger_mode=self._normalize_retrigger_mode(
-                self.retrigger_combo.currentText()
+                self.retrigger_param.get_value()
             ),
         )
 
@@ -439,7 +419,7 @@ class ADSRModule(ModuleWidget):
             parameters, "release_duration", self.release_knob.get_value
         )
         mode_value = parameters.get(
-            "retrigger_mode", self.retrigger_combo.currentText()
+            "retrigger_mode", self.retrigger_param.get_value()
         )
         adsr.retrigger_mode = self._normalize_retrigger_mode(str(mode_value))
 

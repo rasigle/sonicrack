@@ -24,7 +24,8 @@ class MultipleModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=160, height=160, color=QColor(95, 105, 115))
+        # Port-only utility: height sized for 4 output jacks, not empty controls.
+        super().__init__(width=140, height=160, color=QColor(95, 105, 115))
         self.in_port = self.add_input("In", signal=PortSignal.CONTROL_CV)
         self.out_ports = [
             self.add_output(f"Out {i + 1}", signal=PortSignal.CONTROL_CV)

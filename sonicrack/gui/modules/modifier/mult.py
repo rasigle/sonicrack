@@ -27,7 +27,7 @@ class MultModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=200, height=200, color=QColor(110, 100, 90))
+        super().__init__(width=200, height=150, color=QColor(110, 100, 90))
         self.a_port = self.add_input("A", signal=PortSignal.AUDIO)
         self.b_port = self.add_input("B", signal=PortSignal.CONTROL_CV)
         self.out_port = self.add_output("Out", signal=PortSignal.AUDIO)

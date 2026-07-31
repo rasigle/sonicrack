@@ -39,7 +39,7 @@ class FilterModule(FilterModuleBase):
         """Initialize filter module."""
         super().__init__(
             width=220,
-            height=310,
+            height=280,
             color=QColor(100, 180, 140),  # Greenish color for filter
         )
 

@@ -5,57 +5,47 @@
     "description": "",
     "tags": [],
     "category": "User",
-    "created": "2026-06-29T21:12:49.121588",
+    "created": "2026-07-31T08:39:35.880194",
     "version": "1.0"
   },
   "modules": [
     {
       "id": 0,
-      "type": "VCA",
+      "type": "MIDI Input",
       "custom_name": "",
-      "module_category": "Modifier",
+      "module_category": "MIDI",
       "position": {
-        "x": 366.0,
-        "y": -157.0
+        "x": -846.3999999999999,
+        "y": 112.7
       },
       "parameters": {
         "active": true,
-        "amplitude": 0.9200000000000005
+        "device": "(No Device)",
+        "priority": "Last",
+        "pitch_bend_range": 7
       }
     },
     {
       "id": 1,
-      "type": "Waveform",
+      "type": "VCO",
       "custom_name": "",
-      "module_category": "Visualization",
+      "module_category": "Source",
       "position": {
-        "x": 375.0,
-        "y": 179.0
+        "x": 40.0,
+        "y": -143.0
       },
       "parameters": {
-        "active": true
+        "active": true,
+        "waveform": "Sawtooth",
+        "mode": "analog",
+        "fm_mode": "1V/octave",
+        "frequency": 440.0,
+        "fm_amount": 0.0,
+        "pulsewidth": 0.5
       }
     },
     {
       "id": 2,
-      "type": "ADSR Envelope",
-      "custom_name": "",
-      "module_category": "Modulated Source",
-      "position": {
-        "x": -264.0,
-        "y": 52.0
-      },
-      "parameters": {
-        "active": true,
-        "attack_duration": 0.005,
-        "decay_duration": 1.2747850000000003,
-        "sustain_level": 0.8800000000000001,
-        "release_duration": 1.4747649999999952,
-        "retrigger_mode": "Punch"
-      }
-    },
-    {
-      "id": 3,
       "type": "Output",
       "custom_name": "",
       "module_category": "Output",
@@ -68,74 +58,90 @@
       }
     },
     {
-      "id": 4,
-      "type": "MIDI Keyboard",
+      "id": 3,
+      "type": "ADSR Envelope",
       "custom_name": "",
-      "module_category": "Source",
+      "module_category": "Envelope",
       "position": {
-        "x": -498.0,
-        "y": -334.0
+        "x": -264.0,
+        "y": 52.0
       },
       "parameters": {
         "active": true,
-        "octave": "4",
-        "velocity": 127
+        "attack_duration": 0.005,
+        "decay_duration": 1.2747850000000003,
+        "sustain_level": 0.8800000000000001,
+        "release_duration": 1.4747649999999952,
+        "velocity_depth": 0.0,
+        "retrigger_mode": "Punch",
+        "trigger_mode": "Latched"
+      }
+    },
+    {
+      "id": 4,
+      "type": "Waveform",
+      "custom_name": "",
+      "module_category": "Visualization",
+      "position": {
+        "x": 771.75,
+        "y": 234.20000000000002
+      },
+      "parameters": {
+        "active": true
       }
     },
     {
       "id": 5,
-      "type": "VCO",
+      "type": "VCA",
       "custom_name": "",
-      "module_category": "Modulated Source",
+      "module_category": "Modifier",
       "position": {
-        "x": 40.0,
-        "y": -143.0
+        "x": 384.4000000000001,
+        "y": -14.400000000000006
       },
       "parameters": {
         "active": true,
-        "waveform": "Sawtooth",
-        "mode": "analog",
-        "frequency": 440.0,
-        "phase": 0.0
+        "amplitude": 0.9200000000000005,
+        "cv_attenuation": 1.0
       }
     }
   ],
   "connections": [
     {
-      "source_module": 2,
+      "source_module": 3,
       "source_port": "Out",
-      "target_module": 0,
+      "target_module": 5,
       "target_port": "CV In"
     },
     {
       "source_module": 0,
-      "source_port": "Out",
+      "source_port": "Gate",
       "target_module": 3,
-      "target_port": "Left/Mono"
+      "target_port": "Gate"
     },
     {
       "source_module": 0,
-      "source_port": "Out",
+      "source_port": "1V/Oct",
       "target_module": 1,
-      "target_port": "L/Mono"
+      "target_port": "V/Oct"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 5,
+      "target_port": "In"
     },
     {
       "source_module": 5,
       "source_port": "Out",
-      "target_module": 0,
+      "target_module": 4,
       "target_port": "In"
     },
     {
-      "source_module": 4,
-      "source_port": "Gate",
+      "source_module": 5,
+      "source_port": "Out",
       "target_module": 2,
-      "target_port": "Gate"
-    },
-    {
-      "source_module": 4,
-      "source_port": "Freq",
-      "target_module": 5,
-      "target_port": "V/Oct"
+      "target_port": "Left/Mono"
     }
   ]
 }

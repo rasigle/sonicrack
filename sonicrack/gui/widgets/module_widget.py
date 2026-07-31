@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from abc import ABCMeta
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
@@ -24,6 +24,56 @@ from sonicrack.patching.module import AudioModule
 from sonicrack.runtime.helpers import silence, write_silence_if_disconnected
 
 logger = logging.getLogger(__name__)
+
+
+class MenuChoiceParameter:
+    """Discrete string choice backed by the module context menu.
+
+    Implements ``get_value`` / ``set_value`` so it works with
+    :meth:`ModuleWidget.register_parameter` for patch presets without a
+    faceplate widget.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        label: str,
+        choices: Sequence[str],
+        default: str,
+        *,
+        on_changed: Callable[[str], None] | None = None,
+        tooltip: str | None = None,
+    ) -> None:
+        if not choices:
+            raise ValueError("MenuChoiceParameter requires at least one choice")
+        self.name = name
+        self.label = label
+        self.choices = list(choices)
+        self.tooltip = tooltip
+        self._on_changed = on_changed
+        self._value = self._resolve_choice(default) or self.choices[0]
+
+    def get_value(self) -> str:
+        return self._value
+
+    def set_value(self, value: str) -> None:
+        resolved = self._resolve_choice(value)
+        if resolved is None or resolved == self._value:
+            return
+        self._value = resolved
+        if self._on_changed is not None:
+            self._on_changed(resolved)
+
+    def _resolve_choice(self, value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        if value in self.choices:
+            return value
+        lowered = value.lower()
+        for choice in self.choices:
+            if choice.lower() == lowered:
+                return choice
+        return None
 
 
 # Create a compatible metaclass that combines QGraphicsWidget's metaclass with ABCMeta
@@ -109,6 +159,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         # Parameter registry for automatic get/set (widget, getter, setter)
         self._parameters: dict[str, tuple[Any, str, str]] = {}
         self._parameter_values: dict[str, Any] = {}
+        # Discrete options shown in the right-click context menu
+        self._menu_choices: list[MenuChoiceParameter] = []
         self.parameter_changed.connect(self._cache_parameter_value)
 
         # Make module movable and selectable
@@ -199,11 +251,11 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         proxy.setPos(0, self._title_bar_height())
         return proxy
 
-    def _create_standard_layout(self, spacing: int = 10) -> QVBoxLayout:
+    def _create_standard_layout(self, spacing: int = 6) -> QVBoxLayout:
         """Create a standard vertical layout with default margins.
 
         Args:
-            spacing: Spacing between widgets (default: 5)
+            spacing: Spacing between widgets (default: 6)
 
         Returns:
             Configured layout
@@ -218,12 +270,12 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self._create_portwidgets()
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(spacing)
         layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         return layout
 
-    def _begin_controls(self, *, spacing: int = 10) -> QVBoxLayout:
+    def _begin_controls(self, *, spacing: int = 6) -> QVBoxLayout:
         """Create the controls container and return its layout.
 
         Call after ports are registered so ``_create_standard_layout`` can
@@ -377,6 +429,76 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self._parameters[name] = (widget, getter, setter)
         if hasattr(widget, getter):
             self._parameter_values[name] = getattr(widget, getter)()
+
+    def register_menu_choice(
+        self,
+        name: str,
+        label: str,
+        choices: Sequence[str],
+        default: str,
+        *,
+        on_changed: Callable[[str], None] | None = None,
+        tooltip: str | None = None,
+    ) -> MenuChoiceParameter:
+        """Register a discrete option that appears in the module context menu.
+
+        Use for setup/mode parameters that should stay off the playable
+        faceplate. Values are serialized via :meth:`register_parameter` with
+        the same names used by the rest of the patch system.
+
+        Args:
+            name: Parameter name for presets / runtime
+            label: Submenu title shown in the right-click menu
+            choices: Allowed display strings (keep stable for patch compat)
+            default: Initial value (must match a choice, case-insensitive ok)
+            on_changed: Optional callback when the value changes
+            tooltip: Optional help text on the submenu
+
+        Returns:
+            The choice parameter (call ``get_value()`` / ``set_value()``)
+        """
+
+        def _handle_changed(value: str) -> None:
+            self.parameter_changed.emit(name, value)
+            if on_changed is not None:
+                on_changed(value)
+
+        choice = MenuChoiceParameter(
+            name=name,
+            label=label,
+            choices=choices,
+            default=default,
+            on_changed=_handle_changed,
+            tooltip=tooltip,
+        )
+        self._menu_choices.append(choice)
+        self.register_parameter(name, choice, getter="get_value", setter="set_value")
+        return choice
+
+    def _append_menu_choices(self, menu) -> None:
+        """Add registered menu-choice parameters as exclusive submenus."""
+        from PyQt6.QtGui import QActionGroup
+        from PyQt6.QtWidgets import QMenu
+
+        if not self._menu_choices:
+            return
+
+        menu.addSeparator()
+        for choice in self._menu_choices:
+            submenu: QMenu = menu.addMenu(choice.label)
+            if choice.tooltip:
+                submenu.setToolTip(choice.tooltip)
+            group = QActionGroup(submenu)
+            group.setExclusive(True)
+            current = choice.get_value()
+            for option in choice.choices:
+                action = submenu.addAction(option)
+                action.setCheckable(True)
+                action.setChecked(option == current)
+                group.addAction(action)
+                action.triggered.connect(
+                    lambda checked=False, c=choice, o=option: c.set_value(o)
+                )
 
     def get_parameters(self) -> dict[str, Any]:
         """Get all registered parameters automatically.
@@ -673,6 +795,14 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
     # === Event Handling ===
 
+    def _populate_context_menu(self, menu) -> None:
+        """Add subclass-specific items to the module context menu.
+
+        Prefer connecting ``QAction.triggered`` handlers so the base menu
+        logic does not need to know about custom actions.
+        """
+        del menu
+
     def contextMenuEvent(self, event):
         """Handle right-click context menu."""
         from PyQt6.QtWidgets import QInputDialog, QMenu
@@ -682,6 +812,10 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         rename_action = menu.addAction("Rename...")
         delete_action = menu.addAction("Delete")
         info_action = menu.addAction("Module Info...")
+        # Setup / mode options registered via register_menu_choice()
+        self._append_menu_choices(menu)
+        # Subclass-specific actions (e.g. MIDI device refresh)
+        self._populate_context_menu(menu)
 
         action = menu.exec(event.screenPos())
 

@@ -475,3 +475,62 @@ def test_module_widget_require_input_or_silence(qapp: Any):
     src.write(np.ones(8, dtype=np.float32))
     src.connect(module.in_port)
     assert module._require_input_or_silence(8) is False
+
+def test_register_menu_choice_serializes_and_emits(qapp: Any):
+    del qapp
+    seen: list[tuple[str, object]] = []
+    side_effects: list[str] = []
+
+    class _Probe(ModuleWidget):
+        metadata = ModuleMetadata("Probe", ModuleCategory.MODIFIER)
+
+        def __init__(self):
+            super().__init__()
+            self.controls_widget = self._create_controls_container()
+            self._create_portwidgets()
+            self.mode_param = self.register_menu_choice(
+                "mode",
+                "Mode",
+                ["Alpha", "Beta"],
+                "Alpha",
+                on_changed=side_effects.append,
+            )
+            self.parameter_changed.connect(lambda n, v: seen.append((n, v)))
+
+    module = _Probe()
+    assert module.get_parameters()["mode"] == "Alpha"
+    assert module.mode_param.get_value() == "Alpha"
+    assert len(module._menu_choices) == 1
+
+    module.mode_param.set_value("Beta")
+    assert module.mode_param.get_value() == "Beta"
+    assert module.get_parameters()["mode"] == "Beta"
+    assert ("mode", "Beta") in seen
+    assert side_effects == ["Beta"]
+
+    module.set_parameters({"mode": "alpha"})  # case-insensitive restore
+    assert module.mode_param.get_value() == "Alpha"
+
+
+def test_register_menu_choice_ignores_unknown_values(qapp: Any):
+    del qapp
+
+    class _Probe(ModuleWidget):
+        metadata = ModuleMetadata("Probe", ModuleCategory.MODIFIER)
+
+        def __init__(self):
+            super().__init__()
+            self.controls_widget = self._create_controls_container()
+            self._create_portwidgets()
+            self.mode_param = self.register_menu_choice(
+                "mode",
+                "Mode",
+                ["Alpha", "Beta"],
+                "Alpha",
+            )
+
+    module = _Probe()
+    module.mode_param.set_value("Gamma")
+    assert module.mode_param.get_value() == "Alpha"
+    module.set_parameters({"mode": "not-a-choice"})
+    assert module.mode_param.get_value() == "Alpha"

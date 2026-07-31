@@ -8,8 +8,15 @@ from typing import cast
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QColor, QCursor, QPainter
-from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QMessageBox
+from PyQt6.QtGui import QColor, QCursor, QPainter, QWheelEvent
+from PyQt6.QtWidgets import (
+    QApplication,
+    QGraphicsProxyWidget,
+    QGraphicsScene,
+    QGraphicsView,
+    QMessageBox,
+    QWidget,
+)
 
 from sonicrack.gui.modules.output.output import OutputModule
 from sonicrack.gui.widgets.cable_widget import Cable
@@ -118,9 +125,80 @@ class PatchCanvas(QGraphicsView):
         self._zoom_factor = self.DEFAULT_ZOOM
         self.zoom_changed.emit(self._zoom_factor)
 
+    def _proxy_and_widget_at(
+        self, view_pos: QPoint
+    ) -> tuple[QGraphicsProxyWidget, QWidget] | None:
+        """Return the proxy and deepest embedded widget under a view position.
+
+        Modules host controls via ``QGraphicsProxyWidget``. When the cursor is
+        over those controls, wheel events should go to them (knobs, step cells)
+        instead of zooming the canvas.
+        """
+        item = self.itemAt(view_pos)
+        while item is not None:
+            if isinstance(item, QGraphicsProxyWidget):
+                root = item.widget()
+                if root is None:
+                    return None
+                scene_pos = self.mapToScene(view_pos)
+                local = item.mapFromScene(scene_pos).toPoint()
+                child = root.childAt(local)
+                return item, (child if child is not None else root)
+            item = item.parentItem()
+        return None
+
+    def _deliver_wheel_to_embedded(self, event: QWheelEvent) -> bool:
+        """Forward a wheel event into an embedded control under the cursor.
+
+        Returns True if a target widget accepted the event.
+        """
+        view_pos = event.position().toPoint()
+        hit = self._proxy_and_widget_at(view_pos)
+        if hit is None:
+            return False
+
+        proxy, target = hit
+        embedded_root = proxy.widget()
+        if embedded_root is None:
+            return False
+
+        # Embedded widgets often lack reliable global geometry; map through the
+        # proxy/scene instead of mapFromGlobal.
+        scene_pos = self.mapToScene(view_pos)
+        root_pos = proxy.mapFromScene(scene_pos).toPoint()
+
+        widget: QWidget | None = target
+        while widget is not None:
+            if widget is embedded_root:
+                local_point = root_pos
+            else:
+                local_point = widget.mapFrom(embedded_root, root_pos)
+            forwarded = QWheelEvent(
+                QPointF(local_point),
+                event.globalPosition(),
+                event.pixelDelta(),
+                event.angleDelta(),
+                event.buttons(),
+                event.modifiers(),
+                event.phase(),
+                event.inverted(),
+            )
+            QApplication.sendEvent(widget, forwarded)
+            if forwarded.isAccepted():
+                return True
+            if widget is embedded_root:
+                break
+            widget = widget.parentWidget()
+        return False
+
     def wheelEvent(self, event):  # noqa: N802 - Qt API
-        """Zoom with the scroll wheel (under the cursor)."""
+        """Zoom with the scroll wheel, or adjust controls under the cursor."""
         if event is None:
+            return
+
+        # Knobs / step cells / sliders under the cursor take priority over zoom.
+        if self._deliver_wheel_to_embedded(event):
+            event.accept()
             return
 
         delta = event.angleDelta().y()

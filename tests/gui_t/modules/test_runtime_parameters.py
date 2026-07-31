@@ -249,7 +249,7 @@ def test_vco_fm_input_defaults_to_vcv_exponential_mode(qapp: Any):
 
     assert module.fm_amount_knob.min_value == pytest.approx(-100.0)
     assert module.fm_amount_knob.max_value == pytest.approx(100.0)
-    assert module.fm_mode_combo.currentText() == "1V/octave"
+    assert module.fm_mode_param.get_value() == "1V/octave"
 
     module.process_runtime(
         16,
@@ -614,7 +614,7 @@ def test_adsr_manual_gate_holds_long_attack(qapp: Any):
 def test_adsr_manual_on_off_trigger_releases_on_button_release(qapp: Any):
     del qapp
     module = ADSRModule()
-    module.trigger_mode_combo.setCurrentText("On/Off")
+    module.trigger_mode_param.set_value("On/Off")
     parameters = {
         "attack_duration": 4 / DEFAULT_SAMPLE_RATE,
         "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
@@ -649,7 +649,7 @@ def test_adsr_switching_from_latched_to_on_off_releases_gate(qapp: Any):
 
     module.trigger_button.setChecked(True)
     module.process_runtime(8, parameters)
-    module.trigger_mode_combo.setCurrentText("On/Off")
+    module.trigger_mode_param.set_value("On/Off")
     module.process_runtime(5, parameters)
 
     assert module.trigger_button.text() == "trig"

@@ -153,7 +153,7 @@ class StepSequencerModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=360, height=400, color=QColor(120, 100, 170))
+        super().__init__(width=360, height=310, color=QColor(120, 100, 170))
 
         self.clock_input = self.add_input("Clock", signal=PortSignal.TRIGGER)
         self.reset_input = self.add_input("Reset", signal=PortSignal.TRIGGER)

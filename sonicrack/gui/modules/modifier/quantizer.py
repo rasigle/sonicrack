@@ -28,7 +28,7 @@ class QuantizerModule(ModuleWidget):
     )
 
     def __init__(self) -> None:
-        super().__init__(width=220, height=190, color=QColor(90, 120, 140))
+        super().__init__(width=220, height=145, color=QColor(90, 120, 140))
         self.in_port = self.add_input("In", signal=PortSignal.PITCH_CV)
         self.out_port = self.add_output("Out", signal=PortSignal.PITCH_CV)
         self.component = Quantizer()

@@ -302,21 +302,36 @@ class Knob(QWidget):
             event.accept()
 
     def wheelEvent(self, event):
-        """Handle mouse wheel for fine adjustment."""
+        """Handle mouse wheel while hovered: coarse adjust, Alt for fine-tune."""
+        if event is None:
+            return
+
         delta = event.angleDelta().y()
+        if delta == 0:
+            # High-res trackpads may report pixel deltas instead.
+            delta = event.pixelDelta().y()
+        if delta == 0:
+            event.ignore()
+            return
+
+        # One typical wheel notch is 120 eighth-degrees. Scale so a notch is a
+        # fixed fraction of the range; Alt reduces the step for fine tuning.
+        notches = delta / 120.0
+        fine = bool(event.modifiers() & Qt.KeyboardModifier.AltModifier)
+        # Coarse ≈ 2% of range per notch; fine ≈ 0.2% of range per notch.
+        step_fraction = 0.002 if fine else 0.02
+        norm_delta = notches * step_fraction
 
         if self.logarithmic or self.curve_points is not None:
-            # Non-linear scales adjust in normalized space.
+            # Non-linear scales adjust in normalized space for consistent feel.
             norm_value = self.get_normalized_value()
-            norm_delta = delta / 2000.0  # Finer adjustment
             new_norm_value = max(0.0, min(1.0, norm_value + norm_delta))
-            new_value = self._normalized_to_value(new_norm_value)
-            self.set_value(new_value)
+            self.set_value(self._normalized_to_value(new_norm_value))
         else:
-            # Linear fine adjustment
-            sensitivity = (self.max_value - self.min_value) / 2000.0
-            new_value = self._value + delta * sensitivity
-            self.set_value(new_value)
+            value_delta = norm_delta * (self.max_value - self.min_value)
+            self.set_value(self._value + value_delta)
+
+        self.setToolTip(f"{self.label}: {self._value:.3f}")
         event.accept()
 
     def enterEvent(self, event):

@@ -6,8 +6,22 @@ All notable changes to SonicRack will be documented in this file.
 
 ### Added
 
+- **Module context-menu options**: discrete setup modes can register via
+  `register_menu_choice()` and appear as exclusive submenus on the module
+  right-click menu (header). VCO **FM Mode** and ADSR **Retrigger** /
+  **Trig Mode** moved off the faceplate so panels stay focused on play
+  controls; patch parameter names/values are unchanged.
+- **Knob scroll-wheel control**: hover a knob and use the mouse wheel to change
+  its value; hold **Alt** for fine-tune steps. Canvas zoom is suppressed while
+  the cursor is over interactive module controls.
 - File open/save dialogs remember the last used directory across sessions
 - Visual Step Sequencer: per-step note grid, playhead LEDs, click/wheel edit
+- **Arpeggiator** sequencer module wrapping `soniclab.sequencing.Arpeggiator`:
+  chord builder, free-form MIDI notes, patterns (Up / Down / Up-Down /
+  Down-Up / As Played / Random), octaves, gate length, transpose, latch,
+  internal or external clock; outputs Freq (1V/oct), Gate, Trig, Vel
+- Demo arp presets: `demo_arp_neon_rise`, `demo_arp_glass_cascade`,
+  `demo_arp_chaos_spark`
 - **Poly Voice**: polyphonic keyboard + optional **MIDI device** routing
 - Effects: **Chorus**, **Phaser**, **Limiter**, **EQ**
 - Source: morphable **Wavetable** oscillator
@@ -22,6 +36,14 @@ All notable changes to SonicRack will be documented in this file.
 - MIDI Input controller CV: **Mod** (CC1), **Expr** (CC11), **Bend**
   (bipolar), note **Priority** (Last/High/Low), pitch-bend range
 - MIDI Keyboard note **Priority** (Last/High/Low) using soniclab note-stack
+
+### Changed
+
+- Module panel sizing pass: heights grown where controls clipped (ADSR, EQ,
+  Limiter, MIDI Input, Mod Matrix, Poly Voice) and shrunk where large empty
+  space remained (Arpeggiator, sequencers, LFO, single-knob utilities, etc.)
+- Denser default control layout: margins `10/8` and spacing `6` (was `12/10`
+  and `10`)
 
 ### Fixed
 
@@ -41,6 +63,10 @@ All notable changes to SonicRack will be documented in this file.
 
 ### Changed
 
+- **MIDI device modules** (MIDI Input, MIDI Poly CV, Poly Voice): selecting a
+  device opens it immediately; clearing the selection stops it. Removed the
+  Start/Stop and Refresh buttons — refresh is on the module right-click menu
+  (**Refresh MIDI Devices**).
 - MIDI Input and MIDI Keyboard moved from **Source** → **MIDI** category
 - MIDI Keyboard multi-key hold now relies on `MIDIToCV` note-stack (no
   manual re-NoteOn on release) so High/Low priority stay correct

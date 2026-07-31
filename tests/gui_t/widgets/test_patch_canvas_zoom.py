@@ -60,6 +60,55 @@ def test_scroll_wheel_zooms_canvas(qapp: Any):
     assert canvas.zoom_factor > 1.0
 
 
+def test_scroll_wheel_over_knob_adjusts_value_not_zoom(qapp: Any):
+    """Wheel over an embedded knob changes the knob instead of zooming."""
+    from PyQt6.QtWidgets import QGraphicsProxyWidget, QWidget
+
+    from sonicrack.gui.widgets.knob_widget import Knob
+
+    canvas = PatchCanvas()
+    canvas.resize(400, 300)
+    canvas.show()
+
+    host = QWidget()
+    knob = Knob(
+        label="Test",
+        min_value=0.0,
+        max_value=100.0,
+        default_value=50.0,
+        parent=host,
+    )
+    knob.move(0, 0)
+    knob.resize(80, 80)
+    host.resize(80, 80)
+
+    proxy = QGraphicsProxyWidget()
+    proxy.setWidget(host)
+    proxy.setPos(50, 50)
+    scene = canvas.scene()
+    assert scene is not None
+    scene.addItem(proxy)
+    qapp.processEvents()
+
+    start_zoom = canvas.zoom_factor
+    # Knob center in scene coords is (90, 90); map to view coords for the event.
+    view_pos = canvas.mapFromScene(QPointF(90, 90))
+    event = QWheelEvent(
+        QPointF(view_pos),
+        QPointF(view_pos),
+        QPoint(0, 0),
+        QPoint(0, 120),
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+        Qt.ScrollPhase.NoScrollPhase,
+        False,
+    )
+    canvas.wheelEvent(event)
+
+    assert canvas.zoom_factor == pytest.approx(start_zoom)
+    assert knob.get_value() == pytest.approx(52.0)
+
+
 def test_middle_mouse_enters_and_exits_pan_mode(qapp: Any):
     del qapp
     canvas = PatchCanvas()

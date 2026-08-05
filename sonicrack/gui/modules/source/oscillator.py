@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
@@ -182,6 +182,27 @@ class OscillatorModule(ModuleWidget):
         """
         return None
 
+    def set_parameters(self, params: dict[str, Any]) -> None:
+        """Apply preset parameters and keep frequency-slew state in sync.
+
+        Patch load only updates the knobs by default. Without syncing
+        ``_last_runtime_frequency`` (and the live oscillator frequencies), the
+        first buffers after load slew from the constructor default (120 Hz) to
+        the preset value, which can thump or glitch through a high-resonance
+        filter chain such as ``demo_wobble_bass``.
+        """
+        super().set_parameters(params)
+        if "frequency" not in params:
+            return
+        try:
+            frequency = float(params["frequency"])
+        except (TypeError, ValueError):
+            return
+        self._last_runtime_frequency = frequency
+        for osc in self.oscs:
+            if osc is not None:
+                osc.frequency = frequency
+
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Render each oscillator output for the current engine cycle."""
         frequency = float_parameter(parameters, "frequency", self.freq_knob.get_value)
@@ -240,3 +261,4 @@ class OscillatorModule(ModuleWidget):
         """Handle pulse width changes - only update square oscillator if connected."""
         if self.square_port.is_connected:
             self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
+

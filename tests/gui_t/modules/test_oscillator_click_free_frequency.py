@@ -89,6 +89,23 @@ class TestOscillatorClickFreeFrequency:
         assert hasattr(osc_module, "_last_runtime_frequency")
         assert isinstance(osc_module._last_runtime_frequency, (int, float))
 
+    def test_set_parameters_syncs_frequency_slew_state(self, osc_module):
+        """Patch load must not leave slew state at the constructor default."""
+        osc_module.set_parameters({"frequency": 82.5, "pulsewidth": 0.4})
+        assert osc_module._last_runtime_frequency == pytest.approx(82.5)
+        assert osc_module._square_oscillator.frequency == pytest.approx(82.5)
+        assert osc_module._sawtooth_oscillator.frequency == pytest.approx(82.5)
+
+    def test_square_frequency_ramp_stays_continuous(self, osc_module):
+        """Fifth-style square output must stay continuous across frequency knobs."""
+        osc_module.set_parameters({"frequency": 82.5, "pulsewidth": 0.4})
+        osc_module.process_runtime(256, {"frequency": 82.5, "pulsewidth": 0.4})
+        first = np.asarray(osc_module.square_port.value)
+        osc_module.process_runtime(256, {"frequency": 200.0, "pulsewidth": 0.4})
+        second = np.asarray(osc_module.square_port.value)
+        transition_jump = abs(float(second[0] - first[-1]))
+        assert transition_jump < 0.3
+
 
 class TestFrequencySlewingMechanism:
     """Test the underlying frequency slewing mechanism."""

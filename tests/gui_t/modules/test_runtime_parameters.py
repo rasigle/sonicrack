@@ -399,6 +399,43 @@ def test_render_frequency_ramp_keeps_oscillator_at_smoothed_state():
     assert oscillator.frequency == pytest.approx(rendered_frequency)
 
 
+def test_render_frequency_ramp_uses_bulk_path_for_square_vcv():
+    """GUI frequency slews must stay realtime-safe on band-limited square.
+
+    The slow per-sample ``__next__`` path underruns dense patches (e.g.
+    demo_wobble_bass Fifth oscillator) and sounds like glitches/crackles.
+    """
+    import time
+
+    from soniclab.generators.oscillators.oscillator import SquareOscillator
+
+    oscillator = SquareOscillator(
+        frequency=82.5,
+        sample_rate=44100,
+        pulsewidth=0.4,
+        mode="vcv",
+        gain_db=0,
+    )
+    previous = 82.5
+    for _ in range(5):
+        _, previous = render_with_frequency_ramp(
+            oscillator, previous, 82.5, num_samples=512
+        )
+
+    previous = 82.5
+    started = time.perf_counter()
+    iterations = 50
+    for _ in range(iterations):
+        _, previous = render_with_frequency_ramp(
+            oscillator, previous, 400.0, num_samples=512
+        )
+    elapsed_us = (time.perf_counter() - started) / iterations * 1e6
+    # Realtime budget for 512 samples at 44.1 kHz is ~11.6 ms. The bulk path
+    # is typically <0.1 ms; the old per-sample path was ~4 ms for square alone.
+    assert elapsed_us < 1500.0
+    assert previous > 82.5
+
+
 def test_frequency_slew_is_continuous_when_split_across_buffers():
     continuous_osc = SawtoothOscillator(
         frequency=120.0,

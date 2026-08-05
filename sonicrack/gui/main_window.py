@@ -995,19 +995,28 @@ class ModularSynthWindow(QMainWindow):
             # Clear current patch
             self._clear_canvas()
 
-            # Apply the patch
-            self._apply_preset(patch_data)
+            # Apply the patch (loads what it can; reports module errors after)
+            load_errors = self._apply_preset(patch_data)
 
-            # Update state
+            # Update state even when some modules failed to load
             self.current_patch_path = file_path
             self.patch_modified = False
             self._update_window_title()
             app_settings.remember_file_directory(file_path)
 
-            self._require_statusbar().showMessage(
-                f"Patch loaded: {Path(file_path).name}"
-            )
-            logger.info(f"Patch loaded from {file_path}")
+            patch_name = Path(file_path).name
+            if load_errors:
+                self._require_statusbar().showMessage(
+                    f"Patch loaded with warnings: {patch_name}"
+                )
+                logger.warning(
+                    "Patch loaded from %s with %d warning(s)",
+                    file_path,
+                    len(load_errors),
+                )
+            else:
+                self._require_statusbar().showMessage(f"Patch loaded: {patch_name}")
+                logger.info(f"Patch loaded from {file_path}")
 
         except Exception as e:
             QMessageBox.critical(
@@ -1118,14 +1127,38 @@ class ModularSynthWindow(QMainWindow):
         dialog.preset_selected.connect(self._apply_preset)
         dialog.exec()
 
-    def _apply_preset(self, preset_data: dict):
+    def _report_patch_load_errors(self, errors: list[str]) -> None:
+        """Show non-fatal patch load problems after a partial restore."""
+        if not errors:
+            return
+
+        max_shown = 15
+        lines = [f"• {error}" for error in errors[:max_shown]]
+        if len(errors) > max_shown:
+            lines.append(f"… and {len(errors) - max_shown} more")
+
+        QMessageBox.warning(
+            self,
+            "Patch Loaded with Errors",
+            "Some modules or connections could not be loaded.\n"
+            "The rest of the patch was restored.\n\n" + "\n".join(lines),
+        )
+
+    def _apply_preset(self, preset_data: dict) -> list[str]:
         """Apply a loaded preset to the canvas.
+
+        Modules that cannot be created or restored are skipped so the rest of
+        the patch still loads. Collected problems are reported after restore.
 
         Args:
             preset_data: Dictionary containing preset data with 'modules' and
                 'connections'
+
+        Returns:
+            List of non-fatal error messages encountered while loading.
         """
         patch_canvas = self._require_patch_canvas()
+        errors: list[str] = []
 
         for module in list(patch_canvas.get_modules()):
             shutdown = getattr(module, "shutdown", None)
@@ -1140,62 +1173,77 @@ class ModularSynthWindow(QMainWindow):
         module_map = {}  # Maps old module IDs to new module instances
 
         for module_data in preset_data.get("modules", []):
-            module_type = module_data.get("type")
+            module_type = module_data.get("type", "<unknown>")
             module_id = module_data.get("id")
             position = module_data.get("position", {"x": 0, "y": 0})
             parameters = module_data.get("parameters", {})
+            label = f"{module_type!r}"
+            if module_id is not None:
+                label = f"{module_type!r} (id={module_id})"
 
-            # Get module class from registry
-            module_class = self.registry.get(module_type)
-            if not module_class:
-                logger.warning(f"Unknown module type: {module_type}")
-                continue
-
-            # Create module instance
-            module_instance = module_class()
-
-            # Set parameters
             try:
-                module_instance.set_parameters(parameters)
+                # Get module class from registry
+                module_class = self.registry.get(module_type)
+                if not module_class:
+                    message = f"Unknown module type: {label}"
+                    logger.warning(message)
+                    errors.append(message)
+                    continue
+
+                # Create module instance
+                module_instance = module_class()
+
+                # Set parameters
+                try:
+                    module_instance.set_parameters(parameters)
+                except Exception as e:
+                    message = f"Failed to set parameters for {label}: {e}"
+                    logger.warning(message, exc_info=True)
+                    errors.append(message)
+
+                custom_name = module_data.get("custom_name")
+                if isinstance(custom_name, str) and custom_name:
+                    module_instance.set_custom_name(custom_name)
+
+                # Add to canvas
+                patch_canvas.add_module(module_instance)
+                self.audio_engine.add_module(module_instance)
+
+                if module_instance.metadata.category == ModuleCategory.OUTPUT:
+                    from sonicrack.gui.modules.output.output import OutputModule
+
+                    output_module = cast(OutputModule, module_instance)
+                    output_module.audio_engine = self.audio_engine
+
+                # Set position
+                module_instance.setPos(position["x"], position["y"])
+
+                # Store in map
+                module_map[module_id] = module_instance
             except Exception as e:
-                logger.warning(
-                    "Failed to set parameters for %s: %s",
-                    module_type,
-                    e,
-                    exc_info=True,
-                )
-
-            custom_name = module_data.get("custom_name")
-            if isinstance(custom_name, str) and custom_name:
-                module_instance.set_custom_name(custom_name)
-
-            # Add to canvas
-            patch_canvas.add_module(module_instance)
-            self.audio_engine.add_module(module_instance)
-
-            if module_instance.metadata.category == ModuleCategory.OUTPUT:
-                from sonicrack.gui.modules.output.output import OutputModule
-
-                output_module = cast(OutputModule, module_instance)
-                output_module.audio_engine = self.audio_engine
-
-            # Set position
-            module_instance.setPos(position["x"], position["y"])
-
-            # Store in map
-            module_map[module_id] = module_instance
+                message = f"Failed to load module {label}: {e}"
+                logger.error(message, exc_info=True)
+                errors.append(message)
 
         # Rebuild connections
         for connection_data in preset_data.get("connections", []):
-            source_id = connection_data.get("source_module")
-            source_port = connection_data.get("source_port")
-            target_id = connection_data.get("target_module")
-            target_port = connection_data.get("target_port")
+            try:
+                source_id = connection_data.get("source_module")
+                source_port = connection_data.get("source_port")
+                target_id = connection_data.get("target_module")
+                target_port = connection_data.get("target_port")
 
-            source_module = module_map.get(source_id)
-            target_module = module_map.get(target_id)
+                source_module = module_map.get(source_id)
+                target_module = module_map.get(target_id)
 
-            if source_module and target_module:
+                if not source_module or not target_module:
+                    # Expected when a module was skipped; no extra user noise.
+                    logger.warning(
+                        "Skipping connection due to missing module: %s",
+                        connection_data,
+                    )
+                    continue
+
                 # Find the ports
                 source_port_obj = None
                 target_port_obj = None
@@ -1212,15 +1260,42 @@ class ModularSynthWindow(QMainWindow):
                         break
 
                 if source_port_obj and target_port_obj:
-                    # Create cable connection
-                    patch_canvas.create_connection(source_port_obj, target_port_obj)
-                else:
-                    logger.warning(
-                        f"Could not find ports: {source_port} or {target_port}"
+                    cable = patch_canvas.create_connection(
+                        source_port_obj, target_port_obj
                     )
+                    if cable is None:
+                        message = (
+                            f"Could not connect {source_port} -> {target_port} "
+                            f"(modules {source_id} -> {target_id})"
+                        )
+                        logger.warning(message)
+                        errors.append(message)
+                else:
+                    message = (
+                        f"Could not find ports: {source_port!r} or {target_port!r} "
+                        f"(modules {source_id} -> {target_id})"
+                    )
+                    logger.warning(message)
+                    errors.append(message)
+            except Exception as e:
+                message = f"Failed to restore connection {connection_data}: {e}"
+                logger.error(message, exc_info=True)
+                errors.append(message)
 
-        # Compile the loaded patch
-        self._require_statusbar().showMessage("Patch loaded successfully")
+        if errors:
+            self._require_statusbar().showMessage(
+                f"Patch loaded with {len(errors)} warning(s)"
+            )
+            self._report_patch_load_errors(errors)
+            logger.warning(
+                "Patch loaded with %d non-fatal error(s): %s",
+                len(errors),
+                "; ".join(errors),
+            )
+        else:
+            self._require_statusbar().showMessage("Patch loaded successfully")
+
+        return errors
 
     def shutdown(self, graceful: bool = True) -> None:
         """Release app-owned resources before quitting.

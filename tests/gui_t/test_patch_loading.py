@@ -69,12 +69,125 @@ def test_apply_preset_restores_module_parameters(monkeypatch):
         "connections": [],
     }
 
-    window._apply_preset(patch_data)
+    errors = window._apply_preset(patch_data)
 
+    assert errors == []
     module = window._require_patch_canvas().get_modules()[0]
     assert module.get_custom_name() == "Bass Source"
     assert module.get_parameters()["frequency"] == 220.0
     assert module.get_parameters()["pulsewidth"] == 0.25
+
+
+def test_apply_preset_skips_unknown_modules_and_loads_rest(monkeypatch):
+    """Unknown module types must not abort the rest of the patch."""
+    window = ModularSynthWindow(restore_last_patch=False)
+    monkeypatch.setattr(window, "_start_output_playback", lambda: None)
+    reported: list[list[str]] = []
+    monkeypatch.setattr(
+        window,
+        "_report_patch_load_errors",
+        lambda errors: reported.append(list(errors)),
+    )
+
+    patch_data = {
+        "metadata": {"name": "Partial Patch"},
+        "modules": [
+            {
+                "id": 0,
+                "type": "Oscillator",
+                "position": {"x": 0, "y": 0},
+                "parameters": {"frequency": 110.0},
+            },
+            {
+                "id": 1,
+                "type": "DoesNotExistModule",
+                "position": {"x": 150, "y": 0},
+                "parameters": {},
+            },
+            {
+                "id": 2,
+                "type": "Output",
+                "position": {"x": 300, "y": 0},
+                "parameters": {},
+            },
+        ],
+        "connections": [
+            {
+                "source_module": 0,
+                "source_port": "Sine",
+                "target_module": 2,
+                "target_port": "Left/Mono",
+            },
+            {
+                "source_module": 1,
+                "source_port": "Out",
+                "target_module": 2,
+                "target_port": "R",
+            },
+        ],
+    }
+
+    errors = window._apply_preset(patch_data)
+
+    modules = window._require_patch_canvas().get_modules()
+    connections = window._require_patch_canvas().get_connections()
+    titles = {module.metadata.title for module in modules}
+
+    assert titles == {"Oscillator", "Output"}
+    assert len(connections) == 1
+    assert connections[0][0].port_name == "Sine"
+    assert connections[0][1].port_name == "Left/Mono"
+    assert any("DoesNotExistModule" in error for error in errors)
+    assert reported and reported[0] == errors
+
+
+def test_apply_preset_continues_when_module_constructor_fails(monkeypatch):
+    """A failing module constructor must not prevent later modules from loading."""
+    window = ModularSynthWindow(restore_last_patch=False)
+    monkeypatch.setattr(window, "_start_output_playback", lambda: None)
+    monkeypatch.setattr(window, "_report_patch_load_errors", lambda _errors: None)
+
+    real_get = window.registry.get
+
+    def flaky_get(name, strict=False):
+        module_class = real_get(name, strict=strict)
+        if name != "Filter" or module_class is None:
+            return module_class
+
+        class BrokenFilter(module_class):
+            def __init__(self, *args, **kwargs):
+                raise RuntimeError("constructor boom")
+
+        return BrokenFilter
+
+    monkeypatch.setattr(window.registry, "get", flaky_get)
+
+    patch_data = {
+        "metadata": {"name": "Broken Module Patch"},
+        "modules": [
+            {
+                "id": 0,
+                "type": "Filter",
+                "position": {"x": 0, "y": 0},
+                "parameters": {},
+            },
+            {
+                "id": 1,
+                "type": "Oscillator",
+                "position": {"x": 200, "y": 0},
+                "parameters": {"frequency": 440.0},
+            },
+        ],
+        "connections": [],
+    }
+
+    errors = window._apply_preset(patch_data)
+    modules = window._require_patch_canvas().get_modules()
+
+    assert len(modules) == 1
+    assert modules[0].metadata.title == "Oscillator"
+    assert modules[0].get_parameters()["frequency"] == 440.0
+    assert any("Filter" in error and "constructor boom" in error for error in errors)
 
 
 def test_add_output_keeps_audio_output_backend():

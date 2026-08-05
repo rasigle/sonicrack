@@ -12,6 +12,12 @@ All notable changes to SonicRack will be documented in this file.
   header → **Curve**. Shape preview updates to match. Requires
   `soniclab>=2026.1.4`.
 
+### Fixed
+
+- **Partial patch load**: Opening a patch no longer aborts when a single module
+  is unknown or fails to create. Valid modules and connections still restore;
+  problems are collected and shown in a warning dialog afterward.
+
 ## [2026.2.0] - 2026-07-31
 
 First public release on PyPI. DSP remains provided by the separate

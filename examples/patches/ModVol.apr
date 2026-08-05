@@ -26,7 +26,7 @@
     },
     {
       "id": 1,
-      "type": "Volume (Mod)",
+      "type": "Volume",
       "custom_name": "",
       "module_category": "Modifier",
       "position": {

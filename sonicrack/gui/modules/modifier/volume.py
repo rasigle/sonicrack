@@ -19,14 +19,18 @@ logger = logging.getLogger(__name__)
 
 @register_module()
 class VolumeModule(ModulatedModuleBase):
-    """Volume/Gain module with modulation support."""
+    """Volume/Gain module with optional modulation support.
 
-    runtime_kind = "volume_mod"
+    Without a cable on Mod, the Gain knob sets volume in dB.
+    With Mod connected, the knob controls modulation depth and CV drives gain.
+    """
+
+    runtime_kind = "volume"
 
     metadata = ModuleMetadata(
-        title="Volume (Mod)",
+        title="Volume",
         category=ModuleCategory.MODIFIER,
-        description="Volume control with modulation input",
+        description="Volume/gain control with optional CV modulation",
     )
 
     def __init__(self):
@@ -47,13 +51,21 @@ class VolumeModule(ModulatedModuleBase):
             logarithmic=False,
         )
         layout = self._begin_controls()
-        self.bind_parameter_knob(self.gain_knob, "gain_db")
+        self.bind_parameter_knob(
+            self.gain_knob, "gain_db", on_change=self._on_gain_changed
+        )
         layout.addWidget(self.gain_knob, alignment=Qt.AlignmentFlag.AlignCenter)
         self._finish_controls(layout)
 
         self.register_parameter("gain_db", self.gain_knob)
         self.control_knob = self.gain_knob
         self.component = self.create_unmodulated_component()
+
+    def _on_gain_changed(self, value: float) -> None:
+        """Update Volume.gain_db when not modulated (keeps patch load in sync)."""
+        if self.component is not None and not self.mod_port.is_connected:
+            self.component.gain_db = value
+        logger.debug(f"Volume: gain set to {value:.3f} dB")
 
     def get_required_inputs(self) -> list[str]:
         """Volume requires the In port to be connected."""

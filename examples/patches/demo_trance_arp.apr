@@ -115,7 +115,7 @@
     },
     {
       "id": 7,
-      "type": "Panner (Mod)",
+      "type": "Panner",
       "custom_name": "Stereo",
       "module_category": "Modifier",
       "position": { "x": 1060.0, "y": -60.0 },

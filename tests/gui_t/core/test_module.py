@@ -7,7 +7,7 @@ from soniclab.generators.oscillators.oscillator import SineOscillator
 
 from sonicrack.gui.modules.input.midi_keyboard import MIDIKeyboardModule
 from sonicrack.gui.modules.mixer import MixerModule
-from sonicrack.gui.modules.modifier.volume_mod import VolumeModule
+from sonicrack.gui.modules.modifier.volume import VolumeModule
 from sonicrack.gui.modules.sequencing.step_sequencer import StepSequencerModule
 from sonicrack.gui.modules.source.lfo import LFOModule
 from sonicrack.gui.modules.source.oscillator import OscillatorModule

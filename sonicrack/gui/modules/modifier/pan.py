@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 import numpy as np
@@ -17,14 +19,18 @@ logger = logging.getLogger(__name__)
 
 @register_module()
 class PannerModule(ModulatedModuleBase):
-    """Panner module for stereo positioning with modulation support."""
+    """Stereo panner with optional modulation support.
+
+    Without a cable on Mod, the Pan knob sets stereo position.
+    With Mod connected, the knob controls modulation depth and CV drives pan.
+    """
 
     runtime_kind = "panner"
 
     metadata = ModuleMetadata(
-        title="Panner (Mod)",
+        title="Panner",
         category=ModuleCategory.MODIFIER,
-        description="Stereo panner with modulation input",
+        description="Stereo panner with optional CV modulation",
     )
 
     def __init__(self):
@@ -41,13 +47,21 @@ class PannerModule(ModulatedModuleBase):
             label="Pan", min_value=-1.0, max_value=1.0, default_value=0.0
         )
         layout = self._begin_controls()
-        self.bind_parameter_knob(self.pan_knob, "position")
+        self.bind_parameter_knob(
+            self.pan_knob, "position", on_change=self._on_pan_changed
+        )
         layout.addWidget(self.pan_knob, alignment=Qt.AlignmentFlag.AlignCenter)
         self._finish_controls(layout)
 
         self.register_parameter("position", self.pan_knob)
         self.control_knob = self.pan_knob
         self.component = self.create_unmodulated_component()
+
+    def _on_pan_changed(self, pan_value: float) -> None:
+        """Update pan position when not modulated."""
+        if self.component is not None and not self.mod_port.is_connected:
+            self.component.position = pan_value
+            logger.debug(f"Panner: position value set to {pan_value:.3f}")
 
     def get_required_inputs(self) -> list[str]:
         """Panner requires the In port to be connected."""

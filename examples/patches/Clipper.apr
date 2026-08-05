@@ -11,7 +11,7 @@
   "modules": [
     {
       "id": 0,
-      "type": "Clipper (Mod)",
+      "type": "Clipper",
       "custom_name": "",
       "module_category": "Modifier",
       "position": {

@@ -1,4 +1,6 @@
-"""Modulated Clipper module - clipper with CV threshold control."""
+"""Clipper module - hard clipper with optional CV threshold control."""
+
+from __future__ import annotations
 
 import logging
 
@@ -17,19 +19,23 @@ logger = logging.getLogger(__name__)
 
 
 @register_module()
-class ClipperModulatedModule(ModulatedModuleBase):
-    """Clipper module with modulation support for dynamic threshold control."""
+class ClipperModule(ModulatedModuleBase):
+    """Clipper for distortion/limiting with optional modulation support.
+
+    Without a cable on Mod, the Threshold knob sets the clip level.
+    With Mod connected, the knob controls modulation depth and CV drives threshold.
+    """
 
     runtime_kind = "clipper"
 
     metadata = ModuleMetadata(
-        title="Clipper (Mod)",
+        title="Clipper",
         category=ModuleCategory.MODIFIER,
-        description="Audio clipper with CV threshold control",
+        description="Audio clipper with optional CV threshold control",
     )
 
     def __init__(self):
-        """Initialize modulated clipper module."""
+        """Initialize clipper module."""
         super().__init__(
             width=140,
             height=150,
@@ -46,13 +52,22 @@ class ClipperModulatedModule(ModulatedModuleBase):
             default_value=0.5,
         )
         layout = self._begin_controls()
-        self.bind_parameter_knob(self.threshold_knob, "threshold")
+        self.bind_parameter_knob(
+            self.threshold_knob, "threshold", on_change=self._on_threshold_changed
+        )
         layout.addWidget(self.threshold_knob, alignment=Qt.AlignmentFlag.AlignCenter)
         self._finish_controls(layout)
 
         self.register_parameter("threshold", self.threshold_knob)
         self.control_knob = self.threshold_knob
         self.component = self.create_unmodulated_component()
+
+    def _on_threshold_changed(self, new_threshold: float) -> None:
+        """Update Clipper wave_range when not modulated."""
+        logger.debug(f"Clipper: threshold knob changed to {new_threshold:.3f}")
+        if self.component is not None and not self.mod_port.is_connected:
+            self.component.wave_range = (-new_threshold, new_threshold)
+            logger.debug(f"Clipper: wave_range set to +/- {new_threshold:.3f}")
 
     def get_required_inputs(self) -> list[str]:
         """Clipper requires the In port to be connected."""

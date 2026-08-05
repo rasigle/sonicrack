@@ -7,7 +7,7 @@ from typing import Any
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
 
-from sonicrack.gui.modules.modifier.volume_mod import VolumeModule
+from sonicrack.gui.modules.modifier.volume import VolumeModule
 from sonicrack.gui.modules.source.oscillator import OscillatorModule
 from sonicrack.gui.widgets.patch_canvas import PatchCanvas
 from sonicrack.gui.widgets.port_widget import PortWidget

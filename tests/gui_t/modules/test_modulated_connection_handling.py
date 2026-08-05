@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
-from sonicrack.gui.modules.modifier.clipper_mod import ClipperModulatedModule
-from sonicrack.gui.modules.modifier.pan_mod import PannerModule
-from sonicrack.gui.modules.modifier.volume_mod import VolumeModule
+from sonicrack.gui.modules.modifier.clipper import ClipperModule
+from sonicrack.gui.modules.modifier.pan import PannerModule
+from sonicrack.gui.modules.modifier.volume import VolumeModule
 from sonicrack.gui.modules.source.oscillator import OscillatorModule
 from sonicrack.runtime.specs import RuntimeParameters
 
@@ -87,7 +87,7 @@ def test_clipper_component_prepared_on_connection(qapp: Any):
     """Test that Clipper component is prepared when modulation is connected."""
     del qapp
 
-    clipper = ClipperModulatedModule()
+    clipper = ClipperModule()
     lfo = OscillatorModule()
 
     # Initially, clipper has unmodulated component

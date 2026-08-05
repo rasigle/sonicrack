@@ -73,7 +73,7 @@
     },
     {
       "id": 4,
-      "type": "Volume (Mod)",
+      "type": "Volume",
       "custom_name": "",
       "module_category": "Modifier",
       "position": {

@@ -12,21 +12,27 @@ pytest.importorskip("soniclab.dsp.filters.ladder")
 pytest.importorskip("soniclab.generators.sample_player")
 pytest.importorskip("soniclab.voices.subtractive")
 
-from sonicrack.gui.modules.effects.effects_bitcrusher import BitcrusherModule
-from sonicrack.gui.modules.effects.effects_flanger import FlangerModule
-from sonicrack.gui.modules.effects.effects_ring_mod import RingModModule
-from sonicrack.gui.modules.mixer.mixer import MixerModule
-from sonicrack.gui.modules.modifier.ladder_filter import LadderFilterModule
-from sonicrack.gui.modules.modifier.stereo_width import StereoWidthModule
-from sonicrack.gui.modules.modifier.svf_filter import SVFFilterModule
-from sonicrack.gui.modules.modulated_source.envelope_follower import (
+from sonicrack.gui.modules.effects.effects_bitcrusher import (  # noqa: E402
+    BitcrusherModule,
+)
+from sonicrack.gui.modules.effects.effects_flanger import FlangerModule  # noqa: E402
+from sonicrack.gui.modules.effects.effects_ring_mod import RingModModule  # noqa: E402
+from sonicrack.gui.modules.mixer.mixer import MixerModule  # noqa: E402
+from sonicrack.gui.modules.modifier.ladder_filter import (  # noqa: E402
+    LadderFilterModule,
+)
+from sonicrack.gui.modules.modifier.stereo_width import StereoWidthModule  # noqa: E402
+from sonicrack.gui.modules.modifier.svf_filter import SVFFilterModule  # noqa: E402
+from sonicrack.gui.modules.modulated_source.envelope_follower import (  # noqa: E402
     EnvelopeFollowerModule,
 )
-from sonicrack.gui.modules.source.sample_player import SamplePlayerModule
-from sonicrack.gui.modules.source.unison import UnisonModule
-from sonicrack.gui.modules.voice.subtractive_voice import SubtractiveVoiceModule
-from sonicrack.patching.registry import discover_modules, get_registry
-from tests.gui_t.helpers import connect_signal as _connect_signal
+from sonicrack.gui.modules.source.sample_player import SamplePlayerModule  # noqa: E402
+from sonicrack.gui.modules.source.unison import UnisonModule  # noqa: E402
+from sonicrack.gui.modules.voice.subtractive_voice import (  # noqa: E402
+    SubtractiveVoiceModule,
+)
+from sonicrack.patching.registry import discover_modules, get_registry  # noqa: E402
+from tests.gui_t.helpers import connect_signal as _connect_signal  # noqa: E402
 
 
 def test_new_modules_are_discoverable(qapp: Any) -> None:

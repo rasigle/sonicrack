@@ -11,12 +11,12 @@ assets; DSP, realtime audio, and MIDI primitives come from [`soniclab`](https://
 
 ## Snapshot
 
-- Package version: `2026.2.0`
+- Package version: `2026.3.0`
 - Python: `>=3.11`
 - CLI entry point: `sonicrack`
 - Module entry point: `python -m sonicrack.modular_synth_app`
 - Main package: `sonicrack`
-- DSP dependency: `soniclab>=2026.1.3`
+- DSP dependency: `soniclab>=2026.2.0`
 - License: MIT
 
 ## Install (PyPI)

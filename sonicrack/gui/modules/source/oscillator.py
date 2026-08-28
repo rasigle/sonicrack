@@ -261,4 +261,3 @@ class OscillatorModule(ModuleWidget):
         """Handle pulse width changes - only update square oscillator if connected."""
         if self.square_port.is_connected:
             self._square_oscillator.pulsewidth = self.pulsewidth_knob.get_value()
-

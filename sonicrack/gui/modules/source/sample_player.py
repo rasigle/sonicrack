@@ -7,7 +7,11 @@ from pathlib import Path
 import numpy as np
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton
-from soniclab.generators.sample_player import SamplePlayer
+
+# pylint: disable-next=no-name-in-module
+from soniclab.generators.sample_player import (  # type: ignore[import-not-found]
+    SamplePlayer,
+)
 from soniclab.utils.cv import pitch_cv_to_frequency
 
 from sonicrack.config.app_settings import app_settings

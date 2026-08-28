@@ -597,6 +597,7 @@ def test_adsr_runtime_renders_expected_gate_attack_decay_sustain(qapp: Any):
             "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
             "sustain_level": 0.5,
             "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+            "curve": "linear",
         },
     )
 
@@ -622,6 +623,7 @@ def test_adsr_runtime_renders_expected_gate_release(qapp: Any):
         "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
         "sustain_level": 0.5,
         "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "curve": "linear",
     }
 
     # ADSR stretches short gates to max(2 ms, attack*0.5 + 8 ms). Hold the
@@ -645,6 +647,7 @@ def test_adsr_manual_gate_holds_long_attack(qapp: Any):
         "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
         "sustain_level": 0.5,
         "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "curve": "linear",
     }
 
     module.trigger_button.setChecked(True)
@@ -667,6 +670,7 @@ def test_adsr_manual_on_off_trigger_releases_on_button_release(qapp: Any):
         "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
         "sustain_level": 0.5,
         "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "curve": "linear",
     }
 
     module._on_trigger_pressed()
@@ -692,6 +696,7 @@ def test_adsr_switching_from_latched_to_on_off_releases_gate(qapp: Any):
         "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
         "sustain_level": 0.5,
         "release_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "curve": "linear",
     }
 
     module.trigger_button.setChecked(True)
@@ -740,6 +745,7 @@ def test_decay_envelope_runtime_renders_gate_pluck(qapp: Any):
             "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
             "amount": 1.0,
             "accent_amount": 0.0,
+            "curve": "linear",
         },
     )
 
@@ -765,6 +771,7 @@ def test_decay_envelope_runtime_applies_accent_amount(qapp: Any):
             "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
             "amount": 0.5,
             "accent_amount": 1.0,
+            "curve": "linear",
         },
     )
 

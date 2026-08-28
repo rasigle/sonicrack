@@ -44,6 +44,7 @@ class AudioConfig:
     """
 
     _instance = None
+    _initialized = False
 
     def __new__(cls):
         """Ensure only one instance exists (singleton pattern)."""

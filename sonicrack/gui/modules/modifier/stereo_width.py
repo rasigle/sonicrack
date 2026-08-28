@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QColor
-from soniclab.dsp.modifiers.spatial import StereoWidth
+
+# pylint: disable-next=no-name-in-module
+from soniclab.dsp.modifiers.spatial import StereoWidth  # type: ignore[import-not-found]
 
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.module_widget import ModuleWidget

@@ -7,8 +7,14 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel
 from soniclab.utils.cv import pitch_cv_to_frequency
-from soniclab.voices import SubtractiveVoice
-from soniclab.voices.subtractive import FilterModeName
+
+# pylint: disable-next=no-name-in-module
+from soniclab.voices import SubtractiveVoice  # type: ignore[attr-defined]
+
+# pylint: disable-next=no-name-in-module
+from soniclab.voices.subtractive import (  # type: ignore[import-not-found]
+    FilterModeName,
+)
 
 from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.widgets import Knob

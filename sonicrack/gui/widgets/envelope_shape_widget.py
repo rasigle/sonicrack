@@ -362,11 +362,14 @@ class EnvelopeShapeWidget(QWidget):
             sus_end = peak_i
             for i in range(peak_i, len(points)):
                 y = points[i][1]
-                if sustain_y is None and i > peak_i:
-                    if abs(y - points[min(i + 1, len(points) - 1)][1]) < 1e-6:
-                        sustain_y = y
-                        sus_start = i
-                        sus_end = i
+                if (
+                    sustain_y is None
+                    and i > peak_i
+                    and abs(y - points[min(i + 1, len(points) - 1)][1]) < 1e-6
+                ):
+                    sustain_y = y
+                    sus_start = i
+                    sus_end = i
                 if sustain_y is not None and abs(y - sustain_y) < 1e-6:
                     sus_end = i
             if stage == "attack":

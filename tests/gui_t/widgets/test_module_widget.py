@@ -407,10 +407,32 @@ def test_module_bounding_rect_covers_border_pen(qapp: Any) -> None:
     bounds = module.boundingRect()
     assert bounds.contains(body)
     overflow = (bounds.width() - body.width()) / 2.0
-    assert overflow >= ModuleWidget.SELECTION_BORDER_WIDTH / 2.0
+    assert overflow >= ModuleWidget.SELECTION_BORDER_WIDTH
     shape = module.shape()
     assert shape.contains(QPointF(body.center()))
     assert not shape.contains(QPointF(bounds.left(), body.center().y()))
+
+
+def test_module_widget_geometry_matches_panel(qapp: Any) -> None:
+    """QGraphicsWidget size must stay the panel size after it is shown.
+
+    First-show ``adjustSize`` would otherwise shrink the widget to the
+    default 50x50 hint, and C++ ``boundingRect()`` (rect/size) would
+    then fail to clear the outline while dragging.
+    """
+    del qapp
+    from PyQt6.QtWidgets import QGraphicsScene
+
+    module = _ModifierWidget()
+    assert module.size().width() == module.module_width
+    assert module.size().height() == module.module_height
+    frame = module.windowFrameRect()
+    assert frame.contains(module.boundingRect())
+
+    scene = QGraphicsScene()
+    scene.addItem(module)
+    assert module.size().width() == module.module_width
+    assert module.size().height() == module.module_height
 
 
 def test_render_plan_resolves_runtime_parameters_at_render_time(qapp: Any):

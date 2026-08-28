@@ -3209,16 +3209,16 @@ wheels = [
 
 [[package]]
 name = "soniclab"
-version = "2026.1.3"
+version = "2026.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1a/85/840cd135a252e1fb61c4bb8c444e3dd945c9417043880bc291aa3512ac47/soniclab-2026.1.3.tar.gz", hash = "sha256:48f439daf286fb59a82fe2778e1986fa1d9db6b8df5dad614171e0ed9a22aa94", size = 283093, upload-time = "2026-07-31T06:11:33.8Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/de/58e9661db0c5fe6b169d85bc2ca63962feb1ce42de41526a2d9c930bff89/soniclab-2026.2.0.tar.gz", hash = "sha256:8dd4bf1dc66cada77ee442d5bd56ca7a1282ff9c1f8583db8433b12f102c9ca6", size = 346836, upload-time = "2026-08-28T11:43:35.505Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/23/141b9ec798f63fca206d7df1452112c80a3620129f2b968b16c8f90c158b/soniclab-2026.1.3-py3-none-any.whl", hash = "sha256:ca98de1454fc019cd21c2dfd0a95de56224eba15ce5f09ec93b60bc402b4e3eb", size = 234781, upload-time = "2026-07-31T06:11:32.107Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/1f/f5011c66cfd53e8418e18412c89601f7d544c65ea60894b062632239c14d/soniclab-2026.2.0-py3-none-any.whl", hash = "sha256:d13a8e489e75a59395aeff4ec8dfda012171469d0856306c1c43565199024d79", size = 289838, upload-time = "2026-08-28T11:43:34.118Z" },
 ]
 
 [package.optional-dependencies]
@@ -3312,7 +3312,7 @@ requires-dist = [
     { name = "pyqtgraph", marker = "extra == 'examples'", specifier = ">=0.13.7" },
     { name = "pyqtgraph", marker = "extra == 'full'", specifier = ">=0.13.7" },
     { name = "scipy", specifier = ">=1.11" },
-    { name = "soniclab", extras = ["full"], specifier = ">=2026.1.3" },
+    { name = "soniclab", extras = ["full"], specifier = ">=2026.2.0" },
     { name = "soniclab", extras = ["midi"], marker = "extra == 'full'" },
     { name = "soniclab", extras = ["midi"], marker = "extra == 'midi'" },
     { name = "sounddevice", specifier = ">=0.5.5" },

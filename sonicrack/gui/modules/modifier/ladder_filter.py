@@ -7,7 +7,9 @@ from typing import Any, Literal
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
-from soniclab.dsp.filters import LadderFilter
+
+# pylint: disable-next=no-name-in-module
+from soniclab.dsp.filters import LadderFilter  # type: ignore[attr-defined]
 
 from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules.modifier._filter_base import (

@@ -11,6 +11,7 @@ from importlib.resources.abc import Traversable
 from pathlib import Path
 
 # Shared audio engine constants (single source of truth in soniclab).
+# pylint: disable=unused-import
 from soniclab.constants import (  # noqa: F401
     A4_FREQUENCY,
     AUTO_MODE_VECTORIZE_THRESHOLD,
@@ -36,6 +37,8 @@ from soniclab.constants import (  # noqa: F401
     SAMPLE_RATE_192K,
     SEMITONE_RATIO,
 )
+
+# pylint: enable=unused-import
 
 APP_TITLE: str = "SonicRack - Modular Synthesizer"
 APP_ICON_NAME: str = "icon.png"

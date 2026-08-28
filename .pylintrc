@@ -37,9 +37,8 @@ load-plugins=
     pylint.extensions.comparison_placement,
     pylint.extensions.mccabe
 
-# Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
-# number of processors available to use.
-jobs=0
+# Parallel pylint (jobs=0) can crash on Windows with BrokenProcessPool.
+jobs=1
 
 # Allow loading of arbitrary C extensions. Extensions are imported into the
 # active Python interpreter and may run arbitrary code.
@@ -138,7 +137,7 @@ logging-modules=logging
 
 # The type of string formatting that logging methods do. `old` means using %
 # formatting, `new` is for `{}` formatting.
-logging-format-style=new
+logging-format-style=old
 
 
 [MISCELLANEOUS]

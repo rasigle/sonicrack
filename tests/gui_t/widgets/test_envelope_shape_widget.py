@@ -220,7 +220,7 @@ def test_adsr_module_curve_menu_updates_shape_and_engine(qapp: Any):
     if _SONICLAB_HAS_ENVELOPE_CURVE:
         adsr = module._current_adsr()
         module._apply_runtime_parameters(adsr, {"curve": "Linear"})
-        assert adsr.curve == "linear"
+        assert adsr.curve == "linear"  # type: ignore[attr-defined]
 
 
 def test_decay_module_curve_menu(qapp: Any):

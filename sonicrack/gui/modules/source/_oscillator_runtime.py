@@ -16,7 +16,6 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-
 from soniclab.generators.oscillators.runtime import (
     DEFAULT_FREQUENCY_SLEW_TIME_MS,
     RuntimeOscillator,

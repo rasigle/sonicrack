@@ -96,9 +96,7 @@ class MixerModule(ModuleWidget):
                 max_value=1.0,
                 default_value=DEFAULT_CHANNEL_VOLUME,
             )
-            gain.value_changed.connect(
-                lambda _value, i=index: self._on_gain_changed(i)
-            )
+            gain.value_changed.connect(lambda _value, i=index: self._on_gain_changed(i))
             column.addWidget(gain)
             self.gain_knobs.append(gain)
 

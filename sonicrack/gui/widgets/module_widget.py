@@ -8,7 +8,7 @@ from abc import ABCMeta
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
+from PyQt6.QtCore import QPointF, QRectF, QSizeF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPen
 from PyQt6.QtWidgets import (
     QGraphicsItem,
@@ -168,6 +168,10 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.setAcceptHoverEvents(True)
+        # QGraphicsWidget::boundingRect() in C++ is rect()/size(). Keep that
+        # geometry equal to the panel so scene updates cover the body, and
+        # pad the window frame for the outline that sits outside it.
+        self._sync_widget_geometry()
 
     # === UI Construction Helpers ===
     @staticmethod
@@ -653,8 +657,23 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         antialias fringe lie outside ``(0, 0, width, height)``. The scene
         only redraws ``boundingRect`` while dragging; if that rect is too
         small, the old outline is left behind.
+
+        Pad by a full selection stroke (not just half) plus extra for
+        rounded-corner coverage and fractional HiDPI rounding used by
+        ``BoundingRectViewportUpdate``.
         """
-        return cls.SELECTION_BORDER_WIDTH * 0.5 + 2.0
+        return float(cls.SELECTION_BORDER_WIDTH) + 4.0
+
+    def _sync_widget_geometry(self) -> None:
+        """Keep QGraphicsWidget size aligned with the painted panel."""
+        self.resize(float(self.module_width), float(self.module_height))
+        pad = self._paint_margin()
+        self.setWindowFrameMargins(pad, pad, pad, pad)
+
+    def sizeHint(self, which, constraint=None):  # noqa: N802 - Qt API
+        """Return the panel size so first-show ``adjustSize`` cannot shrink us."""
+        del which, constraint
+        return QSizeF(float(self.module_width), float(self.module_height))
 
     def _body_rect(self) -> QRectF:
         """Panel rectangle in item coordinates (excludes paint overflow)."""
@@ -669,6 +688,14 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             self.module_width + 2.0 * pad,
             self.module_height + 2.0 * pad,
         )
+
+    def _invalidate_painted_region(self) -> None:
+        """Dirty the old/new outline including antialias fringe."""
+        scene = self.scene()
+        if scene is None:
+            return
+        extra = self._paint_margin()
+        scene.update(self.sceneBoundingRect().adjusted(-extra, -extra, extra, extra))
 
     def _title_bar_height(self) -> int:
         """Return the current title bar height."""
@@ -714,6 +741,9 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         body = self._body_rect()
 
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Intersect the view clip so rounded-rect AA cannot stamp pixels
+        # outside the region that will be cleared on the next move.
+        painter.setClipRect(self.boundingRect(), Qt.ClipOperation.IntersectClip)
 
         # Rack panel background with subtle vertical shading.
         gradient = QLinearGradient(body.topLeft(), body.bottomLeft())
@@ -854,9 +884,12 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
     def itemChange(self, change, value):  # noqa: N802 - Qt API
         """Update attached cables when the module is moved on the canvas."""
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
+            self._invalidate_painted_region()
         result = super().itemChange(change, value)
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
             self._refresh_attached_cables()
+            self._invalidate_painted_region()
         return result
 
     # === Event Handling ===

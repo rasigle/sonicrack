@@ -7,11 +7,14 @@ do not ship with dedicated output classes (mod wheel, expression, pitch bend).
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 from soniclab.core.component import AudioComponent
+from soniclab.core.sample_mode import SampleMode
 from soniclab.midi_io import MIDIToCV
+
+from sonicrack.constants import DEFAULT_SAMPLE_RATE
 
 NotePriority = Literal["last", "high", "low"]
 
@@ -34,8 +37,13 @@ class ScalarCVOutput(AudioComponent):
         super().__init__()
         self._getter = getter
 
-    def get_samples(self, n: int, *args: Any, **kwargs: Any) -> np.ndarray:
-        del args, kwargs
+    def get_samples(
+        self,
+        n: int = DEFAULT_SAMPLE_RATE,
+        reset: bool = False,
+        mode: SampleMode = "auto",
+    ) -> np.ndarray:
+        del reset, mode
         return np.full(n, float(self._getter()), dtype=np.float32)
 
     def __iter__(self):

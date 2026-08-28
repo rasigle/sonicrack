@@ -3,17 +3,29 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Protocol
 
 import numpy as np
 from scipy.io import wavfile
 
 from sonicrack.config.audio_config import audio_config
-from sonicrack.gui.modules.output.output import OutputModule
 from sonicrack.runtime.helpers import as_stereo
 
 
+class OutputBounceTarget(Protocol):
+    """Duck-typed Output module surface used by offline bounce."""
+
+    audio_output: Any
+
+    def render_offline(self, num_frames: int) -> np.ndarray: ...
+
+    def stop_playback(self, graceful: bool = True) -> None: ...
+
+    def start_playback(self) -> bool: ...
+
+
 def bounce_output_module(
-    output_module: OutputModule,
+    output_module: OutputBounceTarget,
     duration_seconds: float,
     *,
     buffer_size: int | None = None,

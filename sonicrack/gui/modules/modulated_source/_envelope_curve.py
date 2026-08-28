@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
+from typing import Literal, Protocol
 
 EnvelopeCurveName = Literal["linear", "exponential", "polynomial"]
 
@@ -42,12 +42,20 @@ def apply_envelope_curve(component: object, value: str) -> EnvelopeCurveName:
     return curve
 
 
+class EnvelopeCurveParameter(Protocol):
+    """Menu-backed curve choice with the ``get_value`` / ``set_value`` surface."""
+
+    def get_value(self) -> str: ...
+
+    def set_value(self, value: str) -> None: ...
+
+
 def register_envelope_curve_choice(
     module: object,
     on_changed: Callable[[str], None],
     *,
     tooltip: str,
-) -> object:
+) -> EnvelopeCurveParameter:
     """Register the shared Curve context-menu choice on an envelope module."""
     return module.register_menu_choice(  # type: ignore[attr-defined]
         "curve",

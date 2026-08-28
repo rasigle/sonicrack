@@ -4,13 +4,15 @@ All notable changes to SonicRack will be documented in this file.
 
 ## [Unreleased]
 
+## [2026.3.0] - 2026-08-28
+
 ### Added
 
 - **Envelope curve (right-click menu)**: ADSR and Decay modules can choose
   segment interpolation — **Linear**, **Exponential** (default, analog RC /
   best VCA feel), or **Polynomial** (smooth S-curve). Right-click the module
   header → **Curve**. Shape preview updates to match. Requires
-  `soniclab>=2026.1.4`.
+  `soniclab>=2026.2.0`.
 - **Ladder Filter** and **SVF Filter**: Moog-style 24 dB ladder and
   multi-mode state-variable filter, both with cutoff CV. Wrap
   `soniclab.LadderFilter` / `StateVariableFilter`.
@@ -32,6 +34,7 @@ All notable changes to SonicRack will be documented in this file.
 
 ### Changed
 
+- Base install depends on `soniclab>=2026.2.0`.
 - Patch canvas uses a darker rack-case grid; module panels get a light
   sheen and a softer accent glow.
 
@@ -46,9 +49,11 @@ All notable changes to SonicRack will be documented in this file.
   are stretched so attack can open. Random Melody glides quantized pitch;
   the subtractive pad uses a slow unipolar square gate instead of 2 ms clock
   ticks.
-- **Module drag trails**: bounding rect includes the outline pen (and
-  antialias fringe) so `BoundingRectViewportUpdate` clears the old border
-  while moving modules. Port jacks use a matching overflow pad.
+- **Module drag trails**: module widgets keep a geometry that matches the
+  panel, pad the window-frame/bounding rect by a full selection stroke plus
+  antialias/HiDPI slack, clip painting to that rect, and invalidate the
+  expanded region on move so `BoundingRectViewportUpdate` clears the old
+  outline. Port jacks use a matching overflow pad.
 
 ## [2026.2.0] - 2026-07-31
 

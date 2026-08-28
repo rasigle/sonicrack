@@ -138,6 +138,21 @@
       }
     },
     {
+      "id": 9,
+      "type": "Slew",
+      "custom_name": "Glide",
+      "module_category": "Modifier",
+      "position": {
+        "x": 140.0,
+        "y": -640.0
+      },
+      "parameters": {
+        "active": true,
+        "rise_ms": 25.0,
+        "fall_ms": 25.0
+      }
+    },
+    {
       "id": 8,
       "type": "Output",
       "custom_name": "",
@@ -184,6 +199,12 @@
     },
     {
       "source_module": 1,
+      "source_port": "Out",
+      "target_module": 9,
+      "target_port": "In"
+    },
+    {
+      "source_module": 9,
       "source_port": "Out",
       "target_module": 3,
       "target_port": "V/Oct"

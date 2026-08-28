@@ -11,6 +11,28 @@ All notable changes to SonicRack will be documented in this file.
   best VCA feel), or **Polynomial** (smooth S-curve). Right-click the module
   header → **Curve**. Shape preview updates to match. Requires
   `soniclab>=2026.1.4`.
+- **Ladder Filter** and **SVF Filter**: Moog-style 24 dB ladder and
+  multi-mode state-variable filter, both with cutoff CV. Wrap
+  `soniclab.LadderFilter` / `StateVariableFilter`.
+- **Unison** source: detuned PolyBLEP stack with stereo spread (supersaw).
+- **Sample Player**: gated WAV playback with pitch CV, loop, and a built-in
+  pluck so it sounds before a file is loaded (`soniclab.SamplePlayer`).
+- **Subtractive Voice**: compact osc → SVF → VCA voice with amp ADSR and
+  filter LFO (`soniclab.SubtractiveVoice`).
+- Effects: **Flanger**, **Bitcrusher**, **Ring Mod**.
+- Utilities: **Stereo Width** (mid/side), **Env Follower** (audio → CV).
+- **Mixer** per-channel pan, mute, and peak meters; mix bus is stereo.
+- **File → Export Audio…** (`Ctrl+Shift+E`): offline bounce of the Output
+  graph to WAV.
+- Demo patches: `demo_unison_ladder.apr`, `demo_subtractive_pad.apr`,
+  `demo_lofi_crush.apr`, `RandomMelody.apr`. The ring-mod alien demo now
+  includes a spectrum tap and a saved layout from a playing session.
+- **Output** left/right peak meters next to the master gain.
+
+### Changed
+
+- Patch canvas uses a darker rack-case grid; module panels get a light
+  sheen and a softer accent glow.
 
 ### Fixed
 

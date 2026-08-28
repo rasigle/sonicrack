@@ -1,7 +1,8 @@
 import logging
 
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout
 from soniclab.dsp.effects import Compressor
 
 from sonicrack.gui.modules._modulated_base import ModulatedModuleBase
@@ -9,7 +10,7 @@ from sonicrack.gui.modules.effects._cv_modulation import (
     ControlRateCvSpec,
     apply_control_rate_cv,
 )
-from sonicrack.gui.widgets import Knob
+from sonicrack.gui.widgets import Knob, LevelMeter
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
 from sonicrack.runtime.helpers import float_parameter, read_samples
@@ -31,8 +32,8 @@ class CompressorModule(ModulatedModuleBase):
 
     def __init__(self):
         super().__init__(
-            width=260,
-            height=330,
+            width=280,
+            height=350,
             color=QColor(160, 90, 190),
         )
 
@@ -132,7 +133,24 @@ class CompressorModule(ModulatedModuleBase):
             lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
         )
         output_row.addWidget(self.mix_knob)
+
+        meter_col = QVBoxLayout()
+        meter_col.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        gr_label = QLabel("GR")
+        gr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        meter_col.addWidget(gr_label)
+        self.gr_meter = LevelMeter(width=12, height=52)
+        self.gr_meter.setToolTip("Gain reduction")
+        meter_col.addWidget(self.gr_meter)
+        output_row.addLayout(meter_col)
         layout.addLayout(output_row)
+
+        self._gr_level = 0.0
+        self._meter_timer = QTimer(self)
+        self._meter_timer.setTimerType(Qt.TimerType.CoarseTimer)
+        self._meter_timer.setInterval(40)
+        self._meter_timer.timeout.connect(self._refresh_gr_meter)
+        self._meter_timer.start()
 
         self._finish_controls(layout)
 
@@ -225,3 +243,10 @@ class CompressorModule(ModulatedModuleBase):
             )
 
             self.out_port.write(self.component(read_samples(self.in_port, num_samples)))
+            reduction = float(getattr(self.component, "gain_reduction_db", 0.0))
+            self._gr_level = min(1.0, abs(reduction) / 24.0)
+
+    def _refresh_gr_meter(self) -> None:
+        self.gr_meter.set_level(self._gr_level)
+        self.gr_meter.decay()
+        self._gr_level *= 0.85

@@ -105,6 +105,28 @@ def test_chorus_and_phaser_process_audio(qapp: Any) -> None:
     assert np.asarray(phaser.out_port.value).shape == (256,)
 
 
+def test_compressor_exposes_gain_reduction_meter(qapp: Any) -> None:
+    del qapp
+    from sonicrack.gui.modules.effects.effects_compressor import CompressorModule
+
+    module = CompressorModule()
+    assert module.gr_meter is not None
+    x = np.full(256, 0.9, dtype=np.float32)
+    _connect_signal(module.in_port, x)
+    module.process_runtime(
+        256,
+        {
+            "threshold_db": -24.0,
+            "ratio": 8.0,
+            "attack_ms": 0.5,
+            "release_ms": 40.0,
+            "makeup_gain_db": 0.0,
+            "mix": 1.0,
+        },
+    )
+    assert module._gr_level > 0.0
+
+
 def test_limiter_and_eq_process_audio(qapp: Any) -> None:
     del qapp
     x = np.full(128, 1.5, dtype=np.float32)

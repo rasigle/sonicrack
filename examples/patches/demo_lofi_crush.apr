@@ -1,0 +1,102 @@
+{
+  "metadata": {
+    "name": "Demo: Lo-Fi Crush",
+    "author": "SonicRack",
+    "description": "Gritty bit-reduced saw through a flanger sweep. Bitcrusher into flanger, then stereo width.",
+    "tags": ["demo", "lofi", "bitcrusher", "flanger", "character"],
+    "category": "Demo",
+    "created": "2026-08-28T12:00:00",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Unison",
+      "custom_name": "Crunch Saw",
+      "module_category": "Source",
+      "position": { "x": -700.0, "y": -60.0 },
+      "parameters": {
+        "active": true,
+        "waveform": "Saw",
+        "frequency": 98.0,
+        "voices": 3.0,
+        "detune": 8.0,
+        "spread": 0.4,
+        "level": 0.5
+      }
+    },
+    {
+      "id": 1,
+      "type": "Bitcrusher",
+      "custom_name": "Crush",
+      "module_category": "Effect",
+      "position": { "x": -360.0, "y": -40.0 },
+      "parameters": {
+        "active": true,
+        "bits": 6.0,
+        "downsample": 5.0,
+        "mix": 0.7
+      }
+    },
+    {
+      "id": 2,
+      "type": "Flanger",
+      "custom_name": "Sweep",
+      "module_category": "Effect",
+      "position": { "x": -40.0, "y": -30.0 },
+      "parameters": {
+        "active": true,
+        "rate": 0.18,
+        "depth": 2.2,
+        "delay": 2.4,
+        "feedback": 0.62,
+        "mix": 0.55
+      }
+    },
+    {
+      "id": 3,
+      "type": "Stereo Width",
+      "custom_name": "",
+      "module_category": "Modifier",
+      "position": { "x": 260.0, "y": -20.0 },
+      "parameters": {
+        "active": true,
+        "width": 1.35
+      }
+    },
+    {
+      "id": 4,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": { "x": 520.0, "y": 0.0 },
+      "parameters": { "active": true }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 0,
+      "source_port": "Out",
+      "target_module": 1,
+      "target_port": "In"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 2,
+      "target_port": "In"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "In"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "Left/Mono"
+    }
+  ]
+}

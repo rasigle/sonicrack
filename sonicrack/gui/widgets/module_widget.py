@@ -225,6 +225,30 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 margin: -5px 0;
                 border-radius: 7px;
             }
+            QPushButton {
+                color: #edf1f5;
+                background-color: #2a3138;
+                border: 1px solid #55606d;
+                border-radius: 4px;
+                padding: 3px 8px;
+                min-height: 22px;
+            }
+            QPushButton:hover {
+                background-color: #343c45;
+                border-color: #6a7888;
+            }
+            QPushButton:pressed {
+                background-color: #1e242a;
+            }
+            QPushButton:checked {
+                color: #1a1010;
+                background-color: #e07070;
+                border-color: #c05050;
+            }
+            QCheckBox {
+                color: #edf1f5;
+                spacing: 6px;
+            }
             """)
         return widget
 
@@ -679,10 +703,25 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
         painter.drawRoundedRect(rect, self.BORDER_RADIUS, self.BORDER_RADIUS)
 
+        # Faint top sheen so panels read as metal, not flat boxes.
+        sheen = QLinearGradient(rect.topLeft(), QPointF(rect.left(), rect.top() + 18))
+        sheen.setColorAt(0.0, QColor(255, 255, 255, 18))
+        sheen.setColorAt(1.0, QColor(255, 255, 255, 0))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(sheen))
+        painter.drawRoundedRect(
+            rect.adjusted(2, 2, -2, -2),
+            self.BORDER_RADIUS,
+            self.BORDER_RADIUS,
+        )
+
         # Left accent rail gives each module family a rack identity.
         accent_rect = QRectF(0, 0, 6, self.module_height)
         accent_color = self.module_color if self.is_active else QColor(82, 86, 90)
         painter.fillRect(accent_rect, accent_color)
+        glow = QColor(self.module_color)
+        glow.setAlpha(55 if self.is_active else 0)
+        painter.fillRect(QRectF(6, 0, 4, self.module_height), glow)
 
         # Title bar.
         title_bar_height = self._title_bar_height()

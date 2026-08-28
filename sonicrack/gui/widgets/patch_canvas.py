@@ -8,7 +8,7 @@ from typing import cast
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QColor, QCursor, QPainter, QWheelEvent
+from PyQt6.QtGui import QColor, QCursor, QPainter, QPen, QWheelEvent
 from PyQt6.QtWidgets import (
     QApplication,
     QGraphicsProxyWidget,
@@ -72,8 +72,12 @@ class PatchCanvas(QGraphicsView):
         self.setMouseTracking(True)
         self.viewport().setMouseTracking(True)
 
-        # Background
-        self.setBackgroundBrush(QColor(45, 45, 48))
+        # Background — dark rack case; grid is painted in drawBackground.
+        self.setBackgroundBrush(QColor(22, 24, 28))
+        self._grid_minor = 24
+        self._grid_major = 96
+        self._grid_minor_color = QColor(36, 40, 46)
+        self._grid_major_color = QColor(48, 54, 62)
 
         # Zoom state (absolute scale relative to identity transform)
         self._zoom_factor = self.DEFAULT_ZOOM
@@ -108,6 +112,29 @@ class PatchCanvas(QGraphicsView):
         self._zoom_factor = target
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.zoom_changed.emit(self._zoom_factor)
+
+    def drawBackground(self, painter: QPainter | None, rect) -> None:  # noqa: N802
+        """Fill the case and draw a subtle rack grid."""
+        if painter is None:
+            return
+        painter.fillRect(rect, QColor(22, 24, 28))
+        left = int(rect.left()) - (int(rect.left()) % self._grid_minor)
+        top = int(rect.top()) - (int(rect.top()) % self._grid_minor)
+        right = int(rect.right())
+        bottom = int(rect.bottom())
+
+        minor_pen = QPen(self._grid_minor_color, 1)
+        major_pen = QPen(self._grid_major_color, 1)
+        x = left
+        while x <= right:
+            painter.setPen(major_pen if x % self._grid_major == 0 else minor_pen)
+            painter.drawLine(x, top, x, bottom)
+            x += self._grid_minor
+        y = top
+        while y <= bottom:
+            painter.setPen(major_pen if y % self._grid_major == 0 else minor_pen)
+            painter.drawLine(left, y, right, y)
+            y += self._grid_minor
 
     def zoom_in(self) -> None:
         """Zoom in by one step."""

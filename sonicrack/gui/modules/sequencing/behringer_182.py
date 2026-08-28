@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 
 import numpy as np
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -48,6 +48,10 @@ class Behringer182Module(ModuleWidget):
     runtime_kind = "behringer_182"
     step_count = 8
 
+    # Emitted from the audio render path; Qt queues delivery to the GUI thread.
+    # First argument is the step index, or -1 when there is no playhead.
+    active_step_changed = pyqtSignal(int, bool)
+
     metadata = ModuleMetadata(
         title="Behringer 182",
         category=ModuleCategory.SEQUENCER,
@@ -71,8 +75,11 @@ class Behringer182Module(ModuleWidget):
         self._previous_running = True
         self._previous_clock = 0.0
         self._syncing_gate_toggles = False
+        self._displayed_active_step: int | None = None
+        self._displayed_running: bool | None = None
         self.step_leds: list[LedIndicator] = []
         self.gate_buttons: list[ImagePushButton] = []
+        self.active_step_changed.connect(self._update_step_leds)
 
         layout = self._begin_controls(spacing=4)
 
@@ -452,7 +459,7 @@ class Behringer182Module(ModuleWidget):
         self.run_button.setText("Stop" if running else "Start")
         self.parameter_changed.emit("running", running)
         if not running:
-            self._update_step_leds(None, running=False)
+            self._update_step_leds(-1, False)
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         cv_a = self._cv_row_from_parameters(parameters, "cv_a", self.cv_a_knobs)
@@ -524,7 +531,14 @@ class Behringer182Module(ModuleWidget):
             run_signal=(None if running else np.zeros(num_samples, dtype=np.float32)),
         )
         active_step = int(frame.step[-1]) if len(frame.step) else None
-        self._update_step_leds(active_step, running=running)
+        if (
+            active_step != self._displayed_active_step
+            or running != self._displayed_running
+        ):
+            self._displayed_active_step = active_step
+            self._displayed_running = running
+            step_index = -1 if active_step is None else active_step
+            self.active_step_changed.emit(step_index, running)
         self.cv_a_port.write(frame.cv_a)
         self.cv_b_port.write(frame.cv_b)
         if running:
@@ -537,7 +551,7 @@ class Behringer182Module(ModuleWidget):
             self.trigger_port.write(stopped)
             self.end_port.write(stopped)
 
-    def _update_step_leds(self, active_step: int | None, *, running: bool) -> None:
+    def _update_step_leds(self, active_step: int, running: bool = True) -> None:
         for index, led in enumerate(self.step_leds):
             led.set_on(running and active_step == index)
 

@@ -14,7 +14,7 @@ from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples
+from sonicrack.runtime.helpers import float_parameter, read_control_cv
 from sonicrack.runtime.specs import RuntimeParameters
 
 
@@ -96,8 +96,8 @@ class WavetableModule(ModuleWidget):
         morph = float_parameter(parameters, "morph", self.morph_knob.get_value)
         gain = float_parameter(parameters, "gain", self.gain_knob.get_value)
 
-        if self.freq_input.is_connected:
-            pitch_cv = float(read_samples(self.freq_input, num_samples)[0])
+        pitch_cv = read_control_cv(self.freq_input, num_samples)
+        if pitch_cv is not None:
             frequency = pitch_cv_to_frequency(pitch_cv)
         else:
             frequency = base_freq

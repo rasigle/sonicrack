@@ -20,10 +20,9 @@ from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
 from sonicrack.runtime.helpers import (
-    as_mono,
     constant_power_pan,
     float_parameter,
-    read_samples,
+    read_control_cv,
     str_parameter,
 )
 from sonicrack.runtime.specs import RuntimeParameters
@@ -78,9 +77,7 @@ class UnisonModule(ModuleWidget):
             logarithmic=True,
             curve_points=AUDIO_FREQUENCY_KNOB_CURVE,
         )
-        self.freq_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("frequency", self.freq_knob.get_value())
-        )
+        self.bind_parameter_knob(self.freq_knob, "frequency", register=True)
         row1.addWidget(self.freq_knob)
 
         self.voices_knob = Knob(
@@ -90,9 +87,7 @@ class UnisonModule(ModuleWidget):
             max_value=7.0,
             default_value=5.0,
         )
-        self.voices_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("voices", self.voices_knob.get_value())
-        )
+        self.bind_parameter_knob(self.voices_knob, "voices", register=True)
         row1.addWidget(self.voices_knob)
         layout.addLayout(row1)
 
@@ -104,9 +99,7 @@ class UnisonModule(ModuleWidget):
             max_value=50.0,
             default_value=14.0,
         )
-        self.detune_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("detune", self.detune_knob.get_value())
-        )
+        self.bind_parameter_knob(self.detune_knob, "detune", register=True)
         row2.addWidget(self.detune_knob)
 
         self.spread_knob = Knob(
@@ -116,9 +109,7 @@ class UnisonModule(ModuleWidget):
             max_value=1.0,
             default_value=0.7,
         )
-        self.spread_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("spread", self.spread_knob.get_value())
-        )
+        self.bind_parameter_knob(self.spread_knob, "spread", register=True)
         row2.addWidget(self.spread_knob)
         layout.addLayout(row2)
 
@@ -129,20 +120,13 @@ class UnisonModule(ModuleWidget):
             max_value=1.0,
             default_value=0.45,
         )
-        self.level_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("level", self.level_knob.get_value())
-        )
+        self.bind_parameter_knob(self.level_knob, "level", register=True)
         layout.addWidget(self.level_knob)
         self._finish_controls(layout)
 
         self.register_parameter(
             "waveform", self.wave_combo, "currentText", "setCurrentText"
         )
-        self.register_parameter("frequency", self.freq_knob)
-        self.register_parameter("voices", self.voices_knob)
-        self.register_parameter("detune", self.detune_knob)
-        self.register_parameter("spread", self.spread_knob)
-        self.register_parameter("level", self.level_knob)
         self._rebuild_oscillators(5, WaveShape.SAWTOOTH_UP)
         self._install_sample_rate_listener()
 
@@ -191,8 +175,8 @@ class UnisonModule(ModuleWidget):
             self._rebuild_oscillators(voices, shape)
 
         base_freq = float_parameter(parameters, "frequency", self.freq_knob.get_value)
-        if self.freq_input.is_connected:
-            pitch_cv = float(as_mono(read_samples(self.freq_input, num_samples))[0])
+        pitch_cv = read_control_cv(self.freq_input, num_samples)
+        if pitch_cv is not None:
             base_freq = float(pitch_cv_to_frequency(pitch_cv))
         detune = float_parameter(parameters, "detune", self.detune_knob.get_value)
         spread = float_parameter(parameters, "spread", self.spread_knob.get_value)

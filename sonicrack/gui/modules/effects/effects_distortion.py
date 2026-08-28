@@ -19,9 +19,6 @@ from sonicrack.runtime.specs import RuntimeParameters
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_DISTORTION_TYPE = "Distortion"
-
-
 @register_module()
 class DistortionModule(ModulatedModuleBase):
     """Distortion module"""
@@ -34,7 +31,7 @@ class DistortionModule(ModulatedModuleBase):
     )
 
     def __init__(self):
-        """Initialize panner module."""
+        """Initialize distortion module."""
         super().__init__(
             width=220,
             height=205,
@@ -58,12 +55,10 @@ class DistortionModule(ModulatedModuleBase):
             label="Drive",
             description="Controls the amount of distortion",
             min_value=0.0,
-            max_value=1.0,
-            default_value=0.5,
+            max_value=10.0,
+            default_value=1.0,
         )
-        self.drive_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("drive", self.drive_knob.get_value())
-        )
+        self.bind_parameter_knob(self.drive_knob, "drive", register=True)
         knobs_row.addWidget(self.drive_knob)
 
         self.mix_knob = Knob(
@@ -73,9 +68,7 @@ class DistortionModule(ModulatedModuleBase):
             max_value=1.0,
             default_value=0.5,
         )
-        self.mix_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
-        )
+        self.bind_parameter_knob(self.mix_knob, "mix", register=True)
         knobs_row.addWidget(self.mix_knob)
         layout.addLayout(knobs_row)
 
@@ -87,9 +80,6 @@ class DistortionModule(ModulatedModuleBase):
 
         self._finish_controls(layout)
 
-        # Register parameters for automatic get/set
-        self.register_parameter("drive", self.drive_knob)
-        self.register_parameter("mix", self.mix_knob)
         self.register_parameter(
             "distortion_type",
             self.distortion_combo,
@@ -127,7 +117,11 @@ class DistortionModule(ModulatedModuleBase):
         """Create simple Distortion without modulation."""
         drive = self.drive_knob.get_value()
         mix = self.mix_knob.get_value()
-        return Distortion(drive=drive, mix=mix)
+        return Distortion(
+            drive=drive,
+            mix=mix,
+            distortion_type=self.distortion_combo.currentText(),
+        )
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply distortion during an engine-owned render cycle."""

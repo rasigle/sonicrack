@@ -5,6 +5,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout
 from soniclab.dsp.effects import Compressor
 
+from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules._modulated_base import ModulatedModuleBase
 from sonicrack.gui.modules.effects._cv_modulation import (
     ControlRateCvSpec,
@@ -162,6 +163,7 @@ class CompressorModule(ModulatedModuleBase):
         self.register_parameter("mix", self.mix_knob)
 
         self.control_knob = self.threshold_knob
+        self._install_sample_rate_listener()
 
     def get_required_inputs(self) -> list[str]:
         """Compressor requires an audio input."""
@@ -185,7 +187,20 @@ class CompressorModule(ModulatedModuleBase):
             release_ms=self.release_knob.get_value(),
             makeup_gain_db=self.makeup_knob.get_value(),
             mix=self.mix_knob.get_value(),
+            sample_rate=audio_config.sample_rate,
         )
+
+    def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
+        with self._component_lock:
+            self.component = Compressor(
+                threshold_db=self.threshold_knob.get_value(),
+                ratio=self.ratio_knob.get_value(),
+                attack_ms=self.attack_knob.get_value(),
+                release_ms=self.release_knob.get_value(),
+                makeup_gain_db=self.makeup_knob.get_value(),
+                mix=self.mix_knob.get_value(),
+                sample_rate=new_sample_rate,
+            )
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply compression during an engine-owned render cycle."""
@@ -243,7 +258,13 @@ class CompressorModule(ModulatedModuleBase):
             )
 
             self.out_port.write(self.component(read_samples(self.in_port, num_samples)))
-            reduction = float(getattr(self.component, "gain_reduction_db", 0.0))
+            reduction = float(
+                getattr(
+                    self.component,
+                    "gain_reduction_db",
+                    getattr(self.component, "_gain_reduction_db", 0.0),
+                )
+            )
             self._gr_level = min(1.0, abs(reduction) / 24.0)
 
     def _refresh_gr_meter(self) -> None:

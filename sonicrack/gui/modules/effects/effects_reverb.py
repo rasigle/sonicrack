@@ -4,6 +4,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.effects import Reverb
 
+from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules._modulated_base import ModulatedModuleBase
 from sonicrack.gui.modules.effects._cv_modulation import (
     ControlRateCvSpec,
@@ -58,11 +59,7 @@ class ReverbModule(ModulatedModuleBase):
             max_value=1.0,
             default_value=0.5,
         )
-        self.room_size_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "room_size", self.room_size_knob.get_value()
-            )
-        )
+        self.bind_parameter_knob(self.room_size_knob, "room_size", register=True)
         knobs_row.addWidget(self.room_size_knob)
 
         self.damping_knob = Knob(
@@ -72,11 +69,7 @@ class ReverbModule(ModulatedModuleBase):
             max_value=1.0,
             default_value=0.5,
         )
-        self.damping_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "damping", self.damping_knob.get_value()
-            )
-        )
+        self.bind_parameter_knob(self.damping_knob, "damping", register=True)
         knobs_row.addWidget(self.damping_knob)
         layout.addLayout(knobs_row)
 
@@ -89,9 +82,7 @@ class ReverbModule(ModulatedModuleBase):
             max_value=1.0,
             default_value=0.5,
         )
-        self.mix_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
-        )
+        self.bind_parameter_knob(self.mix_knob, "mix", register=True)
         mix_row.addStretch()
         mix_row.addWidget(self.mix_knob)
         mix_row.addStretch()
@@ -99,13 +90,9 @@ class ReverbModule(ModulatedModuleBase):
 
         self._finish_controls(layout)
 
-        # Register parameters for automatic get/set
-        self.register_parameter("room_size", self.room_size_knob)
-        self.register_parameter("damping", self.damping_knob)
-        self.register_parameter("mix", self.mix_knob)
-
         # Set control_knob for base class functionality
         self.control_knob = self.room_size_knob
+        self._install_sample_rate_listener()
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -126,7 +113,21 @@ class ReverbModule(ModulatedModuleBase):
         room_size = self.room_size_knob.get_value()
         damping = self.damping_knob.get_value()
         mix = self.mix_knob.get_value()
-        return Reverb(room_size=room_size, damping=damping, mix=mix)
+        return Reverb(
+            room_size=room_size,
+            damping=damping,
+            mix=mix,
+            sample_rate=audio_config.sample_rate,
+        )
+
+    def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
+        with self._component_lock:
+            self.component = Reverb(
+                room_size=self.room_size_knob.get_value(),
+                damping=self.damping_knob.get_value(),
+                mix=self.mix_knob.get_value(),
+                sample_rate=new_sample_rate,
+            )
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply reverb during an engine-owned render cycle."""

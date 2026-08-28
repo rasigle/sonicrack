@@ -4,6 +4,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.effects import Delay
 
+from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules._modulated_base import ModulatedModuleBase
 from sonicrack.gui.modules.effects._cv_modulation import (
     ControlRateCvSpec,
@@ -55,28 +56,20 @@ class DelayModule(ModulatedModuleBase):
             label="Time",
             description="Sets the delay time",
             min_value=0.001,
-            max_value=3.0,
+            max_value=2.0,
             default_value=0.5,
         )
-        self.time_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "delay_time", self.time_knob.get_value()
-            )
-        )
+        self.bind_parameter_knob(self.time_knob, "delay_time", register=True)
         knobs_row.addWidget(self.time_knob)
 
         self.feedback_knob = Knob(
             label="Feedback",
             description="Controls the amount of feedback in the delay line",
             min_value=0.0,
-            max_value=1.0,
+            max_value=0.95,
             default_value=0.5,
         )
-        self.feedback_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "feedback", self.feedback_knob.get_value()
-            )
-        )
+        self.bind_parameter_knob(self.feedback_knob, "feedback", register=True)
         knobs_row.addWidget(self.feedback_knob)
         layout.addLayout(knobs_row)
 
@@ -89,9 +82,7 @@ class DelayModule(ModulatedModuleBase):
             max_value=1.0,
             default_value=0.5,
         )
-        self.mix_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
-        )
+        self.bind_parameter_knob(self.mix_knob, "mix", register=True)
         mix_row.addStretch()
         mix_row.addWidget(self.mix_knob)
         mix_row.addStretch()
@@ -99,13 +90,9 @@ class DelayModule(ModulatedModuleBase):
 
         self._finish_controls(layout)
 
-        # Register parameters for automatic get/set
-        self.register_parameter("delay_time", self.time_knob)
-        self.register_parameter("feedback", self.feedback_knob)
-        self.register_parameter("mix", self.mix_knob)
-
         # Set control_knob for base class functionality
         self.control_knob = self.time_knob
+        self._install_sample_rate_listener()
 
     # AudioModuleInterface implementation
     def get_required_inputs(self) -> list[str]:
@@ -126,7 +113,21 @@ class DelayModule(ModulatedModuleBase):
         delay_time = self.time_knob.get_value()
         feedback = self.feedback_knob.get_value()
         mix = self.mix_knob.get_value()
-        return Delay(delay_time=delay_time, feedback=feedback, mix=mix)
+        return Delay(
+            delay_time=delay_time,
+            feedback=feedback,
+            mix=mix,
+            sample_rate=audio_config.sample_rate,
+        )
+
+    def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
+        with self._component_lock:
+            self.component = Delay(
+                delay_time=self.time_knob.get_value(),
+                feedback=self.feedback_knob.get_value(),
+                mix=self.mix_knob.get_value(),
+                sample_rate=new_sample_rate,
+            )
 
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         """Apply delay during an engine-owned render cycle."""
@@ -148,7 +149,7 @@ class DelayModule(ModulatedModuleBase):
                         self.time_knob.get_value,
                         self.time_cv_port,
                         0.001,
-                        3.0,
+                        2.0,
                     ),
                     ControlRateCvSpec(
                         "feedback",
@@ -156,7 +157,7 @@ class DelayModule(ModulatedModuleBase):
                         self.feedback_knob.get_value,
                         self.feedback_cv_port,
                         0.0,
-                        1.0,
+                        0.95,
                     ),
                     ControlRateCvSpec(
                         "mix",

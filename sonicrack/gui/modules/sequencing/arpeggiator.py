@@ -34,6 +34,7 @@ from sonicrack.runtime.helpers import (
     float_parameter,
     read_samples,
     rising_edge_pulses,
+    rising_edge_triggered,
     str_parameter,
 )
 from sonicrack.runtime.specs import RuntimeParameters
@@ -540,11 +541,12 @@ class ArpeggiatorModule(ModuleWidget):
         )
 
         if self.reset_input.is_connected:
-            reset_signal = read_samples(self.reset_input, num_samples)
-            current_reset = float(reset_signal[0]) if len(reset_signal) else 0.0
-            if self._previous_reset < 0.3 and current_reset > 0.7:
+            triggered, self._previous_reset = rising_edge_triggered(
+                read_samples(self.reset_input, num_samples),
+                self._previous_reset,
+            )
+            if triggered:
                 self.component.reset()
-            self._previous_reset = current_reset
 
         running = bool(parameters.get("running", self.run_checkbox.isChecked()))
         # Collapse multi-sample Clock triggers to one edge per step.

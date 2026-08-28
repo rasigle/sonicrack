@@ -132,6 +132,22 @@ def rising_edge_pulses(
     return edges, final_level
 
 
+def rising_edge_triggered(
+    signal: np.ndarray,
+    previous_level: float,
+    *,
+    low: float = _GATE_LOW,
+    high: float = _GATE_HIGH,
+) -> tuple[bool, float]:
+    """Return whether ``signal`` contains a rising edge, plus the final level.
+
+    Sequencer Reset inputs must scan the whole buffer: Clock/Trig pulses are
+    several samples wide and often do not sit at index 0.
+    """
+    edges, final_level = rising_edge_pulses(signal, previous_level, low=low, high=high)
+    return bool(np.any(edges > 0.5)), final_level
+
+
 def read_samples(port: Port, num_samples: int) -> np.ndarray:
     return as_samples(port.read(num_samples), num_samples)
 
@@ -149,6 +165,17 @@ def read_optional_port(port: Any | None, num_samples: int) -> np.ndarray | None:
 
 # Alias used by effect CV helpers / older call sites.
 read_optional_cv = read_optional_port
+
+
+def read_control_cv(port: Any | None, num_samples: int) -> float | None:
+    """Control-rate read: first sample of a connected port, as mono."""
+    samples = read_optional_port(port, num_samples)
+    if samples is None:
+        return None
+    mono = as_mono(samples)
+    if mono.size == 0:
+        return None
+    return float(mono.flat[0])
 
 
 def write_silence_if_disconnected(
@@ -261,10 +288,12 @@ __all__ = [
     "min_trigger_samples",
     "parameter",
     "ramp_if_changed",
+    "read_control_cv",
     "read_optional_cv",
     "read_optional_port",
     "read_samples",
     "rising_edge_pulses",
+    "rising_edge_triggered",
     "silence",
     "str_parameter",
     "write_output",

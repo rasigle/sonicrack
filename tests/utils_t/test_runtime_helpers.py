@@ -21,8 +21,10 @@ from sonicrack.runtime.helpers import (
     min_trigger_samples,
     parameter,
     ramp_if_changed,
+    read_control_cv,
     read_optional_port,
     rising_edge_pulses,
+    rising_edge_triggered,
     silence,
     str_parameter,
     write_silence_if_disconnected,
@@ -194,6 +196,30 @@ class TestGateAndParameters:
         edges3, prev = rising_edge_pulses(third, previous_level=prev)
         np.testing.assert_allclose(edges3, [0, 1])
         assert prev == pytest.approx(1.0)
+
+    def test_rising_edge_triggered_sees_edge_not_at_sample_zero(self):
+        pulse = np.array([0.0, 0.0, 1.0, 1.0], dtype=np.float32)
+        triggered, final = rising_edge_triggered(pulse, previous_level=0.0)
+        assert triggered is True
+        assert final == pytest.approx(1.0)
+        held, _final = rising_edge_triggered(
+            np.ones(4, dtype=np.float32), previous_level=1.0
+        )
+        assert held is False
+
+    def test_read_control_cv_uses_mono_first_sample(self):
+        left = np.array([0.25, 0.5], dtype=np.float32)
+        right = np.array([0.75, 1.0], dtype=np.float32)
+        stereo = np.column_stack((left, right))
+
+        class _Port:
+            is_connected = True
+
+            def read(self, num_samples: int):
+                del num_samples
+                return stereo
+
+        assert read_control_cv(_Port(), 2) == pytest.approx(0.5)
 
     def test_parameter_helpers(self):
         params = {"cutoff": "440", "mode": "low"}

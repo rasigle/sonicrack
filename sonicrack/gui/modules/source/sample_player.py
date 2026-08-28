@@ -21,6 +21,7 @@ from sonicrack.runtime.helpers import (
     as_mono,
     float_parameter,
     gate_transition_indices,
+    read_control_cv,
     read_samples,
     str_parameter,
 )
@@ -107,11 +108,7 @@ class SamplePlayerModule(ModuleWidget):
             default_value=440.0,
             logarithmic=True,
         )
-        self.pitch_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "frequency", self.pitch_knob.get_value()
-            )
-        )
+        self.bind_parameter_knob(self.pitch_knob, "frequency", register=True)
         knobs.addWidget(self.pitch_knob)
 
         self.level_knob = Knob(
@@ -121,15 +118,11 @@ class SamplePlayerModule(ModuleWidget):
             max_value=1.0,
             default_value=0.7,
         )
-        self.level_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("level", self.level_knob.get_value())
-        )
+        self.bind_parameter_knob(self.level_knob, "level", register=True)
         knobs.addWidget(self.level_knob)
         layout.addLayout(knobs)
         self._finish_controls(layout)
 
-        self.register_parameter("frequency", self.pitch_knob)
-        self.register_parameter("level", self.level_knob)
         self.register_parameter("path", self._file_path)
         self.loop_choice = self.register_menu_choice(
             "loop",
@@ -206,11 +199,9 @@ class SamplePlayerModule(ModuleWidget):
         self.component.amplitude = float_parameter(
             parameters, "level", self.level_knob.get_value
         )
-        base_freq = float_parameter(
-            parameters, "frequency", self.pitch_knob.get_value
-        )
-        if self.freq_input.is_connected:
-            pitch_cv = float(as_mono(read_samples(self.freq_input, num_samples))[0])
+        base_freq = float_parameter(parameters, "frequency", self.pitch_knob.get_value)
+        pitch_cv = read_control_cv(self.freq_input, num_samples)
+        if pitch_cv is not None:
             self.component.frequency = float(pitch_cv_to_frequency(pitch_cv))
         else:
             self.component.frequency = base_freq

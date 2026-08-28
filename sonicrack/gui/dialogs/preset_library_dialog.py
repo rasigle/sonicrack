@@ -27,7 +27,12 @@ from PyQt6.QtWidgets import (
 )
 
 from sonicrack.config.app_settings import app_settings
+from sonicrack.constants import PRESET_FILE_EXTENSION
 from sonicrack.patching.preset_manager import PresetManager
+
+_PRESET_FILE_FILTER = (
+    f"Patch Files (*{PRESET_FILE_EXTENSION});;JSON Files (*.json);;All Files (*)"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -362,7 +367,7 @@ class LibraryPresetBrowserDialog(QDialog):
             self,
             "Import Preset",
             start_dir,
-            "JSON Files (*.json);;All Files (*)",
+            _PRESET_FILE_FILTER,
         )
 
         if filepath:
@@ -381,13 +386,16 @@ class LibraryPresetBrowserDialog(QDialog):
             return
 
         name = preset_meta.get("name", "preset")
-        start_path = str(Path(app_settings.file_dialog_start_dir()) / f"{name}.json")
+        start_path = str(
+            Path(app_settings.file_dialog_start_dir())
+            / f"{name}{PRESET_FILE_EXTENSION}"
+        )
 
         filepath, _ = QFileDialog.getSaveFileName(
             self,
             "Export Preset",
             start_path,
-            "JSON Files (*.json);;All Files (*)",
+            _PRESET_FILE_FILTER,
         )
 
         if filepath:

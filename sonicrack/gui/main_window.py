@@ -115,7 +115,6 @@ class ModularSynthWindow(QMainWindow):
         self._setup_ui()
         self._setup_app_icon()
         self._setup_menu()
-        self._setup_toolbar()
         self._setup_statusbar()
         self._connect_signals()
         should_restore_last_patch = (
@@ -453,10 +452,6 @@ class ModularSynthWindow(QMainWindow):
         about_action = QtGui.QAction("&About", self)
         about_action.triggered.connect(lambda: show_about(self, version=__version__))
         help_menu.addAction(about_action)
-
-    def _setup_toolbar(self):
-        """Setup the toolbar."""
-        return
 
     def _setup_statusbar(self):
         """Setup the status bar."""
@@ -947,6 +942,11 @@ class ModularSynthWindow(QMainWindow):
         # Update state
         self.current_patch_path = file_path
         self.patch_modified = False
+        self._update_window_title()
+        app_settings.remember_file_directory(file_path)
+
+        self._require_statusbar().showMessage(f"Patch saved: {Path(file_path).name}")
+        logger.info("Patch saved to %s", file_path)
 
     def _export_audio(self) -> None:
         """Bounce the current Output module graph to a WAV file."""
@@ -979,16 +979,10 @@ class ModularSynthWindow(QMainWindow):
             audio = bounce_output_module(output_module, dialog.duration_seconds())
             written = write_wav(file_path, audio)
             app_settings.remember_file_directory(written)
-            statusbar = self._require_statusbar()
-            statusbar.showMessage(f"Exported {written.name}", 8000)
+            self._require_statusbar().showMessage(f"Exported {written.name}", 8000)
         except Exception as exc:
             logger.error("Audio export failed: %s", exc, exc_info=True)
             QMessageBox.critical(self, "Export Audio", f"Export failed:\n{exc}")
-        self._update_window_title()
-        app_settings.remember_file_directory(file_path)
-
-        self._require_statusbar().showMessage(f"Patch saved: {Path(file_path).name}")
-        logger.info(f"Patch saved to {file_path}")
 
     def _open_patch(self):
         """Open a patch file via user-dialog."""

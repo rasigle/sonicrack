@@ -131,7 +131,17 @@ class PresetManager:
         presets: list[dict[str, Any]] = []
 
         try:
-            for filepath in self.preset_directory.glob("*.json"):
+            seen: set[Path] = set()
+            candidates: list[Path] = list(
+                self.preset_directory.glob(f"*{PRESET_FILE_EXTENSION}")
+            )
+            if PRESET_FILE_EXTENSION.lower() != ".json":
+                candidates.extend(self.preset_directory.glob("*.json"))
+            for filepath in candidates:
+                resolved = filepath.resolve()
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
                 preset_data = self.load_preset(filepath)
                 if preset_data:
                     metadata = preset_data.get("metadata", {})

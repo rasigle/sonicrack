@@ -344,6 +344,10 @@ class OutputModule(ModuleWidget):
         out[:n, 1] = x[:n]
         return n > 0
 
+    def render_offline(self, num_frames: int) -> np.ndarray:
+        """Render one stereo block for File → Export Audio (no live callback)."""
+        return self._generate_samples(num_frames)
+
     def _generate_samples(self, num_frames: int) -> np.ndarray:
         """Generate stereo audio samples through the engine-owned graph.
 

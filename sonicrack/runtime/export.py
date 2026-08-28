@@ -9,6 +9,7 @@ from scipy.io import wavfile
 
 from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules.output.output import OutputModule
+from sonicrack.runtime.helpers import as_stereo
 
 
 def bounce_output_module(
@@ -40,11 +41,7 @@ def bounce_output_module(
     try:
         while remaining > 0:
             n = min(block, remaining)
-            chunk = np.asarray(output_module._generate_samples(n), dtype=np.float32)
-            if chunk.ndim == 1:
-                chunk = np.column_stack((chunk, chunk))
-            elif chunk.ndim == 2 and chunk.shape[1] == 1:
-                chunk = np.column_stack((chunk[:, 0], chunk[:, 0]))
+            chunk = as_stereo(output_module.render_offline(n))
             chunks.append(chunk[:n, :2])
             remaining -= n
     finally:

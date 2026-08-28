@@ -148,11 +148,13 @@ class UnisonModule(ModuleWidget):
 
     def _rebuild_oscillators(self, count: int, shape: WaveShape) -> None:
         count = max(1, min(7, int(count)))
+        rng = np.random.default_rng()
         self._oscillators = [
             PolyBLEPOscillator(
                 frequency=110.0,
                 amplitude=1.0,
                 gain_db=None,
+                phase=float(rng.uniform(0.0, 360.0)),
                 wave_shape=shape,
                 sample_rate=audio_config.sample_rate,
             )

@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import QWidget
 
-from sonicrack.gui.widgets.knob_style import KnobStyle, ProceduralKnobStyle
+from sonicrack.gui.widgets.knob_style import KnobStyle, medium_knob_style
 
 
 class Knob(QWidget):
@@ -47,6 +47,8 @@ class Knob(QWidget):
             parent: Parent widget
         """
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAutoFillBackground(False)
 
         self.label = label
         self.min_value = min_value
@@ -56,7 +58,7 @@ class Knob(QWidget):
         self.callback = callback
         self.default_value = default_value if default_value is not None else min_value
         self._value = self.default_value
-        self.knob_style = style or ProceduralKnobStyle.medium()
+        self.knob_style = style or medium_knob_style()
 
         self._description = description
         if self._description:

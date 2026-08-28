@@ -24,7 +24,8 @@ from sonicrack.gui.widgets import (
     KnobGeometry,
     LedIndicator,
     LedStyle,
-    ProceduralKnobStyle,
+    davies_knob_style,
+    small_knob_style,
 )
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
@@ -93,7 +94,7 @@ class Behringer182Module(ModuleWidget):
         self.cv_a_knobs: list[Knob] = []
         self.cv_b_knobs: list[Knob] = []
         # Compact, unlabeled knobs so A/B step values stay dense in the grid.
-        row_knob_style = ProceduralKnobStyle(
+        row_knob_style = davies_knob_style(
             geometry=KnobGeometry(
                 knob_size=28,
                 min_width=44,
@@ -224,7 +225,7 @@ class Behringer182Module(ModuleWidget):
         self.run_button.toggled.connect(self._on_running_changed)
         layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        compact_knob_style = ProceduralKnobStyle.small()
+        compact_knob_style = small_knob_style()
         control_row = QHBoxLayout()
         control_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         control_row.setSpacing(2)

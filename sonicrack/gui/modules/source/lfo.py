@@ -14,8 +14,12 @@ from sonicrack.constants import (
     MAX_PW_PERCENTAGE_VALUE,
     MIN_PW_PERCENTAGE_VALUE,
 )
-from sonicrack.gui.widgets import Knob
-from sonicrack.gui.widgets.knob_style import ProceduralKnobStyle
+from sonicrack.gui.widgets import (
+    Knob,
+    medium_knob_style,
+    metal_knob_style,
+    small_knob_style,
+)
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
@@ -113,8 +117,9 @@ class LFOModule(ModuleWidget):
 
         self._previous_clock = 0.0
 
-        primary_style = ProceduralKnobStyle.medium()
-        secondary_style = ProceduralKnobStyle.small()
+        primary_style = metal_knob_style()
+        depth_style = medium_knob_style()
+        secondary_style = small_knob_style()
 
         layout = self._begin_controls(spacing=4)
 
@@ -141,7 +146,7 @@ class LFOModule(ModuleWidget):
             min_value=0.0,
             max_value=1.0,
             default_value=LFO_DEFAULT_DEPTH,
-            style=primary_style,
+            style=depth_style,
         )
         self.amount_knob.value_changed.connect(
             lambda: self.parameter_changed.emit("amount", self.amount_knob.get_value())

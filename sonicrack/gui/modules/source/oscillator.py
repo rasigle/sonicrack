@@ -19,7 +19,7 @@ from sonicrack.constants import (
     MIN_PW_PERCENTAGE_VALUE,
 )
 from sonicrack.gui.modules.source._oscillator_runtime import render_with_frequency_ramp
-from sonicrack.gui.widgets import Knob
+from sonicrack.gui.widgets import Knob, metal_knob_style
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
@@ -126,6 +126,7 @@ class OscillatorModule(ModuleWidget):
             max_value=OSCILLATOR_MAX_FREQUENCY,
             default_value=OSCILLATOR_DEFAULT_FREQUENCY,
             curve_points=AUDIO_FREQUENCY_KNOB_CURVE,
+            style=metal_knob_style(),
         )
         self.freq_knob.value_changed.connect(self._on_frequency_changed)
         knobs_layout.addWidget(self.freq_knob)

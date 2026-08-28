@@ -25,7 +25,7 @@ from soniclab.midi_io import midi_to_note_name
 from soniclab.sequencing import Arpeggiator, ArpPattern
 
 from sonicrack.config.audio_config import audio_config
-from sonicrack.gui.widgets import Knob, LedIndicator, LedStyle, ProceduralKnobStyle
+from sonicrack.gui.widgets import Knob, LedIndicator, LedStyle, small_knob_style
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
@@ -142,7 +142,7 @@ class ArpeggiatorModule(ModuleWidget):
         self.playhead_changed.connect(self._on_playhead_changed)
 
         layout = self._begin_controls(spacing=5)
-        compact = ProceduralKnobStyle.small()
+        compact = small_knob_style()
 
         # --- Chord builder (Apply writes into Notes; free-form edits stay free) ---
         chord_row = QHBoxLayout()

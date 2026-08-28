@@ -9,6 +9,13 @@ from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QColor, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QWidget
 
+from sonicrack.gui.widgets.skin import (
+    LED_OFF,
+    LED_ON,
+    load_skin_pixmap,
+    tinted_pixmap,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class LedStyle:
@@ -33,10 +40,16 @@ class LedIndicator(QWidget):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAutoFillBackground(False)
         self._on = bool(on)
         self.led_style = style or LedStyle()
-        self._off_pixmap = self._load_pixmap(self.led_style.off_image)
-        self._on_pixmap = self._load_pixmap(self.led_style.on_image)
+        self._off_pixmap = self._load_pixmap(
+            self.led_style.off_image
+        ) or load_skin_pixmap(*LED_OFF)
+        self._on_pixmap = self._load_pixmap(
+            self.led_style.on_image
+        ) or load_skin_pixmap(*LED_ON)
         self.setFixedSize(self.led_style.size, self.led_style.size)
 
     @staticmethod
@@ -62,8 +75,18 @@ class LedIndicator(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        pixmap = self._on_pixmap if self._on else self._off_pixmap
+        if self._on and self.led_style.on_image is None:
+            color = self.led_style.on_color
+            pixmap = (
+                tinted_pixmap(LED_ON, color.red(), color.green(), color.blue(), 140)
+                or self._on_pixmap
+            )
+        elif self._on:
+            pixmap = self._on_pixmap
+        else:
+            pixmap = self._off_pixmap
         if pixmap is not None:
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
             painter.drawPixmap(self.rect(), pixmap)
             return
 

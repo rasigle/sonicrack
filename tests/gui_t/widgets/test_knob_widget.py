@@ -6,8 +6,15 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
 
-from sonicrack.gui.widgets.knob_style import ProceduralKnobStyle
+from sonicrack.gui.widgets.knob_style import (
+    ImageKnobStyle,
+    ProceduralKnobStyle,
+    large_knob_style,
+    medium_knob_style,
+    small_knob_style,
+)
 from sonicrack.gui.widgets.knob_widget import Knob
+from sonicrack.gui.widgets.skin import skin_available
 
 AUDIO_FREQUENCY_CURVE = (
     (0.0, 11.0),
@@ -397,6 +404,47 @@ def test_knob_wheel_logarithmic_uses_normalized_space():
     start_norm = knob.get_normalized_value()
     knob.wheelEvent(_make_wheel_event(120))
     assert knob.get_normalized_value() == pytest.approx(start_norm + 0.02)
+
+
+def test_default_knob_uses_packaged_davies_skin(qapp):
+    del qapp
+    knob = Knob(label="Test", min_value=0.0, max_value=1.0, default_value=0.5)
+    if skin_available():
+        assert isinstance(knob.knob_style, ImageKnobStyle)
+        assert knob.knob_style.rotate_body is False
+        assert knob.knob_style.draw_pointer is True
+        assert knob.knob_style.show_value_arc is True
+    assert knob.knob_size == 44
+
+
+def test_skin_factories_keep_legacy_geometry(qapp):
+    del qapp
+    small = Knob(label="S", style=small_knob_style())
+    large = Knob(label="L", style=large_knob_style())
+    medium = Knob(label="M", style=medium_knob_style())
+
+    assert small.knob_size == 34
+    assert medium.knob_size == 44
+    assert large.knob_size == 58
+    if skin_available():
+        assert isinstance(small.knob_style, ImageKnobStyle)
+        assert isinstance(large.knob_style, ImageKnobStyle)
+        assert large.knob_style.rotate_body is False
+        assert large.knob_style.draw_pointer is True
+
+
+def test_image_knob_style_paints(qapp):
+    del qapp
+    from PyQt6.QtGui import QPainter, QPixmap
+
+    knob = Knob(label="Paint", min_value=0.0, max_value=1.0, default_value=0.25)
+    knob.resize(knob.minimumSize())
+    pixmap = QPixmap(knob.size())
+    pixmap.fill(0)
+    painter = QPainter(pixmap)
+    knob.render(painter)
+    painter.end()
+    assert not pixmap.isNull()
 
 
 if __name__ == "__main__":

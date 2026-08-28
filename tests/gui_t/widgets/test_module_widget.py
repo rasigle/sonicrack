@@ -413,6 +413,16 @@ def test_module_bounding_rect_covers_border_pen(qapp: Any) -> None:
     assert not shape.contains(QPointF(bounds.left(), body.center().y()))
 
 
+def test_module_bounding_rect_covers_ports(qapp: Any) -> None:
+    """Drag updates must clear jacks that hang off the panel."""
+    del qapp
+    module = _ModifierWidget()
+    bounds = module.boundingRect()
+    for port in module.input_ports + module.output_ports:
+        port_rect = port.boundingRect().translated(port.pos())
+        assert bounds.contains(port_rect)
+
+
 def test_module_widget_geometry_matches_panel(qapp: Any) -> None:
     """QGraphicsWidget size must stay the panel size after it is shown.
 

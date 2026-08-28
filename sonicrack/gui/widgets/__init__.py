@@ -6,6 +6,11 @@ from sonicrack.gui.widgets.knob_style import (
     ImageKnobStyle,
     KnobGeometry,
     ProceduralKnobStyle,
+    davies_knob_style,
+    large_knob_style,
+    medium_knob_style,
+    metal_knob_style,
+    small_knob_style,
 )
 from sonicrack.gui.widgets.knob_widget import Knob
 from sonicrack.gui.widgets.led_widget import LedIndicator, LedStyle
@@ -24,6 +29,11 @@ __all__ = [
     "LedStyle",
     "LevelMeter",
     "ProceduralKnobStyle",
+    "davies_knob_style",
+    "large_knob_style",
+    "medium_knob_style",
+    "metal_knob_style",
+    "small_knob_style",
     "VSlider",
     "HSlider",
     "PortWidget",

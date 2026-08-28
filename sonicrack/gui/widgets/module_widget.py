@@ -9,7 +9,15 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from PyQt6.QtCore import QPointF, QRectF, QSizeF, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPen
+from PyQt6.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+)
 from PyQt6.QtWidgets import (
     QGraphicsItem,
     QGraphicsProxyWidget,
@@ -20,6 +28,7 @@ from PyQt6.QtWidgets import (
 
 from sonicrack.gui.dialogs.module_info_dialog import ModuleInfoDialog
 from sonicrack.gui.widgets.port_widget import PortWidget
+from sonicrack.gui.widgets.skin import PANEL_ALUMINUM, SCREW, load_skin_pixmap
 from sonicrack.patching.module import AudioModule
 from sonicrack.runtime.helpers import silence, write_silence_if_disconnected
 
@@ -110,7 +119,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
     # Colors
     COLOR_SELECTION_BORDER = QColor(255, 200, 0)
     COLOR_NORMAL_BORDER = QColor(12, 14, 16)
-    COLOR_TITLE_BAR_BG = QColor(18, 20, 23, 235)
+    COLOR_TITLE_BAR_BG = QColor(18, 20, 23, 150)
     COLOR_MODULE_TYPE = QColor(232, 236, 240)
     COLOR_CUSTOM_NAME = QColor(255, 255, 100)
     COLOR_CATEGORY = QColor(160, 168, 174)
@@ -664,11 +673,24 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         """
         return float(cls.SELECTION_BORDER_WIDTH) + 4.0
 
+    @classmethod
+    def _frame_margins(cls) -> tuple[float, float, float, float]:
+        """Window-frame pad that also covers ports hanging off the sides.
+
+        C++ ``QGraphicsWidget::boundingRect`` is the panel plus these
+        margins. Jacks sit at ``±radius`` outside the body and labels
+        extend further, so left/right must be larger than the stroke pad
+        or drag updates leave port trails.
+        """
+        edge = cls._paint_margin() + 4.0
+        side = 36.0
+        return side, edge, side, edge
+
     def _sync_widget_geometry(self) -> None:
         """Keep QGraphicsWidget size aligned with the painted panel."""
         self.resize(float(self.module_width), float(self.module_height))
-        pad = self._paint_margin()
-        self.setWindowFrameMargins(pad, pad, pad, pad)
+        left, top, right, bottom = self._frame_margins()
+        self.setWindowFrameMargins(left, top, right, bottom)
 
     def sizeHint(self, which, constraint=None):  # noqa: N802 - Qt API
         """Return the panel size so first-show ``adjustSize`` cannot shrink us."""
@@ -680,22 +702,25 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         return QRectF(0, 0, self.module_width, self.module_height)
 
     def boundingRect(self) -> QRectF:
-        """Return the painted area, including border overflow."""
-        pad = self._paint_margin()
+        """Return the painted area, including border and port overflow."""
+        left, top, right, bottom = self._frame_margins()
         return QRectF(
-            -pad,
-            -pad,
-            self.module_width + 2.0 * pad,
-            self.module_height + 2.0 * pad,
+            -left,
+            -top,
+            self.module_width + left + right,
+            self.module_height + top + bottom,
         )
 
     def _invalidate_painted_region(self) -> None:
-        """Dirty the old/new outline including antialias fringe."""
+        """Dirty the old/new outline, ports, and antialias fringe."""
         scene = self.scene()
         if scene is None:
             return
-        extra = self._paint_margin()
-        scene.update(self.sceneBoundingRect().adjusted(-extra, -extra, extra, extra))
+        extra = 8.0
+        rect = self.mapRectToScene(self.boundingRect())
+        for port in self.input_ports + self.output_ports:
+            rect = rect.united(port.sceneBoundingRect())
+        scene.update(rect.adjusted(-extra, -extra, extra, extra))
 
     def _title_bar_height(self) -> int:
         """Return the current title bar height."""
@@ -727,11 +752,62 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
         This ensures the entire module area is clickable and draggable.
         """
-        from PyQt6.QtGui import QPainterPath
-
         path = QPainterPath()
         path.addRect(self._body_rect())
         return path
+
+    def _paint_faceplate(
+        self, painter: QPainter, body: QRectF, panel_path: QPainterPath
+    ) -> None:
+        """Fill the rounded panel with aluminum, or a procedural metal gradient."""
+        plate = load_skin_pixmap(*PANEL_ALUMINUM)
+        if plate is not None:
+            cover = max(int(body.width()), int(body.height()), 1)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            painter.drawPixmap(
+                QRectF(body.left(), body.top(), cover, cover).toRect(),
+                plate,
+            )
+            wash = QColor(self.module_color)
+            wash.setAlpha(32 if self.is_active else 14)
+            painter.fillPath(panel_path, wash)
+        else:
+            gradient = QLinearGradient(body.topLeft(), body.bottomLeft())
+            gradient.setColorAt(0, self.COLOR_PANEL_TOP)
+            gradient.setColorAt(1, self.COLOR_PANEL_BOTTOM)
+            painter.fillPath(panel_path, QBrush(gradient))
+
+        sheen = QLinearGradient(body.topLeft(), QPointF(body.left(), body.top() + 18))
+        sheen.setColorAt(0.0, QColor(255, 255, 255, 22))
+        sheen.setColorAt(1.0, QColor(255, 255, 255, 0))
+        painter.fillPath(panel_path, QBrush(sheen))
+
+    def _screw_rects(self) -> list[QRectF]:
+        """Faceplate screw positions, below the title bar and clear of the rail."""
+        size = 11.0
+        margin = 8.0
+        left = 12.0
+        width = float(self.module_width)
+        height = float(self.module_height)
+        top = float(self._title_bar_height()) + 4.0
+        rects = [
+            QRectF(width - margin - size, top, size, size),
+            QRectF(left, height - margin - size, size, size),
+            QRectF(width - margin - size, height - margin - size, size, size),
+        ]
+        if height >= 300:
+            mid_y = (top + height) / 2.0 - size / 2.0
+            rects.append(QRectF(left, mid_y, size, size))
+            rects.append(QRectF(width - margin - size, mid_y, size, size))
+        return rects
+
+    def _paint_screws(self, painter: QPainter) -> None:
+        screw = load_skin_pixmap(*SCREW)
+        if screw is None:
+            return
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        for rect in self._screw_rects():
+            painter.drawPixmap(rect.toRect(), screw)
 
     def paint(self, painter: QPainter | None, option, widget=None):
         """Paint the module."""
@@ -745,12 +821,13 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         # outside the region that will be cleared on the next move.
         painter.setClipRect(self.boundingRect(), Qt.ClipOperation.IntersectClip)
 
-        # Rack panel background with subtle vertical shading.
-        gradient = QLinearGradient(body.topLeft(), body.bottomLeft())
-        gradient.setColorAt(0, self.COLOR_PANEL_TOP)
-        gradient.setColorAt(1, self.COLOR_PANEL_BOTTOM)
+        panel_path = QPainterPath()
+        panel_path.addRoundedRect(body, self.BORDER_RADIUS, self.BORDER_RADIUS)
 
-        painter.setBrush(QBrush(gradient))
+        painter.save()
+        painter.setClipPath(panel_path, Qt.ClipOperation.IntersectClip)
+        self._paint_faceplate(painter, body, panel_path)
+        painter.restore()
 
         # Border
         if self.isSelected():
@@ -759,20 +836,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             )
         else:
             painter.setPen(QPen(self.COLOR_NORMAL_BORDER, self.NORMAL_BORDER_WIDTH))
-
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(body, self.BORDER_RADIUS, self.BORDER_RADIUS)
-
-        # Faint top sheen so panels read as metal, not flat boxes.
-        sheen = QLinearGradient(body.topLeft(), QPointF(body.left(), body.top() + 18))
-        sheen.setColorAt(0.0, QColor(255, 255, 255, 18))
-        sheen.setColorAt(1.0, QColor(255, 255, 255, 0))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(sheen))
-        painter.drawRoundedRect(
-            body.adjusted(2, 2, -2, -2),
-            self.BORDER_RADIUS,
-            self.BORDER_RADIUS,
-        )
 
         # Left accent rail gives each module family a rack identity.
         accent_rect = QRectF(0, 0, 6, self.module_height)
@@ -846,6 +911,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             font_name = QFont("Arial", 10, QFont.Weight.Bold)
             painter.setFont(font_name)
             painter.drawText(name_rect, Qt.AlignmentFlag.AlignLeft, self.custom_name)
+
+        self._paint_screws(painter)
 
         if not self.is_active:
             painter.fillRect(

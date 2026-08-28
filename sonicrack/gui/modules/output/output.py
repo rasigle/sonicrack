@@ -14,7 +14,7 @@ from soniclab.audio_io import AudioOutput
 from soniclab.dsp.modifiers.amplitude import Volume
 
 from sonicrack.config.audio_config import audio_config
-from sonicrack.gui.widgets import Knob, LevelMeter
+from sonicrack.gui.widgets import Knob, LevelMeter, metal_knob_style
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
@@ -88,6 +88,7 @@ class OutputModule(ModuleWidget):
             max_value=12.0,
             default_value=0.0,
             callback=self._on_gain_changed,
+            style=metal_knob_style(),
         )
 
         meter_col = QVBoxLayout()

@@ -45,3 +45,13 @@ def test_led_indicator_tracks_state(qapp: Any):
     led.set_on(True)
 
     assert led.is_on()
+
+
+def test_led_loads_packaged_skin(qapp: Any):
+    del qapp
+    from sonicrack.gui.widgets.skin import skin_available
+
+    led = LedIndicator(style=LedStyle(size=12))
+    if skin_available():
+        assert led._on_pixmap is not None
+        assert led._off_pixmap is not None

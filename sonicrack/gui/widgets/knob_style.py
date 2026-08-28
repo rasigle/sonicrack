@@ -19,6 +19,14 @@ from PyQt6.QtGui import (
     QTransform,
 )
 
+from sonicrack.gui.widgets.skin import (
+    KNOB_DAVIES,
+    KNOB_METAL,
+    load_path_pixmap,
+    load_skin_pixmap,
+    skin_available,
+)
+
 
 class KnobLike(Protocol):
     """Subset of Knob used by visual styles."""
@@ -248,49 +256,177 @@ class ProceduralKnobStyle:
 
 @dataclass(frozen=True, slots=True)
 class ImageKnobStyle:
-    """Image-backed knob style with an optional rotating pointer layer."""
+    """Image-backed knob style with a rotating body and/or pointer layer.
 
-    body_path: str | Path
+    Packaged resources are cached. ``image_zero_angle`` is the math angle
+    (degrees, 90 = up) of the graphic at identity transform so Davies caps
+    painted at 12 o'clock line up with the 270-degree sweep.
+    """
+
+    body_path: str | Path | None = None
     pointer_path: str | Path | None = None
+    body_resource: tuple[str, ...] | None = None
+    pointer_resource: tuple[str, ...] | None = None
     geometry: KnobGeometry = field(default_factory=KnobGeometry)
+    rotate_body: bool = False
+    image_zero_angle: float = 90.0
+    show_value_arc: bool = True
+    draw_pointer: bool = True
     label_painter: Callable[[QPainter, KnobLike], None] | None = None
+
+    def _pixmap(
+        self,
+        resource: tuple[str, ...] | None,
+        path: str | Path | None,
+    ) -> QPixmap | None:
+        if resource is not None:
+            return load_skin_pixmap(*resource)
+        if path is not None:
+            return load_path_pixmap(str(path))
+        return None
+
+    def _current_angle(self, knob: KnobLike) -> float:
+        norm_value = knob.get_normalized_value()
+        return knob.min_angle - norm_value * (knob.min_angle - knob.max_angle)
+
+    def _draw_rotated(
+        self,
+        painter: QPainter,
+        pixmap: QPixmap,
+        center_x: float,
+        center_y: float,
+        size: float,
+        current_angle: float,
+    ) -> None:
+        dest = QRectF(center_x - size / 2, center_y - size / 2, size, size).toRect()
+        transform = QTransform()
+        transform.translate(center_x, center_y)
+        transform.rotate(self.image_zero_angle - current_angle)
+        transform.translate(-center_x, -center_y)
+        painter.save()
+        painter.setTransform(transform, combine=True)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(dest, pixmap)
+        painter.restore()
+
+    def _paint_readable_pointer(
+        self,
+        painter: QPainter,
+        center_x: float,
+        center_y: float,
+        radius: float,
+        current_angle: float,
+    ) -> None:
+        """High-contrast pointer that stays readable at small knob sizes."""
+        angle_rad = math.radians(current_angle)
+        start_r = radius * 0.16
+        end_r = radius * 0.90
+        start = QPointF(
+            center_x + math.cos(angle_rad) * start_r,
+            center_y - math.sin(angle_rad) * start_r,
+        )
+        end = QPointF(
+            center_x + math.cos(angle_rad) * end_r,
+            center_y - math.sin(angle_rad) * end_r,
+        )
+        outline = max(4.0, radius * 0.22)
+        fill = max(2.0, radius * 0.11)
+        painter.setPen(
+            QPen(
+                QColor(16, 12, 8),
+                outline,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+            )
+        )
+        painter.drawLine(start, end)
+        painter.setPen(
+            QPen(
+                QColor(255, 232, 150),
+                fill,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+            )
+        )
+        painter.drawLine(start, end)
 
     def paint(self, painter: QPainter, knob: KnobLike) -> None:
         center_x = knob.width() / 2
         center_y = self.geometry.center_y
-        size = self.geometry.knob_size
-        top_left_x = center_x - size / 2
-        top_left_y = center_y - size / 2
+        size = float(self.geometry.knob_size)
+        radius = size / 2
+        dest = QRectF(center_x - size / 2, center_y - size / 2, size, size).toRect()
+        current_angle = self._current_angle(knob)
+        procedural = ProceduralKnobStyle(self.geometry)
 
-        body = QPixmap(str(self.body_path))
-        if not body.isNull():
-            painter.drawPixmap(
-                QRectF(top_left_x, top_left_y, size, size).toRect(),
-                body,
+        if self.show_value_arc:
+            procedural._paint_track(painter, center_x, center_y, radius)
+            procedural._paint_value_arc(painter, knob, center_x, center_y, radius)
+
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        body = self._pixmap(self.body_resource, self.body_path)
+        if body is not None:
+            if self.rotate_body:
+                self._draw_rotated(
+                    painter, body, center_x, center_y, size, current_angle
+                )
+            else:
+                painter.drawPixmap(dest, body)
+
+        pointer = self._pixmap(self.pointer_resource, self.pointer_path)
+        if pointer is not None:
+            self._draw_rotated(
+                painter, pointer, center_x, center_y, size, current_angle
             )
-
-        if self.pointer_path is not None:
-            pointer = QPixmap(str(self.pointer_path))
-            if not pointer.isNull():
-                norm_value = knob.get_normalized_value()
-                current_angle = knob.min_angle - norm_value * (
-                    knob.min_angle - knob.max_angle
-                )
-                transform = QTransform()
-                transform.translate(center_x, center_y)
-                transform.rotate(-current_angle)
-                transform.translate(-center_x, -center_y)
-                painter.setTransform(transform, combine=True)
-                painter.drawPixmap(
-                    QRectF(top_left_x, top_left_y, size, size).toRect(),
-                    pointer,
-                )
-                painter.resetTransform()
+        elif self.draw_pointer:
+            self._paint_readable_pointer(
+                painter, center_x, center_y, radius, current_angle
+            )
 
         if self.label_painter is not None:
             self.label_painter(painter, knob)
         else:
-            ProceduralKnobStyle(self.geometry)._paint_text(painter, knob)
+            procedural._paint_text(painter, knob)
 
 
 KnobStyle = ProceduralKnobStyle | ImageKnobStyle
+
+
+def davies_knob_style(geometry: KnobGeometry | None = None) -> KnobStyle:
+    """Static Davies cap with a high-contrast pointer and value arc."""
+    geom = geometry or KnobGeometry()
+    if not skin_available():
+        return ProceduralKnobStyle(geometry=geom)
+    return ImageKnobStyle(
+        body_resource=KNOB_DAVIES,
+        geometry=geom,
+        rotate_body=False,
+        show_value_arc=True,
+        draw_pointer=True,
+    )
+
+
+def metal_knob_style(geometry: KnobGeometry | None = None) -> KnobStyle:
+    """Machined metal body with a high-contrast pointer and value arc."""
+    geom = geometry or KnobGeometry()
+    if not skin_available():
+        return ProceduralKnobStyle(geometry=geom)
+    return ImageKnobStyle(
+        body_resource=KNOB_METAL,
+        geometry=geom,
+        rotate_body=False,
+        show_value_arc=True,
+        draw_pointer=True,
+    )
+
+
+def small_knob_style() -> KnobStyle:
+    return davies_knob_style(ProceduralKnobStyle.small().geometry)
+
+
+def medium_knob_style() -> KnobStyle:
+    return davies_knob_style(ProceduralKnobStyle.medium().geometry)
+
+
+def large_knob_style() -> KnobStyle:
+    return metal_knob_style(ProceduralKnobStyle.large().geometry)

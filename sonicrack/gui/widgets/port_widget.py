@@ -10,7 +10,15 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PyQt6.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QFontMetrics,
+    QPainter,
+    QPen,
+    QRadialGradient,
+)
 from PyQt6.QtWidgets import QGraphicsItem
 
 from sonicrack.gui.widgets.signal_style import (
@@ -168,9 +176,8 @@ class PortWidget(QGraphicsItem):
         Returns:
             Bounding rectangle for painting
         """
-        # Pen is 2px centered on the jack circle; include AA so drag/hover
-        # updates clear the outline instead of leaving a ring.
-        r = self.radius + 3
+        # Halo and AA sit a few pixels outside the hit circle.
+        r = self.radius + 6
         width = max(r * 2, self.label_width)
         return QRectF(-width / 2, -r, width, r * 2 + 13)
 
@@ -185,17 +192,8 @@ class PortWidget(QGraphicsItem):
         if painter is None:
             return
 
-        # Jack color follows signal kind (audio / V/Oct / gate / trigger / …)
         color = port_color_for_signal(self.port.signal, hovered=self.hovered)
-
-        painter.setBrush(color)
-        painter.setPen(QPen(Qt.GlobalColor.black, 2))
-        painter.drawEllipse(QPointF(0, 0), self.radius, self.radius)
-
-        # Draw inner circle if connected (based on cables, not model connection)
-        if self.cables:
-            painter.setBrush(QColor(255, 255, 100))
-            painter.drawEllipse(QPointF(0, 0), self.radius * 0.5, self.radius * 0.5)
+        self._paint_jack(painter, color)
 
         font = QFont("Arial", 6)
         painter.setFont(font)
@@ -220,6 +218,42 @@ class PortWidget(QGraphicsItem):
             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
             label_text,
         )
+
+    def _paint_jack(self, painter: QPainter, color: QColor) -> None:
+        """Paint a round 3.5mm-style jack with a signal-colored collar."""
+        radius = float(self.radius)
+        origin = QPointF(0, 0)
+
+        halo = QColor(color)
+        halo.setAlpha(100 if self.hovered else 55)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(halo)
+        painter.drawEllipse(origin, radius + 2.5, radius + 2.5)
+
+        metal = QRadialGradient(QPointF(-radius * 0.3, -radius * 0.35), radius * 1.25)
+        metal.setColorAt(0.0, QColor(168, 174, 182))
+        metal.setColorAt(0.45, QColor(88, 94, 102))
+        metal.setColorAt(1.0, QColor(28, 32, 36))
+        painter.setPen(QPen(QColor(8, 10, 12), 1.2))
+        painter.setBrush(QBrush(metal))
+        painter.drawEllipse(origin, radius, radius)
+
+        collar = color.lighter(125) if self.hovered else QColor(color)
+        painter.setPen(QPen(color.darker(150), 1))
+        painter.setBrush(collar)
+        painter.drawEllipse(origin, radius * 0.58, radius * 0.58)
+
+        hole = QRadialGradient(origin, radius * 0.38)
+        hole.setColorAt(0.0, QColor(6, 6, 8))
+        hole.setColorAt(1.0, QColor(28, 24, 22))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(hole))
+        painter.drawEllipse(origin, radius * 0.34, radius * 0.34)
+
+        if self.cables:
+            painter.setPen(QPen(QColor(70, 48, 12), 0.8))
+            painter.setBrush(QColor(255, 214, 96))
+            painter.drawEllipse(origin, radius * 0.18, radius * 0.18)
 
     def hoverEnterEvent(self, event):
         """Handle mouse hover enter.

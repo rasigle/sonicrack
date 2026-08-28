@@ -24,7 +24,7 @@ from sonicrack.gui.widgets import (
     Knob,
     LedIndicator,
     LedStyle,
-    ProceduralKnobStyle,
+    small_knob_style,
 )
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
@@ -253,7 +253,7 @@ class StepSequencerModule(ModuleWidget):
         layout.addLayout(randomize_layout)
 
         clock_layout = QHBoxLayout()
-        compact_knob_style = ProceduralKnobStyle.small()
+        compact_knob_style = small_knob_style()
         self.bpm_knob = Knob(
             label="BPM",
             description="Sets the tempo of the sequencer in beats per minute",

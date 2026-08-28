@@ -4,6 +4,13 @@ All notable changes to SonicRack will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Eurorack hardware skin**: modules use a dark brushed-aluminum faceplate with
+  mounting screws; knobs use a static Davies/metal cap with a high-contrast
+  pointer and value arc; round 3.5mm-style jacks are painted (signal-colored
+  collar). Procedural painting remains the fallback if assets are missing.
+
 ## [2026.3.0] - 2026-08-28
 
 ### Added

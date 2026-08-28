@@ -372,6 +372,13 @@ class ModularSynthWindow(QMainWindow):
 
         file_menu.addSeparator()
 
+        export_action = QtGui.QAction("E&xport Audio...", self)
+        export_action.setShortcut("Ctrl+Shift+E")
+        export_action.triggered.connect(self._export_audio)
+        file_menu.addAction(export_action)
+
+        file_menu.addSeparator()
+
         exit_action = QtGui.QAction("E&xit", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
@@ -940,6 +947,43 @@ class ModularSynthWindow(QMainWindow):
         # Update state
         self.current_patch_path = file_path
         self.patch_modified = False
+
+    def _export_audio(self) -> None:
+        """Bounce the current Output module graph to a WAV file."""
+        from sonicrack.gui.dialogs.export_audio_dialog import ExportAudioDialog
+        from sonicrack.gui.modules.output.output import OutputModule
+        from sonicrack.runtime.export import bounce_output_module, write_wav
+
+        patch_canvas = self._require_patch_canvas()
+        output_module = None
+        for module in patch_canvas.get_modules():
+            if isinstance(module, OutputModule):
+                output_module = module
+                break
+        if output_module is None:
+            QMessageBox.warning(
+                self,
+                "Export Audio",
+                "Add an Output module and connect a signal before exporting.",
+            )
+            return
+
+        dialog = ExportAudioDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        file_path = dialog.file_path()
+        if not file_path:
+            return
+
+        try:
+            audio = bounce_output_module(output_module, dialog.duration_seconds())
+            written = write_wav(file_path, audio)
+            app_settings.remember_file_directory(written)
+            statusbar = self._require_statusbar()
+            statusbar.showMessage(f"Exported {written.name}", 8000)
+        except Exception as exc:
+            logger.error("Audio export failed: %s", exc, exc_info=True)
+            QMessageBox.critical(self, "Export Audio", f"Export failed:\n{exc}")
         self._update_window_title()
         app_settings.remember_file_directory(file_path)
 

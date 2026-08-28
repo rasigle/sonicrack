@@ -39,6 +39,12 @@ All notable changes to SonicRack will be documented in this file.
 - **Partial patch load**: Opening a patch no longer aborts when a single module
   is unknown or fails to create. Valid modules and connections still restore;
   problems are collected and shown in a warning dialog afterward.
+- **Demo clicks**: Mixer stays mono when all pans are centered (existing
+  Mixer→Filter demos no longer fail/glitch on stereo blocks). Unison voices
+  start at random phases. Clock/trig pulses into Subtractive Voice and ADSR
+  are stretched so attack can open. Random Melody glides quantized pitch;
+  the subtractive pad uses a slow unipolar square gate instead of 2 ms clock
+  ticks.
 
 ## [2026.2.0] - 2026-07-31
 

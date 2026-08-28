@@ -25,15 +25,8 @@ from sonicrack.gui.modules.modulated_source.envelope_follower import (
 from sonicrack.gui.modules.source.sample_player import SamplePlayerModule
 from sonicrack.gui.modules.source.unison import UnisonModule
 from sonicrack.gui.modules.voice.subtractive_voice import SubtractiveVoiceModule
-from sonicrack.patching.port import Port
 from sonicrack.patching.registry import discover_modules, get_registry
-
-
-def _connect_signal(input_port: Port, values: np.ndarray) -> Port:
-    output_port = Port("output", "Test Out")
-    output_port.write(values)
-    output_port.connect(input_port)
-    return output_port
+from tests.gui_t.helpers import connect_signal as _connect_signal
 
 
 def test_new_modules_are_discoverable(qapp: Any) -> None:
@@ -112,6 +105,21 @@ def test_ladder_and_svf_filter_audio(qapp: Any) -> None:
     svf_out = np.asarray(svf.out_port.value)
     assert svf_out.shape[0] == 256
     assert np.std(svf_out) > 0.001
+
+    cv = np.full(256, 1.0, dtype=np.float32)
+    _connect_signal(ladder.cutoff_cv_port, cv)
+    ladder.process_runtime(
+        256,
+        {
+            "cutoff": 600.0,
+            "resonance": 0.6,
+            "drive": 1.4,
+            "cv_depth_octaves": 1.0,
+        },
+    )
+    modulated = np.asarray(ladder.out_port.value)
+    assert modulated.shape[0] == 256
+    assert not np.allclose(modulated, ladder_out)
 
 
 def test_stereo_width_and_envelope_follower(qapp: Any) -> None:

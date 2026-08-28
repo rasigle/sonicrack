@@ -88,23 +88,16 @@ def apply_control_rate_cv(
     for spec in specs:
         base = float_parameter(parameters, spec.param_name, spec.fallback)
         port = spec.port
+        cv = None
         if port is not None and getattr(port, "is_connected", False):
             cv = read_optional_cv(port, num_samples)
-            value = modulate_param(
-                base,
-                cv,
-                minimum=spec.minimum,
-                maximum=spec.maximum,
-                scale=spec.scale,
-            )
-        else:
-            # No CV: clamp base into the parameter range without a port read.
-            value = base
-            if value < spec.minimum:
-                value = spec.minimum
-            elif value > spec.maximum:
-                value = spec.maximum
-            value = float(value)
+        value = modulate_param(
+            base,
+            cv,
+            minimum=spec.minimum,
+            maximum=spec.maximum,
+            scale=spec.scale,
+        )
 
         try:
             current = getattr(component, spec.attr)

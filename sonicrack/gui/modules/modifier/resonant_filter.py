@@ -4,17 +4,18 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.filters.butterworth import BiquadResonantFilter
 
 from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.modules.modifier._filter_base import (
     RESONANT_TYPE_ITEMS,
     FilterModuleBase,
+    apply_octave_cutoff_cv,
     create_filter_type_combo,
+    labeled_knob_column,
     normalize_filter_type,
 )
 from sonicrack.gui.widgets import Knob
@@ -59,9 +60,6 @@ class ResonantFilterModule(FilterModuleBase):
 
         cutoff_row = QHBoxLayout()
         cutoff_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cutoff_layout = QVBoxLayout()
-        cutoff_label = QLabel("Cutoff")
-        cutoff_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cutoff_knob = Knob(
             label="Hz",
             min_value=20,
@@ -69,22 +67,15 @@ class ResonantFilterModule(FilterModuleBase):
             default_value=1200,
             logarithmic=True,
         )
-        self.cutoff_value_label = QLabel("1200 Hz")
-        self.cutoff_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.bind_parameter_knob(
+        cutoff_layout, self.cutoff_value_label = labeled_knob_column(
+            self,
+            "Cutoff",
             self.cutoff_knob,
             "cutoff",
-            value_label=self.cutoff_value_label,
-            format_value=lambda v: f"{int(v)} Hz",
+            lambda v: f"{int(v)} Hz",
         )
-        cutoff_layout.addWidget(cutoff_label)
-        cutoff_layout.addWidget(self.cutoff_knob)
-        cutoff_layout.addWidget(self.cutoff_value_label)
         cutoff_row.addLayout(cutoff_layout)
 
-        resonance_layout = QVBoxLayout()
-        resonance_label = QLabel("Resonance")
-        resonance_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.resonance_knob = Knob(
             label="Q",
             min_value=0.1,
@@ -92,86 +83,56 @@ class ResonantFilterModule(FilterModuleBase):
             default_value=0.707,
             logarithmic=True,
         )
-        self.resonance_value_label = QLabel("0.71")
-        self.resonance_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.bind_parameter_knob(
+        resonance_layout, self.resonance_value_label = labeled_knob_column(
+            self,
+            "Resonance",
             self.resonance_knob,
             "resonance",
-            value_label=self.resonance_value_label,
-            format_value=lambda v: f"{v:.2f}",
+            lambda v: f"{v:.2f}",
         )
-        resonance_layout.addWidget(resonance_label)
-        resonance_layout.addWidget(self.resonance_knob)
-        resonance_layout.addWidget(self.resonance_value_label)
         cutoff_row.addLayout(resonance_layout)
         layout.addLayout(cutoff_row)
 
         character_row = QHBoxLayout()
         character_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cv_layout = QVBoxLayout()
-        cv_label = QLabel("CV Depth")
-        cv_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cv_depth_knob = Knob(
             label="Oct", min_value=-5.0, max_value=5.0, default_value=0.0
         )
-        self.cv_depth_value_label = QLabel("0.0 oct")
-        self.cv_depth_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.bind_parameter_knob(
+        cv_layout, self.cv_depth_value_label = labeled_knob_column(
+            self,
+            "CV Depth",
             self.cv_depth_knob,
             "cv_depth_octaves",
-            value_label=self.cv_depth_value_label,
-            format_value=lambda v: f"{v:.1f} oct",
+            lambda v: f"{v:.1f} oct",
         )
-        cv_layout.addWidget(cv_label)
-        cv_layout.addWidget(self.cv_depth_knob)
-        cv_layout.addWidget(self.cv_depth_value_label)
         character_row.addLayout(cv_layout)
 
-        drive_layout = QVBoxLayout()
-        drive_label = QLabel("Drive")
-        drive_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drive_knob = Knob(
             label="dB", min_value=0.0, max_value=24.0, default_value=0.0
         )
-        self.drive_value_label = QLabel("0 dB")
-        self.drive_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.bind_parameter_knob(
+        drive_layout, self.drive_value_label = labeled_knob_column(
+            self,
+            "Drive",
             self.drive_knob,
             "drive_db",
-            value_label=self.drive_value_label,
-            format_value=lambda v: f"{v:.0f} dB",
+            lambda v: f"{v:.0f} dB",
         )
-        drive_layout.addWidget(drive_label)
-        drive_layout.addWidget(self.drive_knob)
-        drive_layout.addWidget(self.drive_value_label)
-        output_layout = QVBoxLayout()
-        output_label = QLabel("Output")
-        output_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.output_gain_knob = Knob(
             label="dB", min_value=-24.0, max_value=12.0, default_value=-6.0
         )
-        self.output_gain_value_label = QLabel("-6 dB")
-        self.output_gain_value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.bind_parameter_knob(
+        output_layout, self.output_gain_value_label = labeled_knob_column(
+            self,
+            "Output",
             self.output_gain_knob,
             "output_gain_db",
-            value_label=self.output_gain_value_label,
-            format_value=lambda v: f"{v:.0f} dB",
+            lambda v: f"{v:.0f} dB",
         )
-        output_layout.addWidget(output_label)
-        output_layout.addWidget(self.output_gain_knob)
-        output_layout.addWidget(self.output_gain_value_label)
         character_row.addLayout(drive_layout)
         character_row.addLayout(output_layout)
         layout.addLayout(character_row)
 
         self._finish_controls(layout)
 
-        self.register_parameter("cutoff", self.cutoff_knob)
-        self.register_parameter("resonance", self.resonance_knob)
-        self.register_parameter("cv_depth_octaves", self.cv_depth_knob)
-        self.register_parameter("drive_db", self.drive_knob)
-        self.register_parameter("output_gain_db", self.output_gain_knob)
         self._register_filter_type_parameter(self.type_combo)
 
         self.component = self.create_engine_component()
@@ -253,21 +214,15 @@ class ResonantFilterModule(FilterModuleBase):
             self._last_output_gain_db, output_gain_db, num_samples
         )
 
-        if self.cutoff_cv_port.is_connected:
-            cv_signal = read_samples(self.cutoff_cv_port, num_samples)
-            cv_depth = float_parameter(
+        cutoff_values = apply_octave_cutoff_cv(
+            cutoff,
+            cutoff_values,
+            self.cutoff_cv_port,
+            float_parameter(
                 parameters, "cv_depth_octaves", self.cv_depth_knob.get_value
-            )
-            base_cutoff = (
-                cutoff_values
-                if cutoff_values is not None
-                else np.full(num_samples, cutoff, dtype=np.float32)
-            )
-            cutoff_values = np.clip(
-                base_cutoff * np.power(2.0, cv_signal * cv_depth),
-                20.0,
-                audio_config.sample_rate * 0.45,
-            )
+            ),
+            num_samples,
+        )
 
         self.out_port.write(
             self.component.process_modulated(

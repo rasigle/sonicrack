@@ -5,11 +5,23 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from soniclab.dsp.modulators import ADSREnvelope
 
+from sonicrack.gui.modules.modulated_source._envelope_curve import (
+    normalize_envelope_curve,
+)
 from sonicrack.gui.modules.modulated_source.envelope_adsr import ADSRModule
 from sonicrack.gui.modules.modulated_source.envelope_decay import DecayEnvelopeModule
 from sonicrack.gui.widgets.envelope_shape_widget import EnvelopeShapeWidget
 from sonicrack.patching.module import ModuleCategory
+
+_SONICLAB_HAS_ENVELOPE_CURVE = hasattr(ADSREnvelope(), "curve")
+
+
+def test_normalize_envelope_curve_labels() -> None:
+    assert normalize_envelope_curve("Linear") == "linear"
+    assert normalize_envelope_curve("polynomial") == "polynomial"
+    assert normalize_envelope_curve("unknown") == "exponential"
 
 
 def test_shape_points_include_attack_peak_sustain_and_release():
@@ -184,6 +196,7 @@ def test_decay_module_live_position_tracks_component(qapp: Any):
     assert indicator is not None
     assert indicator[1] > 0.0
 
+
 def test_shape_points_exponential_differs_from_linear():
     linear = EnvelopeShapeWidget.shape_points(0.2, 0.2, 0.5, 0.2, curve="linear")
     expo = EnvelopeShapeWidget.shape_points(0.2, 0.2, 0.5, 0.2, curve="exponential")
@@ -204,9 +217,10 @@ def test_adsr_module_curve_menu_updates_shape_and_engine(qapp: Any):
     module.curve_param.set_value("Polynomial")
     assert module.shape_widget.curve() == "polynomial"
 
-    adsr = module._current_adsr()
-    module._apply_runtime_parameters(adsr, {"curve": "Linear"})
-    assert adsr.curve == "linear"
+    if _SONICLAB_HAS_ENVELOPE_CURVE:
+        adsr = module._current_adsr()
+        module._apply_runtime_parameters(adsr, {"curve": "Linear"})
+        assert adsr.curve == "linear"
 
 
 def test_decay_module_curve_menu(qapp: Any):
@@ -215,4 +229,3 @@ def test_decay_module_curve_menu(qapp: Any):
     assert module.curve_param.get_value() == "Exponential"
     module.curve_param.set_value("Linear")
     assert module.shape_widget.curve() == "linear"
-

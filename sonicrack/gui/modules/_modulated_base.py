@@ -124,19 +124,7 @@ class PortModulatorAdapter:
 
         value = float(self._buffer[self._index])
         self._index += 1
-
-        # Apply CV scaling if needed
-        if self._needs_scaling:
-            value = value * self._scale + self._offset
-            # Clamp to expected range
-            value = max(self.expected_range[0], min(self.expected_range[1], value))
-
-        # Apply modulation amount (depth control)
-        if self.modulation_amount < 1.0:
-            range_center = (self.expected_range[0] + self.expected_range[1]) / 2
-            value = range_center + (value - range_center) * self.modulation_amount
-
-        return value
+        return float(self._apply_cv_and_depth(value))
 
     def get_samples(self, n: int, mode: str = "vectorized") -> np.ndarray:
         """Get samples from port (engine API).
@@ -154,20 +142,18 @@ class PortModulatorAdapter:
         from sonicrack.runtime.helpers import read_samples
 
         samples = read_samples(self.port, n)
+        return np.asarray(self._apply_cv_and_depth(samples), dtype=np.float32)
 
-        # Apply CV scaling if needed
+    def _apply_cv_and_depth(self, samples: np.ndarray | float) -> np.ndarray | float:
+        """Scale a source CV into the destination range and apply depth."""
+        values = samples
         if self._needs_scaling:
-            samples = samples * self._scale + self._offset
-            # Clamp to expected range
-            samples = np.clip(samples, self.expected_range[0], self.expected_range[1])
-
-        # Apply modulation amount (depth control)
-        # Scale modulation around the center of the expected range
+            values = values * self._scale + self._offset
+            values = np.clip(values, self.expected_range[0], self.expected_range[1])
         if self.modulation_amount < 1.0:
             range_center = (self.expected_range[0] + self.expected_range[1]) / 2
-            samples = range_center + (samples - range_center) * self.modulation_amount
-
-        return samples
+            values = range_center + (values - range_center) * self.modulation_amount
+        return values
 
     def get_samples_vectorized(self, n: int) -> np.ndarray:
         """Get vectorized samples from port (compatibility method).

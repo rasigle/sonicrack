@@ -393,8 +393,14 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         value_label: Any | None = None,
         format_value: Callable[[float], str] | None = None,
         on_change: Callable[[float], None] | None = None,
+        register: bool = False,
+        getter: str = "get_value",
+        setter: str = "set_value",
     ) -> None:
-        """Connect a knob to ``parameter_changed`` (and optional value label)."""
+        """Connect a knob to ``parameter_changed`` (and optional value label).
+
+        Pass ``register=True`` to also register the knob for preset get/set.
+        """
 
         def _handler(*_args: object) -> None:
             value = knob.get_value()
@@ -405,6 +411,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             self.parameter_changed.emit(param_name, value)
 
         knob.value_changed.connect(_handler)
+        if register:
+            self.register_parameter(param_name, knob, getter=getter, setter=setter)
 
     def _create_portwidgets(self):
         for in_port in self.inputs.values():

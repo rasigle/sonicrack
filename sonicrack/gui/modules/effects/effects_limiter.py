@@ -7,16 +7,15 @@ from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.effects import Limiter
 
 from sonicrack.config.audio_config import audio_config
+from sonicrack.gui.modules.effects._cv_modulation import ControlRateCvSpec
+from sonicrack.gui.modules.effects._simple_effect import SimpleEffectModule
 from sonicrack.gui.widgets import Knob
-from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples
-from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()
-class LimiterModule(ModuleWidget):
+class LimiterModule(SimpleEffectModule):
     """Peak limiter for finishing loud patches without digital trash."""
 
     runtime_kind = "limiter"
@@ -28,9 +27,7 @@ class LimiterModule(ModuleWidget):
 
     def __init__(self) -> None:
         super().__init__(width=220, height=235, color=QColor(160, 90, 90))
-        self.in_port = self.add_input("In")
-        self.out_port = self.add_output("Out")
-        self.component = Limiter(sample_rate=audio_config.sample_rate)
+        self._setup_effect_io(Limiter(sample_rate=audio_config.sample_rate))
 
         layout = self._begin_controls()
         row = QHBoxLayout()
@@ -41,11 +38,7 @@ class LimiterModule(ModuleWidget):
             max_value=1.0,
             default_value=0.9,
         )
-        self.threshold_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "threshold", self.threshold_knob.get_value()
-            )
-        )
+        self.bind_parameter_knob(self.threshold_knob, "threshold", register=True)
         row.addWidget(self.threshold_knob)
 
         self.release_knob = Knob(
@@ -56,11 +49,7 @@ class LimiterModule(ModuleWidget):
             default_value=50.0,
             logarithmic=True,
         )
-        self.release_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "release", self.release_knob.get_value()
-            )
-        )
+        self.bind_parameter_knob(self.release_knob, "release", register=True)
         row.addWidget(self.release_knob)
         layout.addLayout(row)
 
@@ -71,19 +60,38 @@ class LimiterModule(ModuleWidget):
             max_value=4.0,
             default_value=1.0,
         )
-        self.makeup_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("makeup", self.makeup_knob.get_value())
-        )
+        self.bind_parameter_knob(self.makeup_knob, "makeup", register=True)
         layout.addWidget(self.makeup_knob)
         self._finish_controls(layout)
-
-        self.register_parameter("threshold", self.threshold_knob)
-        self.register_parameter("release", self.release_knob)
-        self.register_parameter("makeup", self.makeup_knob)
         self._install_sample_rate_listener()
 
-    def get_required_inputs(self) -> list[str]:
-        return ["In"]
+    def control_rate_specs(self) -> tuple[ControlRateCvSpec, ...]:
+        return (
+            ControlRateCvSpec(
+                "threshold",
+                "threshold",
+                self.threshold_knob.get_value,
+                None,
+                self.threshold_knob.min_value,
+                self.threshold_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "release_ms",
+                "release",
+                self.release_knob.get_value,
+                None,
+                self.release_knob.min_value,
+                self.release_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "makeup",
+                "makeup",
+                self.makeup_knob.get_value,
+                None,
+                self.makeup_knob.min_value,
+                self.makeup_knob.max_value,
+            ),
+        )
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component = Limiter(
@@ -92,17 +100,3 @@ class LimiterModule(ModuleWidget):
             makeup=self.makeup_knob.get_value(),
             sample_rate=new_sample_rate,
         )
-
-    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        if self._require_input_or_silence(num_samples):
-            return
-        self.component.threshold = float_parameter(
-            parameters, "threshold", self.threshold_knob.get_value
-        )
-        self.component.release_ms = float_parameter(
-            parameters, "release", self.release_knob.get_value
-        )
-        self.component.makeup = float_parameter(
-            parameters, "makeup", self.makeup_knob.get_value
-        )
-        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

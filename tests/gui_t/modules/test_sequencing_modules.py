@@ -14,15 +14,8 @@ from sonicrack.gui.modules.sequencing.clock import ClockModule
 from sonicrack.gui.modules.sequencing.slide import SlideModule
 from sonicrack.gui.modules.sequencing.step_sequencer import StepSequencerModule
 from sonicrack.gui.widgets import ImagePushButton
-from sonicrack.patching.port import Port
 from sonicrack.patching.registry import discover_modules, get_registry
-
-
-def _connect_signal(input_port: Port, values: np.ndarray) -> Port:
-    output_port = Port("output", "Test Out")
-    output_port.write(values)
-    output_port.connect(input_port)
-    return output_port
+from tests.gui_t.helpers import connect_signal as _connect_signal
 
 
 def test_sequencing_modules_are_discoverable(qapp: Any):

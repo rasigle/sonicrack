@@ -8,6 +8,12 @@ from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 from soniclab.dsp.modulators import ADSREnvelope, GateTriggeredADSR
 
 from sonicrack.config.audio_config import audio_config
+from sonicrack.gui.modules.modulated_source._envelope_curve import (
+    ENVELOPE_CURVE_TOOLTIP_ADSR,
+    apply_envelope_curve,
+    normalize_envelope_curve,
+    register_envelope_curve_choice,
+)
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.envelope_shape_widget import EnvelopeShapeWidget
 from sonicrack.gui.widgets.module_widget import ModuleWidget
@@ -234,18 +240,10 @@ class ADSRModule(ModuleWidget):
                 "On/Off: hold trig down to gate on, release it to gate off."
             ),
         )
-        self.curve_param = self.register_menu_choice(
-            "curve",
-            "Curve",
-            ["Linear", "Exponential", "Polynomial"],
-            "Exponential",
-            on_changed=self._on_curve_changed,
-            tooltip=(
-                "Segment interpolation for attack, decay, and release.\n"
-                "Linear: straight ramps.\n"
-                "Exponential: analog RC shape — natural VCA feel (recommended).\n"
-                "Polynomial: smooth S-curve (Hermite smoothstep)."
-            ),
+        self.curve_param = register_envelope_curve_choice(
+            self,
+            self._on_curve_changed,
+            tooltip=ENVELOPE_CURVE_TOOLTIP_ADSR,
         )
 
         # Register parameters for automatic get/set
@@ -413,8 +411,8 @@ class ADSRModule(ModuleWidget):
             retrigger_mode=self._normalize_retrigger_mode(
                 self.retrigger_param.get_value()
             ),
-            curve=self._normalize_curve(self.curve_param.get_value()),
         )
+        apply_envelope_curve(adsr, self.curve_param.get_value())
 
         # If gate input is connected, wrap with gate-triggered version
         if input_components and len(input_components) > 0:
@@ -455,7 +453,7 @@ class ADSRModule(ModuleWidget):
         mode_value = parameters.get("retrigger_mode", self.retrigger_param.get_value())
         adsr.retrigger_mode = self._normalize_retrigger_mode(str(mode_value))
         curve_value = parameters.get("curve", self.curve_param.get_value())
-        adsr.curve = self._normalize_curve(str(curve_value))
+        apply_envelope_curve(adsr, str(curve_value))
 
     @staticmethod
     def _normalize_retrigger_mode(value: str) -> Literal["legato", "punch"]:
@@ -465,12 +463,7 @@ class ADSRModule(ModuleWidget):
     def _normalize_curve(
         value: str,
     ) -> Literal["linear", "exponential", "polynomial"]:
-        lowered = value.lower().strip()
-        if lowered == "polynomial":
-            return "polynomial"
-        if lowered == "linear":
-            return "linear"
-        return "exponential"
+        return normalize_envelope_curve(value)
 
     def _render_gate_triggered_adsr(
         self, adsr: ADSREnvelope, gate_signal: np.ndarray, num_samples: int

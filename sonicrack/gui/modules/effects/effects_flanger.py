@@ -7,16 +7,15 @@ from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.effects import Flanger
 
 from sonicrack.config.audio_config import audio_config
+from sonicrack.gui.modules.effects._cv_modulation import ControlRateCvSpec
+from sonicrack.gui.modules.effects._simple_effect import SimpleEffectModule
 from sonicrack.gui.widgets import Knob
-from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples
-from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()
-class FlangerModule(ModuleWidget):
+class FlangerModule(SimpleEffectModule):
     """Short modulated delay with feedback (classic comb-notch sweep)."""
 
     runtime_kind = "flanger"
@@ -28,9 +27,7 @@ class FlangerModule(ModuleWidget):
 
     def __init__(self) -> None:
         super().__init__(width=220, height=260, color=QColor(80, 150, 190))
-        self.in_port = self.add_input("In")
-        self.out_port = self.add_output("Out")
-        self.component = Flanger(sample_rate=audio_config.sample_rate)
+        self._setup_effect_io(Flanger(sample_rate=audio_config.sample_rate))
 
         layout = self._begin_controls()
         row1 = QHBoxLayout()
@@ -42,9 +39,7 @@ class FlangerModule(ModuleWidget):
             default_value=0.25,
             logarithmic=True,
         )
-        self.rate_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("rate", self.rate_knob.get_value())
-        )
+        self.bind_parameter_knob(self.rate_knob, "rate", register=True)
         row1.addWidget(self.rate_knob)
 
         self.depth_knob = Knob(
@@ -54,9 +49,7 @@ class FlangerModule(ModuleWidget):
             max_value=5.0,
             default_value=1.5,
         )
-        self.depth_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("depth", self.depth_knob.get_value())
-        )
+        self.bind_parameter_knob(self.depth_knob, "depth", register=True)
         row1.addWidget(self.depth_knob)
         layout.addLayout(row1)
 
@@ -68,9 +61,7 @@ class FlangerModule(ModuleWidget):
             max_value=10.0,
             default_value=2.0,
         )
-        self.delay_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("delay", self.delay_knob.get_value())
-        )
+        self.bind_parameter_knob(self.delay_knob, "delay", register=True)
         row2.addWidget(self.delay_knob)
 
         self.feedback_knob = Knob(
@@ -80,11 +71,7 @@ class FlangerModule(ModuleWidget):
             max_value=0.95,
             default_value=0.7,
         )
-        self.feedback_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "feedback", self.feedback_knob.get_value()
-            )
-        )
+        self.bind_parameter_knob(self.feedback_knob, "feedback", register=True)
         row2.addWidget(self.feedback_knob)
         layout.addLayout(row2)
 
@@ -95,21 +82,54 @@ class FlangerModule(ModuleWidget):
             max_value=1.0,
             default_value=0.5,
         )
-        self.mix_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
-        )
+        self.bind_parameter_knob(self.mix_knob, "mix", register=True)
         layout.addWidget(self.mix_knob)
         self._finish_controls(layout)
-
-        self.register_parameter("rate", self.rate_knob)
-        self.register_parameter("depth", self.depth_knob)
-        self.register_parameter("delay", self.delay_knob)
-        self.register_parameter("feedback", self.feedback_knob)
-        self.register_parameter("mix", self.mix_knob)
         self._install_sample_rate_listener()
 
-    def get_required_inputs(self) -> list[str]:
-        return ["In"]
+    def control_rate_specs(self) -> tuple[ControlRateCvSpec, ...]:
+        return (
+            ControlRateCvSpec(
+                "rate_hz",
+                "rate",
+                self.rate_knob.get_value,
+                None,
+                self.rate_knob.min_value,
+                self.rate_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "depth_ms",
+                "depth",
+                self.depth_knob.get_value,
+                None,
+                self.depth_knob.min_value,
+                self.depth_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "delay_ms",
+                "delay",
+                self.delay_knob.get_value,
+                None,
+                self.delay_knob.min_value,
+                self.delay_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "feedback",
+                "feedback",
+                self.feedback_knob.get_value,
+                None,
+                self.feedback_knob.min_value,
+                self.feedback_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "mix",
+                "mix",
+                self.mix_knob.get_value,
+                None,
+                self.mix_knob.min_value,
+                self.mix_knob.max_value,
+            ),
+        )
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component = Flanger(
@@ -120,21 +140,3 @@ class FlangerModule(ModuleWidget):
             feedback=self.feedback_knob.get_value(),
             sample_rate=new_sample_rate,
         )
-
-    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        if self._require_input_or_silence(num_samples):
-            return
-        self.component.rate_hz = float_parameter(
-            parameters, "rate", self.rate_knob.get_value
-        )
-        self.component.depth_ms = float_parameter(
-            parameters, "depth", self.depth_knob.get_value
-        )
-        self.component.delay_ms = float_parameter(
-            parameters, "delay", self.delay_knob.get_value
-        )
-        self.component.feedback = float_parameter(
-            parameters, "feedback", self.feedback_knob.get_value
-        )
-        self.component.mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
-        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

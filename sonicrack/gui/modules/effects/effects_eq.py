@@ -8,16 +8,17 @@ from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.effects import ParametricEQ
 
 from sonicrack.config.audio_config import audio_config
+from sonicrack.gui.modules.effects._cv_modulation import ControlRateCvSpec
+from sonicrack.gui.modules.effects._simple_effect import SimpleEffectModule
 from sonicrack.gui.widgets import Knob
-from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples, str_parameter
+from sonicrack.runtime.helpers import str_parameter
 from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()
-class EQModule(ModuleWidget):
+class EQModule(SimpleEffectModule):
     """Single-band parametric EQ (peak / low shelf / high shelf)."""
 
     runtime_kind = "eq"
@@ -29,9 +30,7 @@ class EQModule(ModuleWidget):
 
     def __init__(self) -> None:
         super().__init__(width=220, height=290, color=QColor(130, 130, 100))
-        self.in_port = self.add_input("In")
-        self.out_port = self.add_output("Out")
-        self.component = ParametricEQ(sample_rate=audio_config.sample_rate)
+        self._setup_effect_io(ParametricEQ(sample_rate=audio_config.sample_rate))
 
         layout = self._begin_controls()
         row1 = QHBoxLayout()
@@ -43,9 +42,7 @@ class EQModule(ModuleWidget):
             default_value=1000.0,
             logarithmic=True,
         )
-        self.freq_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("frequency", self.freq_knob.get_value())
-        )
+        self.bind_parameter_knob(self.freq_knob, "frequency", register=True)
         row1.addWidget(self.freq_knob)
 
         self.gain_knob = Knob(
@@ -55,9 +52,7 @@ class EQModule(ModuleWidget):
             max_value=18.0,
             default_value=0.0,
         )
-        self.gain_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("gain_db", self.gain_knob.get_value())
-        )
+        self.bind_parameter_knob(self.gain_knob, "gain_db", register=True)
         row1.addWidget(self.gain_knob)
         layout.addLayout(row1)
 
@@ -68,9 +63,7 @@ class EQModule(ModuleWidget):
             max_value=8.0,
             default_value=1.0,
         )
-        self.q_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("q", self.q_knob.get_value())
-        )
+        self.bind_parameter_knob(self.q_knob, "q", register=True)
         layout.addWidget(self.q_knob)
 
         self.mode_combo = QtWidgets.QComboBox()
@@ -82,16 +75,46 @@ class EQModule(ModuleWidget):
         layout.addWidget(self.mode_combo)
         self._finish_controls(layout)
 
-        self.register_parameter("frequency", self.freq_knob)
-        self.register_parameter("gain_db", self.gain_knob)
-        self.register_parameter("q", self.q_knob)
         self.register_parameter(
             "mode", self.mode_combo, getter="currentText", setter="setCurrentText"
         )
         self._install_sample_rate_listener()
 
-    def get_required_inputs(self) -> list[str]:
-        return ["In"]
+    def control_rate_specs(self) -> tuple[ControlRateCvSpec, ...]:
+        return (
+            ControlRateCvSpec(
+                "frequency",
+                "frequency",
+                self.freq_knob.get_value,
+                None,
+                self.freq_knob.min_value,
+                self.freq_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "gain_db",
+                "gain_db",
+                self.gain_knob.get_value,
+                None,
+                self.gain_knob.min_value,
+                self.gain_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "q",
+                "q",
+                self.q_knob.get_value,
+                None,
+                self.q_knob.min_value,
+                self.q_knob.max_value,
+            ),
+        )
+
+    def apply_runtime_parameters(
+        self, parameters: RuntimeParameters, num_samples: int
+    ) -> None:
+        super().apply_runtime_parameters(parameters, num_samples)
+        self.component.mode = str_parameter(
+            parameters, "mode", self.mode_combo.currentText
+        )
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component = ParametricEQ(
@@ -101,18 +124,3 @@ class EQModule(ModuleWidget):
             mode=self.mode_combo.currentText(),
             sample_rate=new_sample_rate,
         )
-
-    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        if self._require_input_or_silence(num_samples):
-            return
-        self.component.frequency = float_parameter(
-            parameters, "frequency", self.freq_knob.get_value
-        )
-        self.component.gain_db = float_parameter(
-            parameters, "gain_db", self.gain_knob.get_value
-        )
-        self.component.q = float_parameter(parameters, "q", self.q_knob.get_value)
-        self.component.mode = str_parameter(
-            parameters, "mode", self.mode_combo.currentText
-        )
-        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

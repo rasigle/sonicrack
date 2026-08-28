@@ -609,20 +609,25 @@ def test_adsr_runtime_renders_expected_gate_attack_decay_sustain(qapp: Any):
 
 def test_adsr_runtime_renders_expected_gate_release(qapp: Any):
     del qapp
-    from sonicrack.runtime.helpers import min_trigger_samples
+    from sonicrack.runtime.helpers import (
+        DEFAULT_MIN_TRIGGER_SECONDS,
+        min_trigger_samples,
+    )
 
     module = ADSRModule()
     gate_source = _connect_constant_input(module.gate_input, 1.0)
+    attack_s = 4 / DEFAULT_SAMPLE_RATE
     parameters = {
-        "attack_duration": 4 / DEFAULT_SAMPLE_RATE,
+        "attack_duration": attack_s,
         "decay_duration": 4 / DEFAULT_SAMPLE_RATE,
         "sustain_level": 0.5,
         "release_duration": 4 / DEFAULT_SAMPLE_RATE,
     }
 
-    # Hold gate high longer than the ~2 ms min trigger stretch so release is
-    # not delayed by ensure_min_pulse_width leftover hold samples.
-    gate_on = min_trigger_samples(DEFAULT_SAMPLE_RATE) + 16
+    # ADSR stretches short gates to max(2 ms, attack*0.5 + 8 ms). Hold the
+    # gate high longer than that so leftover hold samples do not delay release.
+    width_s = min(0.08, max(DEFAULT_MIN_TRIGGER_SECONDS, attack_s * 0.5 + 0.008))
+    gate_on = min_trigger_samples(DEFAULT_SAMPLE_RATE, width_s) + 16
     gate_source.write(np.ones(gate_on, dtype=np.float32))
     module.process_runtime(gate_on, parameters)
     gate_source.write(np.zeros(6, dtype=np.float32))

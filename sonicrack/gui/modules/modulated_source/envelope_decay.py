@@ -10,6 +10,12 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 from soniclab.dsp.modulators import DecayEnvelope
 
+from sonicrack.gui.modules.modulated_source._envelope_curve import (
+    ENVELOPE_CURVE_TOOLTIP_DECAY,
+    apply_envelope_curve,
+    normalize_envelope_curve,
+    register_envelope_curve_choice,
+)
 from sonicrack.gui.widgets import Knob
 from sonicrack.gui.widgets.envelope_shape_widget import EnvelopeShapeWidget
 from sonicrack.gui.widgets.module_widget import ModuleWidget
@@ -43,7 +49,8 @@ class DecayEnvelopeModule(ModuleWidget):
         self.accent_input = self.add_input("Accent", signal=PortSignal.CONTROL_CV)
         self.out_port = self.add_output("Out", signal=PortSignal.CONTROL_CV)
 
-        self.component = DecayEnvelope(curve="exponential")
+        self.component = DecayEnvelope()
+        apply_envelope_curve(self.component, "exponential")
         self._previous_gate = 0.0
 
         layout = self._begin_controls(spacing=6)
@@ -128,18 +135,10 @@ class DecayEnvelopeModule(ModuleWidget):
         self.register_parameter("amount", self.amount_knob)
         self.register_parameter("accent_amount", self.accent_knob)
 
-        self.curve_param = self.register_menu_choice(
-            "curve",
-            "Curve",
-            ["Linear", "Exponential", "Polynomial"],
-            "Exponential",
-            on_changed=self._on_curve_changed,
-            tooltip=(
-                "Segment interpolation for attack and decay.\n"
-                "Linear: straight ramps.\n"
-                "Exponential: analog RC shape — natural pluck tails (recommended).\n"
-                "Polynomial: smooth S-curve (Hermite smoothstep)."
-            ),
+        self.curve_param = register_envelope_curve_choice(
+            self,
+            self._on_curve_changed,
+            tooltip=ENVELOPE_CURVE_TOOLTIP_DECAY,
         )
 
         self._update_shape_display()
@@ -167,12 +166,7 @@ class DecayEnvelopeModule(ModuleWidget):
     def _normalize_curve(
         value: str,
     ) -> Literal["linear", "exponential", "polynomial"]:
-        lowered = value.lower().strip()
-        if lowered == "polynomial":
-            return "polynomial"
-        if lowered == "linear":
-            return "linear"
-        return "exponential"
+        return normalize_envelope_curve(value)
 
     def _update_live_position(self) -> None:
         """Refresh the shape playhead from the decay envelope component."""
@@ -221,7 +215,7 @@ class DecayEnvelopeModule(ModuleWidget):
             parameters, "amount", self.amount_knob.get_value
         )
         curve_value = parameters.get("curve", self.curve_param.get_value())
-        self.component.curve = self._normalize_curve(str(curve_value))
+        apply_envelope_curve(self.component, str(curve_value))
 
         gate_signal = (
             read_samples(self.gate_input, num_samples)

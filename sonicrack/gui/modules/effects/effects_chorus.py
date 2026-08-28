@@ -7,16 +7,15 @@ from PyQt6.QtWidgets import QHBoxLayout
 from soniclab.dsp.effects import Chorus
 
 from sonicrack.config.audio_config import audio_config
+from sonicrack.gui.modules.effects._cv_modulation import ControlRateCvSpec
+from sonicrack.gui.modules.effects._simple_effect import SimpleEffectModule
 from sonicrack.gui.widgets import Knob
-from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
-from sonicrack.runtime.helpers import float_parameter, read_samples
-from sonicrack.runtime.specs import RuntimeParameters
 
 
 @register_module()
-class ChorusModule(ModuleWidget):
+class ChorusModule(SimpleEffectModule):
     """Stereo-style mono chorus with rate, depth, delay, and mix."""
 
     runtime_kind = "chorus"
@@ -28,9 +27,7 @@ class ChorusModule(ModuleWidget):
 
     def __init__(self) -> None:
         super().__init__(width=220, height=260, color=QColor(100, 140, 180))
-        self.in_port = self.add_input("In")
-        self.out_port = self.add_output("Out")
-        self.component = Chorus(sample_rate=audio_config.sample_rate)
+        self._setup_effect_io(Chorus(sample_rate=audio_config.sample_rate))
 
         layout = self._begin_controls()
         row1 = QHBoxLayout()
@@ -42,9 +39,7 @@ class ChorusModule(ModuleWidget):
             default_value=0.8,
             logarithmic=True,
         )
-        self.rate_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("rate", self.rate_knob.get_value())
-        )
+        self.bind_parameter_knob(self.rate_knob, "rate", register=True)
         row1.addWidget(self.rate_knob)
 
         self.depth_knob = Knob(
@@ -54,9 +49,7 @@ class ChorusModule(ModuleWidget):
             max_value=10.0,
             default_value=3.5,
         )
-        self.depth_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("depth", self.depth_knob.get_value())
-        )
+        self.bind_parameter_knob(self.depth_knob, "depth", register=True)
         row1.addWidget(self.depth_knob)
         layout.addLayout(row1)
 
@@ -68,9 +61,7 @@ class ChorusModule(ModuleWidget):
             max_value=30.0,
             default_value=12.0,
         )
-        self.delay_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("delay", self.delay_knob.get_value())
-        )
+        self.bind_parameter_knob(self.delay_knob, "delay", register=True)
         row2.addWidget(self.delay_knob)
 
         self.mix_knob = Knob(
@@ -80,21 +71,47 @@ class ChorusModule(ModuleWidget):
             max_value=1.0,
             default_value=0.5,
         )
-        self.mix_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
-        )
+        self.bind_parameter_knob(self.mix_knob, "mix", register=True)
         row2.addWidget(self.mix_knob)
         layout.addLayout(row2)
         self._finish_controls(layout)
-
-        self.register_parameter("rate", self.rate_knob)
-        self.register_parameter("depth", self.depth_knob)
-        self.register_parameter("delay", self.delay_knob)
-        self.register_parameter("mix", self.mix_knob)
         self._install_sample_rate_listener()
 
-    def get_required_inputs(self) -> list[str]:
-        return ["In"]
+    def control_rate_specs(self) -> tuple[ControlRateCvSpec, ...]:
+        return (
+            ControlRateCvSpec(
+                "rate_hz",
+                "rate",
+                self.rate_knob.get_value,
+                None,
+                self.rate_knob.min_value,
+                self.rate_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "depth_ms",
+                "depth",
+                self.depth_knob.get_value,
+                None,
+                self.depth_knob.min_value,
+                self.depth_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "delay_ms",
+                "delay",
+                self.delay_knob.get_value,
+                None,
+                self.delay_knob.min_value,
+                self.delay_knob.max_value,
+            ),
+            ControlRateCvSpec(
+                "mix",
+                "mix",
+                self.mix_knob.get_value,
+                None,
+                self.mix_knob.min_value,
+                self.mix_knob.max_value,
+            ),
+        )
 
     def _on_global_sample_rate_changed(self, new_sample_rate: int) -> None:
         self.component = Chorus(
@@ -104,18 +121,3 @@ class ChorusModule(ModuleWidget):
             mix=self.mix_knob.get_value(),
             sample_rate=new_sample_rate,
         )
-
-    def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
-        if self._require_input_or_silence(num_samples):
-            return
-        self.component.rate_hz = float_parameter(
-            parameters, "rate", self.rate_knob.get_value
-        )
-        self.component.depth_ms = float_parameter(
-            parameters, "depth", self.depth_knob.get_value
-        )
-        self.component.delay_ms = float_parameter(
-            parameters, "delay", self.delay_knob.get_value
-        )
-        self.component.mix = float_parameter(parameters, "mix", self.mix_knob.get_value)
-        self.out_port.write(self.component(read_samples(self.in_port, num_samples)))

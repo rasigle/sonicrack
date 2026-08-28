@@ -86,9 +86,7 @@ class EnvelopeFollowerModule(ModuleWidget):
             default_value=8.0,
             logarithmic=True,
         )
-        self.attack_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("attack", self.attack_knob.get_value())
-        )
+        self.bind_parameter_knob(self.attack_knob, "attack", register=True)
         row.addWidget(self.attack_knob)
 
         self.release_knob = Knob(
@@ -99,11 +97,7 @@ class EnvelopeFollowerModule(ModuleWidget):
             default_value=120.0,
             logarithmic=True,
         )
-        self.release_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit(
-                "release", self.release_knob.get_value()
-            )
-        )
+        self.bind_parameter_knob(self.release_knob, "release", register=True)
         row.addWidget(self.release_knob)
         layout.addLayout(row)
 
@@ -115,15 +109,9 @@ class EnvelopeFollowerModule(ModuleWidget):
             default_value=1.5,
             logarithmic=True,
         )
-        self.gain_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("gain", self.gain_knob.get_value())
-        )
+        self.bind_parameter_knob(self.gain_knob, "gain", register=True)
         layout.addWidget(self.gain_knob)
         self._finish_controls(layout)
-
-        self.register_parameter("attack", self.attack_knob)
-        self.register_parameter("release", self.release_knob)
-        self.register_parameter("gain", self.gain_knob)
 
     def get_required_inputs(self) -> list[str]:
         return ["In"]

@@ -9,15 +9,18 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any, Literal, overload
 
+import numpy as np
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout
 
+from sonicrack.config.audio_config import audio_config
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 
 # Re-export runtime helpers used by filter modules.
 from sonicrack.runtime.helpers import (  # noqa: F401
     ramp_if_changed,
     read_optional_port,
+    read_samples,
 )
 
 ButterworthFilterType = Literal["low", "high", "band"]
@@ -94,6 +97,79 @@ def create_filter_type_combo(
         combo.currentTextChanged.connect(on_changed)
     layout.addWidget(combo)
     return layout, combo
+
+
+def labeled_knob_column(
+    module: ModuleWidget,
+    title: str,
+    knob: Any,
+    param_name: str,
+    format_value: Callable[[float], str],
+) -> tuple[QVBoxLayout, QLabel]:
+    """Title + knob + live value label, bound to a patch parameter."""
+    column = QVBoxLayout()
+    title_label = QLabel(title)
+    title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    value_label = QLabel(format_value(knob.get_value()))
+    value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    module.bind_parameter_knob(
+        knob,
+        param_name,
+        value_label=value_label,
+        format_value=format_value,
+        register=True,
+    )
+    column.addWidget(title_label)
+    column.addWidget(knob)
+    column.addWidget(value_label)
+    return column, value_label
+
+
+def apply_octave_cutoff_cv(
+    cutoff: float,
+    cutoff_values: np.ndarray | None,
+    cv_port: Any,
+    cv_depth: float,
+    num_samples: int,
+    *,
+    min_hz: float = 20.0,
+    max_hz: float | None = None,
+) -> np.ndarray | None:
+    """Apply 1V/oct-style cutoff CV: ``cutoff * 2 ** (cv * depth)``."""
+    if cv_port is None or not getattr(cv_port, "is_connected", False):
+        return cutoff_values
+    cv_signal = read_samples(cv_port, num_samples)
+    base_cutoff = (
+        cutoff_values
+        if cutoff_values is not None
+        else np.full(num_samples, cutoff, dtype=np.float32)
+    )
+    nyquist_limit = audio_config.sample_rate * 0.45 if max_hz is None else max_hz
+    return np.clip(
+        base_cutoff * np.power(2.0, cv_signal * cv_depth),
+        min_hz,
+        nyquist_limit,
+    )
+
+
+def write_modulated_filter_output(
+    out_port: Any,
+    component: Any,
+    input_signal: np.ndarray,
+    cutoff_values: np.ndarray | None,
+    resonance_values: np.ndarray | None,
+) -> None:
+    """Process with per-sample ramps only when cutoff or resonance is moving."""
+    if cutoff_values is None and resonance_values is None:
+        out_port.write(component.process(input_signal))
+        return
+    out_port.write(
+        component.process_modulated(
+            input_signal,
+            cutoff_values=cutoff_values,
+            resonance_values=resonance_values,
+        )
+    )
 
 
 class FilterModuleBase(ModuleWidget):

@@ -43,9 +43,7 @@ class RingModModule(ModuleWidget):
             max_value=2.0,
             default_value=1.0,
         )
-        self.amount_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("amount", self.amount_knob.get_value())
-        )
+        self.bind_parameter_knob(self.amount_knob, "amount", register=True)
         row.addWidget(self.amount_knob)
 
         self.mix_knob = Knob(
@@ -55,15 +53,10 @@ class RingModModule(ModuleWidget):
             max_value=1.0,
             default_value=1.0,
         )
-        self.mix_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("mix", self.mix_knob.get_value())
-        )
+        self.bind_parameter_knob(self.mix_knob, "mix", register=True)
         row.addWidget(self.mix_knob)
         layout.addLayout(row)
         self._finish_controls(layout)
-
-        self.register_parameter("amount", self.amount_knob)
-        self.register_parameter("mix", self.mix_knob)
 
     def get_required_inputs(self) -> list[str]:
         return ["In"]

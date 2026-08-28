@@ -38,12 +38,9 @@ class StereoWidthModule(ModuleWidget):
             max_value=2.0,
             default_value=1.0,
         )
-        self.width_knob.value_changed.connect(
-            lambda: self.parameter_changed.emit("width", self.width_knob.get_value())
-        )
+        self.bind_parameter_knob(self.width_knob, "width", register=True)
         layout.addWidget(self.width_knob)
         self._finish_controls(layout)
-        self.register_parameter("width", self.width_knob)
 
     def get_required_inputs(self) -> list[str]:
         return ["In"]

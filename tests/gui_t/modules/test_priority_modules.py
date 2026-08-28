@@ -23,15 +23,8 @@ from sonicrack.gui.modules.sequencing.step_sequencer import StepSequencerModule
 from sonicrack.gui.modules.source.lfo import LFOModule
 from sonicrack.gui.modules.source.wavetable import WavetableModule
 from sonicrack.gui.modules.voice.poly_voice import PolyVoiceModule
-from sonicrack.patching.port import Port
 from sonicrack.patching.registry import discover_modules, get_registry
-
-
-def _connect_signal(input_port: Port, values: np.ndarray) -> Port:
-    output_port = Port("output", "Test Out")
-    output_port.write(values)
-    output_port.connect(input_port)
-    return output_port
+from tests.gui_t.helpers import connect_signal as _connect_signal
 
 
 def test_priority_modules_are_discoverable(qapp: Any) -> None:

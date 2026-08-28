@@ -10,7 +10,11 @@ import pytest
 from sonicrack.runtime.helpers import (
     EMPTY_PARAMETERS,
     apply_cv_influence,
+    as_mono,
     as_samples,
+    as_stereo,
+    bool_parameter,
+    constant_power_pan,
     ensure_min_pulse_width,
     float_parameter,
     gate_transition_indices,
@@ -225,3 +229,33 @@ class TestGateAndParameters:
         writable = silence(4, writable=True)
         writable[0] = 1.0
         assert writable[0] == 1.0
+
+
+class TestChannelAndPanHelpers:
+    def test_as_mono_averages_stereo(self):
+        stereo = np.column_stack(
+            (np.ones(4, dtype=np.float32), np.full(4, 0.5, dtype=np.float32))
+        )
+        np.testing.assert_allclose(as_mono(stereo), 0.75)
+
+    def test_as_stereo_duplicates_mono(self):
+        mono = np.linspace(0, 1, 5, dtype=np.float32)
+        stereo = as_stereo(mono)
+        assert stereo.shape == (5, 2)
+        np.testing.assert_allclose(stereo[:, 0], mono)
+        np.testing.assert_allclose(stereo[:, 1], mono)
+
+    def test_bool_parameter_coerces_strings(self):
+        assert bool_parameter({"mute": "on"}, "mute", lambda: False) is True
+        assert bool_parameter({"mute": "0"}, "mute", lambda: True) is False
+        assert bool_parameter({}, "mute", lambda: True) is True
+
+    def test_constant_power_pan_extremes(self):
+        left_l, left_r = constant_power_pan(-1.0)
+        right_l, right_r = constant_power_pan(1.0)
+        center_l, center_r = constant_power_pan(0.0)
+        assert left_l == pytest.approx(1.0, abs=1e-5)
+        assert left_r == pytest.approx(0.0, abs=1e-5)
+        assert right_l == pytest.approx(0.0, abs=1e-5)
+        assert right_r == pytest.approx(1.0, abs=1e-5)
+        assert center_l == pytest.approx(center_r, abs=1e-5)

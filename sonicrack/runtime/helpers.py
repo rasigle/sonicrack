@@ -190,6 +190,50 @@ def str_parameter(
     return str(parameter(parameters, name, fallback_getter))
 
 
+def bool_parameter(
+    parameters: RuntimeParameters,
+    name: str,
+    fallback_getter: Callable[[], object],
+) -> bool:
+    """Coerce a registered parameter to bool (checkboxes, mute, loop)."""
+    value = parameter(parameters, name, fallback_getter)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "on", "yes"}
+    return bool(value)
+
+
+def as_mono(samples: np.ndarray) -> np.ndarray:
+    """Return a 1-D float32 buffer; stereo/multi-channel is averaged."""
+    arr = np.asarray(samples, dtype=np.float32)
+    if arr.ndim == 0:
+        return arr.reshape(1)
+    if arr.ndim == 1:
+        return arr
+    return np.mean(arr, axis=-1).astype(np.float32, copy=False)
+
+
+def as_stereo(samples: np.ndarray) -> np.ndarray:
+    """Return an ``(n, 2)`` float32 buffer; mono is duplicated L/R."""
+    arr = np.asarray(samples, dtype=np.float32)
+    if arr.ndim == 0:
+        value = float(arr)
+        return np.array([[value, value]], dtype=np.float32)
+    if arr.ndim == 1:
+        return np.column_stack((arr, arr))
+    if arr.shape[-1] >= 2:
+        if arr.ndim == 2:
+            return arr[:, :2].astype(np.float32, copy=False)
+        return np.column_stack((arr[..., 0], arr[..., 1]))
+    mono = arr.reshape(arr.shape[0], -1)[:, 0]
+    return np.column_stack((mono, mono))
+
+
+def constant_power_pan(pan: float) -> tuple[float, float]:
+    """Map bipolar pan ``[-1, 1]`` to constant-power left/right gains."""
+    angle = (float(np.clip(pan, -1.0, 1.0)) + 1.0) * (np.pi * 0.25)
+    return float(np.cos(angle)), float(np.sin(angle))
+
+
 def write_output(
     output_port: Port, value: float | np.ndarray, num_samples: int
 ) -> None:
@@ -206,7 +250,11 @@ __all__ = [
     "EMPTY_PARAMETERS",
     "RuntimeParameters",
     "apply_cv_influence",
+    "as_mono",
     "as_samples",
+    "as_stereo",
+    "bool_parameter",
+    "constant_power_pan",
     "ensure_min_pulse_width",
     "float_parameter",
     "gate_transition_indices",

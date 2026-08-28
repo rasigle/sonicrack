@@ -28,6 +28,7 @@ All notable changes to SonicRack will be documented in this file.
   `demo_lofi_crush.apr`, `RandomMelody.apr`. The ring-mod alien demo now
   includes a spectrum tap and a saved layout from a playing session.
 - **Output** left/right peak meters next to the master gain.
+- **Compressor gain-reduction meter** (GR) next to makeup/mix.
 
 ### Changed
 
@@ -47,7 +48,7 @@ All notable changes to SonicRack will be documented in this file.
   ticks.
 - **Module drag trails**: bounding rect includes the outline pen (and
   antialias fringe) so `BoundingRectViewportUpdate` clears the old border
-  while moving modules.
+  while moving modules. Port jacks use a matching overflow pad.
 
 ## [2026.2.0] - 2026-07-31
 

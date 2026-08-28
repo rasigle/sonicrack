@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "name": "Demo: Subtractive Pad",
+    "author": "SonicRack",
+    "description": "Clocked subtractive voice with slow filter LFO, chorus, and a long reverb tail.",
+    "tags": ["demo", "pad", "subtractive", "svf", "ambient"],
+    "category": "Demo",
+    "created": "2026-08-28T12:00:00",
+    "version": "1.0"
+  },
+  "modules": [
+    {
+      "id": 0,
+      "type": "Clock",
+      "custom_name": "Pulse",
+      "module_category": "Sequencer",
+      "position": { "x": -740.0, "y": -40.0 },
+      "parameters": {
+        "active": true,
+        "bpm": 72.0,
+        "division": "1/4"
+      }
+    },
+    {
+      "id": 1,
+      "type": "Subtractive Voice",
+      "custom_name": "Pad",
+      "module_category": "Modulated Source",
+      "position": { "x": -420.0, "y": -80.0 },
+      "parameters": {
+        "active": true,
+        "waveform": "Saw",
+        "filter_mode": "Low",
+        "cutoff": 900.0,
+        "resonance": 1.8,
+        "env_amount": 2.4,
+        "attack": 0.35,
+        "decay": 0.8,
+        "sustain": 0.65,
+        "release": 1.4,
+        "lfo_rate": 0.22,
+        "lfo_filter": 0.6,
+        "volume": 0.7
+      }
+    },
+    {
+      "id": 2,
+      "type": "Chorus",
+      "custom_name": "",
+      "module_category": "Effect",
+      "position": { "x": -40.0, "y": -20.0 },
+      "parameters": {
+        "active": true,
+        "rate": 0.22,
+        "depth": 4.0,
+        "delay": 16.0,
+        "mix": 0.45
+      }
+    },
+    {
+      "id": 3,
+      "type": "Reverb",
+      "custom_name": "",
+      "module_category": "Effect",
+      "position": { "x": 240.0, "y": -10.0 },
+      "parameters": {
+        "active": true,
+        "room_size": 0.85,
+        "damping": 0.4,
+        "mix": 0.42
+      }
+    },
+    {
+      "id": 4,
+      "type": "Output",
+      "custom_name": "",
+      "module_category": "Output",
+      "position": { "x": 520.0, "y": 10.0 },
+      "parameters": { "active": true }
+    }
+  ],
+  "connections": [
+    {
+      "source_module": 0,
+      "source_port": "Clock",
+      "target_module": 1,
+      "target_port": "Gate"
+    },
+    {
+      "source_module": 1,
+      "source_port": "Out",
+      "target_module": 2,
+      "target_port": "In"
+    },
+    {
+      "source_module": 2,
+      "source_port": "Out",
+      "target_module": 3,
+      "target_port": "In"
+    },
+    {
+      "source_module": 3,
+      "source_port": "Out",
+      "target_module": 4,
+      "target_port": "Left/Mono"
+    }
+  ]
+}

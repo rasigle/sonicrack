@@ -18,7 +18,9 @@ from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
 from sonicrack.runtime.helpers import (
     as_mono,
+    ensure_min_pulse_width,
     float_parameter,
+    min_trigger_samples,
     read_samples,
     silence,
     str_parameter,
@@ -63,6 +65,8 @@ class SubtractiveVoiceModule(ModuleWidget):
         self.gate_input = self.add_input("Gate", signal=PortSignal.GATE)
         self.out_port = self.add_output("Out", signal=PortSignal.AUDIO)
         self.component = SubtractiveVoice(sample_rate=audio_config.sample_rate)
+        self._gate_hold = 0
+        self._previous_raw_gate = 0.0
 
         layout = self._begin_controls(spacing=4)
 
@@ -309,7 +313,20 @@ class SubtractiveVoiceModule(ModuleWidget):
         else:
             freq = np.full(num_samples, 220.0, dtype=np.float32)
         if self.gate_input.is_connected:
-            gate = as_mono(read_samples(self.gate_input, num_samples))
+            raw_gate = as_mono(read_samples(self.gate_input, num_samples))
+            # Clock/trig pulses are ~2 ms; stretch so attack can actually open.
+            attack_s = max(0.02, float(voice.attack) * 0.5)
+            width = min_trigger_samples(
+                audio_config.sample_rate, min(0.12, max(0.02, attack_s))
+            )
+            gate, self._gate_hold = ensure_min_pulse_width(
+                raw_gate,
+                self._previous_raw_gate,
+                width,
+                self._gate_hold,
+            )
+            if num_samples > 0:
+                self._previous_raw_gate = float(raw_gate[-1])
         else:
             gate = np.ones(num_samples, dtype=np.float32)
         self.out_port.write(voice.process(frequency=freq, gate=gate))

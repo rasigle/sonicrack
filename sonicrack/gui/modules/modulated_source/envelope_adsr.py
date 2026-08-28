@@ -15,6 +15,7 @@ from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.port import PortSignal
 from sonicrack.patching.registry import register_module
 from sonicrack.runtime.helpers import (
+    DEFAULT_MIN_TRIGGER_SECONDS,
     ensure_min_pulse_width,
     float_parameter,
     gate_transition_indices,
@@ -512,10 +513,14 @@ class ADSRModule(ModuleWidget):
             # Accept Gate or Trigger sources. Short triggers (Clock, MIDI Trig)
             # are stretched to a minimum high time so attack can develop.
             raw_gate = read_samples(self.gate_input, num_samples)
+            attack_s = float(adsr.attack_duration)
+            width_s = min(
+                0.08, max(DEFAULT_MIN_TRIGGER_SECONDS, attack_s * 0.5 + 0.008)
+            )
             gate_signal, self._gate_hold = ensure_min_pulse_width(
                 raw_gate,
                 self._previous_raw_gate,
-                min_trigger_samples(audio_config.sample_rate),
+                min_trigger_samples(audio_config.sample_rate, width_s),
                 self._gate_hold,
             )
             if num_samples > 0:

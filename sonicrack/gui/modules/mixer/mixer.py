@@ -182,6 +182,8 @@ class MixerModule(ModuleWidget):
     def process_runtime(self, num_samples: int, parameters: RuntimeParameters) -> None:
         mixed_left = None
         mixed_right = None
+        mixed_mono = None
+        any_panned = False
         input_ports = [self.in1_port, self.in2_port, self.in3_port, self.in4_port]
 
         for channel_idx, port in enumerate(input_ports):
@@ -215,13 +217,19 @@ class MixerModule(ModuleWidget):
             peak = float(np.max(np.abs(gained))) if gained.size else 0.0
             self._peaks[channel_idx] = max(self._peaks[channel_idx], min(1.0, peak))
 
+            mixed_mono = gained if mixed_mono is None else mixed_mono + gained
+            if abs(pan) > 1e-3:
+                any_panned = True
             left_gain, right_gain = constant_power_pan(pan)
             left = gained * np.float32(left_gain)
             right = gained * np.float32(right_gain)
             mixed_left = left if mixed_left is None else mixed_left + left
             mixed_right = right if mixed_right is None else mixed_right + right
 
-        if mixed_left is None or mixed_right is None:
+        if mixed_mono is None:
             self.out_port.write(silence(num_samples))
             return
-        self.out_port.write(np.column_stack((mixed_left, mixed_right)))
+        if any_panned and mixed_left is not None and mixed_right is not None:
+            self.out_port.write(np.column_stack((mixed_left, mixed_right)))
+            return
+        self.out_port.write(mixed_mono)

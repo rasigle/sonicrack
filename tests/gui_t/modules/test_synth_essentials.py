@@ -209,6 +209,11 @@ def test_mixer_pan_mute_and_meters(qapp: Any) -> None:
     assert out.shape == (64, 2)
     assert float(np.mean(out[:, 0])) > float(np.mean(out[:, 1]))
 
+    mixer.process_runtime(64, {"gain1": 1.0, "pan1": 0.0, "mute1": False})
+    centered = np.asarray(mixer.out_port.value)
+    assert centered.ndim == 1
+    assert centered.shape == (64,)
+
     mixer.process_runtime(64, {"gain1": 1.0, "pan1": 0.0, "mute1": True})
     muted = np.asarray(mixer.out_port.value)
     assert np.allclose(muted, 0.0)

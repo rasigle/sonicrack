@@ -7,12 +7,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from PyQt6 import QtWidgets
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout
 from soniclab.audio_io import AudioOutput
 from soniclab.dsp.modifiers.amplitude import Volume
 
 from sonicrack.config.audio_config import audio_config
-from sonicrack.gui.widgets import Knob
+from sonicrack.gui.widgets import Knob, LevelMeter
 from sonicrack.gui.widgets.module_widget import ModuleWidget
 from sonicrack.patching.module import ModuleCategory, ModuleMetadata
 from sonicrack.patching.registry import register_module
@@ -45,8 +47,8 @@ class OutputModule(ModuleWidget):
     def __init__(self):
         """Initialize output module."""
         super().__init__(
-            width=220,
-            height=175,
+            width=230,
+            height=200,
             color=QColor(200, 80, 80),
         )
 
@@ -87,7 +89,30 @@ class OutputModule(ModuleWidget):
             default_value=0.0,
             callback=self._on_gain_changed,
         )
-        layout.addWidget(self.master_gain_knob)  # Add knob to layout
+
+        meter_col = QVBoxLayout()
+        meter_col.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        meter_labels = QHBoxLayout()
+        meter_labels.setSpacing(8)
+        left_lbl = QLabel("L")
+        left_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        right_lbl = QLabel("R")
+        right_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        meter_labels.addWidget(left_lbl)
+        meter_labels.addWidget(right_lbl)
+        meter_col.addLayout(meter_labels)
+        meters = QHBoxLayout()
+        meters.setSpacing(8)
+        self.left_meter = LevelMeter(width=12, height=52)
+        self.right_meter = LevelMeter(width=12, height=52)
+        meters.addWidget(self.left_meter)
+        meters.addWidget(self.right_meter)
+        meter_col.addLayout(meters)
+
+        row = QHBoxLayout()
+        row.addWidget(self.master_gain_knob)
+        row.addLayout(meter_col)
+        layout.addLayout(row)
 
         # Status label only; sample/buffer configured globally
         self.status_label = QtWidgets.QLabel("Stopped")
@@ -96,6 +121,14 @@ class OutputModule(ModuleWidget):
         )
         layout.addWidget(self.status_label)
         layout.addStretch()
+
+        self._peak_l = 0.0
+        self._peak_r = 0.0
+        self._meter_timer = QTimer(self)
+        self._meter_timer.setTimerType(Qt.TimerType.CoarseTimer)
+        self._meter_timer.setInterval(40)
+        self._meter_timer.timeout.connect(self._refresh_meters)
+        self._meter_timer.start()
 
         self._finish_controls(layout)
 
@@ -359,5 +392,29 @@ class OutputModule(ModuleWidget):
         # Apply smooth, click-free gain using Volume component
         # The Volume component handles gain smoothing internally to prevent clicks
         out = self.volume_component(out)
-
+        self._capture_peaks(out)
         return out
+
+    def _capture_peaks(self, stereo: np.ndarray) -> None:
+        """Store peak levels for the UI meter timer (audio-thread safe floats)."""
+        if stereo.size == 0:
+            return
+        block = np.asarray(stereo)
+        if block.ndim == 1:
+            peak = float(np.max(np.abs(block)))
+            self._peak_l = max(self._peak_l, peak)
+            self._peak_r = max(self._peak_r, peak)
+            return
+        self._peak_l = max(self._peak_l, float(np.max(np.abs(block[:, 0]))))
+        if block.shape[1] > 1:
+            self._peak_r = max(self._peak_r, float(np.max(np.abs(block[:, 1]))))
+        else:
+            self._peak_r = self._peak_l
+
+    def _refresh_meters(self) -> None:
+        self.left_meter.set_level(min(1.0, self._peak_l))
+        self.right_meter.set_level(min(1.0, self._peak_r))
+        self.left_meter.decay()
+        self.right_meter.decay()
+        self._peak_l *= 0.7
+        self._peak_r *= 0.7

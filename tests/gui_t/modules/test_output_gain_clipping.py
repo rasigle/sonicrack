@@ -63,6 +63,9 @@ class TestOutputClickFreeGain:
         # Volume component applies gain smoothly
         assert samples.shape == (8, 2)
         assert not np.allclose(samples, 0.5)  # Should be modified by gain
+        assert output_module._peak_l > 0.0
+        output_module._refresh_meters()
+        assert output_module.left_meter.width() > 0
 
     def test_volume_component_smoothing_prevents_clicks(self, output_module):
         """Test that Volume component smoothing is active for click prevention."""

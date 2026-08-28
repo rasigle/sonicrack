@@ -45,6 +45,9 @@ All notable changes to SonicRack will be documented in this file.
   are stretched so attack can open. Random Melody glides quantized pitch;
   the subtractive pad uses a slow unipolar square gate instead of 2 ms clock
   ticks.
+- **Module drag trails**: bounding rect includes the outline pen (and
+  antialias fringe) so `BoundingRectViewportUpdate` clears the old border
+  while moving modules.
 
 ## [2026.2.0] - 2026-07-31
 

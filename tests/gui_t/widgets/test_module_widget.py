@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, QRectF
 from soniclab.core.component import AudioComponent
 
 from sonicrack.gui.widgets.module_widget import ModuleWidget
@@ -397,6 +397,20 @@ def test_runtime_spec_declares_processor_and_ports(qapp: Any):
     assert spec.input_names == ("In",)
     assert spec.output_names == ("Out",)
     assert spec.parameter_names == ("gain_db",)
+
+
+def test_module_bounding_rect_covers_border_pen(qapp: Any) -> None:
+    """Scene updates use boundingRect; it must include the outline stroke."""
+    del qapp
+    module = _ModifierWidget()
+    body = QRectF(0, 0, module.module_width, module.module_height)
+    bounds = module.boundingRect()
+    assert bounds.contains(body)
+    overflow = (bounds.width() - body.width()) / 2.0
+    assert overflow >= ModuleWidget.SELECTION_BORDER_WIDTH / 2.0
+    shape = module.shape()
+    assert shape.contains(QPointF(body.center()))
+    assert not shape.contains(QPointF(bounds.left(), body.center().y()))
 
 
 def test_render_plan_resolves_runtime_parameters_at_render_time(qapp: Any):

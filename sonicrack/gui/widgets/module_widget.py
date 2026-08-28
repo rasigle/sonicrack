@@ -637,9 +637,30 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
     # === Port Management ===
 
-    def boundingRect(self) -> QRectF:
-        """Return the bounding rectangle of the module."""
+    @classmethod
+    def _paint_margin(cls) -> float:
+        """Pixels of outline that sit outside the panel body.
+
+        Borders are drawn with a centered pen, so half the stroke plus an
+        antialias fringe lie outside ``(0, 0, width, height)``. The scene
+        only redraws ``boundingRect`` while dragging; if that rect is too
+        small, the old outline is left behind.
+        """
+        return cls.SELECTION_BORDER_WIDTH * 0.5 + 2.0
+
+    def _body_rect(self) -> QRectF:
+        """Panel rectangle in item coordinates (excludes paint overflow)."""
         return QRectF(0, 0, self.module_width, self.module_height)
+
+    def boundingRect(self) -> QRectF:
+        """Return the painted area, including border overflow."""
+        pad = self._paint_margin()
+        return QRectF(
+            -pad,
+            -pad,
+            self.module_width + 2.0 * pad,
+            self.module_height + 2.0 * pad,
+        )
 
     def _title_bar_height(self) -> int:
         """Return the current title bar height."""
@@ -674,7 +695,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         from PyQt6.QtGui import QPainterPath
 
         path = QPainterPath()
-        path.addRect(self.boundingRect())
+        path.addRect(self._body_rect())
         return path
 
     def paint(self, painter: QPainter | None, option, widget=None):
@@ -682,12 +703,12 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         if painter is None:
             return
 
-        rect = self.boundingRect()
+        body = self._body_rect()
 
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Rack panel background with subtle vertical shading.
-        gradient = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+        gradient = QLinearGradient(body.topLeft(), body.bottomLeft())
         gradient.setColorAt(0, self.COLOR_PANEL_TOP)
         gradient.setColorAt(1, self.COLOR_PANEL_BOTTOM)
 
@@ -701,16 +722,16 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         else:
             painter.setPen(QPen(self.COLOR_NORMAL_BORDER, self.NORMAL_BORDER_WIDTH))
 
-        painter.drawRoundedRect(rect, self.BORDER_RADIUS, self.BORDER_RADIUS)
+        painter.drawRoundedRect(body, self.BORDER_RADIUS, self.BORDER_RADIUS)
 
         # Faint top sheen so panels read as metal, not flat boxes.
-        sheen = QLinearGradient(rect.topLeft(), QPointF(rect.left(), rect.top() + 18))
+        sheen = QLinearGradient(body.topLeft(), QPointF(body.left(), body.top() + 18))
         sheen.setColorAt(0.0, QColor(255, 255, 255, 18))
         sheen.setColorAt(1.0, QColor(255, 255, 255, 0))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(sheen))
         painter.drawRoundedRect(
-            rect.adjusted(2, 2, -2, -2),
+            body.adjusted(2, 2, -2, -2),
             self.BORDER_RADIUS,
             self.BORDER_RADIUS,
         )
@@ -790,7 +811,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
 
         if not self.is_active:
             painter.fillRect(
-                rect.adjusted(6, title_bar_height, 0, 0),
+                body.adjusted(6, title_bar_height, 0, 0),
                 self.COLOR_INACTIVE_OVERLAY,
             )
 

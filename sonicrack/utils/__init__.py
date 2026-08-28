@@ -25,17 +25,10 @@ from sonicrack.utils.audio_utils import (
 from sonicrack.utils.logging_config import DEFAULT_LOG_LEVEL
 
 __all__ = [
-    # Audio utilities - primary API
     "to_int16",
     "save_wave",
     "load_wave",
     "play_wave",
     "note_to_frequency",
-    # Audio utilities
-    "to_int16",
-    "save_wave",
-    "load_wave",
-    "note_to_frequency",
-    # Logging
     "DEFAULT_LOG_LEVEL",
 ]

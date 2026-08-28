@@ -129,14 +129,13 @@ sonicrack/
 |   `-- registry.py           # module discovery and registration
 |-- runtime/
 |   |-- engine.py             # graph renderer and render-plan cache
+|   |-- export.py             # offline WAV bounce
 |   |-- specs.py              # RuntimeModuleSpec and dispatch contracts
 |   `-- helpers.py            # shared runtime block-processing helpers
 |-- gui/
 |   |-- main_window.py        # main Qt window and patch workflow
-|   |-- ui_constants.py       # Qt/UI constants
 |   |-- dialogs/              # Qt dialogs
 |   |-- modules/              # built-in patch modules
-|   |-- utils/                # GUI-specific utilities
 |   `-- widgets/              # reusable Qt widgets
 |-- resources/                # packaged runtime assets
 `-- utils/                    # logging, diagnostics, and audio file helpers

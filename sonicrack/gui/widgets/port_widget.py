@@ -1,7 +1,7 @@
 """Qt graphics widget for port visualization.
 
 This module provides the UI layer for ports, handling rendering and interaction.
-The actual port logic is in sonicrack.gui.port_model.PortModel.
+The actual port logic is in ``sonicrack.patching.port.Port``.
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ class PortWidget(QGraphicsItem):
     - Mouse interaction
     - Cable visualization
 
-    The actual port logic (value, connections, read/write) is in PortModel.
-    Uses composition: contains a PortModel instance.
+    The actual port logic (value, connections, read/write) is in ``Port``.
+    Uses composition: contains a ``Port`` instance.
     """
 
     def __init__(

@@ -6,7 +6,7 @@ synthesis engine, featuring:
 - Real-time audio playback
 - Visual feedback (waveforms, spectrum analysis)
 - Preset management
-- MIDI support (future)
+- MIDI input, keyboard, and poly CV modules
 """
 
 __all__ = ["ModularSynthWindow"]

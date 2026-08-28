@@ -168,7 +168,9 @@ class PortWidget(QGraphicsItem):
         Returns:
             Bounding rectangle for painting
         """
-        r = self.radius + 2
+        # Pen is 2px centered on the jack circle; include AA so drag/hover
+        # updates clear the outline instead of leaving a ring.
+        r = self.radius + 3
         width = max(r * 2, self.label_width)
         return QRectF(-width / 2, -r, width, r * 2 + 13)
 

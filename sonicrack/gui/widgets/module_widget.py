@@ -177,9 +177,9 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.setAcceptHoverEvents(True)
-        # QGraphicsWidget::boundingRect() in C++ is rect()/size(). Keep that
-        # geometry equal to the panel so scene updates cover the body, and
-        # pad the window frame for the outline that sits outside it.
+        # QGraphicsWidget::boundingRect() is windowFrameRect() (panel plus
+        # window-frame margins). Keep the panel size as geometry and pad the
+        # frame for the outline and hanging jacks.
         self._sync_widget_geometry()
 
     # === UI Construction Helpers ===
@@ -711,16 +711,32 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             self.module_height + top + bottom,
         )
 
-    def _invalidate_painted_region(self) -> None:
-        """Dirty the old/new outline, ports, and antialias fringe."""
-        scene = self.scene()
-        if scene is None:
-            return
+    def _painted_scene_rect(self) -> QRectF:
+        """Scene rect covering the panel, ports, and antialias fringe."""
         extra = 8.0
         rect = self.mapRectToScene(self.boundingRect())
         for port in self.input_ports + self.output_ports:
             rect = rect.united(port.sceneBoundingRect())
-        scene.update(rect.adjusted(-extra, -extra, extra, extra))
+        return rect.adjusted(-extra, -extra, extra, extra)
+
+    def _invalidate_painted_region(self) -> None:
+        """Dirty old/new outline pixels in every view.
+
+        ``QGraphicsScene.update()`` does not reach the view (since Qt 4.5 the
+        scene/view ``changed`` signal is not auto-connected). Mark the
+        viewport widget dirty so antialiased outline pixels are cleared even
+        when item bounding-rect updates miss a fringe.
+        """
+        scene = self.scene()
+        if scene is None:
+            return
+        dirty = self._painted_scene_rect()
+        for view in scene.views():
+            viewport = view.viewport()
+            if viewport is None:
+                continue
+            mapped = view.mapFromScene(dirty).boundingRect()
+            viewport.update(mapped.adjusted(-2, -2, 2, 2))
 
     def _title_bar_height(self) -> int:
         """Return the current title bar height."""
@@ -762,12 +778,8 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         """Fill the rounded panel with aluminum, or a procedural metal gradient."""
         plate = load_skin_pixmap(*PANEL_ALUMINUM)
         if plate is not None:
-            cover = max(int(body.width()), int(body.height()), 1)
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-            painter.drawPixmap(
-                QRectF(body.left(), body.top(), cover, cover).toRect(),
-                plate,
-            )
+            painter.drawPixmap(body.toRect(), plate)
             wash = QColor(self.module_color)
             wash.setAlpha(32 if self.is_active else 14)
             painter.fillPath(panel_path, wash)
@@ -815,6 +827,7 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
             return
 
         body = self._body_rect()
+        radius = float(self.BORDER_RADIUS)
 
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         # Intersect the view clip so rounded-rect AA cannot stamp pixels
@@ -822,22 +835,13 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
         painter.setClipRect(self.boundingRect(), Qt.ClipOperation.IntersectClip)
 
         panel_path = QPainterPath()
-        panel_path.addRoundedRect(body, self.BORDER_RADIUS, self.BORDER_RADIUS)
+        panel_path.addRoundedRect(body, radius, radius)
 
+        # Clip fills to the rounded panel so square title/accent rects cannot
+        # paint into the corner cutouts (those crumbs trail while dragging).
         painter.save()
         painter.setClipPath(panel_path, Qt.ClipOperation.IntersectClip)
         self._paint_faceplate(painter, body, panel_path)
-        painter.restore()
-
-        # Border
-        if self.isSelected():
-            painter.setPen(
-                QPen(self.COLOR_SELECTION_BORDER, self.SELECTION_BORDER_WIDTH)
-            )
-        else:
-            painter.setPen(QPen(self.COLOR_NORMAL_BORDER, self.NORMAL_BORDER_WIDTH))
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(body, self.BORDER_RADIUS, self.BORDER_RADIUS)
 
         # Left accent rail gives each module family a rack identity.
         accent_rect = QRectF(0, 0, 6, self.module_height)
@@ -919,6 +923,22 @@ class ModuleWidget(QGraphicsWidget, AudioModule, metaclass=ModuleWidgetMeta):
                 body.adjusted(6, title_bar_height, 0, 0),
                 self.COLOR_INACTIVE_OVERLAY,
             )
+        painter.restore()
+
+        # Border last so fills cannot overwrite it. Inset by half the pen so
+        # the centered stroke stays inside the panel (C++ geometry).
+        if self.isSelected():
+            pen_width = float(self.SELECTION_BORDER_WIDTH)
+            pen = QPen(self.COLOR_SELECTION_BORDER, pen_width)
+        else:
+            pen_width = float(self.NORMAL_BORDER_WIDTH)
+            pen = QPen(self.COLOR_NORMAL_BORDER, pen_width)
+        half = pen_width / 2.0
+        stroke = body.adjusted(half, half, -half, -half)
+        corner = max(0.01, radius - half)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(stroke, corner, corner)
 
     def _update_port_positions(self):
         """Update the positions of all ports."""

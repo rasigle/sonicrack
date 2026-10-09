@@ -11,6 +11,14 @@ All notable changes to SonicRack will be documented in this file.
   pointer and value arc; round 3.5mm-style jacks are painted (signal-colored
   collar). Procedural painting remains the fallback if assets are missing.
 
+### Fixed
+
+- **Module drag trails**: moving a module no longer leaves outline crumbs.
+  Faceplate fills clip to the rounded panel, the border stroke sits inside
+  the panel, the canvas uses region updates, and old/new viewport pixels are
+  invalidated directly on move (``QGraphicsScene.update()`` does not reach
+  the view).
+
 ## [2026.3.0] - 2026-08-28
 
 ### Added

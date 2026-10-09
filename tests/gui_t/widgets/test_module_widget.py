@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from PyQt6.QtCore import QPointF, QRectF
+from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QRectF
+from PyQt6.QtGui import QImage, QPainter, QPaintEvent
+from PyQt6.QtWidgets import QGraphicsView
 from soniclab.core.component import AudioComponent
 
 from sonicrack.gui.widgets.module_widget import ModuleWidget
@@ -399,6 +401,33 @@ def test_runtime_spec_declares_processor_and_ports(qapp: Any):
     assert spec.parameter_names == ("gain_db",)
 
 
+def test_rounded_panel_does_not_paint_square_corners(qapp: Any) -> None:
+    """Title/accent fills must stay inside the rounded outline.
+
+    Square ``fillRect`` calls used to stamp the top-left cutout; those
+    pixels sat on the panel edge and trailed while dragging.
+    """
+    del qapp
+    module = _ModifierWidget()
+    bounds = module.boundingRect()
+    image = QImage(
+        int(bounds.width()) + 8,
+        int(bounds.height()) + 8,
+        QImage.Format.Format_ARGB32,
+    )
+    image.fill(0)
+    painter = QPainter(image)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.translate(-bounds.left() + 4, -bounds.top() + 4)
+    module.paint(painter, None, None)
+    painter.end()
+
+    origin_x = int(4 - bounds.left())
+    origin_y = int(4 - bounds.top())
+    corner = image.pixelColor(origin_x, origin_y)
+    assert corner.alpha() == 0, corner.getRgb()
+
+
 def test_module_bounding_rect_covers_border_pen(qapp: Any) -> None:
     """Scene updates use boundingRect; it must include the outline stroke."""
     del qapp
@@ -427,7 +456,7 @@ def test_module_widget_geometry_matches_panel(qapp: Any) -> None:
     """QGraphicsWidget size must stay the panel size after it is shown.
 
     First-show ``adjustSize`` would otherwise shrink the widget to the
-    default 50x50 hint, and C++ ``boundingRect()`` (rect/size) would
+    default 50x50 hint, and C++ ``boundingRect()`` (windowFrameRect) would
     then fail to clear the outline while dragging.
     """
     del qapp
@@ -438,11 +467,73 @@ def test_module_widget_geometry_matches_panel(qapp: Any) -> None:
     assert module.size().height() == module.module_height
     frame = module.windowFrameRect()
     assert frame.contains(module.boundingRect())
+    assert frame == module.boundingRect()
 
     scene = QGraphicsScene()
     scene.addItem(module)
     assert module.size().width() == module.module_width
     assert module.size().height() == module.module_height
+
+
+class _PaintRectSpy(QObject):
+    """Record viewport paint-event rects during a module move."""
+
+    def __init__(self, target: Any) -> None:
+        super().__init__(target)
+        self.rects: list[QRect] = []
+        target.installEventFilter(self)
+
+    def eventFilter(self, watched: Any, event: QEvent) -> bool:  # noqa: N802
+        del watched
+        if isinstance(event, QPaintEvent):
+            self.rects.append(QRect(event.rect()))
+        return False
+
+    def united(self) -> QRect:
+        painted = QRect()
+        for rect in self.rects:
+            painted = painted.united(rect)
+        return painted
+
+
+def test_patch_canvas_uses_region_viewport_updates(qapp: Any) -> None:
+    """Bounding-rect viewport updates drop antialiased module outlines."""
+    del qapp
+    canvas = PatchCanvas()
+    assert (
+        canvas.viewportUpdateMode()
+        == QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate
+    )
+
+
+def test_moving_module_invalidates_old_outline(qapp: Any) -> None:
+    """Drag updates must cover the previous outline, not only the new panel."""
+    canvas = PatchCanvas()
+    canvas.resize(640, 480)
+    canvas.show()
+    qapp.processEvents()
+
+    module = _ModifierWidget()
+    canvas.scene().addItem(module)
+    start = QPointF(-100.0, -80.0)
+    module.setPos(start)
+    canvas.centerOn(module)
+    qapp.processEvents()
+
+    spy = _PaintRectSpy(canvas.viewport())
+    old_scene = module.mapRectToScene(module.boundingRect())
+    old_view = canvas.mapFromScene(old_scene).boundingRect()
+    assert canvas.viewport().rect().contains(old_view), (
+        canvas.viewport().rect(),
+        old_view,
+    )
+
+    module.setPos(start + QPointF(28.0, 20.0))
+    qapp.processEvents()
+
+    painted = spy.united()
+    assert not painted.isEmpty()
+    assert painted.contains(old_view), (painted, old_view)
 
 
 def test_render_plan_resolves_runtime_parameters_at_render_time(qapp: Any):

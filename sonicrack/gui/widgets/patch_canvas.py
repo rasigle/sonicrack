@@ -62,10 +62,11 @@ class PatchCanvas(QGraphicsView):
         self.setSceneRect(-2000, -2000, 4000, 4000)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-        # Prefer dirty-region updates; full-viewport mode was expensive during
-        # pan/zoom/cable drag with many modules and bezier cables.
+        # Region updates, not a single bounding box. BoundingRectViewportUpdate
+        # drops antialiased outline pixels when modules move. Full-viewport
+        # mode was expensive during pan/zoom/cable drag with many modules.
         self.setViewportUpdateMode(
-            QGraphicsView.ViewportUpdateMode.BoundingRectViewportUpdate
+            QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate
         )
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
